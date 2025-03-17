@@ -1,0 +1,218 @@
+.swap-form {
+  background-color: #f8f9fa;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.swap-form.loading {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(0, 112, 243, 0.3);
+  border-radius: 50%;
+  border-top-color: #0070f3;
+  animation: spin 1s ease-in-out infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.swap-form h2 {
+  margin-top: 0;
+  margin-bottom: 24px;
+  text-align: center;
+  color: #333;
+  font-weight: 600;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #555;
+}
+
+.max-button {
+  background: none;
+  border: none;
+  color: #0070f3;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.max-button:hover {
+  background-color: rgba(0, 112, 243, 0.1);
+}
+
+.input-with-token {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.input-with-token input {
+  flex: 1;
+  border: none;
+  padding: 14px;
+  font-size: 16px;
+  outline: none;
+}
+
+.token-select-wrapper {
+  min-width: 140px;
+  padding-right: 8px;
+}
+
+.switch-button {
+  display: block;
+  margin: -10px auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+  position: relative;
+  color: #666;
+  padding: 0;
+  font-weight: bold;
+  border: 1px solid #eee;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.switch-button:hover {
+  background-color: #f5f5f5;
+  transform: scale(1.05);
+}
+
+.slippage-control {
+  margin-top: 24px;
+}
+
+.slippage-options {
+  display: flex;
+  gap: 8px;
+}
+
+.slippage-options button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.slippage-options button.active {
+  background-color: #0070f3;
+  color: white;
+  border-color: #0070f3;
+}
+
+.rate-info {
+  font-size: 14px;
+  color: #666;
+  text-align: right;
+  margin: 8px 0 16px;
+  height: 20px;
+}
+
+.fee-estimate {
+  margin-bottom: 16px;
+  text-align: right;
+  font-size: 14px;
+  color: #666;
+}
+
+.error-message {
+  color: #e53935;
+  margin-bottom: 16px;
+  padding: 8px;
+  background-color: rgba(229, 57, 53, 0.1);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.swap-button {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  background-color: #0070f3;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.swap-button:hover:not(:disabled) {
+  background-color: #0060df;
+}
+
+.swap-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.connect-wallet-prompt {
+  margin-top: 16px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.token-error {
+  padding: 20px;
+  text-align: center;
+  color: #e53935;
+}
+
+/* For smaller screens */
+@media (max-width: 480px) {
+  .swap-form {
+    padding: 16px;
+    margin: 0 12px;
+  }
+
+  .input-with-token input {
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .token-select-wrapper {
+    min-width: 100px;
+  }
+}
