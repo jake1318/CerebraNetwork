@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { useWallet } from "@suiet/wallet-kit";
+import {
+  useWallet,
+  useAccountBalance,
+  useSuiProvider,
+} from "@suiet/wallet-kit";
 import {
   getQuote,
   buildTx,
@@ -7,12 +11,15 @@ import {
   getSuiPrice,
 } from "@7kprotocol/sdk-ts";
 import BigNumber from "bignumber.js";
-import TokenSelector from "./tokenSelector";
+import TokenSelector from "./TokenSelector";
 import { Token, fetchTokens } from "../services/tokenService";
 import "./SwapForm.css";
 
 export default function SwapForm() {
   const wallet = useWallet();
+  const provider = useSuiProvider();
+  const { balance: suiBalance } = useAccountBalance();
+
   const [tokenIn, setTokenIn] = useState<Token | null>(null);
   const [tokenOut, setTokenOut] = useState<Token | null>(null);
   const [amountIn, setAmountIn] = useState("");
@@ -223,26 +230,38 @@ export default function SwapForm() {
     }
   };
 
+  // Get max amount using Suiet wallet kit
   const getMaxAmount = async () => {
     if (!tokenIn || !wallet.account?.address) return;
 
     try {
-      // If the token has a balance property and it's greater than 0, use it
-      if (tokenIn.balance && parseFloat(tokenIn.balance) > 0) {
-        setAmountIn(tokenIn.balance);
-      } else {
-        // Otherwise, fetch the balance from the SDK
-        const { getTokenBalance } = await import("@7kprotocol/sdk-ts");
-        const balance = await getTokenBalance(
-          wallet.account.address,
-          tokenIn.address
-        );
+      // If it's SUI token, use the useAccountBalance hook result
+      if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
+        // Convert from MIST to SUI (divide by 10^9)
+        // Keep a small amount for gas fees (0.05 SUI)
+        const balanceInSui = parseInt(suiBalance) / 1e9;
+        const maxAmount = Math.max(0, balanceInSui - 0.05).toFixed(4);
+        setAmountIn(maxAmount);
+        return;
+      }
 
-        if (balance) {
-          const humanReadableBalance = new BigNumber(balance)
-            .div(10 ** tokenIn.decimals)
-            .toFixed(tokenIn.decimals);
-          setAmountIn(humanReadableBalance);
+      // For other tokens, use provider to get balance
+      if (tokenIn.balance) {
+        // If the balance is already in the token object, use it
+        setAmountIn(tokenIn.balance);
+      } else if (provider) {
+        // Otherwise fetch it from the provider
+        const result = await provider.getBalance({
+          owner: wallet.account.address,
+          coinType: tokenIn.address,
+        });
+
+        if (result?.totalBalance) {
+          const decimals = tokenIn.decimals;
+          const formattedBalance = (
+            parseInt(result.totalBalance) / Math.pow(10, decimals)
+          ).toFixed(4);
+          setAmountIn(formattedBalance);
         }
       }
     } catch (error) {

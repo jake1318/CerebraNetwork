@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Token,
-  fetchTokens,
-  getUserTokenBalances,
-} from "../services/tokenService";
-import { useWallet } from "@suiet/wallet-kit";
+  useWallet,
+  useSuiProvider,
+  useAccountBalance,
+} from "@suiet/wallet-kit";
+import { Token, fetchTokens } from "../services/tokenService";
+import { getCoinMetadata, getTokenPrice } from "../services/sdkService";
 import "./TokenSelector.css";
 
 interface TokenSelectorProps {
@@ -24,12 +25,21 @@ export default function TokenSelector({
   excludeToken,
 }: TokenSelectorProps) {
   const wallet = useWallet();
+  const provider = useSuiProvider();
+  const { balance: suiBalance, loading: suiBalanceLoading } =
+    useAccountBalance();
+
   const [tokens, setTokens] = useState<Token[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>(
+    {}
+  );
+  const [loadingBalances, setLoadingBalances] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Load tokens
@@ -40,25 +50,8 @@ export default function TokenSelector({
 
       try {
         const tokenList = await fetchTokens();
-
-        // If wallet is connected, load balances
-        if (wallet.connected && wallet.account?.address) {
-          try {
-            const tokensWithBalances = await getUserTokenBalances(
-              wallet.account.address,
-              tokenList
-            );
-            setTokens(tokensWithBalances);
-            setFilteredTokens(tokensWithBalances);
-          } catch (balanceError) {
-            console.error("Error loading balances:", balanceError);
-            setTokens(tokenList);
-            setFilteredTokens(tokenList);
-          }
-        } else {
-          setTokens(tokenList);
-          setFilteredTokens(tokenList);
-        }
+        setTokens(tokenList);
+        setFilteredTokens(tokenList);
       } catch (error: any) {
         console.error("Error loading tokens:", error);
         setError("Failed to load tokens. " + (error.message || ""));
@@ -70,31 +63,204 @@ export default function TokenSelector({
     };
 
     loadTokens();
-  }, [wallet.connected, wallet.account?.address]);
+  }, []);
 
-  // Filter and sort tokens when search term or exclude token changes
+  // Fetch balances when wallet is connected and tokens are loaded
   useEffect(() => {
-    let filtered = tokens;
+    if (
+      !wallet.connected ||
+      !wallet.account?.address ||
+      tokens.length === 0 ||
+      !provider
+    ) {
+      return;
+    }
+
+    const fetchBalances = async () => {
+      setLoadingBalances(true);
+      const balances: Record<string, string> = {};
+
+      try {
+        // First, add SUI balance from the hook
+        if (suiBalance && !suiBalanceLoading) {
+          const suiToken = tokens.find((t) => t.address === "0x2::sui::SUI");
+          if (suiToken) {
+            // Convert from MIST to SUI (divide by 10^9)
+            const suiBalanceFormatted = (parseInt(suiBalance) / 1e9).toFixed(4);
+            balances["0x2::sui::SUI"] = suiBalanceFormatted;
+          }
+        }
+
+        // Get balances for all tokens using getAllBalances
+        try {
+          const allBalances = await provider.getAllBalances({
+            owner: wallet.account.address,
+          });
+
+          // Process all coin balances returned from the wallet
+          for (const balance of allBalances) {
+            if (
+              balance.coinType === "0x2::sui::SUI" &&
+              balances["0x2::sui::SUI"]
+            )
+              continue; // Skip SUI if we already have it
+
+            try {
+              // Get coin metadata to determine decimals
+              const metadata = await provider.getCoinMetadata({
+                coinType: balance.coinType,
+              });
+              const decimals = metadata?.decimals || 9;
+
+              // Convert to human readable format
+              const formattedBalance = (
+                parseInt(balance.totalBalance) / Math.pow(10, decimals)
+              ).toFixed(4);
+              balances[balance.coinType] = formattedBalance;
+
+              // If this is a new token not in our list, add it
+              if (!tokens.some((t) => t.address === balance.coinType)) {
+                tokens.push({
+                  symbol:
+                    metadata?.symbol ||
+                    balance.coinType.split("::").pop() ||
+                    "Unknown",
+                  name: metadata?.name || "Unknown Token",
+                  address: balance.coinType,
+                  decimals: decimals,
+                  logo: `https://ui-avatars.com/api/?name=${
+                    metadata?.symbol || "Token"
+                  }&background=random`,
+                });
+              }
+            } catch (metadataError) {
+              console.warn(
+                `Could not get metadata for ${balance.coinType}:`,
+                metadataError
+              );
+              // Default to 9 decimals if metadata unavailable
+              const formattedBalance = (
+                parseInt(balance.totalBalance) / 1e9
+              ).toFixed(4);
+              balances[balance.coinType] = formattedBalance;
+            }
+          }
+        } catch (allBalancesError) {
+          console.warn(
+            "getAllBalances failed, falling back to individual fetches:",
+            allBalancesError
+          );
+
+          // Fallback: fetch balances individually for known tokens
+          for (const token of tokens) {
+            if (token.address === "0x2::sui::SUI" && balances["0x2::sui::SUI"])
+              continue; // Skip SUI if we already have it
+
+            try {
+              const result = await provider.getBalance({
+                owner: wallet.account.address,
+                coinType: token.address,
+              });
+
+              if (result?.totalBalance) {
+                const decimals = token.decimals;
+                const formattedBalance = (
+                  parseInt(result.totalBalance) / Math.pow(10, decimals)
+                ).toFixed(4);
+                balances[token.address] = formattedBalance;
+              }
+            } catch (balanceError) {
+              console.warn(
+                `Could not fetch balance for ${token.symbol}:`,
+                balanceError
+              );
+              // Skip this token if balance fetch fails
+            }
+          }
+        }
+
+        setTokenBalances(balances);
+
+        // Update tokens with balances and USD values
+        const tokensWithBalances = await Promise.all(
+          tokens.map(async (token) => {
+            const balance = balances[token.address];
+
+            if (balance) {
+              // Try to get price and calculate USD value
+              let balanceUsd = "";
+              let price = 0;
+
+              try {
+                price = await getTokenPrice(token.address);
+                if (price) {
+                  balanceUsd = (parseFloat(balance) * price).toFixed(2);
+                }
+              } catch (priceError) {
+                console.warn(
+                  `Could not get price for ${token.symbol}:`,
+                  priceError
+                );
+              }
+
+              return {
+                ...token,
+                balance,
+                balanceUsd,
+                price,
+              };
+            }
+
+            return token;
+          })
+        );
+
+        setTokens(tokensWithBalances);
+        setFilteredTokens(
+          applyFilters(tokensWithBalances, searchTerm, excludeToken)
+        );
+      } catch (error) {
+        console.error("Error fetching balances:", error);
+      } finally {
+        setLoadingBalances(false);
+      }
+    };
+
+    fetchBalances();
+  }, [
+    wallet.connected,
+    wallet.account?.address,
+    tokens.length,
+    provider,
+    suiBalance,
+    suiBalanceLoading,
+  ]);
+
+  // Helper function to apply filters and sorting
+  const applyFilters = (
+    tokenList: Token[],
+    search: string,
+    exclude?: Token
+  ) => {
+    let filtered = [...tokenList];
 
     // Filter by search term
-    if (searchTerm) {
+    if (search) {
       filtered = filtered.filter(
         (token) =>
-          token.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          token.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          token.address.toLowerCase().includes(searchTerm.toLowerCase())
+          token.symbol.toLowerCase().includes(search.toLowerCase()) ||
+          token.name?.toLowerCase().includes(search.toLowerCase()) ||
+          token.address.toLowerCase().includes(search.toLowerCase())
       );
     }
 
     // Exclude the specified token
-    if (excludeToken) {
-      filtered = filtered.filter(
-        (token) => token.address !== excludeToken.address
-      );
+    if (exclude) {
+      filtered = filtered.filter((token) => token.address !== exclude.address);
     }
 
     // Sort tokens: prioritize tokens with balances, then popular tokens, then alphabetically
-    filtered = [...filtered].sort((a, b) => {
+    filtered = filtered.sort((a, b) => {
       // First priority: Tokens with positive balance
       const aBalance = a.balance ? parseFloat(a.balance) : 0;
       const bBalance = b.balance ? parseFloat(b.balance) : 0;
@@ -120,8 +286,13 @@ export default function TokenSelector({
       return a.symbol.localeCompare(b.symbol);
     });
 
-    setFilteredTokens(filtered);
-  }, [searchTerm, tokens, excludeToken]);
+    return filtered;
+  };
+
+  // Filter tokens when search term or exclude token changes
+  useEffect(() => {
+    setFilteredTokens(applyFilters(tokens, searchTerm, excludeToken));
+  }, [searchTerm, excludeToken]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -198,6 +369,10 @@ export default function TokenSelector({
               <div className="token-error">{error}</div>
             ) : (
               <div className="token-list">
+                {wallet.connected && loadingBalances && (
+                  <div className="token-loading">Fetching balances...</div>
+                )}
+
                 {filteredTokens.length > 0 ? (
                   filteredTokens.map((token) => (
                     <div

@@ -1,6 +1,5 @@
 import {
   getSuiClient,
-  getTokenBalance,
   getTokenPrice as get7kTokenPrice,
 } from "@7kprotocol/sdk-ts";
 import { SuiClient } from "@mysten/sui/client";
@@ -14,54 +13,23 @@ export async function fetchSupportedTokens(): Promise<Token[]> {
       throw new Error("SuiClient not initialized");
     }
 
-    // Fetch core 7k Protocol tokens directly from the Sui RPC
-    const response = await fetch("https://sui-mainnet-rpc.allthatnode.com", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    // Add core tokens directly
+    const tokens: Token[] = [
+      {
+        symbol: "SUI",
+        name: "Sui",
+        address: "0x2::sui::SUI",
+        decimals: 9,
+        logo: "https://raw.githubusercontent.com/suiet/sui-wallet/main/packages/chrome/src/assets/sui.png",
       },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "suix_getCoinMetadata",
-        params: [],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tokens: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.result) {
-      throw new Error("Invalid response from RPC");
-    }
-
-    // Map the coin metadata to our Token interface
-    // The Sui RPC returns an array of coin metadata objects
-    const tokens: Token[] = [];
-
-    // Add SUI token which may not be in the metadata list
-    tokens.push({
-      symbol: "SUI",
-      name: "Sui",
-      address: "0x2::sui::SUI",
-      decimals: 9,
-      logo: "https://raw.githubusercontent.com/suiet/sui-wallet/main/packages/chrome/src/assets/sui.png",
-    });
-
-    // Add USDC token which is commonly used
-    tokens.push({
-      symbol: "USDC",
-      name: "USD Coin",
-      address:
-        "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-      decimals: 6,
-      logo: "https://cryptologos.cc/logos/usd-coin-usdc-logo.svg",
-    });
-
-    // Process other common tokens on Sui
-    const commonTokens = [
+      {
+        symbol: "USDC",
+        name: "USD Coin",
+        address:
+          "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+        decimals: 6,
+        logo: "https://cryptologos.cc/logos/usd-coin-usdc-logo.svg",
+      },
       {
         symbol: "USDT",
         name: "Tether USD",
@@ -96,8 +64,13 @@ export async function fetchSupportedTokens(): Promise<Token[]> {
       },
     ];
 
-    // Add all common tokens to our list
-    tokens.push(...commonTokens);
+    // Try to get more tokens using the Sui RPC
+    try {
+      // Fetch additional tokens data if needed - this is a placeholder
+      // In a production app, you'd fetch from a more comprehensive source
+    } catch (tokenListError) {
+      console.warn("Could not fetch additional tokens:", tokenListError);
+    }
 
     return tokens;
   } catch (error) {
@@ -106,67 +79,7 @@ export async function fetchSupportedTokens(): Promise<Token[]> {
   }
 }
 
-// Get real token balances for a user using the 7k Protocol SDK
-export async function fetchTokenBalances(
-  address: string,
-  tokens: Token[]
-): Promise<Token[]> {
-  try {
-    if (!address) {
-      return tokens;
-    }
-
-    const updatedTokens: Token[] = [];
-
-    // Fetch balance for each token using the 7k Protocol SDK
-    for (const token of tokens) {
-      try {
-        // Get token balance using the SDK
-        const balance = await getTokenBalance(address, token.address);
-
-        // Get token price using the SDK
-        let price = 0;
-        try {
-          price = await get7kTokenPrice(token.address);
-        } catch (priceError) {
-          console.warn(
-            `Could not fetch price for ${token.symbol}:`,
-            priceError
-          );
-          // Default prices for common tokens
-          if (token.symbol === "SUI") price = 0.8;
-          else if (token.symbol === "USDC" || token.symbol === "USDT")
-            price = 1.0;
-        }
-
-        // Calculate balance in human-readable format and USD value
-        const balanceFormatted = balance
-          ? (parseFloat(balance) / Math.pow(10, token.decimals)).toFixed(4)
-          : "0.0000";
-
-        const balanceUsd = (parseFloat(balanceFormatted) * price).toFixed(2);
-
-        updatedTokens.push({
-          ...token,
-          balance: balanceFormatted,
-          balanceUsd: balanceUsd,
-          price,
-        });
-      } catch (error) {
-        console.warn(`Error fetching balance for ${token.symbol}:`, error);
-        // Add token without balance info
-        updatedTokens.push(token);
-      }
-    }
-
-    return updatedTokens;
-  } catch (error) {
-    console.error("Error fetching token balances:", error);
-    return tokens; // Return original tokens if fetch fails
-  }
-}
-
-// Get real token price from the 7k Protocol SDK
+// Get token price from the 7k Protocol SDK
 export async function getTokenPrice(tokenAddress: string): Promise<number> {
   try {
     // Use the 7k Protocol SDK to get the token price
@@ -183,5 +96,31 @@ export async function getTokenPrice(tokenAddress: string): Promise<number> {
     }
 
     throw error; // Re-throw for other tokens
+  }
+}
+
+// Get coin metadata to determine decimals
+export async function getCoinMetadata(
+  provider: any,
+  coinType: string
+): Promise<any> {
+  try {
+    const metadata = await provider.getCoinMetadata({ coinType });
+    return metadata;
+  } catch (error) {
+    console.error(`Error fetching metadata for ${coinType}:`, error);
+
+    // Default decimal values for common coins
+    if (coinType === "0x2::sui::SUI") {
+      return { decimals: 9, symbol: "SUI", name: "Sui" };
+    }
+    if (coinType.includes("USDC")) {
+      return { decimals: 6, symbol: "USDC", name: "USD Coin" };
+    }
+    if (coinType.includes("USDT")) {
+      return { decimals: 6, symbol: "USDT", name: "Tether USD" };
+    }
+
+    throw error;
   }
 }
