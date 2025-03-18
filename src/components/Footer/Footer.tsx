@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
     <footer className="footer">
       <div className="footer__content">
         <div className="footer__section">
-          <h3 className="footer__title">7K Protocol</h3>
+          <h3 className="footer__title">Cerebra Network</h3>
           <p className="footer__description">
             The future of decentralized finance on the Sui blockchain. Trade
             tokens, provide liquidity, and earn rewards with our cutting-edge
@@ -66,7 +66,8 @@ const Footer: React.FC = () => {
 
       <div className="footer__bottom">
         <p>
-          &copy; {new Date().getFullYear()} 7K Protocol. All rights reserved.
+          &copy; {new Date().getFullYear()} Cerebra Network. All rights
+          reserved.
         </p>
         <div className="footer__social">
           <a

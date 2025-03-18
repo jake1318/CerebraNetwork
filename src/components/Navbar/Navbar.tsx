@@ -61,6 +61,12 @@ const Navbar: React.FC = () => {
           >
             Pools
           </Link>
+          <Link
+            to="/search"
+            className={location.pathname === "/search" ? "active" : ""}
+          >
+            Search
+          </Link>
         </div>
 
         <div className="navbar__actions">
@@ -122,6 +128,13 @@ const Navbar: React.FC = () => {
             onClick={() => setIsMobileMenuOpen(false)}
           >
             Pools
+          </Link>
+          <Link
+            to="/search"
+            className={location.pathname === "/search" ? "active" : ""}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Search
           </Link>
 
           {connected && account ? (

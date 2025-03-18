@@ -2,12 +2,18 @@
   background: rgba(5, 5, 15, 0.7);
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.25);
   backdrop-filter: blur(10px);
   max-width: 480px;
   margin: 0 auto;
   position: relative;
-  border: 1px solid rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: rgba(0, 255, 255, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.35);
+  }
 }
 
 .swap-form.loading {
@@ -21,11 +27,12 @@
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(0, 255, 255, 0.2);
+  border: 3px solid rgba(0, 255, 255, 0.3);
   border-radius: 50%;
   border-top-color: #00ffff;
   animation: spin 1s ease-in-out infinite;
   margin: 20px auto;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
 }
 
 @keyframes spin {
@@ -68,9 +75,12 @@
   padding: 4px 8px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
 
   &:hover {
-    background: rgba(0, 255, 255, 0.1);
+    background: rgba(0, 255, 255, 0.15);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
   }
 }
 
@@ -78,9 +88,20 @@
   display: flex;
   align-items: center;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(0, 255, 255, 0.2);
+  border: 1px solid rgba(0, 255, 255, 0.3);
   border-radius: 12px;
   overflow: hidden;
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: rgba(0, 255, 255, 0.6);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+  }
+
+  &:focus-within {
+    border-color: rgba(0, 255, 255, 0.8);
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.5);
+  }
 }
 
 .input-with-token input {
@@ -109,19 +130,23 @@
   height: 36px;
   border-radius: 50%;
   background: rgba(5, 5, 15, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 255, 255, 0.3);
   z-index: 2;
   position: relative;
   color: #00ffff;
   padding: 0;
   font-weight: bold;
-  border: 1px solid rgba(0, 255, 255, 0.3);
+  border: 1px solid rgba(0, 255, 255, 0.4);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
 
   &:hover {
-    background: rgba(0, 255, 255, 0.1);
+    background: rgba(0, 255, 255, 0.15);
     transform: scale(1.05);
+    border-color: rgba(0, 255, 255, 0.8);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+    color: #fff;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
   }
 }
 
@@ -137,20 +162,23 @@
     flex: 1;
     padding: 8px;
     border-radius: 8px;
-    border: 1px solid rgba(0, 255, 255, 0.2);
+    border: 1px solid rgba(0, 255, 255, 0.3);
     background: rgba(0, 0, 0, 0.3);
     color: rgba(255, 255, 255, 0.9);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
 
     &:hover {
-      background: rgba(0, 255, 255, 0.1);
+      background: rgba(0, 255, 255, 0.15);
+      border-color: rgba(0, 255, 255, 0.6);
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
     }
 
     &.active {
       background: linear-gradient(45deg, #00ffff, #0088ff);
       color: #000;
       border: none;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
     }
   }
 }
@@ -161,6 +189,14 @@
   text-align: right;
   margin: 8px 0 16px;
   height: 20px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: rgba(0, 255, 255, 0.05);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+  }
 }
 
 .fee-estimate {
@@ -174,9 +210,11 @@
   color: #ff4444;
   margin-bottom: 16px;
   padding: 8px;
-  background: rgba(255, 68, 68, 0.1);
+  background: rgba(255, 68, 68, 0.15);
   border-radius: 8px;
   font-size: 14px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
 }
 
 .swap-button {
@@ -189,16 +227,42 @@
   font-weight: 600;
   border: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
 
   &:hover:not(:disabled) {
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.7);
+    transform: translateY(-2px);
+
+    &::after {
+      opacity: 1;
+    }
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      transparent
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
 
   &:disabled {
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.5);
     cursor: not-allowed;
+    box-shadow: none;
   }
 }
 
@@ -229,4 +293,37 @@
   .token-select-wrapper {
     min-width: 100px;
   }
+}
+.amount-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.percent-button {
+  background: none;
+  border: none;
+  color: #00ffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+
+  &:hover {
+    background: rgba(0, 255, 255, 0.15);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+// Update the existing max-button class to match the percent-button style
+.max-button {
+  @extend .percent-button;
 }

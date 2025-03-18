@@ -5,24 +5,9 @@ import { WalletProvider } from "./contexts/WalletContext";
 import Navbar from "./components/Navbar/Navbar";
 import Footer from "./components/Footer/Footer";
 import Home from "./pages/Home/Home";
-import SwapForm from "./components/SwapForm";
+import Swap from "./pages/Swap/Swap";
+import SearchPage from "./pages/SearchPage/SearchPage"; // Add SearchPage import
 import "./App.scss";
-
-function SwapContent() {
-  const { connected } = useWallet();
-
-  return (
-    <div className="swap-container">
-      {connected ? (
-        <SwapForm />
-      ) : (
-        <div className="connect-prompt">
-          Please connect your wallet to use the app
-        </div>
-      )}
-    </div>
-  );
-}
 
 function AppContent() {
   return (
@@ -32,7 +17,9 @@ function AppContent() {
         <main>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/swap" element={<SwapContent />} />
+            <Route path="/swap" element={<Swap />} />
+            <Route path="/search" element={<SearchPage />} />{" "}
+            {/* Add SearchPage route */}
           </Routes>
         </main>
         <Footer />

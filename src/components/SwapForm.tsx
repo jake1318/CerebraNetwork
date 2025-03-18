@@ -28,11 +28,12 @@ export default function SwapForm() {
   const [quoting, setQuoting] = useState(false);
   const [error, setError] = useState("");
   const [slippage, setSlippage] = useState(0.01); // 1%
+  const [customSlippage, setCustomSlippage] = useState("");
+  const [showCustomSlippage, setShowCustomSlippage] = useState(false);
   const [estimatedFee, setEstimatedFee] = useState<number | null>(null);
   const [suiPrice, setSuiPrice] = useState<number | null>(null);
   const [loadingTokens, setLoadingTokens] = useState(true);
 
-  // Load default tokens on component mount
   useEffect(() => {
     const loadDefaultTokens = async () => {
       try {
@@ -40,16 +41,13 @@ export default function SwapForm() {
         const tokens = await fetchTokens();
 
         if (tokens && tokens.length >= 2) {
-          // Find SUI and USDC tokens
           const suiToken = tokens.find((t) => t.symbol === "SUI");
           const usdcToken = tokens.find((t) => t.symbol === "USDC");
 
-          // Set default tokens
           setTokenIn(suiToken || tokens[0]);
           setTokenOut(usdcToken || tokens[1]);
         }
 
-        // Get SUI price for gas estimations
         try {
           const price = await getSuiPrice();
           setSuiPrice(price);
@@ -67,7 +65,64 @@ export default function SwapForm() {
     loadDefaultTokens();
   }, []);
 
-  // Fetch quote when inputs change
+  const handlePercentageClick = async (percentage: number) => {
+    if (!tokenIn || !wallet.account?.address) return;
+
+    try {
+      if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
+        const balanceInSui = parseInt(suiBalance) / 1e9;
+        const maxAmount = Math.max(0, balanceInSui - 0.05);
+        const percentAmount = (maxAmount * percentage) / 100;
+        setAmountIn(percentAmount.toFixed(4));
+        return;
+      }
+
+      if (tokenIn.balance) {
+        const balance = parseFloat(tokenIn.balance);
+        const percentAmount = (balance * percentage) / 100;
+        setAmountIn(percentAmount.toFixed(4));
+      } else if (provider) {
+        const result = await provider.getBalance({
+          owner: wallet.account.address,
+          coinType: tokenIn.address,
+        });
+
+        if (result?.totalBalance) {
+          const decimals = tokenIn.decimals;
+          const balance =
+            parseInt(result.totalBalance) / Math.pow(10, decimals);
+          const percentAmount = (balance * percentage) / 100;
+          setAmountIn(percentAmount.toFixed(4));
+        }
+      }
+    } catch (error) {
+      console.error(`Error setting ${percentage}% amount:`, error);
+    }
+  };
+
+  const handleCustomSlippageChange = (value: string) => {
+    const cleaned = value.replace(/[^\d.]/g, "");
+
+    const parts = cleaned.split(".");
+    if (parts.length > 2) return;
+
+    if (parts[1] && parts[1].length > 2) return;
+
+    if (Number(cleaned) > 100) return;
+
+    setCustomSlippage(cleaned);
+
+    if (cleaned && Number(cleaned) > 0) {
+      setSlippage(Number(cleaned) / 100);
+    }
+  };
+
+  const formatSlippage = (slippageValue: number) => {
+    return (slippageValue * 100).toFixed(1);
+  };
+
+  const getMaxAmount = () => handlePercentageClick(100);
+
   useEffect(() => {
     if (loadingTokens) return;
 
@@ -78,7 +133,7 @@ export default function SwapForm() {
         setAmountOut("0");
         setEstimatedFee(null);
       }
-    }, 500); // Debounce
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [tokenIn, tokenOut, amountIn, loadingTokens]);
@@ -94,7 +149,6 @@ export default function SwapForm() {
       setQuoting(true);
       setError("");
 
-      // Convert amount to base units based on token decimals
       const decimals = tokenIn.decimals;
       const amountInBaseUnits = new BigNumber(amountIn)
         .times(10 ** decimals)
@@ -107,31 +161,27 @@ export default function SwapForm() {
       });
 
       if (quoteResponse) {
-        // Convert back from base units for display based on token out decimals
         const outDecimals = tokenOut.decimals;
         const outAmount = new BigNumber(quoteResponse.outAmount)
           .div(10 ** outDecimals)
           .toString();
         setAmountOut(outAmount);
 
-        // Estimate gas fee if account is connected
         if (wallet.account?.address) {
           try {
-            // Use cached SUI price if available
             const feeInUsd = await estimateGasFee({
               quoteResponse,
               accountAddress: wallet.account.address,
               slippage,
               suiPrice: suiPrice || undefined,
               commission: {
-                partner: wallet.account.address, // Using user's address as partner for tracking
+                partner: wallet.account.address,
                 commissionBps: 0,
               },
             });
             setEstimatedFee(feeInUsd);
           } catch (feeErr) {
             console.error("Error estimating fee:", feeErr);
-            // Don't set error for fee estimation failure
           }
         }
       }
@@ -160,41 +210,32 @@ export default function SwapForm() {
       setLoading(true);
       setError("");
 
-      // Convert amount to base units
       const decimals = tokenIn.decimals;
       const amountInBaseUnits = new BigNumber(amountIn)
         .times(10 ** decimals)
         .toString();
 
-      // Get quote
       const quoteResponse = await getQuote({
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,
         amountIn: amountInBaseUnits,
       });
 
-      // Build transaction
       const { tx } = await buildTx({
         quoteResponse,
         accountAddress: wallet.account.address,
         slippage,
         commission: {
-          partner: wallet.account.address, // Using user's address as partner for tracking
+          partner: wallet.account.address,
           commissionBps: 0,
         },
       });
 
-      // Sign and execute transaction with Suiet wallet
       try {
-        console.log("Executing transaction with wallet:", wallet);
-        console.log("Transaction object:", tx);
-
-        // Use the Suiet wallet to execute the transaction
         if (!wallet.signAndExecuteTransactionBlock) {
           throw new Error("Wallet does not support transaction signing");
         }
 
-        // Execute the transaction
         const result = await wallet.signAndExecuteTransactionBlock({
           transactionBlock: tx,
         });
@@ -202,7 +243,6 @@ export default function SwapForm() {
         console.log("Swap completed:", result);
         alert("Swap completed successfully!");
 
-        // Reset input amount after successful swap
         setAmountIn("");
         setAmountOut("0");
         setEstimatedFee(null);
@@ -223,53 +263,12 @@ export default function SwapForm() {
       const tempToken = tokenIn;
       setTokenIn(tokenOut);
       setTokenOut(tempToken);
-      // Reset the amount to trigger a new quote
       if (amountIn) {
         setAmountIn(amountIn);
       }
     }
   };
 
-  // Get max amount using Suiet wallet kit
-  const getMaxAmount = async () => {
-    if (!tokenIn || !wallet.account?.address) return;
-
-    try {
-      // If it's SUI token, use the useAccountBalance hook result
-      if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
-        // Convert from MIST to SUI (divide by 10^9)
-        // Keep a small amount for gas fees (0.05 SUI)
-        const balanceInSui = parseInt(suiBalance) / 1e9;
-        const maxAmount = Math.max(0, balanceInSui - 0.05).toFixed(4);
-        setAmountIn(maxAmount);
-        return;
-      }
-
-      // For other tokens, use provider to get balance
-      if (tokenIn.balance) {
-        // If the balance is already in the token object, use it
-        setAmountIn(tokenIn.balance);
-      } else if (provider) {
-        // Otherwise fetch it from the provider
-        const result = await provider.getBalance({
-          owner: wallet.account.address,
-          coinType: tokenIn.address,
-        });
-
-        if (result?.totalBalance) {
-          const decimals = tokenIn.decimals;
-          const formattedBalance = (
-            parseInt(result.totalBalance) / Math.pow(10, decimals)
-          ).toFixed(4);
-          setAmountIn(formattedBalance);
-        }
-      }
-    } catch (error) {
-      console.error("Error getting max amount:", error);
-    }
-  };
-
-  // Render loading state while initializing tokens
   if (loadingTokens) {
     return (
       <div className="swap-form loading">
@@ -287,9 +286,36 @@ export default function SwapForm() {
         <div className="form-label-row">
           <label>From</label>
           {wallet.connected && (
-            <button className="max-button" onClick={getMaxAmount} type="button">
-              MAX
-            </button>
+            <div className="amount-buttons">
+              <button
+                className="percent-button"
+                onClick={() => handlePercentageClick(25)}
+                type="button"
+              >
+                25%
+              </button>
+              <button
+                className="percent-button"
+                onClick={() => handlePercentageClick(50)}
+                type="button"
+              >
+                50%
+              </button>
+              <button
+                className="percent-button"
+                onClick={() => handlePercentageClick(75)}
+                type="button"
+              >
+                75%
+              </button>
+              <button
+                className="max-button"
+                onClick={getMaxAmount}
+                type="button"
+              >
+                MAX
+              </button>
+            </div>
           )}
         </div>
         <div className="input-with-token">
@@ -356,27 +382,74 @@ export default function SwapForm() {
         <label>Slippage Tolerance</label>
         <div className="slippage-options">
           <button
-            className={slippage === 0.005 ? "active" : ""}
-            onClick={() => setSlippage(0.005)}
+            className={
+              !showCustomSlippage && slippage === 0.005 ? "active" : ""
+            }
+            onClick={() => {
+              setSlippage(0.005);
+              setShowCustomSlippage(false);
+              setCustomSlippage("");
+            }}
             type="button"
           >
             0.5%
           </button>
           <button
-            className={slippage === 0.01 ? "active" : ""}
-            onClick={() => setSlippage(0.01)}
+            className={!showCustomSlippage && slippage === 0.01 ? "active" : ""}
+            onClick={() => {
+              setSlippage(0.01);
+              setShowCustomSlippage(false);
+              setCustomSlippage("");
+            }}
             type="button"
           >
             1.0%
           </button>
           <button
-            className={slippage === 0.02 ? "active" : ""}
-            onClick={() => setSlippage(0.02)}
+            className={!showCustomSlippage && slippage === 0.02 ? "active" : ""}
+            onClick={() => {
+              setSlippage(0.02);
+              setShowCustomSlippage(false);
+              setCustomSlippage("");
+            }}
             type="button"
           >
             2.0%
           </button>
+          <div
+            className={`custom-slippage ${showCustomSlippage ? "active" : ""}`}
+          >
+            <button
+              className={showCustomSlippage ? "active" : ""}
+              onClick={() => {
+                setShowCustomSlippage(true);
+                if (!customSlippage) {
+                  setCustomSlippage(formatSlippage(slippage));
+                }
+              }}
+              type="button"
+            >
+              Custom
+            </button>
+            {showCustomSlippage && (
+              <div className="custom-slippage-input">
+                <input
+                  type="text"
+                  value={customSlippage}
+                  onChange={(e) => handleCustomSlippageChange(e.target.value)}
+                  placeholder="0.0"
+                  autoFocus
+                />
+                <span className="percentage-symbol">%</span>
+              </div>
+            )}
+          </div>
         </div>
+        {showCustomSlippage && Number(customSlippage) > 5 && (
+          <div className="slippage-warning">
+            High slippage tolerance. Your trade may be frontrun.
+          </div>
+        )}
       </div>
 
       {estimatedFee !== null && (
