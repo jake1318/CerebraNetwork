@@ -6,7 +6,7 @@ import {
 } from "@suiet/wallet-kit";
 import { Token, fetchTokens } from "../services/tokenService";
 import { getCoinMetadata, getTokenPrice } from "../services/sdkService";
-import "./TokenSelector.css";
+import "./tokenSelector.scss";
 
 interface TokenSelectorProps {
   onSelect: (token: Token) => void;

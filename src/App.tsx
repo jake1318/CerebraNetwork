@@ -1,38 +1,52 @@
 import { useWallet } from "@suiet/wallet-kit";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { SuiProvider } from "./providers/SuiProvider";
+import { WalletProvider } from "./contexts/WalletContext";
+import Navbar from "./components/Navbar/Navbar";
+import Footer from "./components/Footer/Footer";
+import Home from "./pages/Home/Home";
 import SwapForm from "./components/SwapForm";
-import WalletConnect from "./components/WalletConnect";
-import "./App.css";
+import "./App.scss";
 
-function AppContent() {
+function SwapContent() {
   const { connected } = useWallet();
 
   return (
-    <div className="app-container">
-      <header>
-        <h1>7K DeFi App</h1>
-        <WalletConnect />
-      </header>
-      <main>
-        {connected ? (
-          <SwapForm />
-        ) : (
-          <div className="connect-prompt">
-            Please connect your wallet to use the app
-          </div>
-        )}
-      </main>
-      <footer>
-        <p>Powered by 7K Protocol on Sui Blockchain</p>
-      </footer>
+    <div className="swap-container">
+      {connected ? (
+        <SwapForm />
+      ) : (
+        <div className="connect-prompt">
+          Please connect your wallet to use the app
+        </div>
+      )}
     </div>
+  );
+}
+
+function AppContent() {
+  return (
+    <Router>
+      <div className="app-container">
+        <Navbar />
+        <main>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/swap" element={<SwapContent />} />
+          </Routes>
+        </main>
+        <Footer />
+      </div>
+    </Router>
   );
 }
 
 function App() {
   return (
     <SuiProvider>
-      <AppContent />
+      <WalletProvider>
+        <AppContent />
+      </WalletProvider>
     </SuiProvider>
   );
 }

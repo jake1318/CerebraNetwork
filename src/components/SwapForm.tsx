@@ -11,9 +11,9 @@ import {
   getSuiPrice,
 } from "@7kprotocol/sdk-ts";
 import BigNumber from "bignumber.js";
-import TokenSelector from "./TokenSelector";
+import TokenSelector from "./tokenSelector";
 import { Token, fetchTokens } from "../services/tokenService";
-import "./SwapForm.css";
+import "./SwapForm.scss";
 
 export default function SwapForm() {
   const wallet = useWallet();
