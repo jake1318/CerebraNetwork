@@ -8,12 +8,13 @@ import UserOrders from "../../components/UserOrders/UserOrders";
 import "./AdvancedTrading.scss";
 
 const AdvancedTrading: React.FC = () => {
-  const { connected, account, signAndExecuteTransactionBlock } = useWallet();
+  const { connected, account } = useWallet();
   const {
     isInitialized,
     hasBalanceManager,
     pools,
-    createBalanceManager,
+    createBalanceManagerAndExecute,
+    refreshBalanceManagerStatus,
     loading,
     error,
   } = useDeepBook();
@@ -21,6 +22,8 @@ const AdvancedTrading: React.FC = () => {
   const [selectedPool, setSelectedPool] = useState<string | null>(null);
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
   const [setupInProgress, setSetupInProgress] = useState<boolean>(false);
+  const [setupSuccess, setSetupSuccess] = useState<boolean>(false);
+  const [setupMessage, setSetupMessage] = useState<string>("");
 
   // Set default pool when pools are loaded
   useEffect(() => {
@@ -29,26 +32,63 @@ const AdvancedTrading: React.FC = () => {
     }
   }, [pools]);
 
+  // Handle manual refresh of balance manager status
+  const handleRefreshStatus = async () => {
+    try {
+      setSetupMessage("Checking balance manager status...");
+      const result = await refreshBalanceManagerStatus();
+      if (result) {
+        setSetupSuccess(true);
+        setSetupMessage(
+          "Balance manager found! Redirecting to trading interface..."
+        );
+        // Brief delay before UI update
+        setTimeout(() => {
+          setSetupInProgress(false);
+        }, 1000);
+      } else {
+        setSetupMessage(
+          "Balance manager not found. You may need to create one."
+        );
+        setSetupInProgress(false);
+      }
+    } catch (err) {
+      console.error("Error refreshing status:", err);
+      setSetupMessage("Error checking balance manager status.");
+      setSetupInProgress(false);
+    }
+  };
+
   const handleCreateBalanceManager = async () => {
     if (!connected) return;
 
     try {
       setSetupInProgress(true);
-      const txb = await createBalanceManager();
+      setSetupMessage("Creating balance manager...");
 
-      if (txb) {
-        await signAndExecuteTransactionBlock({
-          transactionBlock: txb,
-        });
+      // Use the combined function that creates, executes, and confirms the balance manager
+      const success = await createBalanceManagerAndExecute();
 
-        // Wait a moment and refresh the page to detect the new balance manager
+      if (success) {
+        setSetupSuccess(true);
+        setSetupMessage("Balance manager created successfully!");
+
+        // No need to reload - the context state is now updated
+        // Just wait a moment for UI to show success message
         setTimeout(() => {
-          window.location.reload();
-        }, 2000);
+          setSetupInProgress(false);
+        }, 1500);
+      } else {
+        setSetupMessage(
+          "Transaction completed but balance manager not detected. Try refreshing status."
+        );
+        setSetupInProgress(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating balance manager:", err);
-    } finally {
+      setSetupMessage(
+        `Error: ${err.message || "Failed to create balance manager"}`
+      );
       setSetupInProgress(false);
     }
   };
@@ -100,7 +140,7 @@ const AdvancedTrading: React.FC = () => {
     );
   }
 
-  if (!hasBalanceManager) {
+  if (!hasBalanceManager && !setupSuccess) {
     return (
       <div className="advanced-trading">
         <div className="vertical-scan"></div>
@@ -119,13 +159,26 @@ const AdvancedTrading: React.FC = () => {
               You need to create a balance manager to use advanced trading
               features. This is a one-time setup.
             </p>
-            <button
-              className="btn btn--primary"
-              onClick={handleCreateBalanceManager}
-              disabled={setupInProgress}
-            >
-              {setupInProgress ? "Creating..." : "Create Trading Account"}
-            </button>
+            {setupMessage && (
+              <div className="setup-message">{setupMessage}</div>
+            )}
+            <div className="setup-actions">
+              <button
+                className="btn btn--primary"
+                onClick={handleCreateBalanceManager}
+                disabled={setupInProgress}
+              >
+                {setupInProgress ? "Processing..." : "Create Trading Account"}
+              </button>
+
+              <button
+                className="btn btn--secondary"
+                onClick={handleRefreshStatus}
+                disabled={setupInProgress}
+              >
+                Refresh Status
+              </button>
+            </div>
           </div>
         </div>
       </div>

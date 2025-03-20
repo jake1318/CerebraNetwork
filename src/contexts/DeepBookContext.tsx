@@ -10,6 +10,8 @@ interface DeepBookContextType {
   deepBookService: DeepBookService | null;
   pools: any[];
   createBalanceManager: () => Promise<Transaction>;
+  createBalanceManagerAndExecute: () => Promise<boolean>;
+  refreshBalanceManagerStatus: () => Promise<boolean>;
   placeLimitOrder: (params: LimitOrderParams) => Transaction;
   placeMarketOrder: (params: MarketOrderParams) => Transaction;
   cancelOrder: (poolKey: string, orderId: string) => Transaction;
@@ -46,6 +48,8 @@ const DeepBookContext = createContext<DeepBookContextType>({
   deepBookService: null,
   pools: [],
   createBalanceManager: async () => new Transaction(),
+  createBalanceManagerAndExecute: async () => false,
+  refreshBalanceManagerStatus: async () => false,
   placeLimitOrder: () => new Transaction(),
   placeMarketOrder: () => new Transaction(),
   cancelOrder: () => new Transaction(),
@@ -63,7 +67,7 @@ export const useDeepBook = () => useContext(DeepBookContext);
 export const DeepBookProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { connected, account } = useWallet();
+  const { connected, account, signAndExecuteTransactionBlock } = useWallet();
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [hasBalanceManager, setHasBalanceManager] = useState<boolean>(false);
   const [deepBookService, setDeepBookService] =
@@ -95,33 +99,68 @@ export const DeepBookProvider: React.FC<{ children: React.ReactNode }> = ({
     initializeDeepBook();
   }, []);
 
+  // Function to check if the user has a balance manager
+  const refreshBalanceManagerStatus = async (): Promise<boolean> => {
+    if (!deepBookService || !connected || !account) {
+      setHasBalanceManager(false);
+      return false;
+    }
+
+    try {
+      setLoading(true);
+
+      // Try checking up to 3 times with increasing delays between checks
+      let hasManager = false;
+      let retries = 0;
+      const maxRetries = 5;
+
+      while (!hasManager && retries < maxRetries) {
+        console.log(
+          `Checking balance manager (attempt ${retries + 1}/${maxRetries})...`
+        );
+
+        hasManager = await deepBookService.hasBalanceManager(account.address);
+
+        if (hasManager) {
+          console.log("Balance manager found!");
+          break;
+        }
+
+        // Exponential backoff: wait longer between each retry
+        const delayMs = 1000 * Math.pow(1.5, retries);
+        console.log(
+          `No balance manager found yet. Waiting ${delayMs}ms before retrying...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        retries++;
+      }
+
+      console.log(
+        `Final balance manager status: ${hasManager ? "Found" : "Not found"}`
+      );
+      setHasBalanceManager(hasManager);
+
+      if (hasManager) {
+        await refreshPools();
+      }
+
+      return hasManager;
+    } catch (err: any) {
+      console.error("Error checking balance manager:", err);
+      setError("Failed to check balance manager status: " + err.message);
+      setHasBalanceManager(false);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Check if user has a balance manager when wallet connects
   useEffect(() => {
-    const checkBalanceManager = async () => {
-      if (!deepBookService || !connected || !account) {
-        setHasBalanceManager(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        const hasManager = await deepBookService.hasBalanceManager(
-          account.address
-        );
-        setHasBalanceManager(hasManager);
-        await refreshPools();
-      } catch (err: any) {
-        console.error("Error checking balance manager:", err);
-        setError("Failed to check balance manager status: " + err.message);
-        setHasBalanceManager(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkBalanceManager();
+    refreshBalanceManagerStatus();
   }, [deepBookService, connected, account]);
 
-  // Create a balance manager
+  // Create a balance manager transaction
   const createBalanceManager = async (): Promise<Transaction> => {
     if (!deepBookService || !account) {
       throw new Error(
@@ -133,6 +172,82 @@ export const DeepBookProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       console.error("Error creating balance manager:", err);
       throw err;
+    }
+  };
+
+  // Create and execute a balance manager transaction
+  const createBalanceManagerAndExecute = async (): Promise<boolean> => {
+    if (!deepBookService || !account || !signAndExecuteTransactionBlock) {
+      throw new Error(
+        "DeepBook service not initialized or wallet not connected"
+      );
+    }
+
+    try {
+      setLoading(true);
+
+      // Create the transaction
+      const txb = await deepBookService.createBalanceManager(account.address);
+
+      // Execute the transaction
+      const response = await signAndExecuteTransactionBlock({
+        transactionBlock: txb,
+      });
+
+      console.log("Balance manager creation transaction executed:", response);
+
+      // Wait for transaction to be confirmed and check for balance manager
+      if (response) {
+        // Poll for balance manager existence
+        let hasManager = false;
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        while (!hasManager && attempts < maxAttempts) {
+          console.log(
+            `Polling for balance manager (attempt ${
+              attempts + 1
+            }/${maxAttempts})...`
+          );
+
+          // Wait with exponential backoff
+          const delayMs = 1000 * Math.pow(1.5, attempts);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+          // Check if balance manager exists
+          hasManager = await deepBookService.hasBalanceManager(account.address);
+
+          if (hasManager) {
+            console.log("Balance manager confirmed!");
+            setHasBalanceManager(true);
+            await refreshPools();
+            return true;
+          }
+
+          attempts++;
+        }
+
+        if (!hasManager) {
+          console.error(
+            "Failed to confirm balance manager creation after multiple attempts"
+          );
+          setError(
+            "Transaction completed but balance manager not detected. Please try refreshing the page."
+          );
+          return false;
+        }
+      }
+
+      return false;
+    } catch (err: any) {
+      console.error(
+        "Error creating and executing balance manager transaction:",
+        err
+      );
+      setError("Failed to create balance manager: " + err.message);
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -275,6 +390,8 @@ export const DeepBookProvider: React.FC<{ children: React.ReactNode }> = ({
         deepBookService,
         pools,
         createBalanceManager,
+        createBalanceManagerAndExecute,
+        refreshBalanceManagerStatus,
         placeLimitOrder,
         placeMarketOrder,
         cancelOrder,
