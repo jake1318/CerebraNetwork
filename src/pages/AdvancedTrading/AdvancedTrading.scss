@@ -1,6 +1,4 @@
-// Enhanced Swap Page with dual-color theme matching the search page
-
-.swap-page {
+.advanced-trading {
   width: 100%;
   min-height: calc(100vh - 80px);
   padding: 2rem;
@@ -25,7 +23,7 @@
   position: relative;
   overflow: hidden;
 
-  // Grid overlay similar to search page
+  // Grid overlay
   &::before {
     content: "";
     position: absolute;
@@ -47,7 +45,7 @@
     z-index: 0;
   }
 
-  // Keep the original scanning lines but enhance them
+  // Scanning lines
   &::after {
     content: "";
     position: absolute;
@@ -76,7 +74,7 @@
     box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
   }
 
-  // Enhanced glow effects
+  // Glow effects
   .glow-1 {
     position: absolute;
     width: 300px;
@@ -112,7 +110,7 @@
 
   &__header {
     text-align: center;
-    margin-bottom: 3rem;
+    margin-bottom: 2rem;
 
     h1 {
       font-size: 3.5rem;
@@ -136,14 +134,9 @@
     }
   }
 
-  &__content {
-    position: relative;
-    max-width: 480px;
-    margin: 0 auto;
-    animation: fadeIn 0.5s ease-out;
-  }
-
-  .connect-prompt {
+  .connect-prompt,
+  .loading-container,
+  .setup-container {
     background: rgba(5, 15, 30, 0.7);
     border: 1px solid;
     border-image: linear-gradient(
@@ -158,6 +151,8 @@
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    max-width: 500px;
+    margin: 0 auto;
     transition: all 0.3s ease;
 
     &:hover {
@@ -178,10 +173,150 @@
       color: rgba(255, 255, 255, 0.8);
       font-size: 1.1rem;
       line-height: 1.6;
+      margin-bottom: 1.5rem;
     }
   }
 
-  // Enhanced animations
+  .loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top: 3px solid #00ffff;
+    border-right: 3px solid #ff00ff;
+    border-bottom: 3px solid #00ffff;
+    border-left: 3px solid #ff00ff;
+    animation: spin 1s ease-in-out infinite;
+    margin: 0 auto 20px;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), 0 0 20px rgba(255, 0, 255, 0.2);
+  }
+
+  .error-message {
+    background: rgba(255, 50, 50, 0.2);
+    border: 1px solid rgba(255, 50, 50, 0.4);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 20px;
+    color: #ff6b6b;
+    text-align: center;
+  }
+
+  .pool-selector {
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+
+    label {
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 500;
+      font-size: 1.1rem;
+    }
+
+    select {
+      background: rgba(5, 15, 30, 0.7);
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.3),
+          rgba(255, 0, 255, 0.3)
+        )
+        1;
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      color: #fff;
+      font-size: 1rem;
+      width: 300px;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem top 50%;
+      background-size: 0.8rem auto;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.3),
+          0 0 0 2px rgba(255, 0, 255, 0.3);
+      }
+
+      option {
+        background: rgba(10, 20, 40, 0.95);
+      }
+    }
+  }
+
+  .trading-layout {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "orderbook order-form"
+      "user-orders user-orders";
+    gap: 1.5rem;
+
+    &__orderbook {
+      grid-area: orderbook;
+    }
+
+    &__order-form {
+      grid-area: order-form;
+    }
+
+    &__user-orders {
+      grid-area: user-orders;
+      margin-top: 1rem;
+
+      h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: rgba(255, 255, 255, 0.9);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 0.5rem;
+      }
+    }
+  }
+
+  .order-type-tabs {
+    display: flex;
+    margin-bottom: 1.5rem;
+
+    .tab {
+      flex: 1;
+      background: rgba(5, 15, 30, 0.7);
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      padding: 1rem 0;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+
+      &:last-child {
+        border-radius: 0 8px 8px 0;
+      }
+
+      &.active {
+        background: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(255, 0, 255, 0.2)
+        );
+        color: #fff;
+        font-weight: 600;
+      }
+
+      &:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
   @keyframes horizonScan {
     0% {
       transform: translateX(-150vw);
@@ -211,21 +346,24 @@
     }
   }
 
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
+  @keyframes spin {
     to {
-      opacity: 1;
-      transform: translateY(0);
+      transform: rotate(360deg);
     }
   }
-}
 
-// Add responsive styles
-@media (max-width: 768px) {
-  .swap-page {
+  // Responsive design
+  @media (max-width: 992px) {
+    .trading-layout {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "order-form"
+        "orderbook"
+        "user-orders";
+    }
+  }
+
+  @media (max-width: 768px) {
     padding: 1rem;
 
     &__header {
@@ -238,8 +376,12 @@
       }
     }
 
-    &__content {
-      padding: 0 1rem;
+    .pool-selector {
+      flex-direction: column;
+
+      select {
+        width: 100%;
+      }
     }
   }
 }

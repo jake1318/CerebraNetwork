@@ -1,0 +1,100 @@
+.trading-history {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  overflow: hidden;
+
+  .trading-history-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    h3 {
+      font-size: 1.2rem;
+      color: #fff;
+    }
+  }
+
+  .trading-history-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .history-header-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.2);
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.6);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .history-rows {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+
+      &::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+      }
+    }
+
+    .history-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 0.4rem 1rem;
+      font-size: 0.9rem;
+      transition: background 0.2s ease;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &.buy {
+        .price-col {
+          color: #00ff88;
+        }
+      }
+
+      &.sell {
+        .price-col {
+          color: #ff4d6d;
+        }
+      }
+
+      .amount-col,
+      .time-col {
+        color: rgba(255, 255, 255, 0.8);
+      }
+    }
+  }
+}

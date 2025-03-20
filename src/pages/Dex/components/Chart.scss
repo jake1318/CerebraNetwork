@@ -1,0 +1,179 @@
+.trading-chart {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  overflow: hidden;
+
+  .chart-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    h3 {
+      font-size: 1.2rem;
+      color: #fff;
+    }
+
+    .chart-controls {
+      display: flex;
+      gap: 1rem;
+
+      .timeframe-selector,
+      .chart-type-selector {
+        display: flex;
+        gap: 0.3rem;
+
+        button {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.7);
+          padding: 0.3rem 0.6rem;
+          border-radius: 4px;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.1);
+          }
+
+          &.active {
+            background: linear-gradient(
+              45deg,
+              rgba(0, 255, 255, 0.3),
+              rgba(255, 0, 255, 0.3)
+            );
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #fff;
+          }
+        }
+      }
+    }
+  }
+
+  .chart-content {
+    flex: 1;
+    position: relative;
+    padding: 1rem;
+    overflow: hidden;
+
+    .placeholder-chart {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+
+      .placeholder-candles {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        padding: 2rem;
+
+        .candle {
+          position: absolute;
+          bottom: 20%;
+          width: 0.8%;
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 2px;
+
+          &.up {
+            background: rgba(0, 255, 136, 0.6);
+          }
+
+          &.down {
+            background: rgba(255, 77, 109, 0.6);
+          }
+
+          .wick {
+            position: absolute;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.5);
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 100%;
+          }
+        }
+      }
+
+      .chart-grid {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+
+        .grid-line {
+          position: absolute;
+
+          &.horizontal {
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.05);
+            left: 0;
+          }
+
+          &.vertical {
+            width: 1px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            top: 0;
+          }
+        }
+      }
+
+      .price-axis {
+        position: absolute;
+        right: 10px;
+        top: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 2rem 0;
+
+        .price-tick {
+          font-size: 0.8rem;
+          color: rgba(255, 255, 255, 0.6);
+          background: rgba(0, 0, 0, 0.3);
+          padding: 2px 6px;
+          border-radius: 4px;
+        }
+      }
+
+      .time-axis {
+        position: absolute;
+        bottom: 10px;
+        left: 0;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        padding: 0 2rem;
+
+        .time-tick {
+          font-size: 0.8rem;
+          color: rgba(255, 255, 255, 0.6);
+          background: rgba(0, 0, 0, 0.3);
+          padding: 2px 6px;
+          border-radius: 4px;
+        }
+      }
+    }
+  }
+}

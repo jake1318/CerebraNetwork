@@ -1,0 +1,369 @@
+.dex-page {
+  width: 100%;
+  min-height: calc(100vh - 80px);
+  padding: 1.5rem;
+  // Dual-color background
+  background: radial-gradient(
+      circle at top left,
+      rgba(0, 255, 255, 0.15) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 0, 255, 0.15) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(5, 5, 15, 0.95) 0%,
+      rgba(10, 10, 30, 0.95) 100%
+    );
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: center, center, center;
+  position: relative;
+  overflow: hidden;
+
+  // Grid overlay similar to other pages
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  // Scanning horizontal line (moved to specific container)
+  &::after {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00ffff, transparent);
+    top: 40%;
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+  }
+
+  // Vertical scan line
+  .vertical-scan {
+    position: absolute;
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(180deg, transparent, #ff00ff, transparent);
+    left: 50%;
+    animation: verticalScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+  }
+
+  // Enhanced glow effects
+  .glow-1 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(0, 255, 255, 0.12);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -100px;
+    left: 10%;
+    z-index: 0;
+    animation: pulsate 8s ease-in-out infinite alternate;
+  }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(255, 0, 255, 0.12);
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: 10%;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+  }
+
+  &__container {
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+
+    h1 {
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+  }
+
+  &__trading-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(5, 15, 30, 0.7);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+
+    .stat {
+      padding: 0.5rem 1rem;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      flex: 1;
+      min-width: 120px;
+
+      &:last-child {
+        border-right: none;
+      }
+
+      .label {
+        display: block;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 0.3rem;
+      }
+
+      .value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #fff;
+
+        &.positive {
+          color: #00ff88;
+        }
+
+        &.negative {
+          color: #ff4d6d;
+        }
+      }
+    }
+  }
+
+  &__trading-interface {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+
+    .trading-layout__top-row {
+      display: grid;
+      grid-template-columns: 1fr 400px; // Chart takes more space, Order Form fixed width
+      gap: 1rem;
+      min-height: 450px;
+
+      .chart-container {
+        height: 100%;
+      }
+
+      .order-form-container {
+        height: 100%;
+      }
+    }
+
+    .trading-layout__bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 400px; // Market Depth and Recent Trades match top row widths
+      gap: 1rem;
+      min-height: 350px; // Slightly smaller than top row
+
+      .orderbook-container,
+      .history-container {
+        height: 100%;
+      }
+    }
+  }
+
+  // Connect prompt for users who haven't logged in
+  .connect-prompt {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(5, 15, 30, 0.7);
+    border-radius: 12px;
+    padding: 2rem;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+
+    h2 {
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    p {
+      font-size: 1.1rem;
+      color: rgba(255, 255, 255, 0.8);
+      text-align: center;
+    }
+  }
+
+  // Animations
+  @keyframes horizonScan {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes verticalScan {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100%);
+    }
+  }
+
+  @keyframes pulsate {
+    0% {
+      opacity: 0.5;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.8;
+      transform: scale(1.2);
+    }
+  }
+
+  // Responsive styles
+  @media (max-width: 1200px) {
+    &__trading-interface {
+      .trading-layout__top-row,
+      .trading-layout__bottom-row {
+        grid-template-columns: 1fr 350px; // Slightly thinner on smaller screens
+      }
+    }
+  }
+
+  @media (max-width: 1024px) {
+    &__header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+
+      h1 {
+        font-size: 2rem;
+      }
+    }
+
+    &__trading-interface {
+      .trading-layout__top-row,
+      .trading-layout__bottom-row {
+        grid-template-columns: 1fr; // Stack vertically on smaller screens
+      }
+
+      .trading-layout__top-row {
+        min-height: auto;
+
+        .chart-container {
+          height: 400px; // Fixed height for chart on smaller screens
+        }
+      }
+
+      .trading-layout__bottom-row {
+        min-height: auto;
+
+        .orderbook-container,
+        .history-container {
+          height: 350px; // Fixed height for bottom components
+        }
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    padding: 1rem;
+
+    &__header {
+      h1 {
+        font-size: 1.8rem;
+      }
+    }
+
+    &__trading-stats {
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.75rem;
+
+      .stat {
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.5rem 0;
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        .label,
+        .value {
+          display: inline-block;
+          margin-right: 0.5rem;
+        }
+      }
+    }
+
+    &__trading-interface {
+      .trading-layout__top-row {
+        .chart-container {
+          height: 350px; // Even smaller on mobile
+        }
+      }
+
+      .trading-layout__bottom-row {
+        .orderbook-container,
+        .history-container {
+          height: 300px; // Even smaller on mobile
+        }
+      }
+    }
+  }
+}

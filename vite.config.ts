@@ -9,8 +9,15 @@ export default defineConfig({
       "@": "/src",
     },
   },
-  // Uncomment the following to use a custom port
-  // server: {
-  //   port: 3000
-  // }
+  server: {
+    // You can uncomment the following line to use a custom port
+    // port: 3000,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });

@@ -1,0 +1,175 @@
+.order-book {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  overflow: hidden;
+
+  .order-book-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    h3 {
+      font-size: 1.2rem;
+      color: #fff;
+    }
+
+    .order-book-controls {
+      display: flex;
+      gap: 0.3rem;
+
+      button {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        &.active {
+          background: linear-gradient(
+            45deg,
+            rgba(0, 255, 255, 0.3),
+            rgba(255, 0, 255, 0.3)
+          );
+          border-color: rgba(255, 255, 255, 0.2);
+          color: #fff;
+        }
+      }
+    }
+  }
+
+  .order-book-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .order-book-header-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.2);
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.6);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .sell-orders,
+    .buy-orders {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+
+      &::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+      }
+    }
+
+    .sell-orders {
+      display: flex;
+      flex-direction: column-reverse;
+    }
+
+    .buy-orders {
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .order-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 0.4rem 1rem;
+      font-size: 0.9rem;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s ease;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &.sell {
+        color: #ff4d6d;
+      }
+
+      &.buy {
+        color: #00ff88;
+      }
+
+      .price-col,
+      .amount-col,
+      .total-col {
+        position: relative;
+        z-index: 1;
+      }
+
+      .amount-col,
+      .total-col {
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .depth-indicator {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        z-index: 0;
+        opacity: 0.15;
+
+        &.sell {
+          background: #ff4d6d;
+        }
+
+        &.buy {
+          background: #00ff88;
+        }
+      }
+    }
+
+    .current-price {
+      padding: 0.7rem 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+      .price-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        background: linear-gradient(45deg, #00ffff, #ff00ff);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+      }
+    }
+  }
+}

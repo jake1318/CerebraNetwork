@@ -65,7 +65,12 @@ router.get("/", async (req, res) => {
       "Error in search route:",
       error.response?.data || error.message
     );
-    res.status(500).json({ error: "Failed to fetch search results" });
+    res.status(500).json({
+      error: "Failed to fetch search results",
+      aiAnswer: "Sorry, an error occurred while fetching results.",
+      videos: [],
+      webResults: [],
+    });
   }
 });
 
