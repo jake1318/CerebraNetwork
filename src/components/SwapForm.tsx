@@ -11,7 +11,7 @@ import {
   getSuiPrice,
 } from "@7kprotocol/sdk-ts";
 import BigNumber from "bignumber.js";
-import TokenSelector from "./tokenSelector";
+import TokenSelector from "./tokenSelector/TokenSelector";
 import { Token, fetchTokens } from "../services/tokenService";
 import "./SwapForm.scss";
 
