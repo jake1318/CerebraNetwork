@@ -2,11 +2,14 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import axios from "axios";
 import { CoinBalance } from "../types";
+// Import the API services
+import { birdeyeService, blockvisionService } from "../services/birdeyeService";
 
 const SUI_MAINNET_RPC_URL = "https://fullnode.mainnet.sui.io";
 const PRICE_API =
   "https://api.coingecko.com/api/v3/simple/price?ids=sui,ethereum,bitcoin,usd-coin,tether&vs_currencies=usd";
 
+// Known coins configuration stays the same
 const KNOWN_COINS: Record<
   string,
   { symbol: string; name: string; decimals: number }
@@ -82,8 +85,6 @@ export const useWalletContext = () => {
   return context;
 };
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -95,6 +96,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   const [coinPrices, setCoinPrices] = useState<Record<string, number>>({});
   const [availableCoins, setAvailableCoins] = useState<string[]>([]);
 
+  // Move the formatBalance and formatUsd functions inside the component
   const formatBalance = (
     balance: bigint,
     decimals: number,
@@ -137,14 +139,30 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Replace this function to use birdeyeService instead of backend
   const fetchAvailableCoins = async () => {
     try {
-      const response = await axios.get(`${API_URL}/supportedCoins`);
-      let coins: string[] = response.data.supportedCoins;
-      if (!coins.includes("0x2::sui::SUI")) coins.push("0x2::sui::SUI");
+      // Use birdeyeService to get the token list
+      const tokenListData = await birdeyeService.getTokenList();
+
+      // Extract token addresses from the response
+      let coins: string[] = [];
+      if (
+        tokenListData &&
+        tokenListData.data &&
+        Array.isArray(tokenListData.data)
+      ) {
+        coins = tokenListData.data.map((token: any) => token.address);
+      }
+
+      // Ensure SUI is always included
+      if (!coins.includes("0x2::sui::SUI")) {
+        coins.push("0x2::sui::SUI");
+      }
+
       setAvailableCoins(coins);
     } catch (error) {
-      console.error("Error fetching available coins:", error);
+      console.error("Error fetching available coins from Birdeye:", error);
       setAvailableCoins(["0x2::sui::SUI"]); // Fallback: only SUI available
     }
   };
@@ -158,6 +176,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setLoading(true);
     try {
+      // Try to get coins from wallet
       let coins: any[] = [];
       try {
         if (typeof getCoins === "function") {
@@ -171,10 +190,40 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch (err) {
         console.error("Error getting coins from wallet:", err);
       }
+
+      // If no coins from wallet, try to get from blockvision
       if (!coins || !Array.isArray(coins) || coins.length === 0) {
-        coins = []; // No mock tokens – rely solely on real data.
+        try {
+          const blockvisionData = await blockvisionService.getAccountCoins(
+            account.address
+          );
+
+          // Extract coins array from blockvision response
+          if (
+            blockvisionData &&
+            blockvisionData.data &&
+            Array.isArray(blockvisionData.data)
+          ) {
+            coins = blockvisionData.data.map((coin: any) => ({
+              type: coin.coinType,
+              balance: coin.balance,
+              // Add any other mappings needed for consistency
+              decimals: coin.decimals || 9,
+              symbol:
+                coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
+              name: coin.name || "Unknown Coin",
+            }));
+          }
+        } catch (blockvisionErr) {
+          console.error(
+            "Error getting coins from Blockvision:",
+            blockvisionErr
+          );
+          coins = []; // No tokens found
+        }
       }
 
+      // Rest of the function remains the same...
       const balancesByType: Record<
         string,
         { balance: bigint; metadata?: any }
@@ -239,6 +288,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Effect hooks remain the same
   useEffect(() => {
     fetchCoinPrices();
     fetchAvailableCoins();
