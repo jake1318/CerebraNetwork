@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { useWallet } from "@suiet/wallet-kit"; // Or your current wallet provider
-import { birdeyeService } from "../../services/birdeyeService";
+import { useWallet } from "@suiet/wallet-kit";
+import {
+  birdeyeService,
+  blockvisionService,
+} from "../../services/birdeyeService";
 import "./TokenSelector.scss";
 
 interface TokenData {
@@ -60,7 +63,7 @@ const TokenSelector = ({
         return [];
       };
 
-      // Fetch trending tokens
+      // Fetch trending tokens via Birdeye.
       const trendingData = await birdeyeService.getTrendingTokens();
       const trendingArray = extractArray(trendingData);
       const trending = trendingArray.map((token: any) => ({
@@ -75,7 +78,7 @@ const TokenSelector = ({
       }));
       setTrendingTokens(trending);
 
-      // Fetch token list
+      // Fetch full token list via Birdeye.
       const tokenListData = await birdeyeService.getTokenList();
       const tokenListArray = extractArray(tokenListData);
       const tokenList = tokenListArray
@@ -91,17 +94,18 @@ const TokenSelector = ({
         }));
       setTokens(tokenList);
 
-      // Fetch user's wallet tokens if connected
+      // Fetch user's wallet tokens using Blockvision.
       if (account?.address) {
-        const userTokenData = await birdeyeService.getWalletTokenList(
+        const userTokenData = await blockvisionService.getAccountCoins(
           account.address
         );
         const userTokenArray = extractArray(userTokenData);
         const userTokensMapped = userTokenArray
-          .filter((token: any) => !excludeAddresses.includes(token.address))
+          .filter((token: any) => !excludeAddresses.includes(token.coinType))
           .map((token: any) => ({
-            address: token.address,
-            symbol: token.symbol || "Unknown",
+            address: token.coinType, // using coinType as identifier
+            symbol:
+              token.symbol || token.coinType.split("::").pop() || "Unknown",
             name: token.name || "Unknown Token",
             logo: token.logo || "",
             decimals: token.decimals || 9,
@@ -121,7 +125,6 @@ const TokenSelector = ({
 
   const filteredTokens = () => {
     const query = searchQuery.toLowerCase().trim();
-    // Determine which token list to use based on active tab
     let tokenList: TokenData[] = [];
     if (activeTab === "all") {
       tokenList = tokens;
@@ -130,19 +133,16 @@ const TokenSelector = ({
     } else if (activeTab === "trending") {
       tokenList = trendingTokens;
     }
-    // Apply search filter if query exists
-    if (query) {
-      return tokenList.filter(
-        (token) =>
-          token.symbol.toLowerCase().includes(query) ||
-          token.name.toLowerCase().includes(query) ||
-          token.address.toLowerCase().includes(query)
-      );
-    }
-    return tokenList;
+    return query
+      ? tokenList.filter(
+          (token) =>
+            token.symbol.toLowerCase().includes(query) ||
+            token.name.toLowerCase().includes(query) ||
+            token.address.toLowerCase().includes(query)
+        )
+      : tokenList;
   };
 
-  // Format currency
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",

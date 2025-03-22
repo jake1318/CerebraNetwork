@@ -40,7 +40,7 @@ const KNOWN_COINS: Record<
     },
 };
 
-// Used to map coin types to token IDs for CoinGecko API
+// Map coin types to CoinGecko IDs
 const COIN_TYPE_TO_ID = {
   "0x2::sui::SUI": "sui",
   "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN":
@@ -53,7 +53,6 @@ const COIN_TYPE_TO_ID = {
     "bitcoin",
 };
 
-// Reverse map from ID to coin type
 const ID_TO_COIN_TYPE: Record<string, string> = {};
 Object.entries(COIN_TYPE_TO_ID).forEach(([coinType, id]) => {
   ID_TO_COIN_TYPE[id] = coinType;
@@ -113,7 +112,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   const [coinPrices, setCoinPrices] = useState<Record<string, number>>({});
   const [availableCoins, setAvailableCoins] = useState<string[]>([]);
 
-  // Format balance with up to 5 decimal places by default
   const formatBalance = (
     balance: bigint,
     decimals: number,
@@ -129,7 +127,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
-  // Format USD value with 2 decimal places and a $ symbol
   const formatUsd = (amount: number): string => {
     return amount.toLocaleString("en-US", {
       style: "currency",
@@ -139,7 +136,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
-  // Fetch coin prices from CoinGecko
   const fetchCoinPrices = async () => {
     try {
       const response = await axios.get(PRICE_API);
@@ -151,29 +147,26 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
           prices[coinType] = priceData.usd;
         }
       });
-      if (Object.keys(prices).length > 0) {
-        setCoinPrices(prices);
-        return prices;
-      }
-      return {};
+      setCoinPrices(prices);
+      return prices;
     } catch (error) {
       console.error("Error fetching coin prices:", error);
       return {};
     }
   };
 
-  // Fetch available coins (supported coin types) from the backend
   const fetchAvailableCoins = async () => {
     try {
       const response = await axios.get(`${API_URL}/supportedCoins`);
       let coins: string[] = response.data.supportedCoins;
-      // Ensure SUI is always available
       if (!coins.includes("0x2::sui::SUI")) {
         coins.push("0x2::sui::SUI");
       }
       setAvailableCoins(coins);
     } catch (error) {
       console.error("Error fetching available coins:", error);
+      // Fallback if backend not available:
+      setAvailableCoins(["0x2::sui::SUI"]);
     }
   };
 
@@ -187,7 +180,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     setLoading(true);
     try {
       let coins: any[] = [];
-
       try {
         if (typeof getCoins === "function") {
           coins = await getCoins();
@@ -200,7 +192,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch (err) {
         console.error("Error getting coins from wallet:", err);
       }
-
       if (!coins || !Array.isArray(coins) || coins.length === 0) {
         if (account) {
           coins = getDefaultCoins(account.address);
@@ -211,7 +202,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         string,
         { balance: bigint; metadata?: any }
       > = {};
-
       for (const coin of coins) {
         if (!coin || (!coin.type && !coin.coinType)) continue;
         const coinType = coin.type || coin.coinType;
