@@ -11,7 +11,7 @@ import {
   getSuiPrice,
 } from "@7kprotocol/sdk-ts";
 import BigNumber from "bignumber.js";
-import TokenSelector from "./tokenSelector/TokenSelector";
+import TokenSelector from "./TokenSelector/TokenSelector";
 import { Token, fetchTokens } from "../services/tokenService";
 import "./SwapForm.scss";
 
@@ -34,11 +34,19 @@ export default function SwapForm() {
   const [suiPrice, setSuiPrice] = useState<number | null>(null);
   const [loadingTokens, setLoadingTokens] = useState(true);
 
+  // Add states for token selector modals
+  const [isTokenInSelectorOpen, setIsTokenInSelectorOpen] = useState(false);
+  const [isTokenOutSelectorOpen, setIsTokenOutSelectorOpen] = useState(false);
+  const [availableTokens, setAvailableTokens] = useState<Token[]>([]);
+
   useEffect(() => {
     const loadDefaultTokens = async () => {
       try {
         setLoadingTokens(true);
         const tokens = await fetchTokens();
+        console.log("Fetched tokens:", tokens);
+
+        setAvailableTokens(tokens);
 
         if (tokens && tokens.length >= 2) {
           const suiToken = tokens.find((t) => t.symbol === "SUI");
@@ -269,6 +277,17 @@ export default function SwapForm() {
     }
   };
 
+  // Handle token selection
+  const handleTokenInSelect = (token: any) => {
+    setTokenIn(token);
+    setIsTokenInSelectorOpen(false);
+  };
+
+  const handleTokenOutSelect = (token: any) => {
+    setTokenOut(token);
+    setIsTokenOutSelectorOpen(false);
+  };
+
   if (loadingTokens) {
     return (
       <div className="swap-form loading">
@@ -328,11 +347,33 @@ export default function SwapForm() {
             step="any"
           />
           <div className="token-select-wrapper">
-            <TokenSelector
-              onSelect={setTokenIn}
-              currentToken={tokenIn || undefined}
-              excludeToken={tokenOut || undefined}
-            />
+            <button
+              className="token-selector-button"
+              onClick={() => setIsTokenInSelectorOpen(true)}
+            >
+              {tokenIn ? (
+                <div className="selected-token">
+                  {tokenIn.logo && (
+                    <img
+                      src={tokenIn.logo}
+                      alt={tokenIn.symbol}
+                      className="token-logo"
+                    />
+                  )}
+                  <span>{tokenIn.symbol}</span>
+                </div>
+              ) : (
+                "Select Token"
+              )}
+            </button>
+            {isTokenInSelectorOpen && (
+              <TokenSelector
+                isOpen={isTokenInSelectorOpen}
+                onClose={() => setIsTokenInSelectorOpen(false)}
+                onSelect={handleTokenInSelect}
+                excludeAddresses={tokenOut ? [tokenOut.address] : []}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -355,11 +396,33 @@ export default function SwapForm() {
             placeholder="0.0"
           />
           <div className="token-select-wrapper">
-            <TokenSelector
-              onSelect={setTokenOut}
-              currentToken={tokenOut || undefined}
-              excludeToken={tokenIn || undefined}
-            />
+            <button
+              className="token-selector-button"
+              onClick={() => setIsTokenOutSelectorOpen(true)}
+            >
+              {tokenOut ? (
+                <div className="selected-token">
+                  {tokenOut.logo && (
+                    <img
+                      src={tokenOut.logo}
+                      alt={tokenOut.symbol}
+                      className="token-logo"
+                    />
+                  )}
+                  <span>{tokenOut.symbol}</span>
+                </div>
+              ) : (
+                "Select Token"
+              )}
+            </button>
+            {isTokenOutSelectorOpen && (
+              <TokenSelector
+                isOpen={isTokenOutSelectorOpen}
+                onClose={() => setIsTokenOutSelectorOpen(false)}
+                onSelect={handleTokenOutSelect}
+                excludeAddresses={tokenIn ? [tokenIn.address] : []}
+              />
+            )}
           </div>
         </div>
       </div>

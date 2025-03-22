@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit"; // Or your current wallet provider
 import { birdeyeService } from "../../services/birdeyeService";
 import "./TokenSelector.scss";
@@ -47,10 +47,40 @@ const TokenSelector = ({
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      // Helper to extract an array from various response shapes.
+      const extractArray = (data: any): any[] => {
+        if (!data) return [];
+        if (data.data && Array.isArray(data.data)) {
+          return data.data;
+        } else if (Array.isArray(data)) {
+          return data;
+        } else if (data.tokens && Array.isArray(data.tokens)) {
+          return data.tokens;
+        }
+        return [];
+      };
+
       // Fetch trending tokens
       const trendingData = await birdeyeService.getTrendingTokens();
-      if (trendingData && trendingData.data) {
-        const trending = trendingData.data.map((token: any) => ({
+      const trendingArray = extractArray(trendingData);
+      const trending = trendingArray.map((token: any) => ({
+        address: token.address,
+        symbol: token.symbol || "Unknown",
+        name: token.name || "Unknown Token",
+        logo: token.logo || "",
+        decimals: token.decimals || 9,
+        price: token.price || 0,
+        change24h: token.priceChange24h || 0,
+        isTrending: true,
+      }));
+      setTrendingTokens(trending);
+
+      // Fetch token list
+      const tokenListData = await birdeyeService.getTokenList();
+      const tokenListArray = extractArray(tokenListData);
+      const tokenList = tokenListArray
+        .filter((token: any) => !excludeAddresses.includes(token.address))
+        .map((token: any) => ({
           address: token.address,
           symbol: token.symbol || "Unknown",
           name: token.name || "Unknown Token",
@@ -58,15 +88,16 @@ const TokenSelector = ({
           decimals: token.decimals || 9,
           price: token.price || 0,
           change24h: token.priceChange24h || 0,
-          isTrending: true,
         }));
-        setTrendingTokens(trending);
-      }
+      setTokens(tokenList);
 
-      // Fetch token list
-      const tokenListData = await birdeyeService.getTokenList();
-      if (tokenListData && tokenListData.data) {
-        const tokenList = tokenListData.data
+      // Fetch user's wallet tokens if connected
+      if (account?.address) {
+        const userTokenData = await birdeyeService.getWalletTokenList(
+          account.address
+        );
+        const userTokenArray = extractArray(userTokenData);
+        const userTokensMapped = userTokenArray
           .filter((token: any) => !excludeAddresses.includes(token.address))
           .map((token: any) => ({
             address: token.address,
@@ -75,32 +106,11 @@ const TokenSelector = ({
             logo: token.logo || "",
             decimals: token.decimals || 9,
             price: token.price || 0,
+            balance:
+              parseFloat(token.balance) / Math.pow(10, token.decimals || 9),
             change24h: token.priceChange24h || 0,
           }));
-        setTokens(tokenList);
-      }
-
-      // Fetch user's wallet tokens if connected
-      if (account?.address) {
-        const userTokenData = await birdeyeService.getWalletTokenList(
-          account.address
-        );
-        if (userTokenData && userTokenData.data) {
-          const userTokens = userTokenData.data
-            .filter((token: any) => !excludeAddresses.includes(token.address))
-            .map((token: any) => ({
-              address: token.address,
-              symbol: token.symbol || "Unknown",
-              name: token.name || "Unknown Token",
-              logo: token.logo || "",
-              decimals: token.decimals || 9,
-              price: token.price || 0,
-              balance:
-                parseFloat(token.balance) / Math.pow(10, token.decimals || 9),
-              change24h: token.priceChange24h || 0,
-            }));
-          setUserTokens(userTokens);
-        }
+        setUserTokens(userTokensMapped);
       }
     } catch (error) {
       console.error("Error fetching token data:", error);
@@ -111,7 +121,6 @@ const TokenSelector = ({
 
   const filteredTokens = () => {
     const query = searchQuery.toLowerCase().trim();
-
     // Determine which token list to use based on active tab
     let tokenList: TokenData[] = [];
     if (activeTab === "all") {
@@ -121,7 +130,6 @@ const TokenSelector = ({
     } else if (activeTab === "trending") {
       tokenList = trendingTokens;
     }
-
     // Apply search filter if query exists
     if (query) {
       return tokenList.filter(
@@ -131,7 +139,6 @@ const TokenSelector = ({
           token.address.toLowerCase().includes(query)
       );
     }
-
     return tokenList;
   };
 
