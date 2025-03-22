@@ -16,7 +16,7 @@ const birdeyeApi = axios.create({
   },
 });
 
-// Birdeye error interceptor for logging
+// Birdeye error interceptor
 birdeyeApi.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -32,7 +32,6 @@ const BLOCKVISION_API_BASE_URL = "https://api.blockvision.org";
 const BLOCKVISION_API_KEY =
   import.meta.env.VITE_BLOCKVISION_API_KEY || "2ugIlviim3ywrgFI0BMniB9wdzU";
 
-// Create axios instance for Blockvision
 const blockvisionApi = axios.create({
   baseURL: BLOCKVISION_API_BASE_URL,
   headers: {
@@ -54,12 +53,13 @@ blockvisionApi.interceptors.response.use(
 );
 
 // ===========================
-// Birdeye Service Functions (Supported endpoints)
+// Birdeye Service Functions (Supported Endpoints)
 // ===========================
 export const birdeyeService = {
   /**
-   * Get trending tokens (Birdeye).
-   * Endpoint: GET /defi/token_trending (supports x-chain header).
+   * Get trending tokens.
+   * Endpoint: GET /defi/token_trending.
+   * Query defaults: sort_by=rank, sort_type=asc, offset=0, limit=20.
    */
   getTrendingTokens: async (
     chain: string = "sui",
@@ -68,7 +68,7 @@ export const birdeyeService = {
   ) => {
     try {
       const response = await birdeyeApi.get("/defi/token_trending", {
-        headers: { "x-chain": chain }, // specify Sui chain&#8203;:contentReference[oaicite:4]{index=4}
+        headers: { "x-chain": chain },
         params: { sort_by: "rank", sort_type: "asc", offset, limit },
       });
       return response.data;
@@ -79,8 +79,9 @@ export const birdeyeService = {
   },
 
   /**
-   * Get full token list (Birdeye).
-   * Endpoint: GET /defi/tokenlist (e.g. top tokens by volume/liquidity).
+   * Get full token list.
+   * Endpoint: GET /defi/tokenlist.
+   * Query: sort_by=v24hUSD, sort_type=desc, offset=0, limit=50, min_liquidity=100.
    */
   getTokenList: async (chain: string = "sui") => {
     try {
@@ -102,8 +103,9 @@ export const birdeyeService = {
   },
 
   /**
-   * Get OHLCV price chart data for a token (Birdeye).
-   * Endpoint: GET /defi/ohlcv (requires token address, interval type, currency).
+   * Get OHLCV chart data.
+   * Endpoint: GET /defi/ohlcv.
+   * Query: address, type (e.g., "15m"), and currency (e.g., "usd").
    */
   getChartData: async (
     tokenAddress: string,
@@ -122,21 +124,17 @@ export const birdeyeService = {
       throw error;
     }
   },
-
-  // ... (Other Birdeye V3 endpoints like getTokenMetadataBatch, getSingleTokenMetadata, etc. remain unchanged)
-
-  // NOTE: Deprecated wallet methods removed:
-  // getWalletTokenList and getWalletTokenBalance have been removed in favor of Blockvision APIs.
+  // Additional endpoints (metadata, market data) can be added if needed.
 };
 
 // ===========================
-// Blockvision Service Functions (for Sui wallet data)
+// Blockvision Service Functions (For Wallet Data)
 // ===========================
 export const blockvisionService = {
   /**
-   * Get all coins and balances for a Sui address.
-   * Endpoint: GET /v2/sui/account/coins (Blockvision)&#8203;:contentReference[oaicite:5]{index=5}.
-   * @param account Sui address (0x...) to fetch coin holdings for.
+   * Get coins and balances for a given Sui address.
+   * Endpoint: GET /v2/sui/account/coins.
+   * @param account The Sui address to fetch coins for.
    */
   getAccountCoins: async (account: string) => {
     try {
@@ -151,9 +149,9 @@ export const blockvisionService = {
   },
 
   /**
-   * Get metadata and market details for a specific coin type.
-   * Endpoint: GET /v2/sui/coin/detail (Blockvision)&#8203;:contentReference[oaicite:6]{index=6}.
-   * @param coinType The coin type (address::module::struct) to get details for.
+   * Retrieve coin detail (metadata) for a given coin type.
+   * Endpoint: GET /v2/sui/coin/detail.
+   * @param coinType The coin type identifier.
    */
   getCoinDetail: async (coinType: string) => {
     try {
@@ -167,5 +165,3 @@ export const blockvisionService = {
     }
   },
 };
-
-// (Removed duplicate export statement; the services are already exported as consts above)

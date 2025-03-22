@@ -3,12 +3,10 @@ import { useWallet } from "@suiet/wallet-kit";
 import axios from "axios";
 import { CoinBalance } from "../types";
 
-// Constants
 const SUI_MAINNET_RPC_URL = "https://fullnode.mainnet.sui.io";
 const PRICE_API =
   "https://api.coingecko.com/api/v3/simple/price?ids=sui,ethereum,bitcoin,usd-coin,tether&vs_currencies=usd";
 
-// Commonly used coin types on Sui Mainnet
 const KNOWN_COINS: Record<
   string,
   { symbol: string; name: string; decimals: number }
@@ -40,7 +38,6 @@ const KNOWN_COINS: Record<
     },
 };
 
-// Map coin types to CoinGecko IDs
 const COIN_TYPE_TO_ID = {
   "0x2::sui::SUI": "sui",
   "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN":
@@ -87,20 +84,6 @@ export const useWalletContext = () => {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
-// Temporary default coins for development/testing
-const getDefaultCoins = (address: string) => [
-  {
-    type: "0x2::sui::SUI",
-    balance: "1000000000", // 1 SUI
-    owner: { AddressOwner: address },
-  },
-  {
-    type: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
-    balance: "5000000", // 5 USDC
-    owner: { AddressOwner: address },
-  },
-];
-
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -118,9 +101,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     displayDecimals: number = 5
   ): string => {
     const balanceNumber = Number(balance) / Math.pow(10, decimals);
-    if (balanceNumber > 0 && balanceNumber < 0.00001) {
+    if (balanceNumber > 0 && balanceNumber < 0.00001)
       return balanceNumber.toExponential(2);
-    }
     return balanceNumber.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: displayDecimals,
@@ -159,14 +141,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const response = await axios.get(`${API_URL}/supportedCoins`);
       let coins: string[] = response.data.supportedCoins;
-      if (!coins.includes("0x2::sui::SUI")) {
-        coins.push("0x2::sui::SUI");
-      }
+      if (!coins.includes("0x2::sui::SUI")) coins.push("0x2::sui::SUI");
       setAvailableCoins(coins);
     } catch (error) {
       console.error("Error fetching available coins:", error);
-      // Fallback if backend not available:
-      setAvailableCoins(["0x2::sui::SUI"]);
+      setAvailableCoins(["0x2::sui::SUI"]); // Fallback: only SUI available
     }
   };
 
@@ -193,9 +172,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         console.error("Error getting coins from wallet:", err);
       }
       if (!coins || !Array.isArray(coins) || coins.length === 0) {
-        if (account) {
-          coins = getDefaultCoins(account.address);
-        }
+        coins = []; // No mock tokens – rely solely on real data.
       }
 
       const balancesByType: Record<
