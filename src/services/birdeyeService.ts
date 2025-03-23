@@ -30,7 +30,7 @@ birdeyeApi.interceptors.response.use(
 // ===========================
 const BLOCKVISION_API_BASE_URL = "https://api.blockvision.org";
 const BLOCKVISION_API_KEY =
-  import.meta.env.VITE_BLOCKVISION_API_KEY || "2ugkMK7By51sJWZaXRMaUpKexQH";
+  import.meta.env.VITE_BLOCKVISION_API_KEY || "2ugIlviim3ywrgFI0BMniB9wdzU";
 
 const blockvisionApi = axios.create({
   baseURL: BLOCKVISION_API_BASE_URL,
