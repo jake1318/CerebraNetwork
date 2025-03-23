@@ -7,15 +7,28 @@ import React, {
 } from "react";
 import { birdeyeService } from "../services/birdeyeService";
 
+// Define the token data interface
+interface TokenData {
+  address: string;
+  symbol: string;
+  name: string;
+  logo: string;
+  decimals: number;
+  price: number;
+  balance?: number;
+  change24h?: number;
+  isTrending?: boolean;
+}
+
 interface BirdeyeContextType {
-  trendingTokens: any[];
-  tokenList: any[];
+  trendingTokens: TokenData[]; // Update type from any[] to TokenData[]
+  tokenList: TokenData[]; // Update type from any[] to TokenData[]
   isLoadingTrending: boolean;
   isLoadingTokenList: boolean;
   refreshTrendingTokens: () => Promise<void>;
   refreshTokenList: () => Promise<void>;
   getTokenMetadata: (tokenAddress: string) => Promise<any>;
-  getWalletTokens: (address: string) => Promise<any[]>;
+  getWalletTokens: (address: string) => Promise<TokenData[]>; // Update return type
   getTokenChart: (
     tokenAddress: string,
     resolution?: string,
@@ -28,18 +41,38 @@ const BirdeyeContext = createContext<BirdeyeContextType | undefined>(undefined);
 export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [trendingTokens, setTrendingTokens] = useState<any[]>([]);
-  const [tokenList, setTokenList] = useState<any[]>([]);
+  const [trendingTokens, setTrendingTokens] = useState<TokenData[]>([]);
+  const [tokenList, setTokenList] = useState<TokenData[]>([]);
   const [isLoadingTrending, setIsLoadingTrending] = useState<boolean>(false);
   const [isLoadingTokenList, setIsLoadingTokenList] = useState<boolean>(false);
 
-  // Fetch trending tokens
+  // Helper to extract arrays from various response shapes
+  const extractArray = (data: any): any[] => {
+    if (!data) return [];
+    if (data.data && Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data)) return data;
+    if (data.tokens && Array.isArray(data.tokens)) return data.tokens;
+    return [];
+  };
+
+  // Fetch trending tokens with proper formatting
   const refreshTrendingTokens = async () => {
     setIsLoadingTrending(true);
     try {
       const response = await birdeyeService.getTrendingTokens();
       if (response && response.data) {
-        setTrendingTokens(response.data);
+        const trendingArr = extractArray(response.data);
+        const formattedTokens = trendingArr.map((token: any) => ({
+          address: token.address,
+          symbol: token.symbol || "Unknown",
+          name: token.name || "Unknown Token",
+          logo: token.logo || "",
+          decimals: token.decimals || 9,
+          price: token.price || 0,
+          change24h: token.priceChange24h || 0,
+          isTrending: true,
+        }));
+        setTrendingTokens(formattedTokens);
       }
     } catch (error) {
       console.error("Error fetching trending tokens:", error);
@@ -48,13 +81,23 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Fetch token list
+  // Fetch token list with proper formatting
   const refreshTokenList = async () => {
     setIsLoadingTokenList(true);
     try {
       const response = await birdeyeService.getTokenList();
       if (response && response.data) {
-        setTokenList(response.data);
+        const tokenListArr = extractArray(response.data);
+        const formattedTokens = tokenListArr.map((token: any) => ({
+          address: token.address,
+          symbol: token.symbol || "Unknown",
+          name: token.name || "Unknown Token",
+          logo: token.logo || "",
+          decimals: token.decimals || 9,
+          price: token.price || 0,
+          change24h: token.priceChange24h || 0,
+        }));
+        setTokenList(formattedTokens);
       }
     } catch (error) {
       console.error("Error fetching token list:", error);
@@ -76,11 +119,23 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Get wallet tokens
-  const getWalletTokens = async (address: string) => {
+  // Get wallet tokens with proper formatting
+  const getWalletTokens = async (address: string): Promise<TokenData[]> => {
     try {
       const response = await birdeyeService.getWalletTokenList(address);
-      return response.data || [];
+      const walletArr = extractArray(response.data || []);
+      return walletArr.map((token: any) => ({
+        address: token.coinType || token.address,
+        symbol:
+          token.symbol ||
+          (token.coinType ? token.coinType.split("::").pop() : "Unknown"),
+        name: token.name || "Unknown Token",
+        logo: token.logo || "",
+        decimals: token.decimals || 9,
+        price: token.price || 0,
+        balance: parseFloat(token.balance) / Math.pow(10, token.decimals || 9),
+        change24h: token.priceChange24h || 0,
+      }));
     } catch (error) {
       console.error("Error fetching wallet tokens:", error);
       return [];
