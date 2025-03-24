@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import "./OrderForm.scss";
+import { useWallet } from "@suiet/wallet-kit";
+import { placeLimitOrder } from "@7kprotocol/sdk-ts";
 
 interface OrderFormProps {
   pair: {
@@ -21,9 +23,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
   orderMode,
   setOrderMode,
 }) => {
+  const { connected, account } = useWallet();
   const [price, setPrice] = useState<string>(pair.price.toString());
   const [amount, setAmount] = useState<string>("");
   const [total, setTotal] = useState<string>("");
+  const [expiration, setExpiration] = useState<string>("24"); // Default expiration in hours
+  const [slippage, setSlippage] = useState<string>("1.0"); // Default slippage 1%
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [txResult, setTxResult] = useState<string>("");
 
   // Update total when price or amount changes
   const updateTotal = (newPrice: string, newAmount: string) => {
@@ -62,23 +69,96 @@ const OrderForm: React.FC<OrderFormProps> = ({
     }
   };
 
+  // Calculate expiration timestamp from hours
+  const calculateExpirationTimestamp = (hoursFromNow: number): BigInt => {
+    const now = new Date();
+    const expirationTime = new Date(
+      now.getTime() + hoursFromNow * 60 * 60 * 1000
+    );
+    return BigInt(expirationTime.getTime());
+  };
+
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // In a real app, this would connect to your trading API or smart contract
-    console.log("Order submitted:", {
-      pair: pair.name,
-      type: orderType,
-      mode: orderMode,
-      price: orderMode === "limit" ? parseFloat(price) : "Market",
-      amount: parseFloat(amount),
-      total: parseFloat(total),
-    });
+    if (!connected || !account) {
+      setTxResult("Please connect your wallet first");
+      return;
+    }
 
-    // Reset form
-    setAmount("");
-    setTotal("");
+    if (!price || !amount || parseFloat(amount) <= 0) {
+      setTxResult("Please enter valid amount and price");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setTxResult("");
+
+    try {
+      // Mock coin types - in a real implementation, you would get these from your application state
+      const payCoinType =
+        orderType === "buy"
+          ? "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC"
+          : "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+
+      const targetCoinType =
+        orderType === "buy"
+          ? "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+          : "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
+
+      // Convert values to BigInt with appropriate scaling
+      const payCoinAmount = BigInt(
+        Math.floor(parseFloat(orderType === "buy" ? total : amount) * 1000000)
+      ); // Example: 6 decimals for USDC
+      const expirationTs = calculateExpirationTimestamp(
+        parseInt(expiration, 10)
+      );
+
+      // Calculate rate based on the documentation example
+      // For example: If 1 USDC = 0.25 SUI, rate = 0.25 * 10^(9 - 6) * 10^12 = 250000000000000
+      const rate = BigInt(Math.floor(parseFloat(price) * 1000000000000000)); // This scaling depends on the specific tokens
+
+      // Slippage in basis points (1% = 100 basis points)
+      const slippageValue = BigInt(parseFloat(slippage) * 100);
+
+      if (orderMode === "limit") {
+        const tx = await placeLimitOrder({
+          accountAddress: account.address,
+          payCoinType,
+          targetCoinType,
+          expireTs: expirationTs,
+          payCoinAmount,
+          rate,
+          slippage: slippageValue,
+          devInspect: false,
+        });
+
+        console.log("Limit order placed:", tx);
+        setTxResult(
+          "Limit order placed successfully! Transaction ID: " + tx.digest
+        );
+      } else {
+        // Market order implementation would go here
+        console.log("Market order submitted:", {
+          pair: pair.name,
+          type: orderType,
+          mode: orderMode,
+          amount: parseFloat(amount),
+          total: parseFloat(total),
+        });
+        setTxResult("Market order placed successfully!");
+      }
+
+      // Reset form after successful submission
+      setAmount("");
+      setTotal("");
+    } catch (error) {
+      console.error("Error placing order:", error);
+      setTxResult(`Error placing order: ${error.message || "Unknown error"}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Quick amount selector percentages
@@ -119,13 +199,13 @@ const OrderForm: React.FC<OrderFormProps> = ({
         <h3>Place Order</h3>
         <div className="order-type-selector">
           <button
-            className={orderType === "buy" ? "active buy" : ""}
+            className={`${orderType === "buy" ? "active" : ""} buy`}
             onClick={() => setOrderType("buy")}
           >
             Buy
           </button>
           <button
-            className={orderType === "sell" ? "active sell" : ""}
+            className={`${orderType === "sell" ? "active" : ""} sell`}
             onClick={() => setOrderType("sell")}
           >
             Sell
@@ -152,85 +232,105 @@ const OrderForm: React.FC<OrderFormProps> = ({
         {orderMode === "limit" && (
           <div className="form-group">
             <label>Price ({pair.quoteAsset})</label>
-            <div className="input-wrapper">
-              <input
-                type="number"
-                step="0.01"
-                value={price}
-                onChange={handlePriceChange}
-                placeholder={`Price in ${pair.quoteAsset}`}
-                required
-              />
-            </div>
+            <input
+              type="number"
+              step="0.0000001"
+              value={price}
+              onChange={handlePriceChange}
+              placeholder={`Price in ${pair.quoteAsset}`}
+              required
+            />
           </div>
         )}
 
         <div className="form-group">
           <label>Amount ({pair.baseAsset})</label>
-          <div className="input-wrapper">
-            <input
-              type="number"
-              step="0.000001"
-              value={amount}
-              onChange={handleAmountChange}
-              placeholder={`Amount in ${pair.baseAsset}`}
-              required
-            />
-          </div>
+          <input
+            type="number"
+            step="0.0000001"
+            value={amount}
+            onChange={handleAmountChange}
+            placeholder={`Amount in ${pair.baseAsset}`}
+            required
+          />
         </div>
 
         <div className="form-group">
           <label>Total ({pair.quoteAsset})</label>
-          <div className="input-wrapper">
-            <input
-              type="number"
-              step="0.01"
-              value={total}
-              onChange={handleTotalChange}
-              placeholder={`Total in ${pair.quoteAsset}`}
-              required
-            />
-          </div>
+          <input
+            type="number"
+            step="0.01"
+            value={total}
+            onChange={handleTotalChange}
+            placeholder={`Total in ${pair.quoteAsset}`}
+            required
+          />
         </div>
 
+        {orderMode === "limit" && (
+          <>
+            <div className="form-group">
+              <label>Expiration (hours)</label>
+              <select
+                value={expiration}
+                onChange={(e) => setExpiration(e.target.value)}
+              >
+                <option value="1">1 hour</option>
+                <option value="6">6 hours</option>
+                <option value="12">12 hours</option>
+                <option value="24">24 hours</option>
+                <option value="48">48 hours</option>
+                <option value="168">1 week</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Slippage Tolerance (%)</label>
+              <select
+                value={slippage}
+                onChange={(e) => setSlippage(e.target.value)}
+              >
+                <option value="0.1">0.1%</option>
+                <option value="0.5">0.5%</option>
+                <option value="1.0">1.0%</option>
+                <option value="2.0">2.0%</option>
+                <option value="5.0">5.0%</option>
+              </select>
+            </div>
+          </>
+        )}
+
         <div className="percentage-selector">
-          {amountPercentages.map((percentage) => (
+          {amountPercentages.map((percent) => (
             <button
-              key={percentage}
+              key={percent}
               type="button"
-              onClick={() => handlePercentageClick(percentage)}
+              onClick={() => handlePercentageClick(percent)}
             >
-              {percentage}%
+              {percent}%
             </button>
           ))}
         </div>
 
-        <div className="balance-display">
-          <span>Available:</span>
-          {orderType === "buy" ? (
-            <span>
-              {availableBalance.quote.toFixed(2)} {pair.quoteAsset}
-            </span>
-          ) : (
-            <span>
-              {availableBalance.base.toFixed(6)} {pair.baseAsset}
-            </span>
-          )}
+        <div className="available-balance">
+          <span>Available: </span>
+          <span className="balance-amount">
+            {orderType === "buy"
+              ? `${availableBalance.quote.toFixed(2)} ${pair.quoteAsset}`
+              : `${availableBalance.base.toFixed(6)} ${pair.baseAsset}`}
+          </span>
         </div>
+
+        {txResult && <div className="tx-result">{txResult}</div>}
 
         <button
           type="submit"
           className={`submit-button ${orderType}`}
-          disabled={
-            !amount ||
-            parseFloat(amount) <= 0 ||
-            !total ||
-            parseFloat(total) <= 0
-          }
+          disabled={isSubmitting || !connected}
         >
-          {orderType === "buy"
-            ? `Buy ${pair.baseAsset}`
-            : `Sell ${pair.baseAsset}`}
+          {isSubmitting
+            ? "Processing..."
+            : `${orderType === "buy" ? "Buy" : "Sell"} ${pair.baseAsset}`}
         </button>
       </form>
     </div>

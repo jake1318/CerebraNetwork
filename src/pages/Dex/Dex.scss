@@ -78,61 +78,90 @@
     background: rgba(0, 255, 255, 0.12);
     border-radius: 50%;
     filter: blur(70px);
-    top: -100px;
-    left: 10%;
+    top: 20%;
+    left: 15%;
     z-index: 0;
-    animation: pulsate 8s ease-in-out infinite alternate;
+    animation: pulse 15s ease-in-out infinite alternate;
   }
 
   .glow-2 {
     position: absolute;
-    width: 300px;
-    height: 300px;
+    width: 400px;
+    height: 400px;
     background: rgba(255, 0, 255, 0.12);
     border-radius: 50%;
-    filter: blur(80px);
-    bottom: -100px;
+    filter: blur(90px);
+    bottom: 10%;
     right: 10%;
     z-index: 0;
-    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    animation: pulse 20s ease-in-out infinite alternate-reverse;
   }
 
-  &__container {
+  // Animations
+  @keyframes horizonScan {
+    0% {
+      top: 10%;
+    }
+    50% {
+      top: 90%;
+    }
+    100% {
+      top: 10%;
+    }
+  }
+
+  @keyframes verticalScan {
+    0% {
+      left: 10%;
+    }
+    50% {
+      left: 90%;
+    }
+    100% {
+      left: 10%;
+    }
+  }
+
+  @keyframes pulse {
+    0% {
+      opacity: 0.6;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.9;
+      transform: scale(1.1);
+    }
+  }
+
+  .dex-page__container {
     max-width: 1400px;
     margin: 0 auto;
     position: relative;
     z-index: 2;
   }
 
-  &__header {
+  .dex-page__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
 
     h1 {
-      font-size: 2.5rem;
-      background: linear-gradient(90deg, #00ffff, #ff00ff);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      color: transparent;
-      text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-      font-weight: bold;
-      letter-spacing: 1px;
+      font-size: 2rem;
+      color: #fff;
+      text-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+      margin: 0;
     }
   }
 
-  &__trading-stats {
+  .dex-page__trading-stats {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
+    gap: 1.5rem;
     margin-bottom: 1.5rem;
+    background: rgba(5, 15, 30, 0.5);
     padding: 1rem;
-    background: rgba(5, 15, 30, 0.7);
     border-radius: 12px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(10px);
     border: 1px solid;
     border-image: linear-gradient(
         45deg,
@@ -142,20 +171,13 @@
       1;
 
     .stat {
-      padding: 0.5rem 1rem;
-      border-right: 1px solid rgba(255, 255, 255, 0.1);
-      flex: 1;
-      min-width: 120px;
-
-      &:last-child {
-        border-right: none;
-      }
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
 
       .label {
-        display: block;
         font-size: 0.8rem;
-        color: rgba(255, 255, 255, 0.7);
-        margin-bottom: 0.3rem;
+        color: rgba(255, 255, 255, 0.6);
       }
 
       .value {
@@ -174,195 +196,70 @@
     }
   }
 
-  &__trading-interface {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  .dex-page__content {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 260px);
+    min-height: 600px;
 
-    .trading-layout__top-row {
+    .chart-order-section {
       display: grid;
-      grid-template-columns: 1fr 400px; // Chart takes more space, Order Form fixed width
-      gap: 1rem;
-      min-height: 450px;
-
-      .chart-container {
-        height: 100%;
-      }
-
-      .order-form-container {
-        height: 100%;
-      }
+      grid-template-columns: 3fr 1fr 1fr;
+      gap: 1.5rem;
+      height: 100%;
     }
 
-    .trading-layout__bottom-row {
+    .trading-history-section {
       display: grid;
-      grid-template-columns: 1fr 400px; // Market Depth and Recent Trades match top row widths
-      gap: 1rem;
-      min-height: 350px; // Slightly smaller than top row
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      height: 100%;
+    }
 
+    .chart-container,
+    .orderbook-container,
+    .order-form-container,
+    .trading-history-container,
+    .my-orders-container {
+      height: 100%;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 1200px) {
+  .dex-page {
+    .dex-page__content {
+      .chart-order-section {
+        grid-template-columns: 2fr 1fr 1fr;
+      }
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .dex-page {
+    .dex-page__content {
+      height: auto;
+
+      .chart-order-section {
+        grid-template-columns: 1fr;
+        grid-template-rows: 300px repeat(2, auto);
+      }
+
+      .trading-history-section {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(2, auto);
+      }
+
+      .chart-container,
       .orderbook-container,
-      .history-container {
-        height: 100%;
-      }
-    }
-  }
-
-  // Connect prompt for users who haven't logged in
-  .connect-prompt {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: rgba(5, 15, 30, 0.7);
-    border-radius: 12px;
-    padding: 2rem;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
-      )
-      1;
-
-    h2 {
-      font-size: 1.8rem;
-      margin-bottom: 1rem;
-      background: linear-gradient(90deg, #00ffff, #ff00ff);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      color: transparent;
-    }
-
-    p {
-      font-size: 1.1rem;
-      color: rgba(255, 255, 255, 0.8);
-      text-align: center;
-    }
-  }
-
-  // Animations
-  @keyframes horizonScan {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(100%);
-    }
-  }
-
-  @keyframes verticalScan {
-    0% {
-      transform: translateY(-100%);
-    }
-    100% {
-      transform: translateY(100%);
-    }
-  }
-
-  @keyframes pulsate {
-    0% {
-      opacity: 0.5;
-      transform: scale(0.8);
-    }
-    100% {
-      opacity: 0.8;
-      transform: scale(1.2);
-    }
-  }
-
-  // Responsive styles
-  @media (max-width: 1200px) {
-    &__trading-interface {
-      .trading-layout__top-row,
-      .trading-layout__bottom-row {
-        grid-template-columns: 1fr 350px; // Slightly thinner on smaller screens
-      }
-    }
-  }
-
-  @media (max-width: 1024px) {
-    &__header {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 1rem;
-
-      h1 {
-        font-size: 2rem;
-      }
-    }
-
-    &__trading-interface {
-      .trading-layout__top-row,
-      .trading-layout__bottom-row {
-        grid-template-columns: 1fr; // Stack vertically on smaller screens
-      }
-
-      .trading-layout__top-row {
-        min-height: auto;
-
-        .chart-container {
-          height: 400px; // Fixed height for chart on smaller screens
-        }
-      }
-
-      .trading-layout__bottom-row {
-        min-height: auto;
-
-        .orderbook-container,
-        .history-container {
-          height: 350px; // Fixed height for bottom components
-        }
-      }
-    }
-  }
-
-  @media (max-width: 768px) {
-    padding: 1rem;
-
-    &__header {
-      h1 {
-        font-size: 1.8rem;
-      }
-    }
-
-    &__trading-stats {
-      flex-direction: column;
-      gap: 0.5rem;
-      padding: 0.75rem;
-
-      .stat {
-        border-right: none;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 0.5rem 0;
-
-        &:last-child {
-          border-bottom: none;
-        }
-
-        .label,
-        .value {
-          display: inline-block;
-          margin-right: 0.5rem;
-        }
-      }
-    }
-
-    &__trading-interface {
-      .trading-layout__top-row {
-        .chart-container {
-          height: 350px; // Even smaller on mobile
-        }
-      }
-
-      .trading-layout__bottom-row {
-        .orderbook-container,
-        .history-container {
-          height: 300px; // Even smaller on mobile
-        }
+      .order-form-container,
+      .trading-history-container,
+      .my-orders-container {
+        height: auto;
+        min-height: 300px;
       }
     }
   }

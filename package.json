@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@7kprotocol/sdk-ts": "^2.3.6",
+    "@7kprotocol/sdk-ts": "^2.3.4",
     "@mysten/deepbook-v3": "^0.13.2",
     "@mysten/sui": "^1.17.0",
     "@suiet/wallet-kit": "^0.2.25",

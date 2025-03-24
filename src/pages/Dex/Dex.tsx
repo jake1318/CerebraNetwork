@@ -5,6 +5,7 @@ import OrderBook from "./components/OrderBook";
 import OrderForm from "./components/OrderForm";
 import TradingHistory from "./components/TradingHistory";
 import PairSelector from "./components/PairSelector";
+import MyOrders from "./components/MyOrders";
 import "./Dex.scss";
 
 // Trading pair interface
@@ -77,6 +78,12 @@ const Dex: React.FC = () => {
     setSelectedPair(pair);
   };
 
+  // Handle order related events
+  const handleOrderEvent = () => {
+    // Refresh any relevant data after order operations
+    console.log("Order event occurred");
+  };
+
   return (
     <div className="dex-page">
       {/* Add glow effects */}
@@ -104,11 +111,7 @@ const Dex: React.FC = () => {
                 tradingStats.change24h >= 0 ? "positive" : "negative"
               }`}
             >
-              $
-              {tradingStats.price.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              ${tradingStats.price.toFixed(2)}
             </span>
           </div>
           <div className="stat change">
@@ -125,69 +128,46 @@ const Dex: React.FC = () => {
           <div className="stat volume">
             <span className="label">24h Volume:</span>
             <span className="value">
-              ${(tradingStats.volume24h / 1000000).toFixed(2)}M
+              ${tradingStats.volume24h.toLocaleString()}
             </span>
           </div>
           <div className="stat high">
             <span className="label">24h High:</span>
-            <span className="value">
-              $
-              {tradingStats.high24h.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+            <span className="value">${tradingStats.high24h.toFixed(2)}</span>
           </div>
           <div className="stat low">
             <span className="label">24h Low:</span>
-            <span className="value">
-              $
-              {tradingStats.low24h.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+            <span className="value">${tradingStats.low24h.toFixed(2)}</span>
           </div>
         </div>
 
-        {/* New layout structure */}
-        <div className="dex-page__trading-interface">
-          {/* Top row - Chart and Order Form side by side */}
-          <div className="trading-layout__top-row">
-            {/* Chart container */}
+        <div className="dex-page__content">
+          <div className="chart-order-section">
             <div className="chart-container">
               <Chart pair={selectedPair} />
             </div>
-
-            {/* Order form container */}
-            <div className="order-form-container">
-              {connected ? (
-                <OrderForm
-                  pair={selectedPair}
-                  orderType={orderType}
-                  setOrderType={setOrderType}
-                  orderMode={orderMode}
-                  setOrderMode={setOrderMode}
-                />
-              ) : (
-                <div className="connect-prompt">
-                  <h2>Connect Wallet</h2>
-                  <p>Please connect your wallet to start trading</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Bottom row - Market Depth and Recent Trades side by side */}
-          <div className="trading-layout__bottom-row">
-            {/* Market depth (OrderBook) container */}
             <div className="orderbook-container">
               <OrderBook pair={selectedPair} />
             </div>
-
-            {/* Recent trades container */}
-            <div className="history-container">
+            <div className="order-form-container">
+              <OrderForm
+                pair={selectedPair}
+                orderType={orderType}
+                setOrderType={setOrderType}
+                orderMode={orderMode}
+                setOrderMode={setOrderMode}
+              />
+            </div>
+          </div>
+          <div className="trading-history-section">
+            <div className="trading-history-container">
               <TradingHistory pair={selectedPair} />
+            </div>
+            <div className="my-orders-container">
+              <MyOrders
+                onOrderCancel={handleOrderEvent}
+                onOrderClaim={handleOrderEvent}
+              />
             </div>
           </div>
         </div>
