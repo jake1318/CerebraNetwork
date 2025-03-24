@@ -20,6 +20,7 @@
     "chart.js": "^4.4.8",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.5.0",
+    "lightweight-charts": "^5.0.4",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0",
