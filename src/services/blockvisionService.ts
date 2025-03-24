@@ -13,7 +13,7 @@ export const blockvisionService = {
     };
 
     try {
-      // Updated query parameter from "address" to "account"
+      // Updated query parameter from "address" to "account" as per documentation
       const response = await fetch(
         `https://api.blockvision.org/v2/sui/account/coins?account=${address}`,
         options
@@ -60,7 +60,6 @@ export const blockvisionService = {
     try {
       const packageIdsParam =
         packageIds.length > 0 ? `&packageIds=${packageIds.join("%2C")}` : "";
-
       const response = await fetch(
         `https://api.blockvision.org/v2/sui/account/activities?address=${address}${packageIdsParam}`,
         options

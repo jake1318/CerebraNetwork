@@ -129,9 +129,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         // Only fetch if we don't already have metadata
         if (!newMetadata[coinType]) {
           const metadata = await blockvisionService.getCoinDetail(coinType);
-          // Blockvision returns { code: 200, data: { symbol, name, decimals, logo, price, ...} }
-          if (metadata && metadata.data) {
-            newMetadata[coinType] = metadata.data;
+          // Check for result (Blockvision returns coin details under "result")
+          if (metadata && (metadata.data || metadata.result)) {
+            newMetadata[coinType] = metadata.data || metadata.result;
             hasChanges = true;
           }
         }
@@ -161,17 +161,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       );
 
       let coins: any[] = [];
+      // Blockvision returns the coins under result.coins
       if (
         blockvisionData &&
-        blockvisionData.data &&
-        Array.isArray(blockvisionData.data)
+        blockvisionData.result &&
+        Array.isArray(blockvisionData.result.coins)
       ) {
-        coins = blockvisionData.data.map((coin: any) => ({
+        coins = blockvisionData.result.coins.map((coin: any) => ({
           type: coin.coinType,
           balance: coin.balance,
           decimals: coin.decimals || 9,
           symbol: coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
           name: coin.name || "Unknown Coin",
+          logo: coin.logo || "",
         }));
       }
 
