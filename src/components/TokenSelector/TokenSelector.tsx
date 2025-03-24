@@ -1,50 +1,37 @@
-// src/components/TokenSelector/TokenSelector.tsx
-
 import { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { useWalletContext } from "../../contexts/WalletContext";
 import { useBirdeye } from "../../contexts/BirdeyeContext";
 import "./TokenSelector.scss";
 
-interface TokenData {
+export interface TokenData {
   address: string;
   symbol: string;
   name: string;
   logo: string;
   decimals: number;
   price: number;
-  balance?: number; // user’s balance, if in portfolio
-  // Removed change24h as per requirement
+  balance?: number; // user’s balance, if available
   isTrending?: boolean; // indicates trending token
 }
 
-// Example pinned tokens – adjust as desired.
-const PINNED_TOKENS: TokenData[] = [
-  {
-    address: "0x2::sui::SUI",
-    symbol: "SUI",
-    name: "Sui",
-    logo: "https://assets.coingecko.com/coins/images/24405/large/sui.jpeg",
-    decimals: 9,
-    price: 0,
-  },
-  {
-    address:
-      "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
-    symbol: "USDC",
-    name: "USD Coin",
-    logo: "https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png",
-    decimals: 6,
-    price: 0,
-  },
-  // Add more pinned tokens if desired
-];
-
-interface TokenSelectorProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelect: (token: TokenData) => void;
-  excludeAddresses?: string[];
+/**
+ * Utility to unify name/logo from two token objects.
+ * If Blockvision's name is "Unknown Coin", use Birdeye's name instead.
+ * For the logo, prefer the non-empty value.
+ */
+function unifyNameAndLogo(
+  blockvisionToken: Partial<TokenData>,
+  birdeyeToken: Partial<TokenData>
+): { name: string; logo: string } {
+  const bvName = blockvisionToken.name || "";
+  const bvLogo = blockvisionToken.logo || "";
+  const beName = birdeyeToken.name || "";
+  const beLogo = birdeyeToken.logo || "";
+  const finalName =
+    bvName && bvName !== "Unknown Coin" ? bvName : beName || "Unknown Coin";
+  const finalLogo = bvLogo || beLogo || "";
+  return { name: finalName, logo: finalLogo };
 }
 
 const TokenSelector = ({
@@ -52,136 +39,109 @@ const TokenSelector = ({
   onClose,
   onSelect,
   excludeAddresses = [],
-}: TokenSelectorProps) => {
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (token: TokenData) => void;
+  excludeAddresses?: string[];
+}) => {
   const { account } = useWallet();
-
-  // Pull data from BirdeyeContext
+  const { trendingTokens, tokenList, refreshTrendingTokens, refreshTokenList } =
+    useBirdeye();
   const {
-    trendingTokens,
-    tokenList,
-    isLoadingTrending,
-    isLoadingTokenList,
-    refreshTrendingTokens,
-    refreshTokenList,
-  } = useBirdeye();
-
-  // Pull data from WalletContext (note: coinPrices removed)
-  const { walletState, tokenMetadata, formatUsd, refreshBalances } =
-    useWalletContext();
-
+    walletState,
+    tokenMetadata,
+    refreshBalances,
+    formatUsd,
+    fetchTokenMetadata,
+  } = useWalletContext();
   const [searchQuery, setSearchQuery] = useState("");
-  // activeTab still exists; if "all" we'll show the merged list,
-  // if "portfolio" then only wallet tokens, if "trending" then only trending tokens.
-  const [activeTab, setActiveTab] = useState<"all" | "portfolio" | "trending">(
-    "all"
-  );
 
-  // Merge tokens from three sources:
-  // 1. Wallet tokens (from walletState)
-  // 2. Trending tokens (from BirdeyeContext)
-  // 3. The full token list (from BirdeyeContext + pinned tokens)
-  const getMergedTokens = (): TokenData[] => {
-    // 1. Get wallet tokens
-    const walletTokens =
-      walletState.balances && walletState.balances.length > 0
-        ? walletState.balances.map((bal) => {
-            const metadata = tokenMetadata[bal.coinType] || {};
-            const price = Number(metadata.price) || 0;
-            const balanceValue =
-              Number(bal.balance) / Math.pow(10, bal.decimals);
-            return {
-              address: bal.coinType,
-              symbol: bal.symbol || metadata.symbol || "UNKNOWN",
-              name: bal.name || metadata.name || "Unknown Token",
-              logo: metadata.logo || "",
-              decimals: bal.decimals,
-              price,
-              balance: balanceValue,
-            } as TokenData;
-          })
-        : [];
-
-    // 2. Get trending tokens from BirdeyeContext, filter out excluded addresses
-    const trending = trendingTokens.filter(
-      (t: TokenData) => !excludeAddresses.includes(t.address)
-    );
-
-    // 3. Get full token list (combine pinned tokens with tokenList from Birdeye)
-    const fullList = () => {
-      const validTokenList = tokenList.filter(
-        (t: TokenData) => !excludeAddresses.includes(t.address)
-      );
-      const existingAddr = new Set(
-        validTokenList.map((t: TokenData) => t.address.toLowerCase())
-      );
-      const filteredPinned = PINNED_TOKENS.filter(
-        (pt) => !existingAddr.has(pt.address.toLowerCase())
-      );
-      return [...filteredPinned, ...validTokenList];
-    };
-
-    const allTokens = fullList();
-
-    // 4. Merge with priority: walletTokens first, then trending, then remaining full tokens.
-    const merged: TokenData[] = [];
-    const added = new Set<string>();
-
-    // Wallet tokens first
-    walletTokens.forEach((token) => {
-      merged.push(token);
-      added.add(token.address.toLowerCase());
+  // Build a Birdeye token map for easy lookup
+  const buildBirdeyeMap = (): Map<string, TokenData> => {
+    const map = new Map<string, TokenData>();
+    [...tokenList, ...trendingTokens].forEach((t) => {
+      map.set(t.address.toLowerCase(), t);
     });
-
-    // Trending tokens next (if not already in wallet tokens)
-    trending.forEach((token) => {
-      if (!added.has(token.address.toLowerCase())) {
-        merged.push(token);
-        added.add(token.address.toLowerCase());
-      }
-    });
-
-    // Then add the rest from full token list
-    allTokens.forEach((token) => {
-      if (!added.has(token.address.toLowerCase())) {
-        merged.push(token);
-        added.add(token.address.toLowerCase());
-      }
-    });
-
-    return merged;
+    return map;
   };
 
-  // Choose token list based on active tab
+  // Build wallet tokens using Blockvision data, merging with Birdeye data when available
+  function buildWalletTokens(): TokenData[] {
+    if (!walletState.balances || walletState.balances.length === 0) return [];
+    const beMap = buildBirdeyeMap();
+    return walletState.balances.map((bal) => {
+      const blockMeta = tokenMetadata[bal.coinType] || {};
+      const price = Number(blockMeta.price) || 0;
+      const balanceValue = Number(bal.balance) / Math.pow(10, bal.decimals);
+      const beToken = beMap.get(bal.coinType.toLowerCase()) || {};
+      const { name, logo } = unifyNameAndLogo(
+        { name: bal.name, logo: blockMeta.logo },
+        { name: beToken.name, logo: beToken.logo }
+      );
+      return {
+        address: bal.coinType,
+        symbol: bal.symbol || blockMeta.symbol || beToken.symbol || "UNKNOWN",
+        name,
+        logo,
+        decimals: bal.decimals,
+        price,
+        balance: balanceValue,
+      };
+    });
+  }
+
+  // Build tokens from Birdeye that are not in the wallet (zero-balance tokens)
+  function buildBirdeyeOnlyTokens(): TokenData[] {
+    const beMap = buildBirdeyeMap();
+    const walletAddrs = new Set(
+      walletState.balances.map((b) => b.coinType.toLowerCase())
+    );
+    return [...beMap.values()]
+      .filter((t) => !walletAddrs.has(t.address.toLowerCase()))
+      .map((t) => {
+        const blockMeta = tokenMetadata[t.address] || {};
+        const { name, logo } = unifyNameAndLogo(
+          { name: blockMeta.name, logo: blockMeta.logo },
+          { name: t.name, logo: t.logo }
+        );
+        const price = Number(blockMeta.price || t.price) || 0;
+        return {
+          address: t.address,
+          symbol:
+            blockMeta.symbol ||
+            t.symbol ||
+            t.address.split("::").pop() ||
+            "UNKNOWN",
+          name,
+          logo,
+          decimals: blockMeta.decimals || t.decimals || 9,
+          price,
+          balance: 0,
+        };
+      });
+  }
+
+  // Merge wallet tokens first, then Birdeye-only tokens
+  const getMergedTokens = (): TokenData[] => {
+    const walletTokens = buildWalletTokens();
+    const birdeyeOnly = buildBirdeyeOnlyTokens();
+
+    // Sort wallet tokens by highest value (balance * price)
+    walletTokens.sort((a, b) => {
+      const aValue = (a.balance || 0) * a.price;
+      const bValue = (b.balance || 0) * b.price;
+      return bValue - aValue;
+    });
+
+    return [...walletTokens, ...birdeyeOnly];
+  };
+
   const filteredTokens = () => {
     const query = searchQuery.toLowerCase().trim();
-    let list: TokenData[] = [];
-    if (activeTab === "portfolio") {
-      // Only wallet tokens
-      list =
-        walletState.balances && walletState.balances.length > 0
-          ? walletState.balances.map((bal) => {
-              const metadata = tokenMetadata[bal.coinType] || {};
-              const price = Number(metadata.price) || 0;
-              const balanceValue =
-                Number(bal.balance) / Math.pow(10, bal.decimals);
-              return {
-                address: bal.coinType,
-                symbol: bal.symbol || metadata.symbol || "UNKNOWN",
-                name: bal.name || metadata.name || "Unknown Token",
-                logo: metadata.logo || "",
-                decimals: bal.decimals,
-                price,
-                balance: balanceValue,
-              } as TokenData;
-            })
-          : [];
-    } else if (activeTab === "trending") {
-      list = trendingTokens;
-    } else {
-      // "all" tab: use merged token list
-      list = getMergedTokens();
-    }
-
+    const list = getMergedTokens().filter(
+      (t) => !excludeAddresses.includes(t.address)
+    );
     if (query) {
       return list.filter(
         (token) =>
@@ -193,15 +153,16 @@ const TokenSelector = ({
     return list;
   };
 
-  // Overall loading state from contexts
-  const isLoading =
-    isLoadingTrending || isLoadingTokenList || walletState.loading;
-
   useEffect(() => {
     if (isOpen) {
       refreshTrendingTokens();
       refreshTokenList();
       refreshBalances();
+      // Fetch metadata for all tokens from Birdeye sources so zero-balance tokens get icons
+      const allAddrs = [
+        ...new Set([...tokenList, ...trendingTokens].map((t) => t.address)),
+      ];
+      fetchTokenMetadata(allAddrs);
     }
   }, [isOpen, account?.address]);
 
@@ -216,7 +177,6 @@ const TokenSelector = ({
             &times;
           </button>
         </div>
-
         <div className="token-search">
           <input
             type="text"
@@ -225,34 +185,8 @@ const TokenSelector = ({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-
-        <div className="token-tabs">
-          <button
-            className={activeTab === "all" ? "active" : ""}
-            onClick={() => setActiveTab("all")}
-          >
-            All Tokens
-          </button>
-          {account && (
-            <button
-              className={activeTab === "portfolio" ? "active" : ""}
-              onClick={() => setActiveTab("portfolio")}
-            >
-              Your Tokens
-            </button>
-          )}
-          <button
-            className={activeTab === "trending" ? "active" : ""}
-            onClick={() => setActiveTab("trending")}
-          >
-            Trending
-          </button>
-        </div>
-
         <div className="token-list">
-          {isLoading ? (
-            <div className="loading">Loading tokens...</div>
-          ) : filteredTokens().length === 0 ? (
+          {filteredTokens().length === 0 ? (
             <div className="no-tokens">No tokens found</div>
           ) : (
             filteredTokens().map((token) => (
@@ -270,12 +204,7 @@ const TokenSelector = ({
                     />
                   )}
                   <div className="token-details">
-                    <div className="token-symbol">
-                      {token.symbol}
-                      {token.isTrending && (
-                        <span className="trending-badge">🔥</span>
-                      )}
-                    </div>
+                    <div className="token-symbol">{token.symbol}</div>
                     <div className="token-name">{token.name}</div>
                   </div>
                 </div>

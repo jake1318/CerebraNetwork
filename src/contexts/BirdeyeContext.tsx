@@ -1,5 +1,3 @@
-// src/contexts/BirdeyeContext.tsx
-
 import React, {
   createContext,
   useContext,
@@ -9,7 +7,6 @@ import React, {
 } from "react";
 import { birdeyeService } from "../services/birdeyeService";
 
-// Define the token data interface
 export interface TokenData {
   address: string;
   symbol: string;
@@ -48,7 +45,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
   const [isLoadingTrending, setIsLoadingTrending] = useState<boolean>(false);
   const [isLoadingTokenList, setIsLoadingTokenList] = useState<boolean>(false);
 
-  // Helper to extract arrays from various response shapes
   const extractArray = (data: any): any[] => {
     if (!data) return [];
     if (data.data && Array.isArray(data.data)) return data.data;
@@ -57,7 +53,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     return [];
   };
 
-  // Fetch trending tokens with proper formatting
   const refreshTrendingTokens = async () => {
     setIsLoadingTrending(true);
     try {
@@ -83,7 +78,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Fetch token list with proper formatting
   const refreshTokenList = async () => {
     setIsLoadingTokenList(true);
     try {
@@ -108,7 +102,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Get token metadata
   const getTokenMetadata = async (tokenAddress: string) => {
     try {
       const response = await birdeyeService.getSingleTokenMetadata(
@@ -121,7 +114,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Get wallet tokens with proper formatting
   const getWalletTokens = async (address: string): Promise<TokenData[]> => {
     try {
       const response = await birdeyeService.getWalletTokenList(address);
@@ -144,7 +136,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Get token chart data
   const getTokenChart = async (
     tokenAddress: string,
     resolution = "1d",
@@ -163,7 +154,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Load initial data
   useEffect(() => {
     refreshTrendingTokens();
     refreshTokenList();

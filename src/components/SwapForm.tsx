@@ -1,5 +1,3 @@
-// src/components/SwapForm.tsx
-
 import { useState, useEffect } from "react";
 import {
   useWallet,
@@ -14,7 +12,7 @@ import {
 } from "@7kprotocol/sdk-ts";
 import BigNumber from "bignumber.js";
 import TokenSelector from "./TokenSelector/TokenSelector";
-import { useWalletContext } from "../contexts/WalletContext"; // Import WalletContext
+import { useWalletContext } from "../contexts/WalletContext";
 import { Token, fetchTokens } from "../services/tokenService";
 import "./SwapForm.scss";
 
@@ -22,8 +20,6 @@ export default function SwapForm() {
   const wallet = useWallet();
   const provider = useSuiProvider();
   const { balance: suiBalance } = useAccountBalance();
-
-  // Pull from WalletContext: balances, metadata, formatting helpers
   const { walletState, tokenMetadata, formatBalance, formatUsd } =
     useWalletContext();
 
@@ -34,41 +30,29 @@ export default function SwapForm() {
   const [loading, setLoading] = useState(false);
   const [quoting, setQuoting] = useState(false);
   const [error, setError] = useState("");
-  const [slippage, setSlippage] = useState(0.01); // 1%
+  const [slippage, setSlippage] = useState(0.01);
   const [customSlippage, setCustomSlippage] = useState("");
   const [showCustomSlippage, setShowCustomSlippage] = useState(false);
   const [estimatedFee, setEstimatedFee] = useState<number | null>(null);
   const [suiPrice, setSuiPrice] = useState<number | null>(null);
   const [loadingTokens, setLoadingTokens] = useState(true);
 
-  // Token selector modals
   const [isTokenInSelectorOpen, setIsTokenInSelectorOpen] = useState(false);
   const [isTokenOutSelectorOpen, setIsTokenOutSelectorOpen] = useState(false);
-
-  // Final merged token list (from wallet + any external API)
   const [availableTokens, setAvailableTokens] = useState<Token[]>([]);
 
-  // Convert wallet balances (from context) to the Token interface
   const convertWalletBalancesToTokens = (): Token[] => {
     if (!walletState.balances || walletState.balances.length === 0) return [];
-
     return walletState.balances.map((balance) => {
-      // Attempt to fetch additional metadata from tokenMetadata
       const metadata = tokenMetadata[balance.coinType] || {};
-      // Use price from metadata
       const price = Number(metadata.price) || 0;
       const balanceValue =
         Number(balance.balance) / Math.pow(10, balance.decimals);
-
       return {
         address: balance.coinType,
-        symbol:
-          balance.symbol ||
-          metadata.symbol ||
-          balance.coinType.split("::").pop() ||
-          "Unknown",
+        symbol: balance.symbol || metadata.symbol || "Unknown",
         name: balance.name || metadata.name || "Unknown Token",
-        logo: metadata.logo || "", // Use metadata.logo if provided
+        logo: metadata.logo || "",
         decimals: balance.decimals,
         price,
         balance: balanceValue.toString(),
@@ -76,50 +60,35 @@ export default function SwapForm() {
     });
   };
 
-  // Merge tokens from your local fetchTokens() with the wallet tokens
   useEffect(() => {
     const loadDefaultTokens = async () => {
       try {
         setLoadingTokens(true);
-
-        // 1) Get tokens from some external API (if you want)
         const apiTokens = await fetchTokens();
-
-        // 2) Convert wallet balances to your Token interface
         const walletTokens = convertWalletBalancesToTokens();
-
-        // 3) Combine both lists, deduplicating by address
         const tokensMap = new Map<string, Token>();
         apiTokens.forEach((token) => tokensMap.set(token.address, token));
-
         walletTokens.forEach((token) => {
           if (tokensMap.has(token.address)) {
-            // Merge with existing token data but keep wallet balance
             const existing = tokensMap.get(token.address)!;
             tokensMap.set(token.address, {
               ...existing,
-              balance: token.balance, // prefer the wallet's balance
+              balance: token.balance,
               price: token.price || existing.price,
             });
           } else {
             tokensMap.set(token.address, token);
           }
         });
-
         const mergedTokens = Array.from(tokensMap.values());
         console.log("Merged tokens:", mergedTokens);
         setAvailableTokens(mergedTokens);
-
-        // 4) Choose defaults for tokenIn/tokenOut
         if (mergedTokens && mergedTokens.length >= 2) {
           const suiToken = mergedTokens.find((t) => t.symbol === "SUI");
           const usdcToken = mergedTokens.find((t) => t.symbol === "USDC");
-
           setTokenIn(suiToken || mergedTokens[0]);
           setTokenOut(usdcToken || mergedTokens[1]);
         }
-
-        // 5) Fetch SUI price from tokenMetadata if available
         try {
           if (
             tokenMetadata["0x2::sui::SUI"] &&
@@ -127,7 +96,6 @@ export default function SwapForm() {
           ) {
             setSuiPrice(Number(tokenMetadata["0x2::sui::SUI"].price));
           } else {
-            // If not available, set a default (or leave it as 0)
             setSuiPrice(0);
           }
         } catch (priceError) {
@@ -140,47 +108,36 @@ export default function SwapForm() {
         setLoadingTokens(false);
       }
     };
-
     loadDefaultTokens();
   }, [walletState.balances, tokenMetadata]);
 
-  // Helper to fill input by percentage
   const handlePercentageClick = async (percentage: number) => {
     if (!tokenIn || !wallet.account?.address) return;
-
     try {
-      // If it's SUI, use suiBalance from the Suiet kit
       if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
         const balanceInSui = parseInt(suiBalance) / 1e9;
-        // Keep ~0.05 SUI in wallet for gas
         const maxAmount = Math.max(0, balanceInSui - 0.05);
         const percentAmount = (maxAmount * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
         return;
       }
-
-      // Otherwise, find the token in walletState
       const walletToken = walletState.balances.find(
         (b) => b.coinType === tokenIn.address
       );
-
       if (walletToken) {
         const decimals = walletToken.decimals;
         const balanceNum = Number(walletToken.balance) / Math.pow(10, decimals);
         const percentAmount = (balanceNum * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
       } else if (tokenIn.balance) {
-        // Fallback to the merged token's stored balance
         const balanceNum = parseFloat(tokenIn.balance);
         const percentAmount = (balanceNum * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
       } else if (provider) {
-        // Last fallback: direct on-chain query
         const result = await provider.getBalance({
           owner: wallet.account.address,
           coinType: tokenIn.address,
         });
-
         if (result?.totalBalance) {
           const decimals = tokenIn.decimals;
           const balanceNum =
@@ -194,16 +151,13 @@ export default function SwapForm() {
     }
   };
 
-  // Slippage logic
   const handleCustomSlippageChange = (value: string) => {
     const cleaned = value.replace(/[^\d.]/g, "");
     const parts = cleaned.split(".");
     if (parts.length > 2) return;
     if (parts[1] && parts[1].length > 2) return;
     if (Number(cleaned) > 100) return;
-
     setCustomSlippage(cleaned);
-
     if (cleaned && Number(cleaned) > 0) {
       setSlippage(Number(cleaned) / 100);
     }
@@ -215,10 +169,8 @@ export default function SwapForm() {
 
   const getMaxAmount = () => handlePercentageClick(100);
 
-  // Auto-quote after user finishes typing amountIn
   useEffect(() => {
     if (loadingTokens) return;
-
     const timer = setTimeout(() => {
       if (tokenIn && tokenOut && amountIn && parseFloat(amountIn) > 0) {
         getQuoteForSwap();
@@ -227,40 +179,33 @@ export default function SwapForm() {
         setEstimatedFee(null);
       }
     }, 500);
-
     return () => clearTimeout(timer);
   }, [tokenIn, tokenOut, amountIn, loadingTokens]);
 
-  // Fetch swap quote
   const getQuoteForSwap = async () => {
     if (!tokenIn || !tokenOut || !amountIn || Number(amountIn) <= 0) {
       setAmountOut("0");
       setEstimatedFee(null);
       return;
     }
-
     try {
       setQuoting(true);
       setError("");
-
       const decimals = tokenIn.decimals;
       const amountInBaseUnits = new BigNumber(amountIn)
         .times(10 ** decimals)
         .toString();
-
       const quoteResponse = await getQuote({
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,
         amountIn: amountInBaseUnits,
       });
-
       if (quoteResponse) {
         const outDecimals = tokenOut.decimals;
         const outAmount = new BigNumber(quoteResponse.outAmount)
           .div(10 ** outDecimals)
           .toString();
         setAmountOut(outAmount);
-
         if (wallet.account?.address) {
           try {
             const feeInUsd = await estimateGasFee({
@@ -289,33 +234,27 @@ export default function SwapForm() {
     }
   };
 
-  // Execute the swap
   const swapTokens = async () => {
     if (!wallet.connected || !wallet.account?.address) {
       setError("Wallet not connected");
       return;
     }
-
     if (!tokenIn || !tokenOut) {
       setError("Please select tokens");
       return;
     }
-
     try {
       setLoading(true);
       setError("");
-
       const decimals = tokenIn.decimals;
       const amountInBaseUnits = new BigNumber(amountIn)
         .times(10 ** decimals)
         .toString();
-
       const quoteResponse = await getQuote({
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,
         amountIn: amountInBaseUnits,
       });
-
       const { tx } = await buildTx({
         quoteResponse,
         accountAddress: wallet.account.address,
@@ -325,19 +264,15 @@ export default function SwapForm() {
           commissionBps: 0,
         },
       });
-
       try {
         if (!wallet.signAndExecuteTransactionBlock) {
           throw new Error("Wallet does not support transaction signing");
         }
-
         const result = await wallet.signAndExecuteTransactionBlock({
           transactionBlock: tx,
         });
         console.log("Swap completed:", result);
         alert("Swap completed successfully!");
-
-        // Reset after success
         setAmountIn("");
         setAmountOut("0");
         setEstimatedFee(null);
@@ -353,7 +288,6 @@ export default function SwapForm() {
     }
   };
 
-  // Switch 'From' and 'To' tokens
   const switchTokens = () => {
     if (tokenIn && tokenOut) {
       const temp = tokenIn;
@@ -365,7 +299,6 @@ export default function SwapForm() {
     }
   };
 
-  // Handle token selection from the TokenSelector
   const handleTokenInSelect = (token: Token) => {
     setTokenIn(token);
     setIsTokenInSelectorOpen(false);
@@ -388,7 +321,6 @@ export default function SwapForm() {
   return (
     <div className="swap-form">
       <h2>Swap Tokens</h2>
-
       <div className="form-group">
         <div className="form-label-row">
           <label>From</label>
@@ -465,7 +397,6 @@ export default function SwapForm() {
           </div>
         </div>
       </div>
-
       <button
         className="switch-button"
         onClick={switchTokens}
@@ -473,7 +404,6 @@ export default function SwapForm() {
       >
         ↓↑
       </button>
-
       <div className="form-group">
         <label>To (Estimated)</label>
         <div className="input-with-token">
@@ -514,7 +444,6 @@ export default function SwapForm() {
           </div>
         </div>
       </div>
-
       <div className="rate-info">
         {!quoting &&
           tokenIn &&
@@ -528,7 +457,6 @@ export default function SwapForm() {
             </div>
           )}
       </div>
-
       <div className="form-group slippage-control">
         <label>Slippage Tolerance</label>
         <div className="slippage-options">
@@ -602,15 +530,12 @@ export default function SwapForm() {
           </div>
         )}
       </div>
-
       {estimatedFee !== null && (
         <div className="fee-estimate">
           Estimated Gas Fee: ${estimatedFee.toFixed(4)} USD
         </div>
       )}
-
       {error && <div className="error-message">{error}</div>}
-
       <button
         className="swap-button"
         onClick={swapTokens}
@@ -627,7 +552,6 @@ export default function SwapForm() {
       >
         {loading ? "Processing..." : "Swap"}
       </button>
-
       {!wallet.connected && (
         <div className="connect-wallet-prompt">
           Please connect your wallet to perform swaps
