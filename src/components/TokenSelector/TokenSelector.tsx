@@ -11,14 +11,16 @@ export interface TokenData {
   logo: string;
   decimals: number;
   price: number;
-  balance?: number; // user’s balance, if available
-  isTrending?: boolean; // indicates trending token
+  balance?: number; // user’s balance (if any)
+  isTrending?: boolean; // marks a trending token
+  // You can also add a computed field for shortAddress if needed:
+  shortAddress?: string;
 }
 
 /**
- * Utility to unify name/logo from two token objects.
- * If Blockvision's name is "Unknown Coin", use Birdeye's name instead.
- * For the logo, prefer the non-empty value.
+ * Unifies two token objects’ name and logo.
+ * If Blockvision returns "Unknown Coin" for the name, we use the Birdeye name.
+ * For the logo, we prefer a non-empty value.
  */
 function unifyNameAndLogo(
   blockvisionToken: Partial<TokenData>,
@@ -57,7 +59,7 @@ const TokenSelector = ({
   } = useWalletContext();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Build a Birdeye token map for easy lookup
+  // Build a map from Birdeye tokens (from both tokenList and trendingTokens)
   const buildBirdeyeMap = (): Map<string, TokenData> => {
     const map = new Map<string, TokenData>();
     [...tokenList, ...trendingTokens].forEach((t) => {
@@ -66,7 +68,7 @@ const TokenSelector = ({
     return map;
   };
 
-  // Build wallet tokens using Blockvision data, merging with Birdeye data when available
+  // Build tokens that the user holds (from Blockvision via WalletContext)
   function buildWalletTokens(): TokenData[] {
     if (!walletState.balances || walletState.balances.length === 0) return [];
     const beMap = buildBirdeyeMap();
@@ -87,11 +89,12 @@ const TokenSelector = ({
         decimals: bal.decimals,
         price,
         balance: balanceValue,
+        shortAddress: bal.coinType.slice(0, 6) + "…" + bal.coinType.slice(-4),
       };
     });
   }
 
-  // Build tokens from Birdeye that are not in the wallet (zero-balance tokens)
+  // Build tokens from Birdeye that the user does not hold (i.e. zero-balance tokens)
   function buildBirdeyeOnlyTokens(): TokenData[] {
     const beMap = buildBirdeyeMap();
     const walletAddrs = new Set(
@@ -100,7 +103,7 @@ const TokenSelector = ({
     return [...beMap.values()]
       .filter((t) => !walletAddrs.has(t.address.toLowerCase()))
       .map((t) => {
-        const blockMeta = tokenMetadata[t.address] || {};
+        const blockMeta = tokenMetadata[t.address.toLowerCase()] || {};
         const { name, logo } = unifyNameAndLogo(
           { name: blockMeta.name, logo: blockMeta.logo },
           { name: t.name, logo: t.logo }
@@ -118,22 +121,19 @@ const TokenSelector = ({
           decimals: blockMeta.decimals || t.decimals || 9,
           price,
           balance: 0,
+          shortAddress: t.address.slice(0, 6) + "…" + t.address.slice(-4),
         };
       });
   }
 
-  // Merge wallet tokens first, then Birdeye-only tokens
+  // Final merged list: wallet tokens first, then the remaining tokens.
   const getMergedTokens = (): TokenData[] => {
     const walletTokens = buildWalletTokens();
     const birdeyeOnly = buildBirdeyeOnlyTokens();
-
-    // Sort wallet tokens by highest value (balance * price)
-    walletTokens.sort((a, b) => {
-      const aValue = (a.balance || 0) * a.price;
-      const bValue = (b.balance || 0) * b.price;
-      return bValue - aValue;
-    });
-
+    // Sort wallet tokens by descending (balance * price)
+    walletTokens.sort(
+      (a, b) => (a.balance || 0) * a.price - (b.balance || 0) * b.price
+    );
     return [...walletTokens, ...birdeyeOnly];
   };
 
@@ -158,7 +158,7 @@ const TokenSelector = ({
       refreshTrendingTokens();
       refreshTokenList();
       refreshBalances();
-      // Fetch metadata for all tokens from Birdeye sources so zero-balance tokens get icons
+      // Fetch metadata for all tokens in Birdeye so even zero-balance tokens are enriched.
       const allAddrs = [
         ...new Set([...tokenList, ...trendingTokens].map((t) => t.address)),
       ];
@@ -218,7 +218,9 @@ const TokenSelector = ({
                   )}
                   <div className="token-price">{formatUsd(token.price)}</div>
                   <div className="token-address">
-                    {token.address.slice(0, 9)}…
+                    {token.shortAddress
+                      ? token.shortAddress
+                      : token.address.slice(0, 9) + "…"}
                   </div>
                 </div>
               </div>

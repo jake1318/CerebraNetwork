@@ -4,7 +4,7 @@ import { CoinBalance } from "../types";
 import blockvisionService from "../services/blockvisionService";
 import { birdeyeService } from "../services/birdeyeService";
 
-// Removed example coin mappings since we pull all metadata from Blockvision
+// We have removed the hard-coded coin mappings since metadata comes from Blockvision.
 
 interface WalletContextType {
   walletState: {

@@ -23,6 +23,7 @@ export default function SwapForm() {
   const { walletState, tokenMetadata, formatBalance, formatUsd } =
     useWalletContext();
 
+  // Remove the fallback default selections – start with null.
   const [tokenIn, setTokenIn] = useState<Token | null>(null);
   const [tokenOut, setTokenOut] = useState<Token | null>(null);
   const [amountIn, setAmountIn] = useState("");
@@ -83,12 +84,7 @@ export default function SwapForm() {
         const mergedTokens = Array.from(tokensMap.values());
         console.log("Merged tokens:", mergedTokens);
         setAvailableTokens(mergedTokens);
-        if (mergedTokens && mergedTokens.length >= 2) {
-          const suiToken = mergedTokens.find((t) => t.symbol === "SUI");
-          const usdcToken = mergedTokens.find((t) => t.symbol === "USDC");
-          setTokenIn(suiToken || mergedTokens[0]);
-          setTokenOut(usdcToken || mergedTokens[1]);
-        }
+        // Do not auto-select defaults; let the user choose.
         try {
           if (
             tokenMetadata["0x2::sui::SUI"] &&

@@ -217,19 +217,6 @@
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-
-            .price-change {
-              font-size: 0.75rem;
-              margin-top: 2px;
-
-              &.positive {
-                color: #4caf50;
-              }
-
-              &.negative {
-                color: #ff5252;
-              }
-            }
           }
         }
       }
