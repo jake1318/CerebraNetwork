@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
-import { blockvisionService } from "../../services/birdeyeService";
-import { useBirdeye } from "../../contexts/BirdeyeContext"; // Add this import
+import { useWalletContext } from "../../contexts/WalletContext"; // Add this import
+import { useBirdeye } from "../../contexts/BirdeyeContext";
 import "./TokenSelector.scss";
 
 interface TokenData {
@@ -45,9 +45,16 @@ const TokenSelector = ({
     refreshTokenList,
   } = useBirdeye();
 
-  // Keep wallet tokens in local state as they're user-specific
-  const [walletTokens, setWalletTokens] = useState<TokenData[]>([]);
-  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+  // Use the wallet context
+  const {
+    walletState,
+    coinPrices,
+    tokenMetadata,
+    formatBalance,
+    formatUsd,
+    refreshBalances,
+  } = useWalletContext();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "portfolio" | "trending">(
     "all"
@@ -58,50 +65,44 @@ const TokenSelector = ({
       // Refresh context data when modal opens
       refreshTrendingTokens();
       refreshTokenList();
-      // Only fetch wallet tokens
-      fetchWalletTokens();
+      // Refresh wallet balances when modal opens
+      refreshBalances();
     }
   }, [isOpen, account?.address]);
 
-  // Modified to only fetch wallet tokens
-  const fetchWalletTokens = async () => {
-    if (!account?.address) return;
-
-    setIsLoadingWallet(true);
-    try {
-      // Helper to extract an array from various response shapes
-      const extractArray = (data: any): any[] => {
-        if (!data) return [];
-        if (data.data && Array.isArray(data.data)) return data.data;
-        if (Array.isArray(data)) return data;
-        if (data.tokens && Array.isArray(data.tokens)) return data.tokens;
-        return [];
-      };
-
-      // Fetch wallet tokens via Blockvision if connected
-      const walletData = await blockvisionService.getAccountCoins(
-        account.address
-      );
-      const walletArr = extractArray(walletData);
-      const walletList = walletArr
-        .filter((token: any) => !excludeAddresses.includes(token.coinType))
-        .map((token: any) => ({
-          address: token.coinType, // using coinType as token identifier
-          symbol: token.symbol || token.coinType.split("::").pop() || "Unknown",
-          name: token.name || "Unknown Token",
-          logo: token.logo || "",
-          decimals: token.decimals || 9,
-          price: token.price || 0,
-          balance:
-            parseFloat(token.balance) / Math.pow(10, token.decimals || 9),
-          change24h: token.priceChange24h || 0,
-        }));
-      setWalletTokens(walletList);
-    } catch (error) {
-      console.error("Error fetching wallet tokens:", error);
-    } finally {
-      setIsLoadingWallet(false);
+  // Convert wallet balances to TokenData format for the UI
+  const getWalletTokens = (): TokenData[] => {
+    if (!walletState.balances || walletState.balances.length === 0) {
+      return [];
     }
+
+    return walletState.balances
+      .filter((balance) => !excludeAddresses.includes(balance.coinType))
+      .map((balance) => {
+        // Get metadata from our tokenMetadata state
+        const metadata = tokenMetadata[balance.coinType] || {};
+
+        // Calculate USD value using coin prices
+        const price = coinPrices[balance.coinType] || 0;
+        const balanceValue =
+          Number(balance.balance) / Math.pow(10, balance.decimals);
+
+        return {
+          address: balance.coinType,
+          symbol:
+            balance.symbol ||
+            metadata.symbol ||
+            balance.coinType.split("::").pop() ||
+            "Unknown",
+          name: balance.name || metadata.name || "Unknown Token",
+          logo: metadata.logo || "", // Logo from metadata
+          decimals: balance.decimals,
+          price: price,
+          balance: balanceValue,
+          change24h: metadata.priceChange24h || 0,
+          // Add any other properties from metadata that you need
+        };
+      });
   };
 
   // For "all" tab, combine the pinned tokens with the context token list
@@ -130,7 +131,7 @@ const TokenSelector = ({
     let list: TokenData[] = [];
 
     if (activeTab === "portfolio") {
-      list = walletTokens;
+      list = getWalletTokens(); // Use the function to get wallet tokens
     } else if (activeTab === "trending") {
       list = trendingTokens;
     } else if (activeTab === "all") {
@@ -147,17 +148,9 @@ const TokenSelector = ({
       : list;
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  // Check loading state from both context and local state
-  const isLoading = isLoadingTrending || isLoadingTokenList || isLoadingWallet;
+  // Check loading state from context
+  const isLoading =
+    isLoadingTrending || isLoadingTokenList || walletState.loading;
 
   if (!isOpen) return null;
 
@@ -242,7 +235,7 @@ const TokenSelector = ({
                     </div>
                   )}
                   <div className="token-price">
-                    {formatCurrency(token.price)}
+                    {formatUsd(token.price)}
                     {token.change24h !== undefined && (
                       <span
                         className={`price-change ${

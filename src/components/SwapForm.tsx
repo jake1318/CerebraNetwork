@@ -12,6 +12,7 @@ import {
 } from "@7kprotocol/sdk-ts";
 import BigNumber from "bignumber.js";
 import TokenSelector from "./TokenSelector/TokenSelector";
+import { useWalletContext } from "../contexts/WalletContext"; // Import WalletContext
 import { Token, fetchTokens } from "../services/tokenService";
 import "./SwapForm.scss";
 
@@ -19,6 +20,10 @@ export default function SwapForm() {
   const wallet = useWallet();
   const provider = useSuiProvider();
   const { balance: suiBalance } = useAccountBalance();
+
+  // Use WalletContext to access wallet balances and token metadata
+  const { walletState, tokenMetadata, formatBalance, formatUsd, coinPrices } =
+    useWalletContext();
 
   const [tokenIn, setTokenIn] = useState<Token | null>(null);
   const [tokenOut, setTokenOut] = useState<Token | null>(null);
@@ -39,26 +44,87 @@ export default function SwapForm() {
   const [isTokenOutSelectorOpen, setIsTokenOutSelectorOpen] = useState(false);
   const [availableTokens, setAvailableTokens] = useState<Token[]>([]);
 
+  // Function to convert wallet balances to Token format
+  const convertWalletBalancesToTokens = () => {
+    if (!walletState.balances || walletState.balances.length === 0) {
+      return [];
+    }
+
+    return walletState.balances.map((balance) => {
+      const metadata = tokenMetadata[balance.coinType] || {};
+      const price = coinPrices[balance.coinType] || 0;
+      const balanceValue =
+        Number(balance.balance) / Math.pow(10, balance.decimals);
+
+      return {
+        address: balance.coinType,
+        symbol:
+          balance.symbol ||
+          metadata.symbol ||
+          balance.coinType.split("::").pop() ||
+          "Unknown",
+        name: balance.name || metadata.name || "Unknown Token",
+        logo: metadata.logo || "",
+        decimals: balance.decimals,
+        price: price,
+        balance: balanceValue.toString(),
+        // Add other properties needed by Token interface
+      } as Token;
+    });
+  };
+
   useEffect(() => {
     const loadDefaultTokens = async () => {
       try {
         setLoadingTokens(true);
-        const tokens = await fetchTokens();
-        console.log("Fetched tokens:", tokens);
 
-        setAvailableTokens(tokens);
+        // Combine tokens from API with tokens from wallet
+        const apiTokens = await fetchTokens();
+        const walletTokens = convertWalletBalancesToTokens();
 
-        if (tokens && tokens.length >= 2) {
-          const suiToken = tokens.find((t) => t.symbol === "SUI");
-          const usdcToken = tokens.find((t) => t.symbol === "USDC");
+        // Create a map to deduplicate by address
+        const tokensMap = new Map<string, Token>();
 
-          setTokenIn(suiToken || tokens[0]);
-          setTokenOut(usdcToken || tokens[1]);
+        // Add API tokens
+        apiTokens.forEach((token) => {
+          tokensMap.set(token.address, token);
+        });
+
+        // Add or update with wallet tokens (which have accurate balances)
+        walletTokens.forEach((token) => {
+          if (tokensMap.has(token.address)) {
+            // Merge with existing token data but keep balance from wallet
+            const existingToken = tokensMap.get(token.address)!;
+            tokensMap.set(token.address, {
+              ...existingToken,
+              balance: token.balance,
+              price: token.price || existingToken.price,
+            });
+          } else {
+            tokensMap.set(token.address, token);
+          }
+        });
+
+        const mergedTokens = Array.from(tokensMap.values());
+        console.log("Merged tokens:", mergedTokens);
+        setAvailableTokens(mergedTokens);
+
+        if (mergedTokens && mergedTokens.length >= 2) {
+          const suiToken = mergedTokens.find((t) => t.symbol === "SUI");
+          const usdcToken = mergedTokens.find((t) => t.symbol === "USDC");
+
+          setTokenIn(suiToken || mergedTokens[0]);
+          setTokenOut(usdcToken || mergedTokens[1]);
         }
 
         try {
-          const price = await getSuiPrice();
-          setSuiPrice(price);
+          // Use the SUI price from coinPrices if available
+          if (coinPrices["0x2::sui::SUI"]) {
+            setSuiPrice(coinPrices["0x2::sui::SUI"]);
+          } else {
+            const price = await getSuiPrice();
+            setSuiPrice(price);
+          }
         } catch (priceError) {
           console.error("Error fetching SUI price:", priceError);
           setSuiPrice(null);
@@ -71,25 +137,39 @@ export default function SwapForm() {
     };
 
     loadDefaultTokens();
-  }, []);
+  }, [walletState.balances, tokenMetadata, coinPrices]);
 
   const handlePercentageClick = async (percentage: number) => {
     if (!tokenIn || !wallet.account?.address) return;
 
     try {
+      // Use walletState to get token balances
       if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
         const balanceInSui = parseInt(suiBalance) / 1e9;
-        const maxAmount = Math.max(0, balanceInSui - 0.05);
+        const maxAmount = Math.max(0, balanceInSui - 0.05); // Keep some SUI for gas
         const percentAmount = (maxAmount * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
         return;
       }
 
-      if (tokenIn.balance) {
+      // Find the token in wallet balances
+      const walletToken = walletState.balances.find(
+        (b) => b.coinType === tokenIn.address
+      );
+
+      if (walletToken) {
+        // Use the balance from wallet context
+        const decimals = walletToken.decimals;
+        const balance = Number(walletToken.balance) / Math.pow(10, decimals);
+        const percentAmount = (balance * percentage) / 100;
+        setAmountIn(percentAmount.toFixed(4));
+      } else if (tokenIn.balance) {
+        // Fallback to the balance from token
         const balance = parseFloat(tokenIn.balance);
         const percentAmount = (balance * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
       } else if (provider) {
+        // Fallback to provider.getBalance
         const result = await provider.getBalance({
           owner: wallet.account.address,
           coinType: tokenIn.address,

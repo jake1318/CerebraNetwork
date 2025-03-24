@@ -2,8 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import axios from "axios";
 import { CoinBalance } from "../types";
+// In WalletContext.tsx, update the imports
+import blockvisionService from "../services/blockvisionService";
 // Import the API services
-import { birdeyeService, blockvisionService } from "../services/birdeyeService";
+import { birdeyeService } from "../services/birdeyeService";
 
 const SUI_MAINNET_RPC_URL = "https://fullnode.mainnet.sui.io";
 const PRICE_API =
@@ -67,6 +69,7 @@ interface WalletContextType {
   refreshBalances: () => void;
   coinPrices: Record<string, number>;
   availableCoins: string[];
+  tokenMetadata: Record<string, any>; // Add tokenMetadata to the interface
   formatBalance: (
     balance: bigint,
     decimals: number,
@@ -88,13 +91,14 @@ export const useWalletContext = () => {
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { connected, account, getCoins } = useWallet();
+  const { connected, account } = useWallet();
 
   const [balances, setBalances] = useState<CoinBalance[]>([]);
   const [totalUsdValue, setTotalUsdValue] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [coinPrices, setCoinPrices] = useState<Record<string, number>>({});
   const [availableCoins, setAvailableCoins] = useState<string[]>([]);
+  const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({}); // Add state for token metadata
 
   // Move the formatBalance and formatUsd functions inside the component
   const formatBalance = (
@@ -167,6 +171,31 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Function to fetch token metadata
+  const fetchTokenMetadata = async (coinTypes: string[]) => {
+    try {
+      const newMetadata = { ...tokenMetadata };
+      let hasChanges = false;
+
+      for (const coinType of coinTypes) {
+        if (!tokenMetadata[coinType]) {
+          const metadata = await blockvisionService.getCoinDetail(coinType);
+          if (metadata && metadata.data) {
+            newMetadata[coinType] = metadata.data;
+            hasChanges = true;
+          }
+        }
+      }
+
+      if (hasChanges) {
+        setTokenMetadata(newMetadata);
+      }
+    } catch (error) {
+      console.error("Error fetching token metadata:", error);
+    }
+  };
+
+  // Updated fetchBalances function to use Blockvision as primary source
   const fetchBalances = async () => {
     if (!connected || !account) {
       setBalances([]);
@@ -176,58 +205,34 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setLoading(true);
     try {
-      // Try to get coins from wallet
+      // Use Blockvision as primary source for account coins
+      const blockvisionData = await blockvisionService.getAccountCoins(
+        account.address
+      );
+
       let coins: any[] = [];
-      try {
-        if (typeof getCoins === "function") {
-          coins = await getCoins();
-        } else if (
-          window.suiet &&
-          typeof window.suiet.getCoins === "function"
-        ) {
-          coins = await window.suiet.getCoins();
-        }
-      } catch (err) {
-        console.error("Error getting coins from wallet:", err);
+
+      // Extract coins array from blockvision response
+      if (
+        blockvisionData &&
+        blockvisionData.data &&
+        Array.isArray(blockvisionData.data)
+      ) {
+        coins = blockvisionData.data.map((coin: any) => ({
+          type: coin.coinType,
+          balance: coin.balance,
+          decimals: coin.decimals || 9,
+          symbol: coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
+          name: coin.name || "Unknown Coin",
+        }));
       }
 
-      // If no coins from wallet, try to get from blockvision
-      if (!coins || !Array.isArray(coins) || coins.length === 0) {
-        try {
-          const blockvisionData = await blockvisionService.getAccountCoins(
-            account.address
-          );
-
-          // Extract coins array from blockvision response
-          if (
-            blockvisionData &&
-            blockvisionData.data &&
-            Array.isArray(blockvisionData.data)
-          ) {
-            coins = blockvisionData.data.map((coin: any) => ({
-              type: coin.coinType,
-              balance: coin.balance,
-              // Add any other mappings needed for consistency
-              decimals: coin.decimals || 9,
-              symbol:
-                coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
-              name: coin.name || "Unknown Coin",
-            }));
-          }
-        } catch (blockvisionErr) {
-          console.error(
-            "Error getting coins from Blockvision:",
-            blockvisionErr
-          );
-          coins = []; // No tokens found
-        }
-      }
-
-      // Rest of the function remains the same...
+      // Process balances
       const balancesByType: Record<
         string,
         { balance: bigint; metadata?: any }
       > = {};
+
       for (const coin of coins) {
         if (!coin || (!coin.type && !coin.coinType)) continue;
         const coinType = coin.type || coin.coinType;
@@ -242,6 +247,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const formattedBalances: CoinBalance[] = [];
+      const coinTypesToFetchMetadata: string[] = [];
+
       for (const [coinType, data] of Object.entries(balancesByType)) {
         if (data.balance > BigInt(0)) {
           const metadata = data.metadata ||
@@ -257,6 +264,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
             balance: data.balance,
             decimals: metadata.decimals,
           });
+
+          // Add to the list of coin types to fetch metadata for
+          coinTypesToFetchMetadata.push(coinType);
         }
       }
 
@@ -281,6 +291,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setBalances(formattedBalances);
       setTotalUsdValue(total);
+
+      // Fetch metadata for all tokens in the balances
+      fetchTokenMetadata(coinTypesToFetchMetadata);
     } catch (error) {
       console.error("Error fetching balances:", error);
     } finally {
@@ -312,6 +325,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     refreshBalances: fetchBalances,
     coinPrices,
     availableCoins,
+    tokenMetadata, // Add tokenMetadata to the context value
     formatBalance,
     formatUsd,
   };
