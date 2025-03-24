@@ -21,7 +21,7 @@ export default function SwapForm() {
   const provider = useSuiProvider();
   const { balance: suiBalance } = useAccountBalance();
 
-  // Use WalletContext to access wallet balances and token metadata
+  // Pull from WalletContext: balances, metadata, formatting helpers, prices
   const { walletState, tokenMetadata, formatBalance, formatUsd, coinPrices } =
     useWalletContext();
 
@@ -39,18 +39,19 @@ export default function SwapForm() {
   const [suiPrice, setSuiPrice] = useState<number | null>(null);
   const [loadingTokens, setLoadingTokens] = useState(true);
 
-  // Add states for token selector modals
+  // Token selector modals
   const [isTokenInSelectorOpen, setIsTokenInSelectorOpen] = useState(false);
   const [isTokenOutSelectorOpen, setIsTokenOutSelectorOpen] = useState(false);
+
+  // Final merged token list (from wallet + any external API)
   const [availableTokens, setAvailableTokens] = useState<Token[]>([]);
 
-  // Function to convert wallet balances to Token format
-  const convertWalletBalancesToTokens = () => {
-    if (!walletState.balances || walletState.balances.length === 0) {
-      return [];
-    }
+  // Convert wallet balances (from context) to the Token interface
+  const convertWalletBalancesToTokens = (): Token[] => {
+    if (!walletState.balances || walletState.balances.length === 0) return [];
 
     return walletState.balances.map((balance) => {
+      // Attempt to fetch additional metadata from tokenMetadata
       const metadata = tokenMetadata[balance.coinType] || {};
       const price = coinPrices[balance.coinType] || 0;
       const balanceValue =
@@ -64,41 +65,39 @@ export default function SwapForm() {
           balance.coinType.split("::").pop() ||
           "Unknown",
         name: balance.name || metadata.name || "Unknown Token",
-        logo: metadata.logo || "",
+        logo: metadata.logo || "", // Use metadata.logo if provided
         decimals: balance.decimals,
         price: price,
         balance: balanceValue.toString(),
-        // Add other properties needed by Token interface
       } as Token;
     });
   };
 
+  // Merge tokens from your local fetchTokens() with the wallet tokens
   useEffect(() => {
     const loadDefaultTokens = async () => {
       try {
         setLoadingTokens(true);
 
-        // Combine tokens from API with tokens from wallet
+        // 1) Get tokens from some external API (if you want)
         const apiTokens = await fetchTokens();
+
+        // 2) Convert wallet balances to your Token interface
         const walletTokens = convertWalletBalancesToTokens();
 
-        // Create a map to deduplicate by address
+        // 3) Combine both lists, deduplicating by address
         const tokensMap = new Map<string, Token>();
+        apiTokens.forEach((token) => tokensMap.set(token.address, token));
 
-        // Add API tokens
-        apiTokens.forEach((token) => {
-          tokensMap.set(token.address, token);
-        });
-
-        // Add or update with wallet tokens (which have accurate balances)
         walletTokens.forEach((token) => {
           if (tokensMap.has(token.address)) {
-            // Merge with existing token data but keep balance from wallet
-            const existingToken = tokensMap.get(token.address)!;
+            // Merge with existing token data but keep wallet balance
+            const existing = tokensMap.get(token.address)!;
             tokensMap.set(token.address, {
-              ...existingToken,
-              balance: token.balance,
-              price: token.price || existingToken.price,
+              ...existing,
+              balance: token.balance, // prefer the wallet's balance
+              price: token.price || existing.price,
+              // Optionally override name/symbol/logo with wallet's data if needed
             });
           } else {
             tokensMap.set(token.address, token);
@@ -109,6 +108,7 @@ export default function SwapForm() {
         console.log("Merged tokens:", mergedTokens);
         setAvailableTokens(mergedTokens);
 
+        // 4) Choose defaults for tokenIn/tokenOut
         if (mergedTokens && mergedTokens.length >= 2) {
           const suiToken = mergedTokens.find((t) => t.symbol === "SUI");
           const usdcToken = mergedTokens.find((t) => t.symbol === "USDC");
@@ -117,8 +117,8 @@ export default function SwapForm() {
           setTokenOut(usdcToken || mergedTokens[1]);
         }
 
+        // 5) Fetch SUI price from the context coinPrices or fallback from SDK
         try {
-          // Use the SUI price from coinPrices if available
           if (coinPrices["0x2::sui::SUI"]) {
             setSuiPrice(coinPrices["0x2::sui::SUI"]);
           } else {
@@ -139,47 +139,47 @@ export default function SwapForm() {
     loadDefaultTokens();
   }, [walletState.balances, tokenMetadata, coinPrices]);
 
+  // Helper to fill input by percentage
   const handlePercentageClick = async (percentage: number) => {
     if (!tokenIn || !wallet.account?.address) return;
 
     try {
-      // Use walletState to get token balances
+      // If it's SUI, use suiBalance from the Suiet kit
       if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
         const balanceInSui = parseInt(suiBalance) / 1e9;
-        const maxAmount = Math.max(0, balanceInSui - 0.05); // Keep some SUI for gas
+        // Keep ~0.05 SUI in wallet for gas
+        const maxAmount = Math.max(0, balanceInSui - 0.05);
         const percentAmount = (maxAmount * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
         return;
       }
 
-      // Find the token in wallet balances
+      // Otherwise, find the token in walletState
       const walletToken = walletState.balances.find(
         (b) => b.coinType === tokenIn.address
       );
 
       if (walletToken) {
-        // Use the balance from wallet context
         const decimals = walletToken.decimals;
-        const balance = Number(walletToken.balance) / Math.pow(10, decimals);
-        const percentAmount = (balance * percentage) / 100;
+        const balanceNum = Number(walletToken.balance) / Math.pow(10, decimals);
+        const percentAmount = (balanceNum * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
       } else if (tokenIn.balance) {
-        // Fallback to the balance from token
-        const balance = parseFloat(tokenIn.balance);
-        const percentAmount = (balance * percentage) / 100;
+        // Fallback to the merged token's stored balance
+        const balanceNum = parseFloat(tokenIn.balance);
+        const percentAmount = (balanceNum * percentage) / 100;
         setAmountIn(percentAmount.toFixed(4));
       } else if (provider) {
-        // Fallback to provider.getBalance
+        // Last fallback: direct on-chain query
         const result = await provider.getBalance({
           owner: wallet.account.address,
           coinType: tokenIn.address,
         });
-
         if (result?.totalBalance) {
           const decimals = tokenIn.decimals;
-          const balance =
+          const balanceNum =
             parseInt(result.totalBalance) / Math.pow(10, decimals);
-          const percentAmount = (balance * percentage) / 100;
+          const percentAmount = (balanceNum * percentage) / 100;
           setAmountIn(percentAmount.toFixed(4));
         }
       }
@@ -188,18 +188,15 @@ export default function SwapForm() {
     }
   };
 
+  // Slippage logic
   const handleCustomSlippageChange = (value: string) => {
     const cleaned = value.replace(/[^\d.]/g, "");
-
     const parts = cleaned.split(".");
     if (parts.length > 2) return;
-
     if (parts[1] && parts[1].length > 2) return;
-
     if (Number(cleaned) > 100) return;
 
     setCustomSlippage(cleaned);
-
     if (cleaned && Number(cleaned) > 0) {
       setSlippage(Number(cleaned) / 100);
     }
@@ -211,6 +208,7 @@ export default function SwapForm() {
 
   const getMaxAmount = () => handlePercentageClick(100);
 
+  // Auto-quote after user finishes typing amountIn
   useEffect(() => {
     if (loadingTokens) return;
 
@@ -226,6 +224,7 @@ export default function SwapForm() {
     return () => clearTimeout(timer);
   }, [tokenIn, tokenOut, amountIn, loadingTokens]);
 
+  // Fetch swap quote
   const getQuoteForSwap = async () => {
     if (!tokenIn || !tokenOut || !amountIn || Number(amountIn) <= 0) {
       setAmountOut("0");
@@ -283,12 +282,12 @@ export default function SwapForm() {
     }
   };
 
+  // Execute the swap
   const swapTokens = async () => {
     if (!wallet.connected || !wallet.account?.address) {
       setError("Wallet not connected");
       return;
     }
-
     if (!tokenIn || !tokenOut) {
       setError("Please select tokens");
       return;
@@ -327,10 +326,10 @@ export default function SwapForm() {
         const result = await wallet.signAndExecuteTransactionBlock({
           transactionBlock: tx,
         });
-
         console.log("Swap completed:", result);
         alert("Swap completed successfully!");
 
+        // Reset after success
         setAmountIn("");
         setAmountOut("0");
         setEstimatedFee(null);
@@ -346,24 +345,25 @@ export default function SwapForm() {
     }
   };
 
+  // Switch 'From' and 'To' tokens
   const switchTokens = () => {
     if (tokenIn && tokenOut) {
-      const tempToken = tokenIn;
+      const temp = tokenIn;
       setTokenIn(tokenOut);
-      setTokenOut(tempToken);
+      setTokenOut(temp);
       if (amountIn) {
         setAmountIn(amountIn);
       }
     }
   };
 
-  // Handle token selection
-  const handleTokenInSelect = (token: any) => {
+  // Handle token selection from the TokenSelector
+  const handleTokenInSelect = (token: Token) => {
     setTokenIn(token);
     setIsTokenInSelectorOpen(false);
   };
 
-  const handleTokenOutSelect = (token: any) => {
+  const handleTokenOutSelect = (token: Token) => {
     setTokenOut(token);
     setIsTokenOutSelectorOpen(false);
   };

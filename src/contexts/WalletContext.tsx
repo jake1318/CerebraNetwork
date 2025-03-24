@@ -2,16 +2,17 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import axios from "axios";
 import { CoinBalance } from "../types";
-// In WalletContext.tsx, update the imports
+
+// Services
 import blockvisionService from "../services/blockvisionService";
-// Import the API services
 import { birdeyeService } from "../services/birdeyeService";
 
+// SUI mainnet nodes and fallback price API
 const SUI_MAINNET_RPC_URL = "https://fullnode.mainnet.sui.io";
 const PRICE_API =
   "https://api.coingecko.com/api/v3/simple/price?ids=sui,ethereum,bitcoin,usd-coin,tether&vs_currencies=usd";
 
-// Known coins configuration stays the same
+// Known coins config
 const KNOWN_COINS: Record<
   string,
   { symbol: string; name: string; decimals: number }
@@ -43,6 +44,7 @@ const KNOWN_COINS: Record<
     },
 };
 
+// Mapping from coinType -> coingecko ID, used for price lookups
 const COIN_TYPE_TO_ID = {
   "0x2::sui::SUI": "sui",
   "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN":
@@ -55,11 +57,13 @@ const COIN_TYPE_TO_ID = {
     "bitcoin",
 };
 
+// Reverse mapping: coingecko ID -> coinType
 const ID_TO_COIN_TYPE: Record<string, string> = {};
 Object.entries(COIN_TYPE_TO_ID).forEach(([coinType, id]) => {
   ID_TO_COIN_TYPE[id] = coinType;
 });
 
+// The context interface
 interface WalletContextType {
   walletState: {
     balances: CoinBalance[];
@@ -69,7 +73,7 @@ interface WalletContextType {
   refreshBalances: () => void;
   coinPrices: Record<string, number>;
   availableCoins: string[];
-  tokenMetadata: Record<string, any>; // Add tokenMetadata to the interface
+  tokenMetadata: Record<string, any>;
   formatBalance: (
     balance: bigint,
     decimals: number,
@@ -78,6 +82,7 @@ interface WalletContextType {
   formatUsd: (amount: number) => string;
 }
 
+// Create context
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const useWalletContext = () => {
@@ -88,6 +93,7 @@ export const useWalletContext = () => {
   return context;
 };
 
+// The main provider
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -98,23 +104,25 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [coinPrices, setCoinPrices] = useState<Record<string, number>>({});
   const [availableCoins, setAvailableCoins] = useState<string[]>([]);
-  const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({}); // Add state for token metadata
+  const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
 
-  // Move the formatBalance and formatUsd functions inside the component
+  // Format a big integer balance for UI
   const formatBalance = (
     balance: bigint,
     decimals: number,
     displayDecimals: number = 5
   ): string => {
     const balanceNumber = Number(balance) / Math.pow(10, decimals);
-    if (balanceNumber > 0 && balanceNumber < 0.00001)
+    if (balanceNumber > 0 && balanceNumber < 0.00001) {
       return balanceNumber.toExponential(2);
+    }
     return balanceNumber.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: displayDecimals,
     });
   };
 
+  // Format a USD value for UI
   const formatUsd = (amount: number): string => {
     return amount.toLocaleString("en-US", {
       style: "currency",
@@ -124,17 +132,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  // Fetch coin prices from coingecko
   const fetchCoinPrices = async () => {
     try {
       const response = await axios.get(PRICE_API);
       const data = response.data;
       const prices: Record<string, number> = {};
+
+      // data structure is: { sui: {usd: number}, bitcoin: {usd: number}, ...}
       Object.entries(data).forEach(([id, priceData]: [string, any]) => {
         const coinType = ID_TO_COIN_TYPE[id];
         if (coinType && priceData.usd) {
           prices[coinType] = priceData.usd;
         }
       });
+
       setCoinPrices(prices);
       return prices;
     } catch (error) {
@@ -143,14 +155,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Replace this function to use birdeyeService instead of backend
+  // Fetch available tokens from Birdeye
   const fetchAvailableCoins = async () => {
     try {
-      // Use birdeyeService to get the token list
       const tokenListData = await birdeyeService.getTokenList();
-
-      // Extract token addresses from the response
       let coins: string[] = [];
+
       if (
         tokenListData &&
         tokenListData.data &&
@@ -159,7 +169,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         coins = tokenListData.data.map((token: any) => token.address);
       }
 
-      // Ensure SUI is always included
+      // Ensure SUI is always in the list
       if (!coins.includes("0x2::sui::SUI")) {
         coins.push("0x2::sui::SUI");
       }
@@ -167,19 +177,22 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       setAvailableCoins(coins);
     } catch (error) {
       console.error("Error fetching available coins from Birdeye:", error);
-      setAvailableCoins(["0x2::sui::SUI"]); // Fallback: only SUI available
+      // Fallback: only SUI if error
+      setAvailableCoins(["0x2::sui::SUI"]);
     }
   };
 
-  // Function to fetch token metadata
+  // Function to fetch metadata for a list of coin types
   const fetchTokenMetadata = async (coinTypes: string[]) => {
     try {
       const newMetadata = { ...tokenMetadata };
       let hasChanges = false;
 
       for (const coinType of coinTypes) {
-        if (!tokenMetadata[coinType]) {
+        // Only fetch if we don't already have metadata
+        if (!newMetadata[coinType]) {
           const metadata = await blockvisionService.getCoinDetail(coinType);
+          // Blockvision returns { code: 200, data: { symbol, name, decimals, ...} }
           if (metadata && metadata.data) {
             newMetadata[coinType] = metadata.data;
             hasChanges = true;
@@ -195,7 +208,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Updated fetchBalances function to use Blockvision as primary source
+  // Fetch balances primarily from Blockvision
   const fetchBalances = async () => {
     if (!connected || !account) {
       setBalances([]);
@@ -205,14 +218,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setLoading(true);
     try {
-      // Use Blockvision as primary source for account coins
+      // 1) Get wallet coins from Blockvision
       const blockvisionData = await blockvisionService.getAccountCoins(
         account.address
       );
 
       let coins: any[] = [];
-
-      // Extract coins array from blockvision response
       if (
         blockvisionData &&
         blockvisionData.data &&
@@ -227,36 +238,42 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         }));
       }
 
-      // Process balances
+      // 2) Aggregate by coinType
       const balancesByType: Record<
         string,
         { balance: bigint; metadata?: any }
       > = {};
 
       for (const coin of coins) {
-        if (!coin || (!coin.type && !coin.coinType)) continue;
         const coinType = coin.type || coin.coinType;
-        const balance = BigInt(coin.balance || coin.value || 0);
+        if (!coinType) continue;
+
+        const bigBalance = BigInt(coin.balance || 0);
         if (!balancesByType[coinType]) {
           balancesByType[coinType] = { balance: BigInt(0), metadata: null };
         }
-        balancesByType[coinType].balance += balance;
+        balancesByType[coinType].balance += bigBalance;
+
+        // If known coin, store KNOWN_COINS as metadata
         if (!balancesByType[coinType].metadata && KNOWN_COINS[coinType]) {
           balancesByType[coinType].metadata = KNOWN_COINS[coinType];
         }
       }
 
+      // 3) Convert to array of CoinBalance
       const formattedBalances: CoinBalance[] = [];
       const coinTypesToFetchMetadata: string[] = [];
 
       for (const [coinType, data] of Object.entries(balancesByType)) {
         if (data.balance > BigInt(0)) {
-          const metadata = data.metadata ||
-            KNOWN_COINS[coinType] || {
-              symbol: coinType.split("::").pop() || "UNKNOWN",
-              name: "Unknown Coin",
-              decimals: 9,
-            };
+          // Use known coin metadata or fallback
+          const fallbackMetadata = KNOWN_COINS[coinType] || {
+            symbol: coinType.split("::").pop() || "UNKNOWN",
+            name: "Unknown Coin",
+            decimals: 9,
+          };
+
+          const metadata = data.metadata || fallbackMetadata;
           formattedBalances.push({
             coinType,
             symbol: metadata.symbol,
@@ -265,22 +282,26 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
             decimals: metadata.decimals,
           });
 
-          // Add to the list of coin types to fetch metadata for
           coinTypesToFetchMetadata.push(coinType);
         }
       }
 
+      // 4) Fetch coin prices if not already loaded
       const prices =
         Object.keys(coinPrices).length > 0
           ? coinPrices
           : await fetchCoinPrices();
+
+      // 5) Compute total USD value
       let total = 0;
       for (const balance of formattedBalances) {
         const price = prices[balance.coinType] || 0;
-        const balanceWithDecimals =
+        const numericBalance =
           Number(balance.balance) / Math.pow(10, balance.decimals);
-        total += balanceWithDecimals * price;
+        total += numericBalance * price;
       }
+
+      // 6) Sort balances by highest USD value first
       formattedBalances.sort((a, b) => {
         const aPrice = prices[a.coinType] || 0;
         const bPrice = prices[b.coinType] || 0;
@@ -292,7 +313,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       setBalances(formattedBalances);
       setTotalUsdValue(total);
 
-      // Fetch metadata for all tokens in the balances
+      // 7) Fetch metadata from Blockvision if not known
       fetchTokenMetadata(coinTypesToFetchMetadata);
     } catch (error) {
       console.error("Error fetching balances:", error);
@@ -301,14 +322,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Effect hooks remain the same
+  // On mount, fetch coin prices & token list
   useEffect(() => {
     fetchCoinPrices();
     fetchAvailableCoins();
+
     const priceInterval = setInterval(fetchCoinPrices, 5 * 60 * 1000);
     return () => clearInterval(priceInterval);
   }, []);
 
+  // Whenever wallet connects, fetch balances
   useEffect(() => {
     if (connected && account) {
       fetchBalances();
@@ -320,12 +343,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [connected, account]);
 
-  const value = {
+  // Provide context
+  const value: WalletContextType = {
     walletState: { balances, totalUsdValue, loading },
     refreshBalances: fetchBalances,
     coinPrices,
     availableCoins,
-    tokenMetadata, // Add tokenMetadata to the context value
+    tokenMetadata,
     formatBalance,
     formatUsd,
   };
