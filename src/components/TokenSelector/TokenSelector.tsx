@@ -14,7 +14,7 @@ interface TokenData {
   decimals: number;
   price: number;
   balance?: number; // user’s balance, if in portfolio
-  change24h?: number; // 24h price change
+  // Removed change24h as per requirement
   isTrending?: boolean; // indicates trending token
 }
 
@@ -70,81 +70,116 @@ const TokenSelector = ({
     useWalletContext();
 
   const [searchQuery, setSearchQuery] = useState("");
+  // activeTab still exists; if "all" we'll show the merged list,
+  // if "portfolio" then only wallet tokens, if "trending" then only trending tokens.
   const [activeTab, setActiveTab] = useState<"all" | "portfolio" | "trending">(
     "all"
   );
 
-  // Refresh context data each time the modal is opened
-  useEffect(() => {
-    if (isOpen) {
-      refreshTrendingTokens();
-      refreshTokenList();
-      refreshBalances();
-    }
-  }, [isOpen, account?.address]);
+  // Merge tokens from three sources:
+  // 1. Wallet tokens (from walletState)
+  // 2. Trending tokens (from BirdeyeContext)
+  // 3. The full token list (from BirdeyeContext + pinned tokens)
+  const getMergedTokens = (): TokenData[] => {
+    // 1. Get wallet tokens
+    const walletTokens =
+      walletState.balances && walletState.balances.length > 0
+        ? walletState.balances.map((bal) => {
+            const metadata = tokenMetadata[bal.coinType] || {};
+            const price = Number(metadata.price) || 0;
+            const balanceValue =
+              Number(bal.balance) / Math.pow(10, bal.decimals);
+            return {
+              address: bal.coinType,
+              symbol: bal.symbol || metadata.symbol || "UNKNOWN",
+              name: bal.name || metadata.name || "Unknown Token",
+              logo: metadata.logo || "",
+              decimals: bal.decimals,
+              price,
+              balance: balanceValue,
+            } as TokenData;
+          })
+        : [];
 
-  // Convert wallet balances (from WalletContext) to TokenData
-  const getWalletTokens = (): TokenData[] => {
-    if (!walletState.balances || walletState.balances.length === 0) return [];
-
-    return walletState.balances
-      .filter((bal) => !excludeAddresses.includes(bal.coinType))
-      .map((bal) => {
-        // Get metadata from Blockvision via tokenMetadata
-        const metadata = tokenMetadata[bal.coinType] || {};
-        // Price is now taken from Blockvision metadata
-        const price = Number(metadata.price) || 0;
-        const balanceValue = Number(bal.balance) / Math.pow(10, bal.decimals);
-        // Use metadata's priceChange24h if available
-        const change24h = metadata.priceChange24h
-          ? Number(metadata.priceChange24h)
-          : 0;
-
-        return {
-          address: bal.coinType,
-          symbol: bal.symbol || metadata.symbol || "UNKNOWN",
-          name: bal.name || metadata.name || "Unknown Token",
-          logo: metadata.logo || "",
-          decimals: bal.decimals,
-          price,
-          balance: balanceValue,
-          change24h,
-        };
-      });
-  };
-
-  // Combine pinned tokens with the Birdeye tokenList for the "all" tab
-  const getAllTokens = (): TokenData[] => {
-    // Filter out excluded tokens from the Birdeye tokenList
-    const validTokenList = tokenList.filter(
+    // 2. Get trending tokens from BirdeyeContext, filter out excluded addresses
+    const trending = trendingTokens.filter(
       (t: TokenData) => !excludeAddresses.includes(t.address)
     );
 
-    // Use lowercase for deduplication
-    const existingAddr = new Set(
-      validTokenList.map((t: TokenData) => t.address.toLowerCase())
-    );
+    // 3. Get full token list (combine pinned tokens with tokenList from Birdeye)
+    const fullList = () => {
+      const validTokenList = tokenList.filter(
+        (t: TokenData) => !excludeAddresses.includes(t.address)
+      );
+      const existingAddr = new Set(
+        validTokenList.map((t: TokenData) => t.address.toLowerCase())
+      );
+      const filteredPinned = PINNED_TOKENS.filter(
+        (pt) => !existingAddr.has(pt.address.toLowerCase())
+      );
+      return [...filteredPinned, ...validTokenList];
+    };
 
-    // Filter pinned tokens that are not in the public token list
-    const filteredPinned = PINNED_TOKENS.filter(
-      (pt) => !existingAddr.has(pt.address.toLowerCase())
-    );
+    const allTokens = fullList();
 
-    // Return pinned tokens first, then the public list
-    return [...filteredPinned, ...validTokenList];
+    // 4. Merge with priority: walletTokens first, then trending, then remaining full tokens.
+    const merged: TokenData[] = [];
+    const added = new Set<string>();
+
+    // Wallet tokens first
+    walletTokens.forEach((token) => {
+      merged.push(token);
+      added.add(token.address.toLowerCase());
+    });
+
+    // Trending tokens next (if not already in wallet tokens)
+    trending.forEach((token) => {
+      if (!added.has(token.address.toLowerCase())) {
+        merged.push(token);
+        added.add(token.address.toLowerCase());
+      }
+    });
+
+    // Then add the rest from full token list
+    allTokens.forEach((token) => {
+      if (!added.has(token.address.toLowerCase())) {
+        merged.push(token);
+        added.add(token.address.toLowerCase());
+      }
+    });
+
+    return merged;
   };
 
   // Choose token list based on active tab
   const filteredTokens = () => {
     const query = searchQuery.toLowerCase().trim();
     let list: TokenData[] = [];
-
     if (activeTab === "portfolio") {
-      list = getWalletTokens();
+      // Only wallet tokens
+      list =
+        walletState.balances && walletState.balances.length > 0
+          ? walletState.balances.map((bal) => {
+              const metadata = tokenMetadata[bal.coinType] || {};
+              const price = Number(metadata.price) || 0;
+              const balanceValue =
+                Number(bal.balance) / Math.pow(10, bal.decimals);
+              return {
+                address: bal.coinType,
+                symbol: bal.symbol || metadata.symbol || "UNKNOWN",
+                name: bal.name || metadata.name || "Unknown Token",
+                logo: metadata.logo || "",
+                decimals: bal.decimals,
+                price,
+                balance: balanceValue,
+              } as TokenData;
+            })
+          : [];
     } else if (activeTab === "trending") {
       list = trendingTokens;
     } else {
-      list = getAllTokens();
+      // "all" tab: use merged token list
+      list = getMergedTokens();
     }
 
     if (query) {
@@ -161,6 +196,14 @@ const TokenSelector = ({
   // Overall loading state from contexts
   const isLoading =
     isLoadingTrending || isLoadingTokenList || walletState.loading;
+
+  useEffect(() => {
+    if (isOpen) {
+      refreshTrendingTokens();
+      refreshTokenList();
+      refreshBalances();
+    }
+  }, [isOpen, account?.address]);
 
   if (!isOpen) return null;
 
@@ -244,18 +287,9 @@ const TokenSelector = ({
                       })}
                     </div>
                   )}
-                  <div className="token-price">
-                    {formatUsd(token.price)}
-                    {token.change24h !== undefined && (
-                      <span
-                        className={`price-change ${
-                          token.change24h >= 0 ? "positive" : "negative"
-                        }`}
-                      >
-                        {token.change24h >= 0 ? "▲" : "▼"}{" "}
-                        {Math.abs(token.change24h).toFixed(2)}%
-                      </span>
-                    )}
+                  <div className="token-price">{formatUsd(token.price)}</div>
+                  <div className="token-address">
+                    {token.address.slice(0, 9)}…
                   </div>
                 </div>
               </div>

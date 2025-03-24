@@ -1,3 +1,5 @@
+// src/contexts/BirdeyeContext.tsx
+
 import React, {
   createContext,
   useContext,
@@ -8,7 +10,7 @@ import React, {
 import { birdeyeService } from "../services/birdeyeService";
 
 // Define the token data interface
-interface TokenData {
+export interface TokenData {
   address: string;
   symbol: string;
   name: string;
@@ -21,14 +23,14 @@ interface TokenData {
 }
 
 interface BirdeyeContextType {
-  trendingTokens: TokenData[]; // Update type from any[] to TokenData[]
-  tokenList: TokenData[]; // Update type from any[] to TokenData[]
+  trendingTokens: TokenData[];
+  tokenList: TokenData[];
   isLoadingTrending: boolean;
   isLoadingTokenList: boolean;
   refreshTrendingTokens: () => Promise<void>;
   refreshTokenList: () => Promise<void>;
   getTokenMetadata: (tokenAddress: string) => Promise<any>;
-  getWalletTokens: (address: string) => Promise<TokenData[]>; // Update return type
+  getWalletTokens: (address: string) => Promise<TokenData[]>;
   getTokenChart: (
     tokenAddress: string,
     resolution?: string,
