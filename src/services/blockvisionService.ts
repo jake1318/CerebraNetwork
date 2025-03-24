@@ -13,8 +13,9 @@ export const blockvisionService = {
     };
 
     try {
+      // Updated query parameter from "address" to "account"
       const response = await fetch(
-        `https://api.blockvision.org/v2/sui/account/coins?address=${address}`,
+        `https://api.blockvision.org/v2/sui/account/coins?account=${address}`,
         options
       );
       return await response.json();

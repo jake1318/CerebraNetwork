@@ -1,3 +1,5 @@
+// src/components/SwapForm.tsx
+
 import { useState, useEffect } from "react";
 import {
   useWallet,
@@ -21,8 +23,8 @@ export default function SwapForm() {
   const provider = useSuiProvider();
   const { balance: suiBalance } = useAccountBalance();
 
-  // Pull from WalletContext: balances, metadata, formatting helpers, prices
-  const { walletState, tokenMetadata, formatBalance, formatUsd, coinPrices } =
+  // Pull from WalletContext: balances, metadata, formatting helpers
+  const { walletState, tokenMetadata, formatBalance, formatUsd } =
     useWalletContext();
 
   const [tokenIn, setTokenIn] = useState<Token | null>(null);
@@ -53,7 +55,8 @@ export default function SwapForm() {
     return walletState.balances.map((balance) => {
       // Attempt to fetch additional metadata from tokenMetadata
       const metadata = tokenMetadata[balance.coinType] || {};
-      const price = coinPrices[balance.coinType] || 0;
+      // Use price from metadata
+      const price = Number(metadata.price) || 0;
       const balanceValue =
         Number(balance.balance) / Math.pow(10, balance.decimals);
 
@@ -67,7 +70,7 @@ export default function SwapForm() {
         name: balance.name || metadata.name || "Unknown Token",
         logo: metadata.logo || "", // Use metadata.logo if provided
         decimals: balance.decimals,
-        price: price,
+        price,
         balance: balanceValue.toString(),
       } as Token;
     });
@@ -97,7 +100,6 @@ export default function SwapForm() {
               ...existing,
               balance: token.balance, // prefer the wallet's balance
               price: token.price || existing.price,
-              // Optionally override name/symbol/logo with wallet's data if needed
             });
           } else {
             tokensMap.set(token.address, token);
@@ -117,13 +119,16 @@ export default function SwapForm() {
           setTokenOut(usdcToken || mergedTokens[1]);
         }
 
-        // 5) Fetch SUI price from the context coinPrices or fallback from SDK
+        // 5) Fetch SUI price from tokenMetadata if available
         try {
-          if (coinPrices["0x2::sui::SUI"]) {
-            setSuiPrice(coinPrices["0x2::sui::SUI"]);
+          if (
+            tokenMetadata["0x2::sui::SUI"] &&
+            tokenMetadata["0x2::sui::SUI"].price
+          ) {
+            setSuiPrice(Number(tokenMetadata["0x2::sui::SUI"].price));
           } else {
-            const price = await getSuiPrice();
-            setSuiPrice(price);
+            // If not available, set a default (or leave it as 0)
+            setSuiPrice(0);
           }
         } catch (priceError) {
           console.error("Error fetching SUI price:", priceError);
@@ -137,7 +142,7 @@ export default function SwapForm() {
     };
 
     loadDefaultTokens();
-  }, [walletState.balances, tokenMetadata, coinPrices]);
+  }, [walletState.balances, tokenMetadata]);
 
   // Helper to fill input by percentage
   const handlePercentageClick = async (percentage: number) => {
@@ -175,6 +180,7 @@ export default function SwapForm() {
           owner: wallet.account.address,
           coinType: tokenIn.address,
         });
+
         if (result?.totalBalance) {
           const decimals = tokenIn.decimals;
           const balanceNum =
@@ -197,6 +203,7 @@ export default function SwapForm() {
     if (Number(cleaned) > 100) return;
 
     setCustomSlippage(cleaned);
+
     if (cleaned && Number(cleaned) > 0) {
       setSlippage(Number(cleaned) / 100);
     }
@@ -288,6 +295,7 @@ export default function SwapForm() {
       setError("Wallet not connected");
       return;
     }
+
     if (!tokenIn || !tokenOut) {
       setError("Please select tokens");
       return;

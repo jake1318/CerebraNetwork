@@ -1,3 +1,5 @@
+// src/components/TokenSelector/TokenSelector.tsx
+
 import { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { useWalletContext } from "../../contexts/WalletContext";
@@ -16,7 +18,7 @@ interface TokenData {
   isTrending?: boolean; // indicates trending token
 }
 
-// Example pinned tokens, adapt as needed:
+// Example pinned tokens – adjust as desired.
 const PINNED_TOKENS: TokenData[] = [
   {
     address: "0x2::sui::SUI",
@@ -35,7 +37,7 @@ const PINNED_TOKENS: TokenData[] = [
     decimals: 6,
     price: 0,
   },
-  // Add more pinned tokens here if desired
+  // Add more pinned tokens if desired
 ];
 
 interface TokenSelectorProps {
@@ -63,8 +65,8 @@ const TokenSelector = ({
     refreshTokenList,
   } = useBirdeye();
 
-  // Pull data from WalletContext
-  const { walletState, coinPrices, tokenMetadata, formatUsd, refreshBalances } =
+  // Pull data from WalletContext (note: coinPrices removed)
+  const { walletState, tokenMetadata, formatUsd, refreshBalances } =
     useWalletContext();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,7 +74,7 @@ const TokenSelector = ({
     "all"
   );
 
-  // Refresh data (Birdeye + wallet) each time the modal is opened
+  // Refresh context data each time the modal is opened
   useEffect(() => {
     if (isOpen) {
       refreshTrendingTokens();
@@ -81,17 +83,19 @@ const TokenSelector = ({
     }
   }, [isOpen, account?.address]);
 
-  // Convert the user's balances (walletState) to the same TokenData shape
+  // Convert wallet balances (from WalletContext) to TokenData
   const getWalletTokens = (): TokenData[] => {
     if (!walletState.balances || walletState.balances.length === 0) return [];
 
     return walletState.balances
       .filter((bal) => !excludeAddresses.includes(bal.coinType))
       .map((bal) => {
+        // Get metadata from Blockvision via tokenMetadata
         const metadata = tokenMetadata[bal.coinType] || {};
-        const price = coinPrices[bal.coinType] || 0; // If we have a price
+        // Price is now taken from Blockvision metadata
+        const price = Number(metadata.price) || 0;
         const balanceValue = Number(bal.balance) / Math.pow(10, bal.decimals);
-        // If 24h price change is stored in metadata, use it, else 0
+        // Use metadata's priceChange24h if available
         const change24h = metadata.priceChange24h
           ? Number(metadata.priceChange24h)
           : 0;
@@ -103,34 +107,34 @@ const TokenSelector = ({
           logo: metadata.logo || "",
           decimals: bal.decimals,
           price,
-          balance: balanceValue, // user’s portfolio balance
+          balance: balanceValue,
           change24h,
         };
       });
   };
 
-  // Combine pinned tokens with the Birdeye tokenList
+  // Combine pinned tokens with the Birdeye tokenList for the "all" tab
   const getAllTokens = (): TokenData[] => {
-    // Filter out excluded
+    // Filter out excluded tokens from the Birdeye tokenList
     const validTokenList = tokenList.filter(
       (t: TokenData) => !excludeAddresses.includes(t.address)
     );
 
-    // Convert addresses to lowercase for easy dedup
+    // Use lowercase for deduplication
     const existingAddr = new Set(
       validTokenList.map((t: TokenData) => t.address.toLowerCase())
     );
 
-    // Filter pinned if they appear in the tokenList
+    // Filter pinned tokens that are not in the public token list
     const filteredPinned = PINNED_TOKENS.filter(
       (pt) => !existingAddr.has(pt.address.toLowerCase())
     );
 
-    // Return pinned first, then the public token list
+    // Return pinned tokens first, then the public list
     return [...filteredPinned, ...validTokenList];
   };
 
-  // Depending on the active tab, pick the list
+  // Choose token list based on active tab
   const filteredTokens = () => {
     const query = searchQuery.toLowerCase().trim();
     let list: TokenData[] = [];
@@ -140,11 +144,9 @@ const TokenSelector = ({
     } else if (activeTab === "trending") {
       list = trendingTokens;
     } else {
-      // "all" tab
       list = getAllTokens();
     }
 
-    // Filter by search query
     if (query) {
       return list.filter(
         (token) =>
