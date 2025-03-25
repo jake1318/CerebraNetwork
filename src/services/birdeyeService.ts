@@ -59,7 +59,6 @@ export const birdeyeService = {
   /**
    * Get trending tokens.
    * Endpoint: GET /defi/token_trending.
-   * Query defaults: sort_by=rank, sort_type=asc, offset=0, limit=20.
    */
   getTrendingTokens: async (
     chain: string = "sui",
@@ -81,7 +80,6 @@ export const birdeyeService = {
   /**
    * Get full token list.
    * Endpoint: GET /defi/tokenlist.
-   * Query: sort_by=v24hUSD, sort_type=desc, offset=0, limit=50, min_liquidity=100.
    */
   getTokenList: async (chain: string = "sui") => {
     try {
@@ -105,7 +103,6 @@ export const birdeyeService = {
   /**
    * Get OHLCV chart data.
    * Endpoint: GET /defi/ohlcv.
-   * Query: address, type (e.g., "15m"), and currency (e.g., "usd").
    */
   getChartData: async (
     tokenAddress: string,
@@ -124,7 +121,71 @@ export const birdeyeService = {
       throw error;
     }
   },
-  // Additional endpoints (metadata, market data) can be added if needed.
+
+  /**
+   * Get OHLCV candlestick chart data.
+   * Endpoint: GET /defi/ohlcv
+   * Used by chart.tsx for candlestick chart.
+   */
+  getCandlestickData: async (
+    tokenAddress: string,
+    type: string = "15m",
+    currency: string = "usd",
+    chain: string = "sui"
+  ) => {
+    try {
+      const response = await birdeyeApi.get("/defi/ohlcv", {
+        headers: { "x-chain": chain },
+        params: { address: tokenAddress, type, currency },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching candlestick chart data:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get historical line chart data.
+   * Endpoint: GET /defi/history_price
+   * Used by chart.tsx for line chart.
+   */
+  getLineChartData: async (
+    tokenAddress: string,
+    type: string = "15m",
+    chain: string = "sui"
+  ) => {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const durationMap: Record<string, number> = {
+        "1m": 60 * 60,
+        "5m": 60 * 60 * 3,
+        "15m": 60 * 60 * 6,
+        "30m": 60 * 60 * 12,
+        "1h": 60 * 60 * 24,
+        "4h": 60 * 60 * 24 * 2,
+        "1d": 60 * 60 * 24 * 7,
+        "1w": 60 * 60 * 24 * 30,
+      };
+      const secondsAgo = durationMap[type] || 60 * 60 * 24;
+      const time_from = now - secondsAgo;
+
+      const response = await birdeyeApi.get("/defi/history_price", {
+        headers: { "x-chain": chain },
+        params: {
+          address: tokenAddress,
+          address_type: "token",
+          type,
+          time_from,
+          time_to: now,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching line chart data:", error);
+      throw error;
+    }
+  },
 };
 
 // ===========================
@@ -134,7 +195,6 @@ export const blockvisionService = {
   /**
    * Get coins and balances for a given Sui address.
    * Endpoint: GET /v2/sui/account/coins.
-   * @param account The Sui address to fetch coins for.
    */
   getAccountCoins: async (account: string) => {
     try {
@@ -151,7 +211,6 @@ export const blockvisionService = {
   /**
    * Retrieve coin detail (metadata) for a given coin type.
    * Endpoint: GET /v2/sui/coin/detail.
-   * @param coinType The coin type identifier.
    */
   getCoinDetail: async (coinType: string) => {
     try {
