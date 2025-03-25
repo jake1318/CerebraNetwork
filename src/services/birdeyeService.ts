@@ -186,6 +186,27 @@ export const birdeyeService = {
       throw error;
     }
   },
+
+  /**
+   * Get price and volume data for a single token.
+   * Endpoint: GET /defi/price_volume/single
+   */
+  getPriceVolumeSingle: async (
+    address: string,
+    type: string = "24h",
+    chain: string = "sui"
+  ) => {
+    try {
+      const response = await birdeyeApi.get("/defi/price_volume/single", {
+        headers: { "x-chain": chain },
+        params: { address, type },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching price/volume for token:", error);
+      throw error;
+    }
+  },
 };
 
 // ===========================

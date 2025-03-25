@@ -3,12 +3,19 @@ import { createChart, ColorType } from "lightweight-charts";
 import { birdeyeService } from "../../../services/birdeyeService";
 import "./Chart.scss";
 
-const TOKEN_ADDRESSES: Record<string, string> = {
-  SUI: "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
-  USDC: "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-  BTC: "0x027792d9fed7f9844eb4839566001bb6f6cb4804f66aa2da6fe1ee242d896881::coin::COIN",
-  ETH: "0xaf8cd5edc19c4512f4259f0bee101a40d41ebed738ade5874359610ef8eeced5::coin::COIN",
-};
+interface TradingPair {
+  id: string;
+  name: string;
+  baseAsset: string;
+  quoteAsset: string;
+  price: number;
+  change24h: number;
+  volume24h: number;
+  high24h: number;
+  low24h: number;
+  baseAddress: string;
+  quoteAddress: string;
+}
 
 const TIME_FRAMES: Record<string, string> = {
   "1m": "1m",
@@ -22,15 +29,11 @@ const TIME_FRAMES: Record<string, string> = {
 };
 
 interface ChartProps {
-  pair: {
-    name: string;
-    baseAsset: string;
-    quoteAsset: string;
-  };
+  pair: TradingPair;
 }
 
 interface OHLCVData {
-  time: number;
+  time: number; // in seconds for lightweight-charts
   open?: number;
   high?: number;
   low?: number;
@@ -55,32 +58,39 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
     setError(null);
 
     try {
-      const tokenAddress = TOKEN_ADDRESSES[pair.baseAsset];
-      if (!tokenAddress) {
-        throw new Error(`Token address not found for ${pair.baseAsset}`);
-      }
+      // For a pair-based chart on Birdeye, you can use /defi/ohlcv-pair or similar.
+      // We'll keep using your existing getLineChartData / getCandlestickData for the base token address.
+      // If you need pair-specific data, you'd pass both baseAddress & quoteAddress to an endpoint
+      // that supports base/quote on Birdeye. (Check docs for /defi/ohlcv-pair.)
+
+      const baseTokenAddress = pair.baseAddress;
 
       if (chartType === "line") {
         const response = await birdeyeService.getLineChartData(
-          tokenAddress,
+          baseTokenAddress,
           timeframe
         );
-        if (!response?.data?.items) throw new Error("Invalid line chart data");
-
-        const formatted = response.data.items.map((item: any) => ({
+        const items = response?.data?.items;
+        if (!Array.isArray(items)) {
+          throw new Error("Invalid line chart data from Birdeye");
+        }
+        const formatted = items.map((item: any) => ({
+          // lightweight-charts expects time in seconds
           time: item.unixTime,
-          close: item.value,
+          close: Number(item.value),
         }));
         setChartData(formatted);
       } else {
         const response = await birdeyeService.getCandlestickData(
-          tokenAddress,
+          baseTokenAddress,
           timeframe
         );
-        if (!response?.data) throw new Error("Invalid candlestick data");
-
-        const formatted = response.data.map((item: any) => ({
-          time: item.timestamp / 1000,
+        const items = response?.data?.items;
+        if (!Array.isArray(items)) {
+          throw new Error("Invalid candlestick data from Birdeye");
+        }
+        const formatted = items.map((item: any) => ({
+          time: item.unixTime,
           open: Number(item.open),
           high: Number(item.high),
           low: Number(item.low),
@@ -97,11 +107,10 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
     }
   };
 
-  // Chart creation and series setup when chartType changes.
+  // Create chart or reset if chartType changes
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // Remove existing chart instance if any.
     if (chart.current) {
       chart.current.remove();
       chart.current = null;
@@ -111,7 +120,7 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
       layout: {
-        background: { type: ColorType.Solid, color: "rgba(5, 15, 30, 0.0)" },
+        background: { type: ColorType.Solid, color: "rgba(5, 15, 30, 0)" },
         textColor: "rgba(255, 255, 255, 0.7)",
       },
       grid: {
@@ -145,11 +154,9 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
 
     chart.current = chartInstance;
 
-    // Create series based on the chart type.
     if (chartType === "candles") {
-      // Ensure the method exists (requires recent lightweight-charts version)
-      if (typeof chart.current.addCandlestickSeries === "function") {
-        candleSeries.current = chart.current.addCandlestickSeries({
+      if (typeof chartInstance.addCandlestickSeries === "function") {
+        candleSeries.current = chartInstance.addCandlestickSeries({
           upColor: "rgba(0, 255, 136, 0.8)",
           downColor: "rgba(255, 77, 109, 0.8)",
           borderVisible: false,
@@ -157,17 +164,20 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
           wickDownColor: "rgba(255, 77, 109, 0.8)",
         });
       } else {
-        console.error(
-          "addCandlestickSeries is not a function on chart instance."
-        );
+        console.error("addCandlestickSeries is not supported in this version.");
       }
     } else {
-      lineSeries.current = chart.current.addLineSeries({
-        color: "rgba(0, 255, 255, 0.8)",
-        lineWidth: 2,
-      });
+      if (typeof chartInstance.addLineSeries === "function") {
+        lineSeries.current = chartInstance.addLineSeries({
+          color: "rgba(0, 255, 255, 0.8)",
+          lineWidth: 2,
+        });
+      } else {
+        console.error("addLineSeries is not supported in this version.");
+      }
     }
 
+    // Clean up
     return () => {
       window.removeEventListener("resize", handleResize);
       if (chart.current) {
@@ -177,7 +187,7 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
     };
   }, [chartType]);
 
-  // Update the series data when chartData changes.
+  // Update series with new data
   useEffect(() => {
     if (!chart.current || chartData.length === 0) return;
 
@@ -190,22 +200,21 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
       }));
       lineSeries.current.setData(lineData);
     }
-
     chart.current.timeScale().fitContent();
   }, [chartData]);
 
-  // Fetch data when timeframe, asset, or chart type changes.
+  // Fetch new data whenever timeframe, baseAsset, or chartType changes
   useEffect(() => {
     fetchChartData();
-  }, [timeframe, pair.baseAsset, chartType]);
+  }, [timeframe, pair.baseAddress, chartType]);
 
-  // Auto-refresh every 5 seconds.
+  // Auto-refresh every 5s
   useEffect(() => {
     const interval = setInterval(fetchChartData, 5000);
     return () => clearInterval(interval);
-  }, [timeframe, pair.baseAsset, chartType]);
+  }, [timeframe, pair.baseAddress, chartType]);
 
-  // Resize handling.
+  // Handle chart resizing
   const handleResize = () => {
     if (chartContainerRef.current && chart.current) {
       chart.current.applyOptions({
@@ -226,13 +235,13 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
         <h3>{pair.name} Chart</h3>
         <div className="chart-controls">
           <div className="timeframe-selector">
-            {Object.entries(TIME_FRAMES).map(([key, value]) => (
+            {Object.entries(TIME_FRAMES).map(([label, value]) => (
               <button
-                key={key}
+                key={label}
                 className={timeframe === value ? "active" : ""}
                 onClick={() => setTimeframe(value)}
               >
-                {key}
+                {label}
               </button>
             ))}
           </div>

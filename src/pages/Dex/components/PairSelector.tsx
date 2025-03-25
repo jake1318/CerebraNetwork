@@ -25,7 +25,7 @@ const PairSelector: React.FC<PairSelectorProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const toggleDropdown = () => {
-    setIsDropdownOpen(!isDropdownOpen);
+    setIsDropdownOpen((prev) => !prev);
   };
 
   const handlePairSelect = (pair: TradingPair) => {
@@ -51,7 +51,7 @@ const PairSelector: React.FC<PairSelectorProps> = ({
           }`}
         >
           {selectedPair.change24h >= 0 ? "+" : ""}
-          {selectedPair.change24h}%
+          {selectedPair.change24h.toFixed(2)}%
         </span>
         <span className="dropdown-arrow">▼</span>
       </div>
@@ -82,7 +82,7 @@ const PairSelector: React.FC<PairSelectorProps> = ({
                     $
                     {pair.price.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
+                      maximumFractionDigits: 6,
                     })}
                   </span>
                   <span
@@ -91,7 +91,7 @@ const PairSelector: React.FC<PairSelectorProps> = ({
                     }`}
                   >
                     {pair.change24h >= 0 ? "+" : ""}
-                    {pair.change24h}%
+                    {pair.change24h.toFixed(2)}%
                   </span>
                 </div>
               </div>
