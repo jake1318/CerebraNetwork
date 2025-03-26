@@ -1,7 +1,9 @@
+// src/pages/Dex/Dex.tsx
+
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import Chart from "./components/Chart";
-import OrderBook from "./components/OrderBook";
+// REMOVED: OrderBook import
 import OrderForm from "./components/OrderForm";
 import TradingHistory from "./components/TradingHistory";
 import PairSelector from "./components/PairSelector";
@@ -10,21 +12,26 @@ import { blockvisionService } from "../../services/blockvisionService";
 import { birdeyeService } from "../../services/birdeyeService";
 import "./Dex.scss";
 
-/**
- * List of custom tokens to trade against USDC.
- * Each entry is the coinType on Sui.
- */
+// Updated token list
 const BASE_TOKEN_ADDRESSES = [
+  // CETUS
   "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS",
+  // SUI
   "0x2::sui::SUI",
+  // DEEP
   "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+  // ETH
   "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+  // WBTC
   "0xaafb102dd0902f5055cadecd687fb5b71ca82ef0e0285d90afde828ec58ca96b::btc::BTC",
+  // NAVX
   "0xa99b8952d4f7d947ea77fe0ecdcc9e5fc0bcab2841d6e2a5aa00c3044e5544b5::navx::NAVX",
+  // SCA
   "0x7016aae72cfc67f2fadf55769c0a7dd54291a583b63051a5ed71081cce836ac6::sca::SCA",
-  "0xb7844e289a8410e50fb3ca48d69eb9cf29e27d223ef90353fe1bd8e27ff8f3f8::coin::COIN", // WSOL
-  "0xb848cce11ef3a8f62eccea6eb5b35a12c4c2b1ee1af7755d02d7bd6218e8226f::coin::COIN", // WBNB
-  "0x3a5143bb1196e3bcdfab6203d1683ae29edd26294fc8bfeafe4aaa9d2704df37::coin::COIN", // APT
+  // WSOL
+  "0xb7844e289a8410e50fb3ca48d69eb9cf29e27d223ef90353fe1bd8e27ff8f3f8::coin::COIN",
+  // APT
+  "0x3a5143bb1196e3bcdfab6203d1683ae29edd26294fc8bfeafe4aaa9d2704df37::coin::COIN",
 ];
 
 const USDC_ADDRESS =
@@ -54,14 +61,11 @@ const Dex: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // timer for refreshing the selected pair
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // fetch coin metadata from Blockvision
   const fetchBlockvisionData = async (coinType: string) => {
     try {
       const resp = await blockvisionService.getCoinDetail(coinType);
-      // shape: { data: {...fields...} }
       if (resp && resp.data) {
         const d = resp.data;
         return {
@@ -78,7 +82,6 @@ const Dex: React.FC = () => {
     } catch (err) {
       console.error("Blockvision error:", err);
     }
-    // fallback
     return {
       name: "Unknown",
       symbol: "???",
@@ -102,7 +105,6 @@ const Dex: React.FC = () => {
       const slicePromises = slice.map(async (addr) => {
         try {
           const resp = await birdeyeService.getPriceVolumeSingle(addr, "24h");
-          // shape: { data: { volumeUSD, high24h, low24h, ... } } if success
           if (resp && resp.data) {
             results.set(addr, {
               volume24h: resp.data.volumeUSD || 0,
@@ -110,7 +112,6 @@ const Dex: React.FC = () => {
               low24h: resp.data.low24h || 0,
             });
           } else {
-            // fallback
             results.set(addr, { volume24h: 0, high24h: 0, low24h: 0 });
           }
         } catch (err) {
@@ -130,22 +131,20 @@ const Dex: React.FC = () => {
     setError(null);
 
     try {
-      // 1) fetch blockvision data in parallel
+      // 1) blockvision data in parallel
       const bvPromises = BASE_TOKEN_ADDRESSES.map(fetchBlockvisionData);
       const bvList = await Promise.all(bvPromises);
 
-      // 2) fetch birdeye data in small batches
+      // 2) birdeye data in small batches
       const beMap = await fetchBirdeyeDataInBatches(BASE_TOKEN_ADDRESSES);
 
       // combine
       const pairs: TradingPair[] = BASE_TOKEN_ADDRESSES.map((addr, idx) => {
         const bv = bvList[idx];
         const be = beMap.get(addr) || { volume24h: 0, high24h: 0, low24h: 0 };
-        // fallback symbol
         const shortAddr = addr.slice(0, 8);
         const baseSymbol =
           bv.symbol === "???" ? `token-${shortAddr}` : bv.symbol;
-
         const id = `${baseSymbol}-usdc`.toLowerCase();
         return {
           id,
@@ -175,7 +174,6 @@ const Dex: React.FC = () => {
     }
   };
 
-  // refresh the selected pair’s price every 60s using Blockvision
   const refreshSelectedPair = async (pair: TradingPair) => {
     try {
       const resp = await blockvisionService.getCoinDetail(pair.baseAddress);
@@ -185,6 +183,7 @@ const Dex: React.FC = () => {
         const newChange = d.priceChangePercentage24H
           ? parseFloat(String(d.priceChangePercentage24H))
           : 0;
+
         setTradingPairs((prev) =>
           prev.map((p) =>
             p.baseAddress === pair.baseAddress
@@ -193,7 +192,7 @@ const Dex: React.FC = () => {
           )
         );
         setSelectedPair((prev) => {
-          if (!prev) return prev;
+          if (!prev) return null;
           if (prev.baseAddress === pair.baseAddress) {
             return { ...prev, price: newPrice, change24h: newChange };
           }
@@ -241,7 +240,6 @@ const Dex: React.FC = () => {
     console.log("Order event occurred");
   };
 
-  // fallback if not selected
   const tradingStats = selectedPair
     ? {
         price: selectedPair.price,
@@ -262,11 +260,10 @@ const Dex: React.FC = () => {
 
   return (
     <div className="dex-page">
-      {/* Add glow effects */}
+      {/* Glow effects */}
       <div className="glow-1"></div>
       <div className="glow-2"></div>
-
-      {/* Add vertical scan line */}
+      {/* Vertical scan */}
       <div className="vertical-scan"></div>
 
       <div className="dex-page__container">
@@ -355,12 +352,12 @@ const Dex: React.FC = () => {
 
             <div className="dex-page__content">
               <div className="chart-order-section">
-                <div className="chart-container">
+                <div className="chart-wrapper">
                   <Chart pair={selectedPair} />
                 </div>
-                <div className="orderbook-container">
-                  <OrderBook pair={selectedPair} />
-                </div>
+
+                {/* REMOVED: <OrderBook pair={selectedPair} /> */}
+
                 <div className="order-form-container">
                   <OrderForm
                     pair={selectedPair}
@@ -371,6 +368,7 @@ const Dex: React.FC = () => {
                   />
                 </div>
               </div>
+
               <div className="trading-history-section">
                 <div className="trading-history-container">
                   <TradingHistory pair={selectedPair} />

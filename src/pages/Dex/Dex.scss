@@ -1,3 +1,4 @@
+/* src/pages/Dex/Dex.scss */
 .dex-page {
   width: 100%;
   min-height: calc(100vh - 80px);
@@ -23,7 +24,6 @@
   position: relative;
   overflow: hidden;
 
-  // Grid overlay similar to other pages
   &::before {
     content: "";
     position: absolute;
@@ -45,7 +45,6 @@
     z-index: 0;
   }
 
-  // Scanning horizontal line (moved to specific container)
   &::after {
     content: "";
     position: absolute;
@@ -58,7 +57,6 @@
     box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
   }
 
-  // Vertical scan line
   .vertical-scan {
     position: absolute;
     width: 2px;
@@ -70,7 +68,6 @@
     box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
   }
 
-  // Enhanced glow effects
   .glow-1 {
     position: absolute;
     width: 300px;
@@ -97,7 +94,6 @@
     animation: pulse 20s ease-in-out infinite alternate-reverse;
   }
 
-  // Animations
   @keyframes horizonScan {
     0% {
       top: 10%;
@@ -188,7 +184,6 @@
         &.positive {
           color: #00ff88;
         }
-
         &.negative {
           color: #ff4d6d;
         }
@@ -208,6 +203,12 @@
       grid-template-columns: 3fr 1fr 1fr;
       gap: 1.5rem;
       height: 100%;
+
+      .chart-wrapper {
+        /* Just rename from .chart-container to .chart-wrapper 
+           so it doesn't conflict with the Chart's own .chart-container class. */
+        height: 100%;
+      }
     }
 
     .trading-history-section {
@@ -217,7 +218,6 @@
       height: 100%;
     }
 
-    .chart-container,
     .orderbook-container,
     .order-form-container,
     .trading-history-container,
@@ -227,7 +227,6 @@
   }
 }
 
-// Responsive adjustments
 @media (max-width: 1200px) {
   .dex-page {
     .dex-page__content {
@@ -253,7 +252,7 @@
         grid-template-rows: repeat(2, auto);
       }
 
-      .chart-container,
+      .chart-wrapper,
       .orderbook-container,
       .order-form-container,
       .trading-history-container,
