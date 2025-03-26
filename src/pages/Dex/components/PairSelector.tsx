@@ -8,6 +8,7 @@ interface TradingPair {
   quoteAsset: string;
   price: number;
   change24h: number;
+  // logo?: string; // We don't display it in the dropdown
 }
 
 interface PairSelectorProps {

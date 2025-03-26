@@ -1,3 +1,4 @@
+// src/services/birdeyeService.ts
 import axios from "axios";
 
 // ===========================
@@ -7,7 +8,6 @@ const BIRDEYE_API_BASE_URL = "https://public-api.birdeye.so";
 const BIRDEYE_API_KEY =
   import.meta.env.VITE_BIRDEYE_API_KEY || "22430f5885a74d3b97e7cbd01c2140aa";
 
-// Create axios instance for Birdeye
 const birdeyeApi = axios.create({
   baseURL: BIRDEYE_API_BASE_URL,
   headers: {
@@ -25,40 +25,60 @@ birdeyeApi.interceptors.response.use(
   }
 );
 
-// ===========================
-// Blockvision API Configuration
-// ===========================
-const BLOCKVISION_API_BASE_URL = "https://api.blockvision.org";
-const BLOCKVISION_API_KEY =
-  import.meta.env.VITE_BLOCKVISION_API_KEY || "2ugIlviim3ywrgFI0BMniB9wdzU";
+/**
+ * Map user-friendly timeframe (like '1h', '1d', '1w')
+ * to Birdeye official format ('1H', '1D', '1W', etc.).
+ * Fallback to '15m' if unrecognized.
+ */
+function normalizeHistoryType(input: string): string {
+  const map: Record<string, string> = {
+    "1m": "1m",
+    "5m": "5m",
+    "15m": "15m",
+    "30m": "30m",
+    "1h": "1H",
+    "2h": "2H",
+    "4h": "4H",
+    "6h": "6H",
+    "8h": "8H",
+    "12h": "12H",
+    "1d": "1D",
+    "3d": "3D",
+    "1w": "1W",
+    // optionally map '1mth' => '1M' if you want a month timeframe
+  };
+  return map[input.toLowerCase()] || "15m";
+}
 
-const blockvisionApi = axios.create({
-  baseURL: BLOCKVISION_API_BASE_URL,
-  headers: {
-    accept: "application/json",
-    "x-api-key": BLOCKVISION_API_KEY,
-  },
-});
-
-// Blockvision error interceptor
-blockvisionApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error(
-      "Blockvision API Error:",
-      error.response?.data || error.message
-    );
-    return Promise.reject(error);
-  }
-);
-
-// ===========================
-// Birdeye Service Functions (Supported Endpoints)
-// ===========================
 export const birdeyeService = {
   /**
-   * Get trending tokens.
-   * Endpoint: GET /defi/token_trending.
+   * Get price/volume data for a single token.
+   * Endpoint: GET /defi/price_volume/single
+   */
+  getPriceVolumeSingle: async (
+    address: string,
+    type: string = "24h",
+    chain: string = "sui"
+  ) => {
+    try {
+      const response = await birdeyeApi.get("/defi/price_volume/single", {
+        headers: { "x-chain": chain },
+        params: { address, type },
+      });
+      // shape: { success: boolean, data: {...} }
+      const { success, data } = response.data;
+      if (success && data) {
+        return { data };
+      }
+      return { data: null };
+    } catch (error) {
+      console.error("Error fetching price/volume for token:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get trending tokens: GET /defi/token_trending
    */
   getTrendingTokens: async (
     chain: string = "sui",
@@ -70,7 +90,11 @@ export const birdeyeService = {
         headers: { "x-chain": chain },
         params: { sort_by: "rank", sort_type: "asc", offset, limit },
       });
-      return response.data;
+      const { success, data } = response.data;
+      if (success && data) {
+        return { data };
+      }
+      return { data: null };
     } catch (error) {
       console.error("Error fetching trending tokens:", error);
       throw error;
@@ -78,8 +102,7 @@ export const birdeyeService = {
   },
 
   /**
-   * Get full token list.
-   * Endpoint: GET /defi/tokenlist.
+   * Get full token list: GET /defi/tokenlist
    */
   getTokenList: async (chain: string = "sui") => {
     try {
@@ -93,7 +116,11 @@ export const birdeyeService = {
           min_liquidity: 100,
         },
       });
-      return response.data;
+      const { success, data } = response.data;
+      if (success && data) {
+        return { data };
+      }
+      return { data: null };
     } catch (error) {
       console.error("Error fetching token list:", error);
       throw error;
@@ -101,31 +128,7 @@ export const birdeyeService = {
   },
 
   /**
-   * Get OHLCV chart data.
-   * Endpoint: GET /defi/ohlcv.
-   */
-  getChartData: async (
-    tokenAddress: string,
-    type: string = "15m",
-    currency: string = "usd",
-    chain: string = "sui"
-  ) => {
-    try {
-      const response = await birdeyeApi.get("/defi/ohlcv", {
-        headers: { "x-chain": chain },
-        params: { address: tokenAddress, type, currency },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching chart data:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get OHLCV candlestick chart data.
-   * Endpoint: GET /defi/ohlcv
-   * Used by chart.tsx for candlestick chart.
+   * Get OHLCV (candlestick) chart data: GET /defi/ohlcv
    */
   getCandlestickData: async (
     tokenAddress: string,
@@ -134,11 +137,18 @@ export const birdeyeService = {
     chain: string = "sui"
   ) => {
     try {
+      // Normalize the 'type' to uppercase Birdeye format
+      const normalizedType = normalizeHistoryType(type);
+
       const response = await birdeyeApi.get("/defi/ohlcv", {
         headers: { "x-chain": chain },
-        params: { address: tokenAddress, type, currency },
+        params: { address: tokenAddress, type: normalizedType, currency },
       });
-      return response.data;
+      const { success, data } = response.data;
+      if (success && data) {
+        return { data };
+      }
+      return { data: null };
     } catch (error) {
       console.error("Error fetching candlestick chart data:", error);
       throw error;
@@ -146,9 +156,7 @@ export const birdeyeService = {
   },
 
   /**
-   * Get historical line chart data.
-   * Endpoint: GET /defi/history_price
-   * Used by chart.tsx for line chart.
+   * Get historical line chart data: GET /defi/history_price
    */
   getLineChartData: async (
     tokenAddress: string,
@@ -156,13 +164,17 @@ export const birdeyeService = {
     chain: string = "sui"
   ) => {
     try {
+      // Normalize the user-friendly timeframe (e.g. '1h' -> '1H')
+      const normalizedType = normalizeHistoryType(type);
+
+      // Keep your existing logic for calculating time_from
       const now = Math.floor(Date.now() / 1000);
       const durationMap: Record<string, number> = {
         "1m": 60 * 60,
         "5m": 60 * 60 * 3,
         "15m": 60 * 60 * 6,
         "30m": 60 * 60 * 12,
-        "1h": 60 * 60 * 24,
+        "1h": 60 * 60 * 24, // note: your code uses '1h' key
         "4h": 60 * 60 * 24 * 2,
         "1d": 60 * 60 * 24 * 7,
         "1w": 60 * 60 * 24 * 30,
@@ -175,72 +187,19 @@ export const birdeyeService = {
         params: {
           address: tokenAddress,
           address_type: "token",
-          type,
+          type: normalizedType,
           time_from,
           time_to: now,
         },
       });
-      return response.data;
+
+      const { success, data } = response.data;
+      if (success && data) {
+        return { data };
+      }
+      return { data: null };
     } catch (error) {
       console.error("Error fetching line chart data:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get price and volume data for a single token.
-   * Endpoint: GET /defi/price_volume/single
-   */
-  getPriceVolumeSingle: async (
-    address: string,
-    type: string = "24h",
-    chain: string = "sui"
-  ) => {
-    try {
-      const response = await birdeyeApi.get("/defi/price_volume/single", {
-        headers: { "x-chain": chain },
-        params: { address, type },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching price/volume for token:", error);
-      throw error;
-    }
-  },
-};
-
-// ===========================
-// Blockvision Service Functions (For Wallet Data)
-// ===========================
-export const blockvisionService = {
-  /**
-   * Get coins and balances for a given Sui address.
-   * Endpoint: GET /v2/sui/account/coins.
-   */
-  getAccountCoins: async (account: string) => {
-    try {
-      const response = await blockvisionApi.get("/v2/sui/account/coins", {
-        params: { account },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching account coins:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Retrieve coin detail (metadata) for a given coin type.
-   * Endpoint: GET /v2/sui/coin/detail.
-   */
-  getCoinDetail: async (coinType: string) => {
-    try {
-      const response = await blockvisionApi.get("/v2/sui/coin/detail", {
-        params: { coinType },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching coin detail:", error);
       throw error;
     }
   },

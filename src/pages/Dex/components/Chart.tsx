@@ -1,3 +1,4 @@
+// src/pages/Dex/components/Chart.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { createChart, ColorType } from "lightweight-charts";
 import { birdeyeService } from "../../../services/birdeyeService";
@@ -22,7 +23,7 @@ const TIME_FRAMES: Record<string, string> = {
   "5m": "5m",
   "15m": "15m",
   "30m": "30m",
-  "1h": "1h",
+  "1h": "1h", // We'll let birdeyeService normalize "1h" => "1H"
   "4h": "4h",
   "1d": "1d",
   "1w": "1w",
@@ -44,7 +45,7 @@ interface OHLCVData {
 const Chart: React.FC<ChartProps> = ({ pair }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [chartData, setChartData] = useState<OHLCVData[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<string>("15m");
   const [chartType, setChartType] = useState<"candles" | "line">("candles");
@@ -58,37 +59,41 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
     setError(null);
 
     try {
-      // For a pair-based chart on Birdeye, you can use /defi/ohlcv-pair or similar.
-      // We'll keep using your existing getLineChartData / getCandlestickData for the base token address.
-      // If you need pair-specific data, you'd pass both baseAddress & quoteAddress to an endpoint
-      // that supports base/quote on Birdeye. (Check docs for /defi/ohlcv-pair.)
-
       const baseTokenAddress = pair.baseAddress;
 
       if (chartType === "line") {
+        // get line chart data
         const response = await birdeyeService.getLineChartData(
           baseTokenAddress,
           timeframe
         );
-        const items = response?.data?.items;
+        if (!response || !response.data) {
+          throw new Error("No line chart data returned");
+        }
+        const items = response.data.items; // array of { unixTime, value }
         if (!Array.isArray(items)) {
           throw new Error("Invalid line chart data from Birdeye");
         }
+        // transform to the format needed by a line series
         const formatted = items.map((item: any) => ({
-          // lightweight-charts expects time in seconds
           time: item.unixTime,
           close: Number(item.value),
         }));
         setChartData(formatted);
       } else {
+        // get candlestick data
         const response = await birdeyeService.getCandlestickData(
           baseTokenAddress,
           timeframe
         );
-        const items = response?.data?.items;
+        if (!response || !response.data) {
+          throw new Error("No candlestick data returned");
+        }
+        const items = response.data.items; // array of { unixTime, open, high, low, close, volume }
         if (!Array.isArray(items)) {
           throw new Error("Invalid candlestick data from Birdeye");
         }
+        // transform to the format needed by a candlestick series
         const formatted = items.map((item: any) => ({
           time: item.unixTime,
           open: Number(item.open),
@@ -177,9 +182,7 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
       }
     }
 
-    // Clean up
     return () => {
-      window.removeEventListener("resize", handleResize);
       if (chart.current) {
         chart.current.remove();
         chart.current = null;
@@ -203,16 +206,16 @@ const Chart: React.FC<ChartProps> = ({ pair }) => {
     chart.current.timeScale().fitContent();
   }, [chartData]);
 
-  // Fetch new data whenever timeframe, baseAsset, or chartType changes
+  // Fetch data whenever timeframe, chartType, or baseAddress changes
   useEffect(() => {
     fetchChartData();
-  }, [timeframe, pair.baseAddress, chartType]);
+  }, [timeframe, chartType, pair.baseAddress]);
 
   // Auto-refresh every 5s
   useEffect(() => {
     const interval = setInterval(fetchChartData, 5000);
     return () => clearInterval(interval);
-  }, [timeframe, pair.baseAddress, chartType]);
+  }, [timeframe, chartType, pair.baseAddress]);
 
   // Handle chart resizing
   const handleResize = () => {

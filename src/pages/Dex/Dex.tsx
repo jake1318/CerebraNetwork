@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import Chart from "./components/Chart";
 import OrderBook from "./components/OrderBook";
@@ -15,34 +15,34 @@ import "./Dex.scss";
  * Each entry is the coinType on Sui.
  */
 const BASE_TOKEN_ADDRESSES = [
-  "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS", // CETUS
-  "0x2::sui::SUI", // SUI
-  "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP", // DEEP
-  "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH", // ETH
-  "0xaafb102dd0902f5055cadecd687fb5b71ca82ef0e0285d90afde828ec58ca96b::btc::BTC", // WBTC
-  "0xa99b8952d4f7d947ea77fe0ecdcc9e5fc0bcab2841d6e2a5aa00c3044e5544b5::navx::NAVX", // NAVX
-  "0x7016aae72cfc67f2fadf55769c0a7dd54291a583b63051a5ed71081cce836ac6::sca::SCA", // SCA
+  "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS",
+  "0x2::sui::SUI",
+  "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+  "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+  "0xaafb102dd0902f5055cadecd687fb5b71ca82ef0e0285d90afde828ec58ca96b::btc::BTC",
+  "0xa99b8952d4f7d947ea77fe0ecdcc9e5fc0bcab2841d6e2a5aa00c3044e5544b5::navx::NAVX",
+  "0x7016aae72cfc67f2fadf55769c0a7dd54291a583b63051a5ed71081cce836ac6::sca::SCA",
   "0xb7844e289a8410e50fb3ca48d69eb9cf29e27d223ef90353fe1bd8e27ff8f3f8::coin::COIN", // WSOL
   "0xb848cce11ef3a8f62eccea6eb5b35a12c4c2b1ee1af7755d02d7bd6218e8226f::coin::COIN", // WBNB
   "0x3a5143bb1196e3bcdfab6203d1683ae29edd26294fc8bfeafe4aaa9d2704df37::coin::COIN", // APT
 ];
 
-/** USDC token address on Sui (quote token). Replace if needed. */
 const USDC_ADDRESS =
   "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
 
 interface TradingPair {
-  id: string; // e.g. "CETUS-USDC"
-  name: string; // e.g. "CETUS/USDC"
-  baseAsset: string; // e.g. "CETUS"
-  quoteAsset: string; // e.g. "USDC"
-  price: number; // current price in USDC
-  change24h: number; // 24h price change %
-  volume24h: number; // 24h volume in USD
-  high24h: number; // 24h high (if available)
-  low24h: number; // 24h low (if available)
-  baseAddress: string; // coinType of the base token
-  quoteAddress: string; // coinType of the quote token (USDC)
+  id: string;
+  name: string;
+  baseAsset: string;
+  quoteAsset: string;
+  price: number;
+  change24h: number;
+  volume24h: number;
+  high24h: number;
+  low24h: number;
+  baseAddress: string;
+  quoteAddress: string;
+  logo?: string;
 }
 
 const Dex: React.FC = () => {
@@ -54,128 +54,184 @@ const Dex: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Fetch metadata from Blockvision for a single token address.
-   * Adjust if you want to use axios or any other approach
-   * (this example uses blockvisionService as given).
-   */
-  const fetchBlockvisionMeta = async (coinType: string) => {
+  // timer for refreshing the selected pair
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // fetch coin metadata from Blockvision
+  const fetchBlockvisionData = async (coinType: string) => {
     try {
       const resp = await blockvisionService.getCoinDetail(coinType);
-      // Typically returns { name, symbol, decimals, logo, ... }
+      // shape: { data: {...fields...} }
       if (resp && resp.data) {
+        const d = resp.data;
         return {
-          name: resp.data.name || "Unknown",
-          symbol: resp.data.symbol || "???",
-          decimals: resp.data.decimals || 0,
+          name: d.name || "Unknown",
+          symbol: d.symbol || "???",
+          decimals: d.decimals || 0,
+          logo: d.logo || "",
+          price: d.price ? parseFloat(String(d.price)) : 0,
+          change24h: d.priceChangePercentage24H
+            ? parseFloat(String(d.priceChangePercentage24H))
+            : 0,
         };
       }
     } catch (err) {
-      console.error(`Blockvision meta error for ${coinType}:`, err);
+      console.error("Blockvision error:", err);
     }
-    return { name: "Unknown", symbol: "???", decimals: 0 };
-  };
-
-  /**
-   * Fetch price & volume from Birdeye's "Price Volume Single" endpoint
-   * or use a multi request. For now let's do single calls in a loop.
-   */
-  const fetchBirdeyePriceVolume = async (coinType: string) => {
-    try {
-      // This endpoint: GET /defi/price_volume/single?address=<addr>&type=24h
-      // Implemented in birdeyeService as needed. If you have a helper, call it here.
-      const response = await birdeyeService.getPriceVolumeSingle(
-        coinType,
-        "24h"
-      );
-      if (response && response.data) {
-        return {
-          price: response.data.price || 0,
-          priceChangePercent: response.data.priceChangePercent || 0,
-          volumeUSD: response.data.volumeUSD || 0,
-          // high24h, low24h not always provided in /price_volume/single
-          // so you may parse them from a different endpoint if needed
-          high24h: response.data.high24h || 0,
-          low24h: response.data.low24h || 0,
-        };
-      }
-    } catch (err) {
-      console.error(`Birdeye price-volume error for ${coinType}:`, err);
-    }
+    // fallback
     return {
+      name: "Unknown",
+      symbol: "???",
+      decimals: 0,
+      logo: "",
       price: 0,
-      priceChangePercent: 0,
-      volumeUSD: 0,
-      high24h: 0,
-      low24h: 0,
+      change24h: 0,
     };
   };
 
-  /**
-   * Load all token metadata + price/volume data, build TradingPair array.
-   */
+  // fetch Birdeye data in small batches
+  const fetchBirdeyeDataInBatches = async (addresses: string[]) => {
+    const results = new Map<
+      string,
+      { volume24h: number; high24h: number; low24h: number }
+    >();
+    const batchSize = 3;
+
+    for (let i = 0; i < addresses.length; i += batchSize) {
+      const slice = addresses.slice(i, i + batchSize);
+      const slicePromises = slice.map(async (addr) => {
+        try {
+          const resp = await birdeyeService.getPriceVolumeSingle(addr, "24h");
+          // shape: { data: { volumeUSD, high24h, low24h, ... } } if success
+          if (resp && resp.data) {
+            results.set(addr, {
+              volume24h: resp.data.volumeUSD || 0,
+              high24h: resp.data.high24h || 0,
+              low24h: resp.data.low24h || 0,
+            });
+          } else {
+            // fallback
+            results.set(addr, { volume24h: 0, high24h: 0, low24h: 0 });
+          }
+        } catch (err) {
+          console.error("Birdeye error:", err);
+          results.set(addr, { volume24h: 0, high24h: 0, low24h: 0 });
+        }
+      });
+      await Promise.all(slicePromises);
+      // short delay before next batch
+      await new Promise((res) => setTimeout(res, 250));
+    }
+    return results;
+  };
+
   const loadPairs = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // 1) Fetch blockvision metadata in parallel
-      const metaPromises = BASE_TOKEN_ADDRESSES.map((addr) =>
-        fetchBlockvisionMeta(addr)
-      );
-      const metaList = await Promise.all(metaPromises);
+      // 1) fetch blockvision data in parallel
+      const bvPromises = BASE_TOKEN_ADDRESSES.map(fetchBlockvisionData);
+      const bvList = await Promise.all(bvPromises);
 
-      // 2) Fetch birdeye price/volume in parallel
-      const priceVolumePromises = BASE_TOKEN_ADDRESSES.map((addr) =>
-        fetchBirdeyePriceVolume(addr)
-      );
-      const priceVolumeList = await Promise.all(priceVolumePromises);
+      // 2) fetch birdeye data in small batches
+      const beMap = await fetchBirdeyeDataInBatches(BASE_TOKEN_ADDRESSES);
 
-      // 3) Combine to form TradingPair objects
-      const builtPairs = BASE_TOKEN_ADDRESSES.map((addr, idx) => {
-        const meta = metaList[idx];
-        const pv = priceVolumeList[idx];
+      // combine
+      const pairs: TradingPair[] = BASE_TOKEN_ADDRESSES.map((addr, idx) => {
+        const bv = bvList[idx];
+        const be = beMap.get(addr) || { volume24h: 0, high24h: 0, low24h: 0 };
+        // fallback symbol
+        const shortAddr = addr.slice(0, 8);
+        const baseSymbol =
+          bv.symbol === "???" ? `token-${shortAddr}` : bv.symbol;
 
-        // For an ID, use something like "CETUS-USDC" or fallback
-        const id = `${meta.symbol || "Token"}-USDC`.toLowerCase();
-
+        const id = `${baseSymbol}-usdc`.toLowerCase();
         return {
           id,
-          name: `${meta.symbol}/USDC`,
-          baseAsset: meta.symbol,
+          name: `${baseSymbol}/USDC`,
+          baseAsset: baseSymbol,
           quoteAsset: "USDC",
-          price: pv.price,
-          change24h: pv.priceChangePercent,
-          volume24h: pv.volumeUSD,
-          high24h: pv.high24h,
-          low24h: pv.low24h,
+          price: bv.price,
+          change24h: bv.change24h,
+          volume24h: be.volume24h,
+          high24h: be.high24h,
+          low24h: be.low24h,
           baseAddress: addr,
           quoteAddress: USDC_ADDRESS,
+          logo: bv.logo,
         };
       });
 
-      setTradingPairs(builtPairs);
-      // Select the first pair by default (CETUS/USDC in this example)
-      if (builtPairs.length > 0) {
-        setSelectedPair(builtPairs[0]);
+      setTradingPairs(pairs);
+      if (pairs.length > 0) {
+        setSelectedPair(pairs[0]);
       }
     } catch (err: any) {
-      console.error("Failed to load pairs:", err);
+      console.error("loadPairs error:", err);
       setError(err.message || "Error loading trading pairs.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // On component mount, load the token data
+  // refresh the selected pair’s price every 60s using Blockvision
+  const refreshSelectedPair = async (pair: TradingPair) => {
+    try {
+      const resp = await blockvisionService.getCoinDetail(pair.baseAddress);
+      if (resp && resp.data) {
+        const d = resp.data;
+        const newPrice = d.price ? parseFloat(String(d.price)) : 0;
+        const newChange = d.priceChangePercentage24H
+          ? parseFloat(String(d.priceChangePercentage24H))
+          : 0;
+        setTradingPairs((prev) =>
+          prev.map((p) =>
+            p.baseAddress === pair.baseAddress
+              ? { ...p, price: newPrice, change24h: newChange }
+              : p
+          )
+        );
+        setSelectedPair((prev) => {
+          if (!prev) return prev;
+          if (prev.baseAddress === pair.baseAddress) {
+            return { ...prev, price: newPrice, change24h: newChange };
+          }
+          return prev;
+        });
+      }
+    } catch (err) {
+      console.error("Error refreshing selected pair", err);
+    }
+  };
+
+  const startRefreshInterval = (pair: TradingPair) => {
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+    }
+    const timer = setInterval(() => {
+      refreshSelectedPair(pair);
+    }, 60000);
+    refreshTimerRef.current = timer;
+  };
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     loadPairs();
   }, []);
 
-  // If you want to refresh stats (price, volume) periodically,
-  // you could create a separate function or reuse loadPairs,
-  // but be mindful not to re-fetch metadata every time.
-  // For simplicity, skip or do partial refresh.
+  useEffect(() => {
+    if (selectedPair) {
+      startRefreshInterval(selectedPair);
+    }
+  }, [selectedPair]);
 
   const handleSelectPair = (pair: TradingPair) => {
     setSelectedPair(pair);
@@ -183,10 +239,9 @@ const Dex: React.FC = () => {
 
   const handleOrderEvent = () => {
     console.log("Order event occurred");
-    // If you want to refresh data after placing an order, you can do so here
   };
 
-  // For current stats of the selected pair
+  // fallback if not selected
   const tradingStats = selectedPair
     ? {
         price: selectedPair.price,
@@ -194,6 +249,7 @@ const Dex: React.FC = () => {
         volume24h: selectedPair.volume24h,
         high24h: selectedPair.high24h,
         low24h: selectedPair.low24h,
+        logo: selectedPair.logo,
       }
     : {
         price: 0,
@@ -201,6 +257,7 @@ const Dex: React.FC = () => {
         volume24h: 0,
         high24h: 0,
         low24h: 0,
+        logo: "",
       };
 
   return (
@@ -219,11 +276,7 @@ const Dex: React.FC = () => {
             {isLoading && (
               <div className="loading-indicator">Updating market data...</div>
             )}
-            <button
-              className="refresh-button"
-              onClick={() => loadPairs()}
-              disabled={isLoading}
-            >
+            <button onClick={loadPairs} disabled={isLoading}>
               ↻ Refresh
             </button>
             {selectedPair && (
@@ -246,6 +299,13 @@ const Dex: React.FC = () => {
           <>
             <div className="dex-page__trading-stats">
               <div className="stat price">
+                {tradingStats.logo && (
+                  <img
+                    src={tradingStats.logo}
+                    alt={selectedPair.baseAsset}
+                    style={{ width: 24, height: 24, marginRight: 6 }}
+                  />
+                )}
                 <span className="label">Price:</span>
                 <span
                   className={`value ${
