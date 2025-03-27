@@ -1,0 +1,144 @@
+/* src/pages/Dex/components/LimitOrderManager.scss */
+
+.limit-order-manager {
+  padding: 1rem;
+  background: #0d111c;
+  color: #f1f1f1;
+  font-size: 14px;
+
+  .order-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+
+    button {
+      background: #1c2230;
+      color: #ccc;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+
+      &.active {
+        background: #2b82f6;
+        color: #fff;
+      }
+
+      &:hover {
+        background: #2b82f6cc;
+      }
+    }
+  }
+
+  .orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+
+    thead {
+      background: #1c2230;
+
+      th {
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 1px solid #333;
+      }
+    }
+
+    tbody {
+      tr {
+        border-bottom: 1px solid #222;
+        transition: background 0.2s ease;
+
+        &:hover {
+          background: #1a1e2b;
+        }
+
+        td {
+          padding: 0.75rem;
+          border-bottom: 1px solid #1a1a1a;
+          white-space: nowrap;
+
+          button {
+            background: #444;
+            border: none;
+            padding: 0.3rem 0.75rem;
+            border-radius: 4px;
+            color: #eee;
+            cursor: pointer;
+
+            &:hover {
+              background: #555;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .load-more {
+    text-align: center;
+    margin-top: 1rem;
+
+    button {
+      padding: 0.5rem 1.5rem;
+      background: #2b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+
+      &:hover {
+        background: #1c5edb;
+      }
+    }
+  }
+
+  .error {
+    color: #f87171;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  /* Mobile responsiveness */
+  @media (max-width: 768px) {
+    .orders-table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+
+      thead {
+        display: none;
+      }
+
+      tbody {
+        display: block;
+
+        tr {
+          display: block;
+          margin-bottom: 1rem;
+          background: #1a1e2b;
+          border-radius: 6px;
+          padding: 0.5rem;
+
+          td {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.3rem 0;
+
+            &::before {
+              content: attr(data-label);
+              font-weight: bold;
+              margin-right: 1rem;
+              color: #ccc;
+              flex-shrink: 0;
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -56,6 +56,11 @@
     z-index: 1;
     box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
   }
+  .dex-page__container {
+    overflow-y: auto;
+    flex: 1 1 auto; /* allow the container to grow/shrink in a flex layout */
+    min-height: 0; /* if parent is flex, permit child to not overflow */
+  }
 
   .vertical-scan {
     position: absolute;

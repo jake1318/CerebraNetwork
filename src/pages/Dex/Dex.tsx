@@ -1,13 +1,11 @@
 // src/pages/Dex/Dex.tsx
-
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import Chart from "./components/Chart";
-// REMOVED: OrderBook import
 import OrderForm from "./components/OrderForm";
 import TradingHistory from "./components/TradingHistory";
 import PairSelector from "./components/PairSelector";
-import MyOrders from "./components/MyOrders";
+import LimitOrderManager from "./components/LimitOrderManager";
 import { blockvisionService } from "../../services/blockvisionService";
 import { birdeyeService } from "../../services/birdeyeService";
 import "./Dex.scss";
@@ -236,10 +234,6 @@ const Dex: React.FC = () => {
     setSelectedPair(pair);
   };
 
-  const handleOrderEvent = () => {
-    console.log("Order event occurred");
-  };
-
   const tradingStats = selectedPair
     ? {
         price: selectedPair.price,
@@ -356,8 +350,6 @@ const Dex: React.FC = () => {
                   <Chart pair={selectedPair} />
                 </div>
 
-                {/* REMOVED: <OrderBook pair={selectedPair} /> */}
-
                 <div className="order-form-container">
                   <OrderForm
                     pair={selectedPair}
@@ -374,9 +366,12 @@ const Dex: React.FC = () => {
                   <TradingHistory pair={selectedPair} />
                 </div>
                 <div className="my-orders-container">
-                  <MyOrders
-                    onOrderCancel={handleOrderEvent}
-                    onOrderClaim={handleOrderEvent}
+                  <LimitOrderManager
+                    selectedPair={
+                      selectedPair
+                        ? `${selectedPair.baseAddress}-${selectedPair.quoteAddress}`
+                        : undefined
+                    }
                   />
                 </div>
               </div>
