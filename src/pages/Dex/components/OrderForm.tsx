@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { placeLimitOrder } from "@7kprotocol/sdk-ts";
+import { useWallet } from "@suiet/wallet-kit";
 import blockvisionService from "../../../services/blockvisionService";
 
 // Map supported token symbols to their full Sui coinType strings
@@ -15,36 +16,77 @@ const COIN_TYPE_MAP: Record<string, string> = {
   WSOL: "0xb7844e289a8410e50fb3ca48d69eb9cf29e27d223ef90353fe1bd8e27ff8f3f8::coin::COIN",
   WBNB: "0xb848cce11ef3a8f62eccea6eb5b35a12c4c2b1ee1af7755d02d7bd6218e8226f::coin::COIN",
   APT: "0x3a5143bb1196e3bcdfab6203d1683ae29edd26294fc8bfeafe4aaa9d2704df37::coin::COIN",
+  USDC: "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
 };
 
+// Default decimals for common tokens
+const TOKEN_DECIMALS: Record<string, number> = {
+  SUI: 9,
+  USDC: 6,
+  CETUS: 9,
+  DEEP: 9,
+  ETH: 8,
+  WBTC: 8,
+  NAVX: 9,
+  SCA: 9,
+  WSOL: 9,
+  WBNB: 8,
+  APT: 8,
+};
+
+interface TradingPair {
+  id: string;
+  name: string;
+  baseAsset: string;
+  quoteAsset: string;
+  price: number;
+  baseAddress: string;
+  quoteAddress: string;
+}
+
 interface OrderFormProps {
-  baseAsset: string; // e.g. "SUI"
-  quoteAsset: string; // e.g. "CETUS"
-  orderType: "buy" | "sell"; // "buy" for buying baseAsset, "sell" for selling baseAsset
-  walletAddress: string; // user's Sui address
+  pair: TradingPair;
+  orderType: "buy" | "sell";
+  setOrderType: (type: "buy" | "sell") => void;
+  orderMode: "limit" | "market";
+  setOrderMode: (mode: "limit" | "market") => void;
 }
 
 const OrderForm: React.FC<OrderFormProps> = ({
-  baseAsset,
-  quoteAsset,
+  pair,
   orderType,
-  walletAddress,
+  setOrderType,
+  orderMode,
+  setOrderMode,
 }) => {
+  const { connected, account } = useWallet();
+  const walletAddress = account?.address || "";
+
   // State for fetched balances: symbol -> { balance (raw string), decimals (number) }
   const [balances, setBalances] = useState<
     Record<string, { balance: string; decimals: number }>
   >({});
-  // State for order kind selection (limit or market)
-  const [orderKind, setOrderKind] = useState<"limit" | "market">("limit");
+
   // Form inputs for price and amount
   const [price, setPrice] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [orderStatus, setOrderStatus] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  // Extract base and quote assets from the pair
+  const baseAsset = pair.baseAsset;
+  const quoteAsset = pair.quoteAsset;
+  const baseAddress = pair.baseAddress;
+  const quoteAddress = pair.quoteAddress;
 
   // Determine which token is being spent (pay) and which is received (target)
   const payAssetSymbol = orderType === "buy" ? quoteAsset : baseAsset;
   const targetAssetSymbol = orderType === "buy" ? baseAsset : quoteAsset;
-  const payCoinType = COIN_TYPE_MAP[payAssetSymbol];
-  const targetCoinType = COIN_TYPE_MAP[targetAssetSymbol];
+  const payCoinType = orderType === "buy" ? quoteAddress : baseAddress;
+  const targetCoinType = orderType === "buy" ? baseAddress : quoteAddress;
 
   // Compute the available balance (in human-readable units) of the asset being spent
   const payAssetBalanceInfo = balances[payAssetSymbol];
@@ -59,7 +101,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
     if (!address) return;
     try {
       const resp = await blockvisionService.getAccountCoins(address);
-      // The API returns an object where result contains a coins array.
       const result = resp.data;
       const coinsList = result.coins ?? [];
       const newBalances: Record<string, { balance: string; decimals: number }> =
@@ -74,24 +115,42 @@ const OrderForm: React.FC<OrderFormProps> = ({
           }
         }
       }
-      // Ensure supported tokens are present, defaulting to 0 if not found
-      [baseAsset, quoteAsset].forEach((sym) => {
-        if (!newBalances[sym]) {
-          newBalances[sym] = { balance: "0", decimals: 9 };
-        }
-      });
+
+      // Ensure base and quote assets are present with correct decimals
+      if (!newBalances[baseAsset]) {
+        newBalances[baseAsset] = {
+          balance: "0",
+          decimals: TOKEN_DECIMALS[baseAsset] || 9,
+        };
+      }
+
+      if (!newBalances[quoteAsset]) {
+        newBalances[quoteAsset] = {
+          balance: "0",
+          decimals: TOKEN_DECIMALS[quoteAsset] || 6,
+        };
+      }
+
+      console.log("Fetched balances:", newBalances);
       setBalances(newBalances);
     } catch (error) {
       console.error("Failed to fetch balances:", error);
     }
   };
 
-  // Fetch balances whenever the wallet address changes
+  // Fetch balances whenever the wallet address or trading pair changes
   useEffect(() => {
-    if (walletAddress) {
+    if (connected && walletAddress) {
       fetchBalances(walletAddress);
     }
-  }, [walletAddress]);
+  }, [connected, walletAddress, baseAsset, quoteAsset]);
+
+  // Update price when pair price changes
+  useEffect(() => {
+    if (pair && pair.price) {
+      setPrice(pair.price.toString());
+    }
+  }, [pair]);
 
   // Handler for clicking percentage buttons to fill the amount
   const handlePercentage = (percent: number) => {
@@ -114,50 +173,111 @@ const OrderForm: React.FC<OrderFormProps> = ({
   // Form submission handler
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (orderKind === "market") {
+    if (orderMode === "market") {
       alert("Market orders are handled via the swap page.");
       return;
     }
+
+    // Reset previous status
+    setOrderStatus(null);
+
     const priceNum = parseFloat(price);
     const amountNum = parseFloat(amount);
     if (
+      !connected ||
       !walletAddress ||
       !payCoinType ||
       !targetCoinType ||
       !priceNum ||
       !amountNum
     ) {
-      console.error("Missing required fields for placing limit order");
+      setOrderStatus({
+        success: false,
+        message: "Missing required fields or wallet not connected",
+      });
       return;
     }
+
+    setIsSubmitting(true);
+
     try {
-      const payDecimals = balances[payAssetSymbol]?.decimals ?? 0;
-      const targetDecimals = balances[targetAssetSymbol]?.decimals ?? 0;
+      // Get token decimals - use defaults if balances aren't available
+      const payDecimals =
+        balances[payAssetSymbol]?.decimals ||
+        TOKEN_DECIMALS[payAssetSymbol] ||
+        (payAssetSymbol === "USDC" ? 6 : 9);
+
+      const targetDecimals =
+        balances[targetAssetSymbol]?.decimals ||
+        TOKEN_DECIMALS[targetAssetSymbol] ||
+        (targetAssetSymbol === "USDC" ? 6 : 9);
+
+      console.log(`Pay asset: ${payAssetSymbol}, decimals: ${payDecimals}`);
+      console.log(
+        `Target asset: ${targetAssetSymbol}, decimals: ${targetDecimals}`
+      );
+
       let payAmountRaw: bigint;
       let rate: bigint;
+
+      // Calculate parameters for the buy order (buying baseAsset with quoteAsset)
       if (orderType === "buy") {
+        // Amount of quoteAsset to pay (e.g., amount of USDC to spend)
         const quoteAmount = priceNum * amountNum;
         payAmountRaw = BigInt(
           Math.floor(quoteAmount * Math.pow(10, payDecimals))
         );
-        const targetPerPay = priceNum > 0 ? 1 / priceNum : 0;
+
+        // For buy orders, rate calculation follows the SDK docs:
+        // rate = exchange_rate * 10^(target_decimals - pay_decimals) * 10^12
+        // But for buying, exchange_rate is (1/price) because we're calculating
+        // how much base asset we get per quote asset
+        const exchangeRate = 1 / priceNum;
         rate = BigInt(
           Math.floor(
-            targetPerPay * Math.pow(10, targetDecimals - payDecimals) * 1e12
-          )
-        );
-      } else {
-        payAmountRaw = BigInt(
-          Math.floor(amountNum * Math.pow(10, payDecimals))
-        );
-        rate = BigInt(
-          Math.floor(
-            priceNum * Math.pow(10, targetDecimals - payDecimals) * 1e12
+            exchangeRate *
+              Math.pow(10, targetDecimals - payDecimals) *
+              Math.pow(10, 12)
           )
         );
       }
+      // Calculate parameters for the sell order (selling baseAsset for quoteAsset)
+      else {
+        // Amount of baseAsset to pay
+        payAmountRaw = BigInt(
+          Math.floor(amountNum * Math.pow(10, payDecimals))
+        );
+
+        // For sell orders, rate calculation follows the SDK docs:
+        // rate = exchange_rate * 10^(target_decimals - pay_decimals) * 10^12
+        // The exchange_rate is price because we're calculating how much quote asset
+        // we get per base asset
+        const exchangeRate = priceNum;
+        rate = BigInt(
+          Math.floor(
+            exchangeRate *
+              Math.pow(10, targetDecimals - payDecimals) *
+              Math.pow(10, 12)
+          )
+        );
+      }
+
+      // Set expiration to 7 days from now
       const expireTs = BigInt(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      // Slippage tolerance of 1%
       const slippage = BigInt(100);
+
+      console.log("Placing limit order with parameters:", {
+        accountAddress: walletAddress,
+        payCoinType,
+        targetCoinType,
+        expireTs: expireTs.toString(),
+        payCoinAmount: payAmountRaw.toString(),
+        rate: rate.toString(),
+        slippage: slippage.toString(),
+      });
+
       const tx = await placeLimitOrder({
         accountAddress: walletAddress,
         payCoinType,
@@ -168,96 +288,161 @@ const OrderForm: React.FC<OrderFormProps> = ({
         slippage,
         devInspect: false,
       });
+
       console.log("Limit order placed. Transaction:", tx);
+      setOrderStatus({
+        success: true,
+        message: "Limit order placed successfully!",
+      });
+
       fetchBalances(walletAddress);
       setAmount("");
     } catch (err) {
       console.error("Failed to place limit order:", err);
+      setOrderStatus({
+        success: false,
+        message: `Failed to place limit order: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <form className="order-form" onSubmit={handleSubmitOrder}>
-      <h3>{orderType === "buy" ? `Buy ${baseAsset}` : `Sell ${baseAsset}`}</h3>
-
-      {/* Order kind selection: Limit or Market */}
-      <div className="order-kind-toggle">
-        <label>
-          Order Type:
-          <select
-            value={orderKind}
-            onChange={(e) => setOrderKind(e.target.value as "limit" | "market")}
-          >
-            <option value="limit">Limit</option>
-            <option value="market">Market</option>
-          </select>
-        </label>
+    <div className="dex-order-form">
+      <div className="order-form-tabs">
+        <button
+          className={`tab ${orderType === "buy" ? "active" : ""}`}
+          onClick={() => setOrderType("buy")}
+        >
+          Buy {baseAsset}
+        </button>
+        <button
+          className={`tab ${orderType === "sell" ? "active" : ""}`}
+          onClick={() => setOrderType("sell")}
+        >
+          Sell {baseAsset}
+        </button>
       </div>
 
-      {/* Limit order inputs */}
-      {orderKind === "limit" && (
-        <>
-          <div className="form-row">
-            <label>
-              Price ({quoteAsset} per {baseAsset}):
-              <input
-                type="number"
-                step="any"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder={`Price in ${quoteAsset}`}
-              />
-            </label>
-          </div>
-          <div className="form-row">
-            <label>
-              Amount ({baseAsset}):
-              <input
-                type="number"
-                step="any"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={`Amount in ${baseAsset}`}
-              />
-            </label>
-            <div className="available-balance">
-              Available: {payAssetBalanceNum.toFixed(4)} {payAssetSymbol}
-            </div>
-            <div className="percent-buttons">
-              {[25, 50, 75, 100].map((pct) => (
-                <button
-                  type="button"
-                  key={pct}
-                  onClick={() => handlePercentage(pct)}
-                >
-                  {pct}%
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="form-row">
-            <label>Total ({quoteAsset}): </label>
-            <span>
-              {price && amount
-                ? (parseFloat(price) * parseFloat(amount)).toFixed(6)
-                : "0"}
-            </span>
-          </div>
-        </>
-      )}
+      <div className="order-form-mode-selector">
+        <button
+          className={`mode-btn ${orderMode === "limit" ? "active" : ""}`}
+          onClick={() => setOrderMode("limit")}
+        >
+          Limit
+        </button>
+        <button
+          className={`mode-btn ${orderMode === "market" ? "active" : ""}`}
+          onClick={() => setOrderMode("market")}
+        >
+          Market
+        </button>
+      </div>
 
-      {/* Market order notice */}
-      {orderKind === "market" && (
-        <div className="market-notice">
-          <em>Market orders are handled via the swap page.</em>
-        </div>
-      )}
+      <form onSubmit={handleSubmitOrder} className="order-form-content">
+        {orderMode === "limit" && (
+          <>
+            <div className="form-group">
+              <label>Price ({quoteAsset})</label>
+              <div className="input-container">
+                <input
+                  type="number"
+                  step="any"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder={`Price in ${quoteAsset}`}
+                  min="0"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
 
-      {/* Submit button */}
-      <button type="submit" disabled={!walletAddress}>
-        {orderKind === "limit" ? "Place Limit Order" : "Market Order"}
-      </button>
-    </form>
+            <div className="form-group">
+              <label>Amount ({baseAsset})</label>
+              <div className="input-container">
+                <input
+                  type="number"
+                  step="any"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={`Amount in ${baseAsset}`}
+                  min="0"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="balance-info">
+                Available: {payAssetBalanceNum.toFixed(4)} {payAssetSymbol}
+              </div>
+              <div className="percentage-buttons">
+                {[25, 50, 75, 100].map((pct) => (
+                  <button
+                    type="button"
+                    key={pct}
+                    className="pct-btn"
+                    onClick={() => handlePercentage(pct)}
+                    disabled={isSubmitting}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Total {quoteAsset}</label>
+              <div className="total-value">
+                {price && amount
+                  ? (parseFloat(price) * parseFloat(amount)).toFixed(6)
+                  : "0"}{" "}
+                {quoteAsset}
+              </div>
+            </div>
+          </>
+        )}
+
+        {orderMode === "market" && (
+          <div className="market-notice">
+            <p>Market orders are handled via the swap page.</p>
+          </div>
+        )}
+
+        {orderStatus && (
+          <div
+            className={`order-status ${
+              orderStatus.success ? "success" : "error"
+            }`}
+          >
+            {orderStatus.message}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className={`submit-order-btn ${
+            orderType === "buy" ? "buy" : "sell"
+          } ${isSubmitting ? "loading" : ""}`}
+          disabled={
+            !connected ||
+            !walletAddress ||
+            orderMode === "market" ||
+            !price ||
+            !amount ||
+            isSubmitting
+          }
+        >
+          {isSubmitting
+            ? "Processing..."
+            : orderMode === "limit"
+            ? `Place ${orderType === "buy" ? "Buy" : "Sell"} Order`
+            : `${orderType === "buy" ? "Buy" : "Sell"} Market`}
+        </button>
+      </form>
+    </div>
   );
 };
 
