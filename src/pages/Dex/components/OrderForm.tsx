@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { placeLimitOrder } from "@7kprotocol/sdk-ts";
 import { useWallet } from "@suiet/wallet-kit";
 import blockvisionService from "../../../services/blockvisionService";
+import "./OrderForm.scss";
 
 // Map supported token symbols to their full Sui coinType strings
 const COIN_TYPE_MAP: Record<string, string> = {
@@ -59,7 +60,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
   orderMode,
   setOrderMode,
 }) => {
-  const { connected, account } = useWallet();
+  // Update to include signAndExecuteTransactionBlock
+  const { connected, account, signAndExecuteTransactionBlock } = useWallet();
   const walletAddress = account?.address || "";
 
   // State for fetched balances: symbol -> { balance (raw string), decimals (number) }
@@ -289,19 +291,31 @@ const OrderForm: React.FC<OrderFormProps> = ({
         devInspect: false,
       });
 
-      console.log("Limit order placed. Transaction:", tx);
+      console.log("Transaction built:", tx);
+
+      // NEW CODE: Send transaction to wallet for signing and execution
+      if (!signAndExecuteTransactionBlock) {
+        throw new Error("Wallet does not support transaction signing");
+      }
+
+      console.log("Sending transaction to Suiet wallet for signing...");
+      const result = await signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+      });
+
+      console.log("Transaction signed and executed:", result);
       setOrderStatus({
         success: true,
-        message: "Limit order placed successfully!",
+        message: "Limit order placed and executed successfully!",
       });
 
       fetchBalances(walletAddress);
       setAmount("");
     } catch (err) {
-      console.error("Failed to place limit order:", err);
+      console.error("Failed to place or execute limit order:", err);
       setOrderStatus({
         success: false,
-        message: `Failed to place limit order: ${
+        message: `Failed to process limit order: ${
           err instanceof Error ? err.message : String(err)
         }`,
       });

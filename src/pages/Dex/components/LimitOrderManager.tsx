@@ -7,6 +7,7 @@ import {
 } from "@7kprotocol/sdk-ts";
 // Import your wallet hook (adjust path if needed)
 import { useWallet } from "@suiet/wallet-kit";
+import "./LimitOrderManager.scss";
 
 interface LimitOrder {
   orderId: string;

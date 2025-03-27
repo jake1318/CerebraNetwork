@@ -121,36 +121,6 @@ const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="footer__bottom">
-        <p>
-          &copy; {new Date().getFullYear()} Cerebra Network. All rights
-          reserved.
-        </p>
-        <div className="footer__social">
-          <a
-            href="https://twitter.com/7kprotocol"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Twitter
-          </a>
-          <a
-            href="https://github.com/7kprotocol"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
-          <a
-            href="https://discord.gg/7kprotocol"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Discord
-          </a>
-        </div>
-      </div>
-
       {/* Add background effects */}
       <div className="footer-glow footer-glow-1"></div>
       <div className="footer-glow footer-glow-2"></div>

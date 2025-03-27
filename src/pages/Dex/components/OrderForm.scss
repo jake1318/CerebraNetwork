@@ -1,6 +1,17 @@
-.order-form {
-  background: rgba(5, 15, 30, 0.7);
-  border-radius: 12px;
+/* src/pages/Dex/components/OrderForm.scss */
+.dex-order-form {
+  background: radial-gradient(
+      circle at top left,
+      rgba(0, 255, 255, 0.1) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 0, 255, 0.1) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -13,85 +24,112 @@
       rgba(255, 0, 255, 0.2)
     )
     1;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+    0 8px 32px rgba(255, 0, 255, 0.1);
   overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+  animation: fadeIn 0.5s ease-out;
 
-  .order-form-header {
-    padding: 1rem;
+  &:hover {
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
+      0 8px 32px rgba(255, 0, 255, 0.15);
+  }
+
+  /* Unified neon gradient style for any h3 heading in the order form */
+  h3 {
+    background: linear-gradient(90deg, #00ffff, #ff00ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+
+  .order-form-tabs {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
 
-    h3 {
-      font-size: 1.2rem;
-      color: #fff;
-    }
+    .tab {
+      flex: 1;
+      background: rgba(5, 15, 30, 0.5);
+      border: none;
+      color: rgba(255, 255, 255, 0.8);
+      padding: 1rem 0;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
 
-    .order-type-selector {
-      display: flex;
-      gap: 0.5rem;
-
-      button {
+      &:hover {
         background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.7);
-        padding: 0.5rem 1.2rem;
-        border-radius: 6px;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
+      }
 
-        &:hover {
-          background: rgba(255, 255, 255, 0.1);
+      &.active {
+        &[class*="buy"] {
+          background: rgba(0, 255, 136, 0.15);
+          color: #00ff88;
+          text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
         }
-
-        &.active {
-          &.buy {
-            background: rgba(0, 255, 136, 0.2);
-            border-color: rgba(0, 255, 136, 0.5);
-            color: #00ff88;
-          }
-
-          &.sell {
-            background: rgba(255, 77, 109, 0.2);
-            border-color: rgba(255, 77, 109, 0.5);
-            color: #ff4d6d;
-          }
+        &[class*="sell"] {
+          background: rgba(255, 77, 109, 0.15);
+          color: #ff4d6d;
+          text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
         }
       }
     }
   }
 
-  .order-mode-selector {
+  .order-form-mode-selector {
     display: flex;
-    padding: 0.8rem 1rem;
-    gap: 0.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 22px;
+    gap: 12px;
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
 
-    button {
+    .mode-btn {
       flex: 1;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(5, 15, 30, 0.5);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.7);
-      padding: 0.5rem 0;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.8);
+      padding: 12px 0;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        transform: translateY(-2px);
       }
 
       &.active {
         background: linear-gradient(
           45deg,
-          rgba(0, 255, 255, 0.3),
-          rgba(255, 0, 255, 0.3)
+          rgba(0, 255, 255, 0.2),
+          rgba(255, 0, 255, 0.2)
         );
         border-color: rgba(255, 255, 255, 0.2);
         color: #fff;
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
+          0 0 15px rgba(255, 0, 255, 0.15);
       }
     }
   }
@@ -100,143 +138,277 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 1rem;
+    padding: 22px;
     overflow-y: auto;
     scrollbar-width: thin;
 
     &::-webkit-scrollbar {
       width: 4px;
     }
-
     &::-webkit-scrollbar-track {
       background: rgba(0, 0, 0, 0.2);
     }
-
     &::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.3);
       border-radius: 2px;
     }
 
     .form-group {
-      margin-bottom: 1rem;
+      margin-bottom: 16px;
 
       label {
         display: block;
-        font-size: 0.9rem;
+        font-size: 14px;
         color: rgba(255, 255, 255, 0.7);
-        margin-bottom: 0.3rem;
+        margin-bottom: 8px;
+        letter-spacing: 0.5px;
       }
 
-      input,
-      select {
-        width: 100%;
-        background: rgba(0, 0, 0, 0.2);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white;
-        padding: 0.8rem;
-        border-radius: 6px;
-        font-size: 1rem;
-        transition: all 0.2s ease;
+      .input-container {
+        position: relative;
 
-        &:focus {
-          outline: none;
-          border-color: rgba(255, 255, 255, 0.3);
-          box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.2);
-        }
+        input {
+          width: 100%;
+          background: rgba(5, 15, 30, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: white;
+          padding: 12px;
+          border-radius: 10px;
+          font-size: 15px;
+          transition: all 0.3s ease;
 
-        &::placeholder {
-          color: rgba(255, 255, 255, 0.3);
+          &:focus {
+            outline: none;
+            border-color: rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
+              0 0 15px rgba(255, 0, 255, 0.15);
+          }
+
+          &::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+          }
         }
       }
-    }
 
-    .percentage-selector {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-
-      button {
-        flex: 1;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+      .balance-info {
+        display: flex;
+        justify-content: flex-end;
+        font-size: 14px;
         color: rgba(255, 255, 255, 0.7);
-        padding: 0.4rem 0;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
+        margin-top: 8px;
+        letter-spacing: 0.5px;
+      }
 
-        &:hover {
-          background: rgba(255, 255, 255, 0.1);
+      .percentage-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+
+        .pct-btn {
+          flex: 1;
+          background: rgba(5, 15, 30, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.8);
+          padding: 8px 0;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.3s ease;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(0, 255, 255, 0.3);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 255, 255, 0.1),
+              0 4px 12px rgba(255, 0, 255, 0.1);
+          }
         }
       }
     }
 
-    .available-balance {
-      margin-bottom: 1rem;
-      font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.6);
+    .total-value {
+      background: rgba(5, 15, 30, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.9);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-align: right;
+    }
 
-      .balance-amount {
-        color: rgba(255, 255, 255, 0.9);
-        font-weight: 500;
+    .market-notice {
+      padding: 24px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.7);
+      font-style: italic;
+      background: rgba(5, 15, 30, 0.5);
+      border-radius: 10px;
+      border: 1px dashed;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.3),
+          rgba(255, 0, 255, 0.3)
+        )
+        1;
+      margin: 16px 0;
+      letter-spacing: 0.5px;
+    }
+
+    .order-status {
+      margin: 16px 0;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      animation: fadeIn 0.5s ease-out;
+
+      &.success {
+        background: rgba(0, 255, 136, 0.1);
+        color: #00ff88;
+        border: 1px solid rgba(0, 255, 136, 0.3);
+        text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+      }
+      &.error {
+        background: rgba(255, 77, 109, 0.1);
+        color: #ff4d6d;
+        border: 1px solid rgba(255, 77, 109, 0.3);
+        text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
       }
     }
 
-    .tx-result {
-      padding: 0.8rem;
-      margin-bottom: 1rem;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      background: rgba(0, 255, 136, 0.1);
-      color: #00ff88;
-      border: 1px solid rgba(0, 255, 136, 0.3);
-      word-break: break-all;
-
-      &:empty {
-        display: none;
-      }
-    }
-
-    .submit-button {
-      padding: 1rem;
-      border-radius: 8px;
-      font-size: 1rem;
+    .submit-order-btn {
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.3s ease;
       margin-top: auto;
+      border: none;
+      letter-spacing: 0.5px;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.15),
+        0 0 10px rgba(255, 0, 255, 0.15);
 
       &.buy {
         background: linear-gradient(45deg, #00aa5b, #00ff88);
-        border: none;
         color: #002211;
         text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
-        box-shadow: 0 4px 10px rgba(0, 255, 136, 0.3);
-
-        &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 15px rgba(0, 255, 136, 0.4);
-        }
       }
-
       &.sell {
         background: linear-gradient(45deg, #d32f4a, #ff4d6d);
-        border: none;
         color: #fff;
         text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
-        box-shadow: 0 4px 10px rgba(255, 77, 109, 0.3);
-
-        &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 15px rgba(255, 77, 109, 0.4);
-        }
       }
 
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
+          0 0 20px rgba(255, 0, 255, 0.3);
+      }
       &:disabled {
-        opacity: 0.6;
+        opacity: 0.5;
         cursor: not-allowed;
         transform: none !important;
+        box-shadow: none !important;
+      }
+
+      &.loading {
+        position: relative;
+        color: transparent;
+
+        &::after {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 20px;
+          height: 20px;
+          margin-top: -10px;
+          margin-left: -10px;
+          border: 3px solid rgba(255, 255, 255, 0.3);
+          border-top-color: white;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+      }
+    }
+  }
+
+  /* Horizontal scanning line effect */
+  &::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 255, 255, 0.5),
+      transparent
+    );
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    opacity: 0.3;
+    pointer-events: none;
+  }
+}
+
+/* Keyframes */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes horizonScan {
+  0% {
+    transform: translateX(-150vw);
+  }
+  100% {
+    transform: translateX(150vw);
+  }
+}
+
+/* Responsive styling */
+@media (max-width: 768px) {
+  .dex-order-form {
+    .order-form-tabs {
+      .tab {
+        font-size: 16px;
+        padding: 12px 0;
+      }
+    }
+    .order-form-mode-selector {
+      padding: 16px;
+
+      .mode-btn {
+        padding: 10px 0;
+        font-size: 14px;
+      }
+    }
+    .order-form-content {
+      padding: 16px;
+
+      .submit-order-btn {
+        font-size: 14px;
+        padding: 12px;
       }
     }
   }
