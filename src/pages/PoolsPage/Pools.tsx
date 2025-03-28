@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import cetusSDK from "@cetusprotocol/cetus-sui-clmm-sdk";
 import BN from "bn.js";
 import { useWallet } from "@suiet/wallet-kit";
+import "./Pools.scss";
 
 const { initCetusSDK, TickMath, ClmmPoolUtil } = cetusSDK;
 
@@ -30,9 +31,8 @@ type PositionInfo = {
 };
 
 export default function Pools() {
-  const { connected, signAndExecuteTransactionBlock, wallet } = useWallet();
-  const walletAddress: string | undefined =
-    wallet?.accounts?.[0]?.address || wallet?.account?.address || undefined;
+  const { connected, account, signAndExecuteTransactionBlock } = useWallet();
+  const walletAddress = account?.address;
   const sdkRef = useRef<any>(null);
 
   const [pools, setPools] = useState<PoolInfo[]>([]);
@@ -68,9 +68,11 @@ export default function Pools() {
 
   // Initialize SDK and load pools & positions when wallet is connected
   useEffect(() => {
-    if (!walletAddress || !connected) return;
+    if (!connected || !walletAddress) return;
+
     setLoading(true);
     setError(null);
+
     try {
       sdkRef.current = initCetusSDK({
         network: "mainnet",
@@ -263,7 +265,7 @@ export default function Pools() {
         setLoading(false);
       }
     })();
-  }, [walletAddress, connected]);
+  }, [connected, walletAddress]);
 
   // Handlers for user actions:
   const handleOpenPosition = async (pool: PoolInfo) => {
@@ -611,107 +613,130 @@ export default function Pools() {
     }
   };
 
-  if (!connected || !walletAddress) {
-    return <div>Please connect your Sui wallet to view pools.</div>;
-  }
-
-  if (loading) {
-    return <div>Loading pools and positions...</div>;
-  }
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
-
   return (
     <div className="pools-page">
-      <h2>All Pools</h2>
-      <table className="pools-table">
-        <thead>
-          <tr>
-            <th>Pool</th>
-            <th>Liquidity</th>
-            <th>TVL</th>
-            <th>Fee Rate</th>
-            <th>Reward APY</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pools.map((pool) => (
-            <tr key={pool.id}>
-              <td>
-                <span>
-                  {pool.symbolA}/{pool.symbolB}
-                </span>
-              </td>
-              <td>
-                {(
-                  pool.coinA_amount / Math.pow(10, getDecimals(pool.coinTypeA))
-                ).toFixed(2)}{" "}
-                {pool.symbolA} +{" "}
-                {(
-                  pool.coinB_amount / Math.pow(10, getDecimals(pool.coinTypeB))
-                ).toFixed(2)}{" "}
-                {pool.symbolB}
-              </td>
-              <td>${pool.tvlUsd.toFixed(2)}</td>
-              <td>{pool.feeRatePct}</td>
-              <td>{pool.rewardApyPct}</td>
-              <td>
-                <button onClick={() => handleOpenPosition(pool)}>
-                  Open Position
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="vertical-scan"></div>
+      <div className="glow-1"></div>
+      <div className="glow-2"></div>
 
-      <h2>Your Positions</h2>
-      {positions.length === 0 ? (
-        <div>No positions found.</div>
-      ) : (
-        <table className="positions-table">
-          <thead>
-            <tr>
-              <th>Pool</th>
-              <th>Range</th>
-              <th>Liquidity</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {positions.map((pos) => (
-              <tr key={pos.posId}>
-                <td>
-                  {pos.symbolA}/{pos.symbolB}
-                </td>
-                <td>
-                  {formatPrice(Math.pow(1.0001, pos.tickLower))} -{" "}
-                  {formatPrice(Math.pow(1.0001, pos.tickUpper))} {pos.symbolB}/
-                  {pos.symbolA}
-                </td>
-                <td>{pos.liquidity.toString()}</td>
-                <td>
-                  <button onClick={() => handleAddLiquidity(pos)}>Add</button>
-                  <button onClick={() => handleRemoveLiquidity(pos)}>
-                    Remove
-                  </button>
-                  <button onClick={() => handleCollectFees(pos)}>
-                    Collect Fees
-                  </button>
-                  <button onClick={() => handleCollectRewards(pos)}>
-                    Collect Rewards
-                  </button>
-                  <button onClick={() => handleClosePosition(pos)}>
-                    Close
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <div className="pools-page__container">
+        <div className="pools-page__header">
+          <h1>Liquidity Pools</h1>
+          <p>Add liquidity to earn fees and farm rewards</p>
+        </div>
+
+        <div className="pools-page__content">
+          {!connected ? (
+            <div className="connect-prompt">
+              <h2>Connect Wallet</h2>
+              <p>
+                Please connect your wallet to view and manage liquidity pools
+              </p>
+            </div>
+          ) : loading ? (
+            <div className="loading-indicator">
+              Loading pools and positions...
+            </div>
+          ) : error ? (
+            <div className="error-message">Error: {error}</div>
+          ) : (
+            <>
+              <h2>All Pools</h2>
+              <table className="pools-table">
+                <thead>
+                  <tr>
+                    <th>Pool</th>
+                    <th>Liquidity</th>
+                    <th>TVL</th>
+                    <th>Fee Rate</th>
+                    <th>Reward APY</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pools.map((pool) => (
+                    <tr key={pool.id}>
+                      <td>
+                        <span>
+                          {pool.symbolA}/{pool.symbolB}
+                        </span>
+                      </td>
+                      <td>
+                        {(
+                          pool.coinA_amount /
+                          Math.pow(10, getDecimals(pool.coinTypeA))
+                        ).toFixed(2)}{" "}
+                        {pool.symbolA} +{" "}
+                        {(
+                          pool.coinB_amount /
+                          Math.pow(10, getDecimals(pool.coinTypeB))
+                        ).toFixed(2)}{" "}
+                        {pool.symbolB}
+                      </td>
+                      <td>${pool.tvlUsd.toFixed(2)}</td>
+                      <td>{pool.feeRatePct}</td>
+                      <td>{pool.rewardApyPct}</td>
+                      <td>
+                        <button onClick={() => handleOpenPosition(pool)}>
+                          Open Position
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <h2>Your Positions</h2>
+              {positions.length === 0 ? (
+                <div>No positions found.</div>
+              ) : (
+                <table className="positions-table">
+                  <thead>
+                    <tr>
+                      <th>Pool</th>
+                      <th>Range</th>
+                      <th>Liquidity</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {positions.map((pos) => (
+                      <tr key={pos.posId}>
+                        <td>
+                          {pos.symbolA}/{pos.symbolB}
+                        </td>
+                        <td>
+                          {formatPrice(Math.pow(1.0001, pos.tickLower))} -{" "}
+                          {formatPrice(Math.pow(1.0001, pos.tickUpper))}{" "}
+                          {pos.symbolB}/{pos.symbolA}
+                        </td>
+                        <td>{pos.liquidity.toString()}</td>
+                        <td>
+                          <button onClick={() => handleAddLiquidity(pos)}>
+                            Add
+                          </button>
+                          <button onClick={() => handleRemoveLiquidity(pos)}>
+                            Remove
+                          </button>
+                          <button onClick={() => handleCollectFees(pos)}>
+                            Collect Fees
+                          </button>
+                          <button onClick={() => handleCollectRewards(pos)}>
+                            Collect Rewards
+                          </button>
+                          <button onClick={() => handleClosePosition(pos)}>
+                            Close
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
