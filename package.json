@@ -16,6 +16,7 @@
     "@suiet/wallet-kit": "^0.2.25",
     "apexcharts": "^4.5.0",
     "axios": "^1.8.3",
+    "@cetusprotocol/cetus-sui-clmm-sdk": "^3.17.3",
     "bignumber.js": "^9.1.2",
     "bn.js": "^5.2.1",
     "date-fns": "^4.1.0",

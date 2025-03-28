@@ -4,7 +4,6 @@
   width: 100%;
   min-height: calc(100vh - 80px);
   padding: 2rem;
-  // Dual-color background
   background: radial-gradient(
       circle at top left,
       rgba(0, 255, 255, 0.15) 0%,
@@ -47,7 +46,7 @@
     z-index: 0;
   }
 
-  // Scanning horizontal line
+  // Horizontal scanning line
   &::after {
     content: "";
     position: absolute;
@@ -176,21 +175,6 @@
       box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
         0 8px 32px rgba(255, 0, 255, 0.15);
       transform: translateY(-4px);
-    }
-
-    &.placeholder {
-      animation: fadeIn 0.5s ease-out;
-      animation-fill-mode: both;
-
-      &:nth-child(1) {
-        animation-delay: 0.1s;
-      }
-      &:nth-child(2) {
-        animation-delay: 0.2s;
-      }
-      &:nth-child(3) {
-        animation-delay: 0.3s;
-      }
     }
 
     &__header {
