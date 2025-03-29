@@ -34,18 +34,34 @@ const Pools: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/pools?page=${pageToLoad}&limit=8`);
+      // Update to use port 5000 where your server is running
+      const API_BASE_URL =
+        process.env.REACT_APP_API_URL || "http://localhost:5000";
+      const res = await fetch(
+        `${API_BASE_URL}/api/pools?page=${pageToLoad}&limit=8`
+      );
+
+      console.log(
+        `Fetching pools from: ${API_BASE_URL}/api/pools?page=${pageToLoad}&limit=8`
+      );
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
+
       const data = await res.json();
+      console.log("API Response:", data); // Debug logging
+
       // Assume the data is either an array of pools or an object with a 'pools' array
       const newPools: PoolInfo[] = Array.isArray(data) ? data : data.pools;
+
       // Update state: append new pools if not the first page, otherwise replace
       setPools((prevPools) =>
         pageToLoad === 1 ? newPools : [...prevPools, ...newPools]
       );
+
       setPage(pageToLoad); // update current page
+
       // If fewer than 8 items were returned, we've reached the end of available pools
       if (newPools.length < 8) {
         setAllLoaded(true);
