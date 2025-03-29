@@ -10,7 +10,9 @@
     "axios": "^1.7.9",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
-    "express": "^4.18.2",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.3",
+    "@cetusprotocol/cetus-sui-clmm-sdk": "^3.17.3",
     "nodemon": "^3.1.9"
   }
 }
