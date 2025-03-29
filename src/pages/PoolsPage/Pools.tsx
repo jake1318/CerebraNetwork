@@ -34,9 +34,9 @@ const Pools: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Update to use port 5000 where your server is running
-      const API_BASE_URL =
-        process.env.REACT_APP_API_URL || "http://localhost:5000";
+      // Use the hardcoded URL directly instead of process.env
+      // Assuming your backend is running on port 5000
+      const API_BASE_URL = "http://localhost:5000";
       const res = await fetch(
         `${API_BASE_URL}/api/pools?page=${pageToLoad}&limit=8`
       );
@@ -62,8 +62,11 @@ const Pools: React.FC = () => {
 
       setPage(pageToLoad); // update current page
 
-      // If fewer than 8 items were returned, we've reached the end of available pools
-      if (newPools.length < 8) {
+      // Check if we've reached the end of available pools
+      const isLastPage = pageToLoad >= data.totalPages;
+      const hasFullPage = newPools.length === 8;
+
+      if (!hasFullPage || isLastPage) {
         setAllLoaded(true);
       }
     } catch (err: any) {

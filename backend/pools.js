@@ -2,33 +2,86 @@
 
 const express = require("express");
 const axios = require("axios");
-const { initCetusSDK } = require("@cetusprotocol/cetus-sui-clmm-sdk");
+// Import SDK using the correct method
+const { CetusClmmSDK } = require("@cetusprotocol/cetus-sui-clmm-sdk");
 
 // Create a router instead of a full app
 const router = express.Router();
 
-// Initialize Cetus SDK for Sui mainnet
+// Define required package IDs for Cetus on mainnet
+// These values are crucial for the SDK to work properly
+const CETUS_CONFIG = {
+  clmm: {
+    package_id:
+      "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb",
+    published_at:
+      "0xc33c3e937e5aa9759c4cfa30d132372377604325edc58e8bbc321cb7d686e07e",
+    config: {
+      global_config_id:
+        "0x0c7b553fb8a896aec8d3cf29746406f8e15e5c2d1c2454b14f5656ecb3d7fcb3",
+      global_vault_id:
+        "0xce7fcecd651047fde4e51d3c48e013728edda34b2487cbc96c8d8d96debcd6e7",
+      pools_id:
+        "0xf3114a74dc7338bd4d32f55e03c3d3336790a678a37ad8c6ad4397fa6d615af3",
+      partner_list_id:
+        "0xc090b101978bd6370def2666b5438c406fa6e6b1d0b1d29c2e80ac2780e024e1",
+    },
+  },
+  swap: {
+    package_id:
+      "0x5e1e8a38e695d5572b80f90f0da0ae1328c43da0185505dacaaa18a1720b6b06",
+    published_at:
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+    config: {
+      global_config_id:
+        "0x0a7eeb1103180a8d12b44ffdf4e85c9809291236930a5113bad2a7aef31cbfe0",
+      pools_id:
+        "0xbe2b3c90e2e11e48bcaa499c47d24594c0e9b8df16f2dfa96fbb02c2e894aa2c",
+      coins_id:
+        "0x5f6efd1da3f36363b26f46ff3828b746c62b408537d7576408c504006c21997d",
+    },
+  },
+};
+
+// Initialize Cetus SDK for Sui mainnet with proper configuration
 let sdk;
 try {
-  sdk = initCetusSDK({ network: "mainnet" });
+  sdk = new CetusClmmSDK({
+    // Network can be 'testnet', 'mainnet', or 'devnet'
+    network: "mainnet",
+    // Full node URL for the selected network
+    fullRpcUrl: "https://fullnode.mainnet.sui.io",
+    // These are the package IDs and configuration needed for Cetus SDK
+    clmmConfig: CETUS_CONFIG.clmm,
+    cetusConfig: {
+      package_id: CETUS_CONFIG.swap.package_id,
+      published_at: CETUS_CONFIG.swap.published_at,
+      config: CETUS_CONFIG.swap.config,
+    },
+    // Optional simulation account
+    simulationAccount: {
+      address:
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+    },
+    // Optional Cetus API URL for getting extra stats
+    cetusApiUrl: "https://api-sui.cetus.zone",
+    // Whether to fetch token logos
+    fetchTokenLogos: true,
+  });
   console.log("Cetus SDK initialized successfully");
 } catch (err) {
   console.error("Failed to initialize Cetus SDK:", err);
-  // Continue without crashing the entire server
+  process.exit(1); // Exit if SDK initialization fails since we need it for the API
 }
 
 // Define the /api/pools endpoint
 router.get("/pools", async (req, res) => {
   console.log("Received request to /api/pools");
 
-  if (!sdk) {
-    return res.status(500).json({ error: "Cetus SDK not initialized" });
-  }
-
   try {
     // 1. Fetch all pools from Cetus CLMM on Sui mainnet
     console.log("Fetching pools from Cetus SDK...");
-    const allPools = await sdk.Pool.getPools([]);
+    const allPools = await sdk.Pool.getPools();
     console.log(`Retrieved ${allPools.length} total pools`);
 
     // 2. Filter out pools with zero liquidity
@@ -55,7 +108,7 @@ router.get("/pools", async (req, res) => {
     const coinMetaMap = {};
     for (const coinType of coinTypes) {
       try {
-        const meta = await sdk.fullClient.getCoinMetadata({ coinType });
+        const meta = await sdk.Coin.getCoinMetadata(coinType);
         if (meta) {
           coinMetaMap[coinType] = {
             symbol: meta.symbol,
@@ -100,7 +153,7 @@ router.get("/pools", async (req, res) => {
       // Proceed without stats if API call fails (statsMap will remain partially filled or empty)
     }
 
-    // 5. Enrich pool data with metadata and stats - UPDATED to match frontend expectations
+    // 5. Enrich pool data with metadata and stats to match frontend expectations
     console.log("Enriching pool data...");
     const enrichedPools = activePools.map((pool) => {
       const coinAType = pool.coinTypeA;
@@ -152,13 +205,19 @@ router.get("/pools", async (req, res) => {
     });
   } catch (err) {
     console.error("Error handling /api/pools request:", err);
-    res.status(500).json({ error: "Failed to fetch pools data" });
+    res
+      .status(500)
+      .json({ error: "Failed to fetch pools data", details: err.message });
   }
 });
 
 // Health check endpoint
 router.get("/health", (req, res) => {
-  res.json({ status: "ok", message: "Pools API is running" });
+  res.json({
+    status: "ok",
+    message: "Pools API is running",
+    sdkInitialized: !!sdk,
+  });
 });
 
 // Export the router to be mounted in server.js
