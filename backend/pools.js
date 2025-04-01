@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import fetch from "node-fetch"; // For Node <18; if using Node 18+, global fetch is available.
+import fetch from "node-fetch"; // For Node <18; if Node 18+, you can use global fetch.
 const router = express.Router();
 
 import { TurbosSdk, Network } from "turbos-clmm-sdk";
@@ -15,7 +15,7 @@ const sdk = new TurbosSdk(Network.mainnet, { fullnode: RPC_URL });
 // In-memory caches for pools and vault strategies.
 let poolsCache = [];
 let vaultsCache = [];
-let dataLoaded = false;
+let dataLoaded = false; // indicates if initial load is complete
 
 // Utility: delay for a given number of milliseconds.
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -227,7 +227,7 @@ async function fetchPoolsAndVaults() {
 fetchPoolsAndVaults();
 
 // Endpoint: GET /api/pools – returns a paginated list of pools.
-router.get("/pools", (req, res) => {
+router.get("/", (req, res) => {
   if (!dataLoaded) {
     return res
       .status(503)
@@ -251,7 +251,7 @@ router.get("/pools", (req, res) => {
 });
 
 // Endpoint: GET /api/pools/vault-strategies – returns a paginated list of vault strategies.
-router.get("/pools/vault-strategies", (req, res) => {
+router.get("/vault-strategies", (req, res) => {
   if (!dataLoaded) {
     return res.status(503).json({
       error: "Vault strategy data is still loading. Please try again shortly.",
