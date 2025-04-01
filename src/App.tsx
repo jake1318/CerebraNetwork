@@ -1,17 +1,16 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { SuiProvider } from "./providers/SuiProvider";
 import { WalletProvider } from "./contexts/WalletContext";
-import { DeepBookProvider } from "./contexts/DeepBookContext"; // Import DeepBookProvider
-import { BirdeyeProvider } from "./contexts/BirdeyeContext"; // New Birdeye context
+import { DeepBookProvider } from "./contexts/DeepBookContext";
+import { BirdeyeProvider } from "./contexts/BirdeyeContext";
 import Navbar from "./components/Navbar/Navbar";
 import Footer from "./components/Footer/Footer";
 import Home from "./pages/Home/Home";
 import Swap from "./pages/Swap/Swap";
 import SearchPage from "./pages/SearchPage/SearchPage";
-import Pools from "./pages/PoolsPage/Pools";
 import Dex from "./pages/Dex/Dex";
-import AdvancedTrading from "./pages/AdvancedTrading/AdvancedTrading";
-import Portfolio from "./pages/PortfolioPage/PortfolioPage"; // Import Portfolio page
+import Portfolio from "./pages/PortfolioPage/PortfolioPage";
+import PoolsAndVaults from "./pages/PoolsAndVaults";
 import "./App.scss";
 
 function AppContent() {
@@ -29,11 +28,9 @@ function AppContent() {
             <Route path="/" element={<Home />} />
             <Route path="/swap" element={<Swap />} />
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/pools" element={<Pools />} />
             <Route path="/dex" element={<Dex />} />
-            <Route path="/trading" element={<AdvancedTrading />} />
-            <Route path="/portfolio" element={<Portfolio />} />{" "}
-            {/* Add Portfolio route */}
+            <Route path="/pools-and-vaults" element={<PoolsAndVaults />} />
+            <Route path="/portfolio" element={<Portfolio />} />
           </Routes>
         </main>
         <Footer />
@@ -48,8 +45,6 @@ function App() {
       <WalletProvider>
         <DeepBookProvider>
           <BirdeyeProvider>
-            {" "}
-            {/* Add BirdeyeProvider */}
             <AppContent />
           </BirdeyeProvider>
         </DeepBookProvider>

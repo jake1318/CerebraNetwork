@@ -56,23 +56,18 @@ const Navbar: React.FC = () => {
             Swap
           </Link>
           <Link
-            to="/pools"
-            className={location.pathname === "/pools" ? "active" : ""}
+            to="/pools-and-vaults"
+            className={
+              location.pathname === "/pools-and-vaults" ? "active" : ""
+            }
           >
-            Pools
+            Pools & Vaults
           </Link>
           <Link
             to="/dex"
             className={location.pathname === "/dex" ? "active" : ""}
           >
             DEX
-          </Link>
-          <Link
-            to="/trading"
-            className={location.pathname === "/trading" ? "active" : ""}
-          >
-            Advanced Trading
-            <span className="new-badge">NEW</span>
           </Link>
           <Link
             to="/search"
@@ -136,11 +131,13 @@ const Navbar: React.FC = () => {
             Swap
           </Link>
           <Link
-            to="/pools"
-            className={location.pathname === "/pools" ? "active" : ""}
+            to="/pools-and-vaults"
+            className={
+              location.pathname === "/pools-and-vaults" ? "active" : ""
+            }
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            Pools
+            Pools & Vaults
           </Link>
           <Link
             to="/dex"
@@ -148,14 +145,6 @@ const Navbar: React.FC = () => {
             onClick={() => setIsMobileMenuOpen(false)}
           >
             DEX
-          </Link>
-          <Link
-            to="/trading"
-            className={location.pathname === "/trading" ? "active" : ""}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Advanced Trading
-            <span className="new-badge">NEW</span>
           </Link>
           <Link
             to="/search"

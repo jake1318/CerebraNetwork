@@ -1,224 +1,277 @@
-// pools.js - Fetch and serve Cetus Sui liquidity pools with metadata and stats (Router module)
+import dotenv from "dotenv";
+dotenv.config();
 
-const express = require("express");
-const axios = require("axios");
-// Import SDK using the correct method
-const { CetusClmmSDK } = require("@cetusprotocol/cetus-sui-clmm-sdk");
-
-// Create a router instead of a full app
+import express from "express";
+import fetch from "node-fetch"; // For Node <18; if using Node 18+, global fetch is available.
 const router = express.Router();
 
-// Define required package IDs for Cetus on mainnet
-// These values are crucial for the SDK to work properly
-const CETUS_CONFIG = {
-  clmm: {
-    package_id:
-      "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb",
-    published_at:
-      "0xc33c3e937e5aa9759c4cfa30d132372377604325edc58e8bbc321cb7d686e07e",
-    config: {
-      global_config_id:
-        "0x0c7b553fb8a896aec8d3cf29746406f8e15e5c2d1c2454b14f5656ecb3d7fcb3",
-      global_vault_id:
-        "0xce7fcecd651047fde4e51d3c48e013728edda34b2487cbc96c8d8d96debcd6e7",
-      pools_id:
-        "0xf3114a74dc7338bd4d32f55e03c3d3336790a678a37ad8c6ad4397fa6d615af3",
-      partner_list_id:
-        "0xc090b101978bd6370def2666b5438c406fa6e6b1d0b1d29c2e80ac2780e024e1",
-    },
-  },
-  swap: {
-    package_id:
-      "0x5e1e8a38e695d5572b80f90f0da0ae1328c43da0185505dacaaa18a1720b6b06",
-    published_at:
-      "0x0000000000000000000000000000000000000000000000000000000000000000",
-    config: {
-      global_config_id:
-        "0x0a7eeb1103180a8d12b44ffdf4e85c9809291236930a5113bad2a7aef31cbfe0",
-      pools_id:
-        "0xbe2b3c90e2e11e48bcaa499c47d24594c0e9b8df16f2dfa96fbb02c2e894aa2c",
-      coins_id:
-        "0x5f6efd1da3f36363b26f46ff3828b746c62b408537d7576408c504006c21997d",
-    },
-  },
-};
+import { TurbosSdk, Network } from "turbos-clmm-sdk";
 
-// Initialize Cetus SDK for Sui mainnet with proper configuration
-let sdk;
-try {
-  sdk = new CetusClmmSDK({
-    // Network can be 'testnet', 'mainnet', or 'devnet'
-    network: "mainnet",
-    // Full node URL for the selected network
-    fullRpcUrl: "https://fullnode.mainnet.sui.io",
-    // These are the package IDs and configuration needed for Cetus SDK
-    clmmConfig: CETUS_CONFIG.clmm,
-    cetusConfig: {
-      package_id: CETUS_CONFIG.swap.package_id,
-      published_at: CETUS_CONFIG.swap.published_at,
-      config: CETUS_CONFIG.swap.config,
-    },
-    // Optional simulation account
-    simulationAccount: {
-      address:
-        "0x0000000000000000000000000000000000000000000000000000000000000000",
-    },
-    // Optional Cetus API URL for getting extra stats
-    cetusApiUrl: "https://api-sui.cetus.zone",
-    // Whether to fetch token logos
-    fetchTokenLogos: true,
+// Initialize Turbos SDK for Sui mainnet using the Ankr RPC provider.
+const ANKR_API_KEY = process.env.ANKR_API_KEY || "YOUR_ANKR_API_KEY";
+const RPC_URL = `https://rpc.ankr.com/sui/${ANKR_API_KEY}`;
+const sdk = new TurbosSdk(Network.mainnet, { fullnode: RPC_URL });
+
+// In-memory caches for pools and vault strategies.
+let poolsCache = [];
+let vaultsCache = [];
+let dataLoaded = false;
+
+// Utility: delay for a given number of milliseconds.
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+/**
+ * JSON-RPC call helper – makes a single call to the Ankr RPC endpoint.
+ */
+async function callRpc(method, params) {
+  const rpcBody = { jsonrpc: "2.0", id: Date.now(), method, params };
+  const response = await fetch(RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rpcBody),
   });
-  console.log("Cetus SDK initialized successfully");
-} catch (err) {
-  console.error("Failed to initialize Cetus SDK:", err);
-  process.exit(1); // Exit if SDK initialization fails since we need it for the API
+  if (!response.ok) {
+    throw new Error(`RPC request failed with status ${response.status}`);
+  }
+  const result = await response.json();
+  if (result.error) {
+    throw new Error(
+      `RPC error: ${result.error.message || JSON.stringify(result.error)}`
+    );
+  }
+  return result.result;
 }
 
-// Define the /api/pools endpoint
-router.get("/pools", async (req, res) => {
-  console.log("Received request to /api/pools");
-
+/**
+ * JSON-RPC call with retry logic.
+ */
+async function callRpcWithRetry(method, params, retries = 3) {
   try {
-    // 1. Fetch all pools from Cetus CLMM on Sui mainnet
-    console.log("Fetching pools from Cetus SDK...");
-    const allPools = await sdk.Pool.getPools();
-    console.log(`Retrieved ${allPools.length} total pools`);
-
-    // 2. Filter out pools with zero liquidity
-    const activePools = allPools.filter((pool) => {
-      try {
-        // pool.liquidity is a big number (string). Use BigInt for comparison.
-        return pool.liquidity && BigInt(pool.liquidity) > 0n;
-      } catch (e) {
-        // If liquidity is missing or invalid, log and exclude the pool
-        console.error(`Invalid liquidity in pool ${pool.poolAddress}:`, e);
-        return false;
-      }
-    });
-    console.log(`Filtered to ${activePools.length} active pools`);
-
-    // 3. Fetch coin metadata (symbol and decimals) for each unique coin in the pools
-    const coinTypes = new Set();
-    for (const pool of activePools) {
-      if (pool.coinTypeA) coinTypes.add(pool.coinTypeA);
-      if (pool.coinTypeB) coinTypes.add(pool.coinTypeB);
-    }
-    console.log(`Found ${coinTypes.size} unique coin types`);
-
-    const coinMetaMap = {};
-    for (const coinType of coinTypes) {
-      try {
-        const meta = await sdk.Coin.getCoinMetadata(coinType);
-        if (meta) {
-          coinMetaMap[coinType] = {
-            symbol: meta.symbol,
-            decimals: meta.decimals,
-          };
-        }
-      } catch (err) {
-        console.error(`Error fetching metadata for coin ${coinType}:`, err);
-      }
-    }
-
-    // 4. Call Cetus API for pool TVL, volume, and APR stats
-    console.log("Fetching pool stats from Cetus API...");
-    const statsMap = {};
-    try {
-      const response = await axios.get(
-        "https://api-sui.cetus.zone/v2/sui/swap/count"
-      );
-      const apiData = response.data;
-      if (apiData && apiData.data && Array.isArray(apiData.data.pools)) {
-        for (const poolStats of apiData.data.pools) {
-          if (!poolStats.swap_account) continue;
-          statsMap[poolStats.swap_account] = {
-            tvl: poolStats.tvl !== undefined ? poolStats.tvl : null,
-            volume24h:
-              poolStats.volume_24h !== undefined
-                ? poolStats.volume_24h
-                : poolStats.volume24h !== undefined
-                ? poolStats.volume24h
-                : null,
-            apr: poolStats.apr !== undefined ? poolStats.apr : null,
-          };
-        }
-        console.log(
-          `Retrieved stats for ${Object.keys(statsMap).length} pools`
-        );
-      } else {
-        console.error("Unexpected Cetus API response format:", apiData);
-      }
-    } catch (err) {
-      console.error("Error fetching data from Cetus API:", err);
-      // Proceed without stats if API call fails (statsMap will remain partially filled or empty)
-    }
-
-    // 5. Enrich pool data with metadata and stats to match frontend expectations
-    console.log("Enriching pool data...");
-    const enrichedPools = activePools.map((pool) => {
-      const coinAType = pool.coinTypeA;
-      const coinBType = pool.coinTypeB;
-      const coinAInfo = coinMetaMap[coinAType] || {};
-      const coinBInfo = coinMetaMap[coinBType] || {};
-      const stats = statsMap[pool.poolAddress] || {};
-
-      // Calculate fee rate percentage from pool.fee if available
-      // Pool fee is typically in basis points (1/10000), convert to percentage
-      const feeRatePct = pool.fee ? Number(pool.fee) / 10000 : undefined;
-
-      return {
-        symbolA: coinAInfo.symbol || "Unknown",
-        symbolB: coinBInfo.symbol || "Unknown",
-        poolAddress: pool.poolAddress,
-        feeRatePct: feeRatePct,
-        apr: stats.apr !== undefined ? stats.apr : undefined,
-        tvlUsd: stats.tvl !== undefined ? stats.tvl : 0,
-        // If you have reward APY data, add it here. For now setting to undefined
-        rewardApy: undefined,
-      };
-    });
-
-    // 6. Handle pagination: parse query params ?page and ?limit
-    console.log("Processing pagination...");
-    let page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 8;
-    if (page < 1) page = 1;
-    const totalPools = enrichedPools.length;
-    const totalPages = totalPools > 0 ? Math.ceil(totalPools / limit) : 0;
-    if (page > totalPages && totalPools > 0) page = totalPages; // clamp page to last page if out of range
-
-    // Calculate start and end index for slicing the results
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const pagePools = enrichedPools.slice(startIndex, endIndex);
-
-    // 7. Respond with JSON
-    console.log(
-      `Responding with ${pagePools.length} pools (page ${page}/${totalPages})`
-    );
-    res.json({
-      pools: pagePools,
-      totalPools: totalPools,
-      totalPages: totalPages,
-      page: page,
-      limit: limit,
-    });
+    return await callRpc(method, params);
   } catch (err) {
-    console.error("Error handling /api/pools request:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to fetch pools data", details: err.message });
+    if (retries <= 0) throw err;
+    console.warn(
+      `RPC call ${method} failed, retrying... (${retries} retries left). Error:`,
+      err.message
+    );
+    await delay(500);
+    return callRpcWithRetry(method, params, retries - 1);
   }
-});
+}
 
-// Health check endpoint
-router.get("/health", (req, res) => {
+/**
+ * Helper to fetch all dynamic field object IDs under a given parent ID.
+ */
+async function fetchAllDynamicChildren(parentId) {
+  let results = [];
+  let cursor = null;
+  do {
+    // Use a limit of 50 per page.
+    const res = await callRpcWithRetry("suix_getDynamicFields", [
+      parentId,
+      cursor,
+      50,
+    ]);
+    const fields = res.data || [];
+    for (const entry of fields) {
+      if (entry.objectId) results.push(entry.objectId);
+    }
+    cursor = res.nextCursor;
+  } while (cursor);
+  return results;
+}
+
+/**
+ * Fetch and enrich all pools and vault strategies from Turbos.
+ * Uses the registry IDs obtained from sdk.contract.getConfig().
+ */
+async function fetchPoolsAndVaults() {
+  try {
+    // Retrieve on-chain config via Turbos SDK.
+    const config = await sdk.contract.getConfig();
+    const poolRegistryId = config.PoolTableId || config.pools_id;
+    const vaultRegistryId =
+      config.VaultGlobalConfig || config.vaultGlobalConfigId;
+    if (!poolRegistryId || !vaultRegistryId) {
+      throw new Error("Could not obtain registry IDs from config");
+    }
+    console.log("Pool Registry ID:", poolRegistryId);
+    console.log("Vault Registry ID:", vaultRegistryId);
+
+    // 1. Fetch all pool IDs via dynamic fields of the pool registry.
+    const poolIDs = await fetchAllDynamicChildren(poolRegistryId);
+    // 2. Fetch all vault strategy IDs via dynamic fields of the vault registry.
+    const vaultIDs = await fetchAllDynamicChildren(vaultRegistryId);
+    console.log(
+      `Found ${poolIDs.length} pool IDs and ${vaultIDs.length} vault IDs`
+    );
+
+    // 3. Batch-fetch pool objects.
+    const poolObjects = [];
+    const options = { showType: true, showContent: true, showOwner: true };
+    const batchSize = 5;
+    for (let i = 0; i < poolIDs.length; i += batchSize) {
+      const batchIds = poolIDs.slice(i, i + batchSize);
+      const objectsPage = await callRpcWithRetry("sui_multiGetObjects", [
+        batchIds,
+        options,
+      ]);
+      poolObjects.push(...objectsPage);
+      await delay(1000); // throttle ~5 calls/sec
+    }
+
+    // 4. Batch-fetch vault objects.
+    const vaultObjects = [];
+    for (let i = 0; i < vaultIDs.length; i += batchSize) {
+      const batchIds = vaultIDs.slice(i, i + batchSize);
+      const objectsPage = await callRpcWithRetry("sui_multiGetObjects", [
+        batchIds,
+        options,
+      ]);
+      vaultObjects.push(...objectsPage);
+      await delay(1000);
+    }
+
+    // 5. Enrich pool data.
+    const enrichedPools = [];
+    for (const obj of poolObjects) {
+      if (obj.error || !obj.data || !obj.data.content) continue;
+      const poolId = obj.data.objectId;
+      const typeStr = obj.data.type; // e.g., "0x...::pool::Pool<0x...::sui::SUI, 0x...::coin::USDC, 5>"
+      const content = obj.data.content;
+      const fields = content.fields || {};
+      let coinTypeA = "";
+      let coinTypeB = "";
+      let feeBps = null;
+      if (typeStr.includes("<") && typeStr.includes(">")) {
+        const typeParams = typeStr.substring(
+          typeStr.indexOf("<") + 1,
+          typeStr.lastIndexOf(">")
+        );
+        const params = typeParams.split(",").map((s) => s.trim());
+        if (params.length >= 2) {
+          coinTypeA = params[0];
+          coinTypeB = params[1];
+        }
+        const feeParam = params.find((p) => /^\d+$/.test(p));
+        if (feeParam) feeBps = parseInt(feeParam, 10);
+      }
+      const liquidity =
+        fields.liquidity !== undefined
+          ? typeof fields.liquidity === "string" &&
+            fields.liquidity.startsWith("0x")
+            ? BigInt(fields.liquidity).toString()
+            : fields.liquidity.toString()
+          : "0";
+      const isLocked = fields.is_locked || fields.is_paused || false;
+      if (!coinTypeA || !coinTypeB) continue;
+      enrichedPools.push({
+        id: poolId,
+        coinTypeA,
+        coinTypeB,
+        feeBps,
+        liquidity,
+        isLocked,
+      });
+    }
+
+    // 6. Enrich vault strategy data.
+    const enrichedVaults = [];
+    for (const obj of vaultObjects) {
+      if (obj.error || !obj.data || !obj.data.content) continue;
+      const strategyId = obj.data.objectId;
+      const typeStr = obj.data.type;
+      const content = obj.data.content;
+      const fields = content.fields || {};
+      let poolId = fields.pool_id || fields.pool || null;
+      let coinTypeA = fields.coin_type_a || "";
+      let coinTypeB = fields.coin_type_b || "";
+      if (
+        (!coinTypeA || !coinTypeB) &&
+        typeStr.includes("<") &&
+        typeStr.includes(">")
+      ) {
+        const typeParams = typeStr.substring(
+          typeStr.indexOf("<") + 1,
+          typeStr.lastIndexOf(">")
+        );
+        const params = typeParams.split(",").map((s) => s.trim());
+        if (params.length >= 2) {
+          coinTypeA = coinTypeA || params[0];
+          coinTypeB = coinTypeB || params[1];
+        }
+      }
+      const isActive =
+        fields.is_paused !== undefined ? !fields.is_paused : true;
+      enrichedVaults.push({
+        strategyId,
+        poolId,
+        coinTypeA,
+        coinTypeB,
+        isActive,
+      });
+    }
+
+    poolsCache = enrichedPools;
+    vaultsCache = enrichedVaults;
+    dataLoaded = true;
+    console.log(
+      `Fetched and enriched ${poolsCache.length} pools and ${vaultsCache.length} vault strategies from Turbos.`
+    );
+  } catch (error) {
+    console.error("Error fetching Turbos pools/vaults:", error);
+    setTimeout(fetchPoolsAndVaults, 5000);
+  }
+}
+
+fetchPoolsAndVaults();
+
+// Endpoint: GET /api/pools – returns a paginated list of pools.
+router.get("/pools", (req, res) => {
+  if (!dataLoaded) {
+    return res
+      .status(503)
+      .json({ error: "Pool data is still loading. Please try again shortly." });
+  }
+  const page = parseInt(req.query.page || "1", 10);
+  const limit = parseInt(req.query.limit || "20", 10);
+  const totalPools = poolsCache.length;
+  const totalPages = Math.ceil(totalPools / limit) || 1;
+  const clampedPage = Math.max(1, Math.min(page, totalPages));
+  const startIndex = (clampedPage - 1) * limit;
+  const endIndex = Math.min(startIndex + limit, totalPools);
+  const pageItems = poolsCache.slice(startIndex, endIndex);
   res.json({
-    status: "ok",
-    message: "Pools API is running",
-    sdkInitialized: !!sdk,
+    totalPools,
+    totalPages,
+    currentPage: clampedPage,
+    pageSize: limit,
+    pools: pageItems,
   });
 });
 
-// Export the router to be mounted in server.js
-module.exports = router;
+// Endpoint: GET /api/pools/vault-strategies – returns a paginated list of vault strategies.
+router.get("/pools/vault-strategies", (req, res) => {
+  if (!dataLoaded) {
+    return res.status(503).json({
+      error: "Vault strategy data is still loading. Please try again shortly.",
+    });
+  }
+  const page = parseInt(req.query.page || "1", 10);
+  const limit = parseInt(req.query.limit || "20", 10);
+  const totalVaults = vaultsCache.length;
+  const totalPages = Math.ceil(totalVaults / limit) || 1;
+  const clampedPage = Math.max(1, Math.min(page, totalPages));
+  const startIndex = (clampedPage - 1) * limit;
+  const endIndex = Math.min(startIndex + limit, totalVaults);
+  const pageItems = vaultsCache.slice(startIndex, endIndex);
+  res.json({
+    totalVaults,
+    totalPages,
+    currentPage: clampedPage,
+    pageSize: limit,
+    vaultStrategies: pageItems,
+  });
+});
+
+export default router;

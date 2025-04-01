@@ -1,30 +1,25 @@
-require("dotenv").config();
-const express = require("express");
-const {
-  createProxyMiddleware,
-  fixRequestBody,
-} = require("http-proxy-middleware");
-const cors = require("cors");
-// Import the pools router with the correct relative path
-const poolsRouter = require("./pools"); // Changed from "./backend/pools" to "./pools"
+import "dotenv/config";
+import express from "express";
+import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
+import cors from "cors";
+import poolsRouter from "./pools.js";
+import searchRouter from "./routes/search.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Use CORS middleware
 app.use(cors());
-
-// Parse JSON request bodies
 app.use(express.json());
 
-// Mount proxy middleware for Sui fullnode requests
+// Proxy middleware for Sui fullnode requests using BlockVision's private RPC endpoint.
 app.use(
   "/sui-proxy",
   createProxyMiddleware({
-    target: "https://fullnode.mainnet.sui.io:443", // Fixed URL with colon before port
+    target: "https://sui-mainnet-endpoint.blockvision.org",
     changeOrigin: true,
-    pathRewrite: {
-      "^/sui-proxy": "",
+    pathRewrite: { "^/sui-proxy": "" },
+    headers: {
+      "x-api-key": process.env.BLOCKVISION_API_KEY,
     },
     onProxyReq: fixRequestBody,
     onProxyRes: (proxyRes, req, res) => {
@@ -37,10 +32,11 @@ app.use(
   })
 );
 
-// Mount the pools router to handle pool-related API requests
-app.use("/api", poolsRouter);
+// Mount routers
+app.use("/api/pools", poolsRouter);
+app.use("/api/search", searchRouter);
 
-// Simple health check endpoint
+// Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Server is running" });
 });

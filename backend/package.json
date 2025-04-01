@@ -2,17 +2,22 @@
   "name": "search-app-backend",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@cetusprotocol/cetus-sui-clmm-sdk": "^5.3.4",
     "axios": "^1.7.9",
+    "bottleneck": "^2.19.5",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.21.2",
     "http-proxy-middleware": "^3.0.3",
-    "@cetusprotocol/cetus-sui-clmm-sdk": "^3.17.3",
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "@mysten/sui": "^1.21.2",
+    "turbos-clmm-sdk": "^3.2.1",
+    "node-fetch": "^2.6.7"
   }
 }

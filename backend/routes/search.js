@@ -1,5 +1,5 @@
-const express = require("express");
-const axios = require("axios");
+import express from "express";
+import axios from "axios";
 
 const router = express.Router();
 
@@ -25,7 +25,7 @@ router.get("/", async (req, res) => {
           },
         }
       ),
-      // YouTube Data API call using params for proper encoding
+      // YouTube Data API call
       axios.get("https://www.googleapis.com/youtube/v3/search", {
         params: {
           part: "snippet",
@@ -74,4 +74,4 @@ router.get("/", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

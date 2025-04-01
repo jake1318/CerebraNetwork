@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-// Define the shape of pool data based on API fields (fields not guaranteed present are optional)
+// Define the shape of pool data based on API fields
 interface PoolInfo {
   symbolA: string;
   symbolB: string;
@@ -21,7 +21,6 @@ const Pools: React.FC = () => {
 
   // Helper function to format large numbers (TVL) into human-readable strings (e.g., 1.2M)
   const formatNumber = (value: number): string => {
-    // Use Intl.NumberFormat for compact formatting (e.g., K, M, B suffixes)
     return new Intl.NumberFormat("en-US", {
       notation: "compact",
       compactDisplay: "short",
@@ -34,7 +33,6 @@ const Pools: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Use the hardcoded URL directly instead of process.env
       // Assuming your backend is running on port 5000
       const API_BASE_URL = "http://localhost:5000";
       const res = await fetch(
@@ -79,14 +77,25 @@ const Pools: React.FC = () => {
 
   // Load initial pools on component mount (page 1)
   useEffect(() => {
-    fetchPools(1); // load the first page of pools on mount
-    // (No dependencies in this effect so it runs only once on mount)
+    fetchPools(1);
   }, []);
 
   // Handler for clicking "Load More"
   const handleLoadMore = () => {
-    if (loading || allLoaded) return; // prevent multiple clicks or loading past end
+    if (loading || allLoaded) return;
     fetchPools(page + 1);
+  };
+
+  // Placeholder: Add Liquidity action
+  const handleAddLiquidity = (pool: PoolInfo) => {
+    console.log(`Add Liquidity clicked for pool: ${pool.poolAddress}`);
+    // TODO: open a form/modal to specify amounts, then call transaction logic
+  };
+
+  // Placeholder: Withdraw action
+  const handleWithdraw = (pool: PoolInfo) => {
+    console.log(`Withdraw clicked for pool: ${pool.poolAddress}`);
+    // TODO: open a form/modal to specify how much to withdraw, then call transaction logic
   };
 
   return (
@@ -101,14 +110,14 @@ const Pools: React.FC = () => {
         </div>
       )}
 
-      {/* No pools found message (shown if not loading, no error, and no data) */}
+      {/* No pools found message */}
       {!loading && !error && pools.length === 0 && (
         <div className="no-pools" style={{ fontStyle: "italic" }}>
           No pools found.
         </div>
       )}
 
-      {/* Pools table (shown if we have any pools) */}
+      {/* Pools table */}
       {pools.length > 0 && (
         <table
           className="pool-list"
@@ -121,6 +130,8 @@ const Pools: React.FC = () => {
               <th align="right">Fee Tier</th>
               <th align="right">TVL (USD)</th>
               <th align="right">Reward APY</th>
+              {/* New Actions column */}
+              <th align="right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -130,11 +141,14 @@ const Pools: React.FC = () => {
                 pool.feeRatePct !== undefined ? pool.feeRatePct : pool.apr;
               const feeDisplay =
                 feeValue !== undefined ? `${feeValue}%` : "N/A";
-              // Format TVL with commas/abbreviation and prepend $
+
+              // Format TVL with abbreviation and prepend $
               const tvlDisplay = `$${formatNumber(pool.tvlUsd)}`;
-              // Reward APY display (if available)
+
+              // Reward APY display
               const apyDisplay =
                 pool.rewardApy !== undefined ? `${pool.rewardApy}%` : "—";
+
               return (
                 <tr key={pool.poolAddress}>
                   <td>
@@ -144,6 +158,18 @@ const Pools: React.FC = () => {
                   <td align="right">{feeDisplay}</td>
                   <td align="right">{tvlDisplay}</td>
                   <td align="right">{apyDisplay}</td>
+                  {/* Render Add Liquidity & Withdraw buttons */}
+                  <td align="right">
+                    <button
+                      onClick={() => handleAddLiquidity(pool)}
+                      style={{ marginRight: "0.5rem" }}
+                    >
+                      Add Liquidity
+                    </button>
+                    <button onClick={() => handleWithdraw(pool)}>
+                      Withdraw
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -158,7 +184,7 @@ const Pools: React.FC = () => {
         </div>
       )}
 
-      {/* Load More button (visible if not currently loading and not all data loaded) */}
+      {/* Load More button */}
       {!loading && !allLoaded && pools.length > 0 && (
         <button
           className="load-more"
