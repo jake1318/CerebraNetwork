@@ -1,22 +1,19 @@
+// vite.config.js
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": "/src",
-    },
-  },
   server: {
-    // You can uncomment the following line to use a custom port
-    // port: 3000,
     proxy: {
-      "/api": {
-        target: "http://localhost:5000",
+      "/sui": {
+        target: "https://rpc.ankr.com/sui",
         changeOrigin: true,
-        secure: false,
+        rewrite: (path) => path.replace(/^\/sui/, ""),
+        configure: (proxy, options) => {
+          // Remove the client-request-method header before forwarding.
+          proxy.on("proxyReq", (proxyReq, req, res) => {
+            proxyReq.removeHeader("client-request-method");
+          });
+        },
       },
     },
   },

@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import fetch from "node-fetch"; // For Node <18; if Node 18+, you can use global fetch.
+import fetch from "node-fetch"; // For Node <18; if using Node 18+, you can use global fetch.
 const router = express.Router();
 
 import { TurbosSdk, Network } from "turbos-clmm-sdk";
@@ -132,7 +132,7 @@ async function fetchPoolsAndVaults() {
       await delay(1000);
     }
 
-    // 5. Enrich pool data.
+    // 5. Enrich pool data: parse coin types, fee, liquidity, and lock status.
     const enrichedPools = [];
     for (const obj of poolObjects) {
       if (obj.error || !obj.data || !obj.data.content) continue;
@@ -226,52 +226,26 @@ async function fetchPoolsAndVaults() {
 
 fetchPoolsAndVaults();
 
-// Endpoint: GET /api/pools – returns a paginated list of pools.
+// Endpoint: GET /api/pools – returns the list of pools.
 router.get("/", (req, res) => {
   if (!dataLoaded) {
-    return res
-      .status(503)
-      .json({ error: "Pool data is still loading. Please try again shortly." });
+    return res.status(503).json({
+      error: "Pool data is still loading. Please try again shortly.",
+    });
   }
-  const page = parseInt(req.query.page || "1", 10);
-  const limit = parseInt(req.query.limit || "20", 10);
-  const totalPools = poolsCache.length;
-  const totalPages = Math.ceil(totalPools / limit) || 1;
-  const clampedPage = Math.max(1, Math.min(page, totalPages));
-  const startIndex = (clampedPage - 1) * limit;
-  const endIndex = Math.min(startIndex + limit, totalPools);
-  const pageItems = poolsCache.slice(startIndex, endIndex);
-  res.json({
-    totalPools,
-    totalPages,
-    currentPage: clampedPage,
-    pageSize: limit,
-    pools: pageItems,
-  });
+  // Return the pool data as a plain array.
+  res.json(poolsCache);
 });
 
-// Endpoint: GET /api/pools/vault-strategies – returns a paginated list of vault strategies.
+// Endpoint: GET /api/pools/vault-strategies – returns the list of vault strategies.
 router.get("/vault-strategies", (req, res) => {
   if (!dataLoaded) {
     return res.status(503).json({
       error: "Vault strategy data is still loading. Please try again shortly.",
     });
   }
-  const page = parseInt(req.query.page || "1", 10);
-  const limit = parseInt(req.query.limit || "20", 10);
-  const totalVaults = vaultsCache.length;
-  const totalPages = Math.ceil(totalVaults / limit) || 1;
-  const clampedPage = Math.max(1, Math.min(page, totalPages));
-  const startIndex = (clampedPage - 1) * limit;
-  const endIndex = Math.min(startIndex + limit, totalVaults);
-  const pageItems = vaultsCache.slice(startIndex, endIndex);
-  res.json({
-    totalVaults,
-    totalPages,
-    currentPage: clampedPage,
-    pageSize: limit,
-    vaultStrategies: pageItems,
-  });
+  // Return the vault strategy data as a plain array.
+  res.json(vaultsCache);
 });
 
 export default router;

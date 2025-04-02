@@ -13,7 +13,6 @@
     "@7kprotocol/sdk-ts": "^2.3.4",
     "@mysten/deepbook-v3": "^0.13.2",
     "@mysten/sui": "^1.21.2",
-    "@cetusprotocol/cetus-sui-clmm-sdk": "^5.3.4",
     "@suiet/wallet-kit": "^0.2.25",
     "apexcharts": "^4.5.0",
     "axios": "^1.8.3",

@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { SuiProvider } from "./providers/SuiProvider";
 import { WalletProvider } from "./contexts/WalletContext";
-import { DeepBookProvider } from "./contexts/DeepBookContext";
 import { BirdeyeProvider } from "./contexts/BirdeyeContext";
 import Navbar from "./components/Navbar/Navbar";
 import Footer from "./components/Footer/Footer";
@@ -43,11 +42,9 @@ function App() {
   return (
     <SuiProvider>
       <WalletProvider>
-        <DeepBookProvider>
-          <BirdeyeProvider>
-            <AppContent />
-          </BirdeyeProvider>
-        </DeepBookProvider>
+        <BirdeyeProvider>
+          <AppContent />
+        </BirdeyeProvider>
       </WalletProvider>
     </SuiProvider>
   );

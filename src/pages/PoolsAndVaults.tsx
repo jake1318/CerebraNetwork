@@ -1,3 +1,4 @@
+// src/pages/PoolsAndVaults.tsx
 import React, { useState } from "react";
 import PoolsTab from "../components/PoolsTab";
 import VaultsTab from "../components/VaultsTab";
@@ -7,6 +8,7 @@ const PoolsAndVaults: React.FC = () => {
 
   return (
     <div>
+      {/* Simple tab switcher */}
       <div style={{ display: "flex", cursor: "pointer", marginBottom: "1rem" }}>
         <div
           onClick={() => setActiveTab("pools")}
@@ -34,6 +36,7 @@ const PoolsAndVaults: React.FC = () => {
           Vaults
         </div>
       </div>
+
       {activeTab === "pools" ? <PoolsTab /> : <VaultsTab />}
     </div>
   );

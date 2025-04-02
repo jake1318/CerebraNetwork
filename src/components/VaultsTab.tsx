@@ -1,5 +1,7 @@
+// src/components/VaultsTab.tsx
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useWallet } from "@suiet/wallet-kit";
+import { sdk } from "../utils/sdkSetup";
 
 interface VaultStrategy {
   strategyId: string;
@@ -10,23 +12,25 @@ interface VaultStrategy {
 }
 
 const VaultsTab: React.FC = () => {
-  const [strategies, setStrategies] = useState<VaultStrategy[]>([]);
+  const { address, connected } = useWallet();
+  const [vaultStrategies, setVaultStrategies] = useState<VaultStrategy[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    axios
-      .get("/api/pools/vault-strategies")
-      .then((res) => {
-        setStrategies(res.data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch vault strategies", err);
+    async function loadVaults() {
+      setLoading(true);
+      try {
+        const strategies = await sdk.vault.getVaultStrategies();
+        setVaultStrategies(strategies);
+      } catch (err: any) {
+        console.error("Error loading vault strategies:", err);
         setError("Failed to load vault strategies");
+      } finally {
         setLoading(false);
-      });
+      }
+    }
+    loadVaults();
   }, []);
 
   if (loading) return <div>Loading vault strategies...</div>;
@@ -34,9 +38,9 @@ const VaultsTab: React.FC = () => {
 
   return (
     <div className="vaults-tab">
-      <h2>Vault Strategies</h2>
-      <ul className="strategies-list">
-        {strategies.map((strategy) => {
+      <h2>Vault Strategies (Mainnet)</h2>
+      <ul>
+        {vaultStrategies.map((strategy) => {
           const symbolA = strategy.coinTypeA
             ? strategy.coinTypeA.split("::").pop()
             : "Unknown";
@@ -47,18 +51,18 @@ const VaultsTab: React.FC = () => {
             ? `${symbolA}/${symbolB}`
             : "Unknown Pair";
           return (
-            <li key={strategy.strategyId} style={{ marginBottom: "1em" }}>
-              <strong>{pairLabel}</strong> {strategy.isActive ? "" : "(Paused)"}{" "}
+            <li key={strategy.strategyId}>
+              <strong>{pairLabel}</strong> {strategy.isActive ? "" : "(Paused)"}
               <button
                 onClick={() =>
-                  alert(`Deposit for vault ${strategy.strategyId}`)
+                  alert(`Deposit into vault ${strategy.strategyId}`)
                 }
               >
                 Deposit
-              </button>{" "}
+              </button>
               <button
                 onClick={() =>
-                  alert(`Withdraw for vault ${strategy.strategyId}`)
+                  alert(`Withdraw from vault ${strategy.strategyId}`)
                 }
               >
                 Withdraw

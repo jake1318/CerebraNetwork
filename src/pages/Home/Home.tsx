@@ -17,7 +17,7 @@ interface Pool {
 
 // Set up the API URL using Vite environment variables.
 // Ensure you have a .env file with VITE_API_URL defined.
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const Home: React.FC = () => {
   // Local state for pools data and initialization flag.
