@@ -1,0 +1,245 @@
+// Enhanced Swap Page with dual-color theme matching the search page
+
+.swap-page {
+  width: 100%;
+  min-height: calc(100vh - 80px);
+  padding: 2rem;
+  // Updated background with dual teal and magenta colors
+  background: radial-gradient(
+      circle at top left,
+      rgba(0, 255, 255, 0.15) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 0, 255, 0.15) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(5, 5, 15, 0.95) 0%,
+      rgba(10, 10, 30, 0.95) 100%
+    );
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: center, center, center;
+  position: relative;
+  overflow: hidden;
+
+  // Grid overlay similar to search page
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  // Keep the original scanning lines but enhance them
+  &::after {
+    content: "";
+    position: absolute;
+    width: 100vw;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00ffff, transparent);
+    top: 50%;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+  }
+
+  .vertical-scan {
+    content: "";
+    position: absolute;
+    width: 2px;
+    height: 100vh;
+    background: linear-gradient(180deg, transparent, #ff00ff, transparent);
+    left: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+    animation: verticalScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+  }
+
+  // Enhanced glow effects
+  .glow-1 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(0, 255, 255, 0.12);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -100px;
+    left: 10%;
+    z-index: 0;
+    animation: pulsate 8s ease-in-out infinite alternate;
+  }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(255, 0, 255, 0.12);
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: 10%;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+  }
+
+  &__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  &__header {
+    text-align: center;
+    margin-bottom: 3rem;
+
+    h1 {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    p {
+      font-size: 1.5rem;
+      color: rgba(255, 255, 255, 0.8);
+      max-width: 600px;
+      margin: 0 auto;
+      letter-spacing: 0.5px;
+    }
+  }
+
+  &__content {
+    position: relative;
+    max-width: 480px;
+    margin: 0 auto;
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  .connect-prompt {
+    background: rgba(5, 15, 30, 0.7);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.3),
+        rgba(255, 0, 255, 0.3)
+      )
+      1;
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+        0 8px 32px rgba(255, 0, 255, 0.1);
+    }
+
+    h2 {
+      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+  }
+
+  // Enhanced animations
+  @keyframes horizonScan {
+    0% {
+      transform: translateX(-150vw);
+    }
+    100% {
+      transform: translateX(150vw);
+    }
+  }
+
+  @keyframes verticalScan {
+    0% {
+      transform: translateY(-150vh);
+    }
+    100% {
+      transform: translateY(150vh);
+    }
+  }
+
+  @keyframes pulsate {
+    0% {
+      opacity: 0.5;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.8;
+      transform: scale(1.2);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+// Add responsive styles
+@media (max-width: 768px) {
+  .swap-page {
+    padding: 1rem;
+
+    &__header {
+      h1 {
+        font-size: 2.5rem;
+      }
+
+      p {
+        font-size: 1.2rem;
+      }
+    }
+
+    &__content {
+      padding: 0 1rem;
+    }
+  }
+}

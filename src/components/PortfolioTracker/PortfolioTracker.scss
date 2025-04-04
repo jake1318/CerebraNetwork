@@ -1,0 +1,126 @@
+.portfolio-tracker {
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  .portfolio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+
+    h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #e5e5e5;
+    }
+
+    .portfolio-total {
+      .total-label {
+        font-size: 0.9rem;
+        color: #a0a0a0;
+        margin-right: 8px;
+      }
+
+      .total-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #e5e5e5;
+      }
+    }
+  }
+
+  .portfolio-not-connected {
+    text-align: center;
+    padding: 40px 20px;
+
+    p {
+      color: #a0a0a0;
+      margin-top: 10px;
+    }
+  }
+
+  .portfolio-loading,
+  .portfolio-error,
+  .portfolio-empty {
+    text-align: center;
+    padding: 30px;
+    color: #a0a0a0;
+  }
+
+  .portfolio-error {
+    color: #ff6b6b;
+  }
+
+  .portfolio-tokens {
+    .token-list-header {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      padding: 10px 15px;
+      border-bottom: 1px solid #2a2a3a;
+      font-size: 0.8rem;
+      color: #a0a0a0;
+      font-weight: 500;
+    }
+
+    .token-item {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      padding: 15px;
+      border-bottom: 1px solid #2a2a3a;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background-color: #242438;
+      }
+
+      .token-info {
+        display: flex;
+        align-items: center;
+
+        .token-logo {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          margin-right: 12px;
+          background-color: #333;
+        }
+
+        .token-name-container {
+          display: flex;
+          flex-direction: column;
+
+          .token-symbol {
+            font-weight: 600;
+            color: #e5e5e5;
+          }
+
+          .token-name {
+            font-size: 0.8rem;
+            color: #a0a0a0;
+          }
+        }
+      }
+
+      .token-balance,
+      .token-price,
+      .token-value {
+        display: flex;
+        align-items: center;
+        color: #e5e5e5;
+      }
+
+      .token-change {
+        &.positive {
+          color: #4caf50;
+        }
+
+        &.negative {
+          color: #ff5252;
+        }
+      }
+    }
+  }
+}

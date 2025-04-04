@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@7kprotocol/sdk-ts": "^2.3.4",
-    "@mysten/deepbook-v3": "^0.13.2",
-    "@mysten/sui": "^1.21.2",
+    "@cetusprotocol/cetus-sui-clmm-sdk": "^5.3.4",
+    "@mysten/sui": "^1.26.1",
     "@suiet/wallet-kit": "^0.2.25",
     "apexcharts": "^4.5.0",
     "axios": "^1.8.3",
@@ -24,8 +24,7 @@
     "react-apexcharts": "^1.7.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.3.0",
-    "turbos-clmm-sdk": "^3.2.1"
+    "react-router-dom": "^7.3.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.5",

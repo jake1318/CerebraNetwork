@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import path from "path";
 
 export default defineConfig({
   server: {
@@ -15,5 +16,16 @@ export default defineConfig({
         },
       },
     },
+  },
+  resolve: {
+    alias: {
+      "@mysten/sui": path.resolve(
+        __dirname,
+        "node_modules/@mysten/sui/dist/index.js"
+      ),
+    },
+  },
+  optimizeDeps: {
+    exclude: ["@mysten/sui"],
   },
 });
