@@ -1,0 +1,390 @@
+/* src/pages/Dex/components/LimitOrderManager.scss */
+.limit-order-manager {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+    0 8px 32px rgba(255, 0, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+  animation: fadeIn 0.5s ease-out;
+
+  &:hover {
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
+      0 8px 32px rgba(255, 0, 255, 0.15);
+  }
+
+  // Tab buttons
+  .order-tabs {
+    display: flex;
+    padding: 22px 22px 0;
+    gap: 10px;
+    
+    button {
+      flex: 1;
+      background: rgba(5, 15, 30, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.8);
+      padding: 12px 0;
+      border-radius: 10px 10px 0 0;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
+      border-bottom: none;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &.active {
+        background: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(255, 0, 255, 0.2)
+        );
+        color: #fff;
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        box-shadow: 0 -5px 15px rgba(0, 255, 255, 0.15),
+          0 -5px 15px rgba(255, 0, 255, 0.15);
+      }
+    }
+  }
+
+  // Order sections
+  .open-orders-section,
+  .closed-orders-section {
+    flex: 1;
+    padding: 22px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    display: flex;
+    flex-direction: column;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 2px;
+    }
+
+    // Empty state and loading messages
+    p {
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+      padding: 30px 0;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+
+      &.error {
+        color: #ff4d6d;
+        background: rgba(255, 77, 109, 0.1);
+        border-radius: 10px;
+        padding: 12px;
+        border: 1px solid rgba(255, 77, 109, 0.3);
+      }
+    }
+  }
+
+  // Orders table
+  .orders-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 16px;
+    
+    th, td {
+      padding: 12px;
+      text-align: left;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    thead {
+      tr {
+        background: rgba(0, 0, 0, 0.2);
+        
+        th {
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.7);
+          letter-spacing: 0.5px;
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+            90deg,
+            rgba(0, 255, 255, 0.2),
+            rgba(255, 0, 255, 0.2)
+          ) 1;
+          padding: 14px 12px;
+          
+          &:first-child {
+            border-top-left-radius: 10px;
+          }
+          
+          &:last-child {
+            border-top-right-radius: 10px;
+          }
+        }
+      }
+    }
+
+    tbody {
+      tr {
+        transition: all 0.3s ease;
+        
+        &:hover {
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        td {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          
+          &:first-child {
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+          }
+          
+          &:last-child {
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+          }
+
+          // Order ID style
+          &:nth-child(5) {
+            font-family: monospace;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+          }
+
+          // Action buttons
+          button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            background: rgba(0, 0, 0, 0.3);
+            color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            
+            &:hover {
+              transform: translateY(-2px);
+              
+              // Cancel button hover
+              &:contains("Cancel") {
+                background: rgba(255, 77, 109, 0.2);
+                color: #ff4d6d;
+                border-color: rgba(255, 77, 109, 0.4);
+                box-shadow: 0 4px 12px rgba(255, 77, 109, 0.2);
+              }
+              
+              // Claim button hover
+              &:contains("Claim") {
+                background: rgba(0, 255, 136, 0.2);
+                color: #00ff88;
+                border-color: rgba(0, 255, 136, 0.4);
+                box-shadow: 0 4px 12px rgba(0, 255, 136, 0.2);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Load more button
+  .load-more {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+    
+    button {
+      padding: 10px 24px;
+      border-radius: 10px;
+      background: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      );
+      border: none;
+      color: white;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 12px rgba(0, 255, 255, 0.1),
+        0 4px 12px rgba(255, 0, 255, 0.1);
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 255, 255, 0.2),
+          0 8px 16px rgba(255, 0, 255, 0.2);
+      }
+    }
+  }
+  
+  // Glowing scan effect
+  &::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.5), transparent);
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    opacity: 0.3;
+    pointer-events: none;
+  }
+}
+
+// Status colors
+.orders-table tbody tr td:nth-child(2) {
+  &:contains("Filled") {
+    color: #00ff88;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+  }
+  
+  &:contains("Cancelled") {
+    color: #ff4d6d;
+    text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
+  }
+  
+  &:contains("Expired") {
+    color: #ffbb00;
+    text-shadow: 0 0 10px rgba(255, 187, 0, 0.4);
+  }
+}
+
+// Animation keyframes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes horizonScan {
+  0% {
+    transform: translateX(-150vw) translateY(-50%);
+  }
+  100% {
+    transform: translateX(150vw) translateY(-50%);
+  }
+}
+
+// Responsive styles
+@media (max-width: 768px) {
+  .limit-order-manager {
+    .order-tabs {
+      padding: 16px 16px 0;
+      
+      button {
+        font-size: 14px;
+        padding: 10px 0;
+      }
+    }
+    
+    .open-orders-section,
+    .closed-orders-section {
+      padding: 16px;
+    }
+    
+    .orders-table {
+      display: block;
+      overflow-x: auto;
+      
+      th, td {
+        padding: 10px;
+        font-size: 13px;
+      }
+    }
+  }
+}
+
+// Adjustments for very small screens
+@media (max-width: 480px) {
+  .limit-order-manager {
+    .orders-table {
+      thead {
+        display: none;
+      }
+      
+      tbody {
+        tr {
+          display: flex;
+          flex-direction: column;
+          margin-bottom: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          background: rgba(5, 15, 30, 0.5);
+          
+          td {
+            border: none;
+            position: relative;
+            padding-left: 40%;
+            text-align: left;
+            
+            &:before {
+              position: absolute;
+              left: 12px;
+              width: 35%;
+              white-space: nowrap;
+              padding-right: 10px;
+              text-align: left;
+              font-weight: 600;
+              color: rgba(255, 255, 255, 0.6);
+            }
+            
+            // Add labels for mobile view
+            &:nth-child(1):before { content: "Pair:"; }
+            &:nth-child(2):before { content: "Price:"; }
+            &:nth-child(3):before { content: "Amount:"; }
+            &:nth-child(4):before { content: "Expiration:"; }
+            &:nth-child(5):before { content: "Order ID:"; }
+            &:nth-child(6):before { content: "Action:"; }
+            
+            // For closed orders
+            &:nth-child(2):before { content: "Status:"; }
+            &:nth-child(3):before { content: "Details:"; }
+          }
+        }
+      }
+    }
+    
+    .load-more button {
+      width: 100%;
+    }
+  }
+}

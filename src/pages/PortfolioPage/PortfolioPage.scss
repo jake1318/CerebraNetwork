@@ -1,0 +1,84 @@
+.portfolio-page {
+  padding: 2rem;
+  color: #f0f0f0;
+  min-height: calc(100vh - 12rem); // Adjust for navbar and footer
+
+  h1 {
+    font-size: 2.2rem;
+    margin-bottom: 2rem;
+    background: linear-gradient(to right, #7b68ee, #3cc8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .token-chart-section {
+    margin-top: 2rem;
+    background: rgba(30, 30, 50, 0.5);
+    border-radius: 12px;
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(100, 100, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+
+    h2 {
+      font-size: 1.4rem;
+      margin: 0;
+    }
+
+    .select-token-button {
+      background: linear-gradient(to right, #7b68ee, #3cc8ff);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+    }
+  }
+
+  .select-token-prompt {
+    height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a0a0a0;
+    background-color: rgba(30, 30, 50, 0.3);
+    border-radius: 8px;
+    font-size: 1.1rem;
+  }
+
+  // Responsive design
+  @media (max-width: 768px) {
+    padding: 1rem;
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .token-chart-section {
+      padding: 1rem;
+    }
+
+    .section-header h2 {
+      font-size: 1.2rem;
+    }
+
+    .select-token-prompt {
+      height: 300px;
+    }
+  }
+}
