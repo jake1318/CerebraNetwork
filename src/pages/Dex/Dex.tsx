@@ -270,13 +270,6 @@ const Dex: React.FC = () => {
             <button onClick={loadPairs} disabled={isLoading}>
               ↻ Refresh
             </button>
-            {selectedPair && (
-              <PairSelector
-                pairs={tradingPairs}
-                selectedPair={selectedPair}
-                onSelectPair={handleSelectPair}
-              />
-            )}
           </div>
         </div>
 
@@ -289,22 +282,46 @@ const Dex: React.FC = () => {
         {selectedPair && (
           <>
             <div className="dex-page__trading-stats">
-              <div className="stat price">
-                {tradingStats.logo && (
-                  <img
-                    src={tradingStats.logo}
-                    alt={selectedPair.baseAsset}
-                    style={{ width: 24, height: 24, marginRight: 6 }}
+              {/* Moved pair selector inside trading stats */}
+              {selectedPair && (
+                <div className="pair-selector-container">
+                  <PairSelector
+                    pairs={tradingPairs}
+                    selectedPair={selectedPair}
+                    onSelectPair={handleSelectPair}
                   />
-                )}
-                <span className="label">Price:</span>
-                <span
-                  className={`value ${
-                    tradingStats.change24h >= 0 ? "positive" : "negative"
-                  }`}
-                >
-                  ${tradingStats.price.toFixed(tradingStats.price < 1 ? 6 : 2)}
-                </span>
+                </div>
+              )}
+              <div className="stat price">
+                <div className="token-info">
+                  {/* Token info with ticker on top and logo below */}
+                  {tradingStats.logo && (
+                    <div className="token-logo-container">
+                      <div className="token-ticker">
+                        {selectedPair.baseAsset}
+                      </div>
+                      <img
+                        src={tradingStats.logo}
+                        alt={selectedPair.baseAsset}
+                        className="token-logo"
+                      />
+                    </div>
+                  )}
+                  {/* Price info is shown to the right of the logo */}
+                  <div className="price-info">
+                    <span className="label">Price:</span>
+                    <span
+                      className={`value ${
+                        tradingStats.change24h >= 0 ? "positive" : "negative"
+                      }`}
+                    >
+                      $
+                      {tradingStats.price.toFixed(
+                        tradingStats.price < 1 ? 6 : 2
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className="stat change">
                 <span className="label">24h Change:</span>

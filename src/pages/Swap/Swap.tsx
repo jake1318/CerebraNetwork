@@ -18,7 +18,6 @@ const Swap: React.FC = () => {
       <div className="swap-page__container">
         <div className="swap-page__header">
           <h1>Swap Tokens</h1>
-          <p>Trade tokens instantly with zero slippage and low fees</p>
         </div>
 
         <div className="swap-page__content">

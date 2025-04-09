@@ -56,10 +56,11 @@
     z-index: 1;
     box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
   }
+
   .dex-page__container {
-    overflow-y: auto;
-    flex: 1 1 auto; /* allow the container to grow/shrink in a flex layout */
-    min-height: 0; /* if parent is flex, permit child to not overflow */
+    /* Remove overflow-y to allow regular page scrolling */
+    position: relative;
+    z-index: 2;
   }
 
   .vertical-scan {
@@ -137,8 +138,6 @@
   .dex-page__container {
     max-width: 1400px;
     margin: 0 auto;
-    position: relative;
-    z-index: 2;
   }
 
   .dex-page__header {
@@ -157,6 +156,7 @@
 
   .dex-page__trading-stats {
     display: flex;
+    flex-wrap: wrap;
     gap: 1.5rem;
     margin-bottom: 1.5rem;
     background: rgba(5, 15, 30, 0.5);
@@ -171,10 +171,56 @@
       )
       1;
 
+    /* Add new container for pair selector */
+    .pair-selector-container {
+      flex: 1;
+      min-width: 180px;
+      margin-right: 1rem;
+    }
+
     .stat {
       display: flex;
       flex-direction: column;
       gap: 0.2rem;
+
+      /* Styles for price stat which now has horizontal layout */
+      &.price {
+        flex-direction: row;
+        align-items: center;
+
+        .token-info {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .token-logo-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-right: 0.5rem;
+
+          /* Swapped order - ticker on top, logo below */
+          .token-ticker {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 4px;
+          }
+
+          .token-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+          }
+        }
+
+        .price-info {
+          display: flex;
+          flex-direction: column;
+        }
+      }
 
       .label {
         font-size: 0.8rem;
@@ -200,19 +246,22 @@
     display: grid;
     grid-template-rows: 1fr 1fr;
     gap: 1.5rem;
-    height: calc(100vh - 260px);
     min-height: 600px;
+    /* Set height to auto to allow content to determine size */
+    height: auto;
 
     .chart-order-section {
       display: grid;
       grid-template-columns: 3fr 1fr 1fr;
       gap: 1.5rem;
       height: 100%;
+      min-height: 350px;
 
       .chart-wrapper {
         /* Just rename from .chart-container to .chart-wrapper 
            so it doesn't conflict with the Chart's own .chart-container class. */
         height: 100%;
+        min-height: 350px;
       }
     }
 
@@ -221,6 +270,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 1.5rem;
       height: 100%;
+      min-height: 350px;
     }
 
     .orderbook-container,
@@ -228,6 +278,7 @@
     .trading-history-container,
     .my-orders-container {
       height: 100%;
+      min-height: 300px;
     }
   }
 }
