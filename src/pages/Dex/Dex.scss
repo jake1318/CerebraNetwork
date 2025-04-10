@@ -1,4 +1,5 @@
 /* src/pages/Dex/Dex.scss */
+
 .dex-page {
   width: 100%;
   min-height: calc(100vh - 80px);
@@ -55,12 +56,6 @@
     animation: horizonScan 15s linear infinite;
     z-index: 1;
     box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-  }
-
-  .dex-page__container {
-    /* Remove overflow-y to allow regular page scrolling */
-    position: relative;
-    z-index: 2;
   }
 
   .vertical-scan {
@@ -138,6 +133,8 @@
   .dex-page__container {
     max-width: 1400px;
     margin: 0 auto;
+    position: relative;
+    z-index: 2;
   }
 
   .dex-page__header {
@@ -152,6 +149,15 @@
       text-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
       margin: 0;
     }
+  }
+
+  .dex-error {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 0, 0, 0.1);
+    border: 1px solid rgba(255, 0, 0, 0.3);
+    color: #ff5555;
+    border-radius: 8px;
   }
 
   .dex-page__trading-stats {
@@ -171,7 +177,6 @@
       )
       1;
 
-    /* Add new container for pair selector */
     .pair-selector-container {
       flex: 1;
       min-width: 180px;
@@ -183,8 +188,8 @@
       flex-direction: column;
       gap: 0.2rem;
 
-      /* Styles for price stat which now has horizontal layout */
       &.price {
+        /* Price has a custom layout: logo on left, price on right */
         flex-direction: row;
         align-items: center;
 
@@ -200,13 +205,12 @@
           align-items: center;
           margin-right: 0.5rem;
 
-          /* Swapped order - ticker on top, logo below */
           .token-ticker {
             font-size: 0.9rem;
             font-weight: 600;
             color: #fff;
-            text-align: center;
             margin-bottom: 4px;
+            text-align: center;
           }
 
           .token-logo {
@@ -242,80 +246,84 @@
     }
   }
 
+  /* -------------------------------------
+     Main content layout
+     ------------------------------------- */
   .dex-page__content {
+    /* Let each "section" size itself, top to bottom */
     display: grid;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: auto auto; /* 2 rows: first is chart/order, second is trades/my-orders */
     gap: 1.5rem;
-    min-height: 600px;
-    /* Set height to auto to allow content to determine size */
-    height: auto;
+  }
+
+  .chart-order-section {
+    display: grid;
+    /* Only 2 columns: .chart-wrapper and .order-form-container */
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    /* Stretch both columns to match the tallest element */
+    align-items: stretch;
+    /* Optional: Set a minimum height for the entire section */
+    min-height: 500px;
+  }
+
+  /* New rules to ensure chart and order form containers expand equally */
+  .chart-wrapper,
+  .order-form-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  /* Ensure the inner chart fills its container fully. Adjust the selector
+     (.chart) as needed to target the correct element inside your Chart component */
+  .chart-wrapper .chart {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .trading-history-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  /* Common containers for better sizing control */
+  .order-form-container,
+  .trading-history-container,
+  .my-orders-container {
+    background: rgba(5, 15, 30, 0.5);
+    border-radius: 12px;
+    padding: 1rem;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 1200px) {
+    .dex-page__content {
+      /* Tweaks for smaller widths can be added here if needed */
+    }
+  }
+
+  @media (max-width: 992px) {
+    .dex-page__content {
+      /* Stack everything vertically on very narrow screens */
+      display: block;
+    }
 
     .chart-order-section {
-      display: grid;
-      grid-template-columns: 3fr 1fr 1fr;
-      gap: 1.5rem;
-      height: 100%;
-      min-height: 350px;
-
-      .chart-wrapper {
-        /* Just rename from .chart-container to .chart-wrapper 
-           so it doesn't conflict with the Chart's own .chart-container class. */
-        height: 100%;
-        min-height: 350px;
-      }
+      display: block;
+      margin-bottom: 1.5rem;
     }
 
     .trading-history-section {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      height: 100%;
-      min-height: 350px;
-    }
-
-    .orderbook-container,
-    .order-form-container,
-    .trading-history-container,
-    .my-orders-container {
-      height: 100%;
-      min-height: 300px;
-    }
-  }
-}
-
-@media (max-width: 1200px) {
-  .dex-page {
-    .dex-page__content {
-      .chart-order-section {
-        grid-template-columns: 2fr 1fr 1fr;
-      }
-    }
-  }
-}
-
-@media (max-width: 992px) {
-  .dex-page {
-    .dex-page__content {
-      height: auto;
-
-      .chart-order-section {
-        grid-template-columns: 1fr;
-        grid-template-rows: 300px repeat(2, auto);
-      }
-
-      .trading-history-section {
-        grid-template-columns: 1fr;
-        grid-template-rows: repeat(2, auto);
-      }
-
-      .chart-wrapper,
-      .orderbook-container,
-      .order-form-container,
-      .trading-history-container,
-      .my-orders-container {
-        height: auto;
-        min-height: 300px;
-      }
+      display: block;
     }
   }
 }

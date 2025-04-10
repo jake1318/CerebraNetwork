@@ -1,3 +1,4 @@
+/* src/pages/Dex/components/PairSelector.scss */
 .pair-selector {
   position: relative;
   min-width: 180px;
@@ -55,8 +56,9 @@
     position: absolute;
     top: calc(100% + 10px);
     left: 0;
-    width: 100%;
+    /* Limit overall width so it takes up less space than full selector width */
     min-width: 240px;
+    max-width: 280px; /* Adjust as needed */
     background: rgba(5, 15, 30, 0.95);
     border: 1px solid;
     border-image: linear-gradient(
@@ -99,7 +101,8 @@
     }
 
     .pair-list {
-      max-height: 300px;
+      /* Limit height so only about 3 items show, then scroll */
+      max-height: 180px; /* ~3 items, adjust as needed */
       overflow-y: auto;
       scrollbar-width: thin;
 

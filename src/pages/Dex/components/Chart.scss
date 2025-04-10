@@ -9,7 +9,9 @@
       rgba(255, 0, 255, 0.2)
     )
     1;
-  overflow: hidden;
+  /* Instead of overflow: hidden, allow vertical overflow */
+  overflow-x: hidden;
+  overflow-y: visible;
   display: flex;
   flex-direction: column;
   min-height: 400px;
@@ -73,7 +75,9 @@
   .chart-content {
     flex: 1;
     position: relative;
-    overflow: hidden;
+    /* We no longer hide vertical overflow */
+    overflow-x: hidden;
+    overflow-y: visible;
     display: flex;
     flex-direction: column;
 
