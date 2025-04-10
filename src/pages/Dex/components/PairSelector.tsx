@@ -8,7 +8,6 @@ interface TradingPair {
   quoteAsset: string;
   price: number;
   change24h: number;
-  // logo?: string; // We don't display it in the dropdown
 }
 
 interface PairSelectorProps {
@@ -34,7 +33,6 @@ const PairSelector: React.FC<PairSelectorProps> = ({
     setIsDropdownOpen(false);
   };
 
-  // Filter pairs based on search query
   const filteredPairs = pairs.filter(
     (pair) =>
       pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -56,7 +54,6 @@ const PairSelector: React.FC<PairSelectorProps> = ({
         </span>
         <span className="dropdown-arrow">▼</span>
       </div>
-
       {isDropdownOpen && (
         <div className="pair-dropdown">
           <div className="search-container">

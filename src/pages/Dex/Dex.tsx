@@ -1,4 +1,3 @@
-// src/pages/Dex/Dex.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import Chart from "./components/Chart";
@@ -12,23 +11,14 @@ import "./Dex.scss";
 
 // Updated token list
 const BASE_TOKEN_ADDRESSES = [
-  // CETUS
   "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS",
-  // SUI
   "0x2::sui::SUI",
-  // DEEP
   "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
-  // ETH
   "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
-  // WBTC
   "0xaafb102dd0902f5055cadecd687fb5b71ca82ef0e0285d90afde828ec58ca96b::btc::BTC",
-  // NAVX
   "0xa99b8952d4f7d947ea77fe0ecdcc9e5fc0bcab2841d6e2a5aa00c3044e5544b5::navx::NAVX",
-  // SCA
   "0x7016aae72cfc67f2fadf55769c0a7dd54291a583b63051a5ed71081cce836ac6::sca::SCA",
-  // WSOL
   "0xb7844e289a8410e50fb3ca48d69eb9cf29e27d223ef90353fe1bd8e27ff8f3f8::coin::COIN",
-  // APT
   "0x3a5143bb1196e3bcdfab6203d1683ae29edd26294fc8bfeafe4aaa9d2704df37::coin::COIN",
 ];
 
@@ -58,7 +48,6 @@ const Dex: React.FC = () => {
   const [orderMode, setOrderMode] = useState<"limit" | "market">("limit");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchBlockvisionData = async (coinType: string) => {
@@ -90,14 +79,12 @@ const Dex: React.FC = () => {
     };
   };
 
-  // fetch Birdeye data in small batches
   const fetchBirdeyeDataInBatches = async (addresses: string[]) => {
     const results = new Map<
       string,
       { volume24h: number; high24h: number; low24h: number }
     >();
     const batchSize = 3;
-
     for (let i = 0; i < addresses.length; i += batchSize) {
       const slice = addresses.slice(i, i + batchSize);
       const slicePromises = slice.map(async (addr) => {
@@ -118,7 +105,6 @@ const Dex: React.FC = () => {
         }
       });
       await Promise.all(slicePromises);
-      // short delay before next batch
       await new Promise((res) => setTimeout(res, 250));
     }
     return results;
@@ -127,16 +113,10 @@ const Dex: React.FC = () => {
   const loadPairs = async () => {
     setIsLoading(true);
     setError(null);
-
     try {
-      // 1) blockvision data in parallel
       const bvPromises = BASE_TOKEN_ADDRESSES.map(fetchBlockvisionData);
       const bvList = await Promise.all(bvPromises);
-
-      // 2) birdeye data in small batches
       const beMap = await fetchBirdeyeDataInBatches(BASE_TOKEN_ADDRESSES);
-
-      // combine
       const pairs: TradingPair[] = BASE_TOKEN_ADDRESSES.map((addr, idx) => {
         const bv = bvList[idx];
         const be = beMap.get(addr) || { volume24h: 0, high24h: 0, low24h: 0 };
@@ -159,11 +139,8 @@ const Dex: React.FC = () => {
           logo: bv.logo,
         };
       });
-
       setTradingPairs(pairs);
-      if (pairs.length > 0) {
-        setSelectedPair(pairs[0]);
-      }
+      if (pairs.length > 0) setSelectedPair(pairs[0]);
     } catch (err: any) {
       console.error("loadPairs error:", err);
       setError(err.message || "Error loading trading pairs.");
@@ -181,7 +158,6 @@ const Dex: React.FC = () => {
         const newChange = d.priceChangePercentage24H
           ? parseFloat(String(d.priceChangePercentage24H))
           : 0;
-
         setTradingPairs((prev) =>
           prev.map((p) =>
             p.baseAddress === pair.baseAddress
@@ -203,31 +179,17 @@ const Dex: React.FC = () => {
   };
 
   const startRefreshInterval = (pair: TradingPair) => {
-    if (refreshTimerRef.current) {
-      clearInterval(refreshTimerRef.current);
-    }
-    const timer = setInterval(() => {
-      refreshSelectedPair(pair);
-    }, 60000);
+    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+    const timer = setInterval(() => refreshSelectedPair(pair), 60000);
     refreshTimerRef.current = timer;
   };
-
-  useEffect(() => {
-    return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     loadPairs();
   }, []);
 
   useEffect(() => {
-    if (selectedPair) {
-      startRefreshInterval(selectedPair);
-    }
+    if (selectedPair) startRefreshInterval(selectedPair);
   }, [selectedPair]);
 
   const handleSelectPair = (pair: TradingPair) => {
@@ -254,10 +216,8 @@ const Dex: React.FC = () => {
 
   return (
     <div className="dex-page">
-      {/* Glow effects */}
       <div className="glow-1"></div>
       <div className="glow-2"></div>
-      {/* Vertical scan */}
       <div className="vertical-scan"></div>
 
       <div className="dex-page__container">
@@ -281,83 +241,68 @@ const Dex: React.FC = () => {
 
         {selectedPair && (
           <>
-            <div className="dex-page__trading-stats">
-              {/* Moved pair selector inside trading stats */}
-              {selectedPair && (
-                <div className="pair-selector-container">
-                  <PairSelector
-                    pairs={tradingPairs}
-                    selectedPair={selectedPair}
-                    onSelectPair={handleSelectPair}
-                  />
-                </div>
-              )}
-              <div className="stat price">
-                <div className="token-info">
-                  {/* Token info with ticker on top and logo below */}
+            <div className="dex-page__trading-stats two-line-stats">
+              <div className="stats-grid">
+                {/* Ticker cell spans two rows and shows ticker data */}
+                <div className="cell ticker-cell">
+                  <span className="ticker-text">{selectedPair.baseAsset}</span>
                   {tradingStats.logo && (
-                    <div className="token-logo-container">
-                      <div className="token-ticker">
-                        {selectedPair.baseAsset}
-                      </div>
-                      <img
-                        src={tradingStats.logo}
-                        alt={selectedPair.baseAsset}
-                        className="token-logo"
-                      />
-                    </div>
+                    <img
+                      src={tradingStats.logo}
+                      alt={selectedPair.baseAsset}
+                      className="token-logo"
+                    />
                   )}
-                  {/* Price info is shown to the right of the logo */}
-                  <div className="price-info">
-                    <span className="label">Price:</span>
-                    <span
-                      className={`value ${
-                        tradingStats.change24h >= 0 ? "positive" : "negative"
-                      }`}
-                    >
-                      $
-                      {tradingStats.price.toFixed(
-                        tradingStats.price < 1 ? 6 : 2
-                      )}
-                    </span>
-                  </div>
                 </div>
-              </div>
-              <div className="stat change">
-                <span className="label">24h Change:</span>
+                {/* Top row: labels for the 5 data columns */}
+                <span className="cell label">Price</span>
+                <span className="cell label">24h Change</span>
+                <span className="cell label">24h Volume</span>
+                <span className="cell label">24h High</span>
+                <span className="cell label">24h Low</span>
+
+                {/* Bottom row: corresponding data */}
                 <span
-                  className={`value ${
+                  className={`cell value ${
+                    tradingStats.change24h >= 0 ? "positive" : "negative"
+                  }`}
+                >
+                  $
+                  {tradingStats.price < 1
+                    ? tradingStats.price.toFixed(6)
+                    : tradingStats.price.toFixed(4)}
+                </span>
+                <span
+                  className={`cell value ${
                     tradingStats.change24h >= 0 ? "positive" : "negative"
                   }`}
                 >
                   {tradingStats.change24h >= 0 ? "+" : ""}
                   {tradingStats.change24h.toFixed(2)}%
                 </span>
-              </div>
-              <div className="stat volume">
-                <span className="label">24h Volume:</span>
-                <span className="value">
+                <span className="cell value">
                   $
                   {tradingStats.volume24h.toLocaleString(undefined, {
                     maximumFractionDigits: 0,
                   })}
                 </span>
-              </div>
-              <div className="stat high">
-                <span className="label">24h High:</span>
-                <span className="value">
+                <span className="cell value">
                   $
                   {tradingStats.high24h.toFixed(
-                    tradingStats.high24h < 1 ? 6 : 2
+                    tradingStats.high24h < 1 ? 6 : 4
                   )}
                 </span>
-              </div>
-              <div className="stat low">
-                <span className="label">24h Low:</span>
-                <span className="value">
+                <span className="cell value">
                   $
-                  {tradingStats.low24h.toFixed(tradingStats.low24h < 1 ? 6 : 2)}
+                  {tradingStats.low24h.toFixed(tradingStats.low24h < 1 ? 6 : 4)}
                 </span>
+              </div>
+              <div className="pair-selector-slot">
+                <PairSelector
+                  pairs={tradingPairs}
+                  selectedPair={selectedPair}
+                  onSelectPair={handleSelectPair}
+                />
               </div>
             </div>
 
@@ -366,7 +311,6 @@ const Dex: React.FC = () => {
                 <div className="chart-wrapper">
                   <Chart pair={selectedPair} />
                 </div>
-
                 <div className="order-form-container">
                   <OrderForm
                     pair={selectedPair}
