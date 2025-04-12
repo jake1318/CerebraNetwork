@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { useWalletContext } from "../../contexts/WalletContext";
 import { useBirdeye } from "../../contexts/BirdeyeContext";
+import tokenCacheService from "../../services/tokenCacheService";
 import "./TokenSelector.scss";
 
 export interface TokenData {
@@ -11,14 +12,15 @@ export interface TokenData {
   logo: string;
   decimals: number;
   price: number;
-  balance?: number; // user’s balance (if any)
+  balance?: number; // user's balance (if any)
   isTrending?: boolean; // marks a trending token
   // You can also add a computed field for shortAddress if needed:
   shortAddress?: string;
+  isLoading?: boolean; // indicates price is loading
 }
 
 /**
- * Unifies two token objects’ name and logo.
+ * Unifies two token objects' name and logo.
  * If Blockvision returns "Unknown Coin" for the name, we use the Birdeye name.
  * For the logo, we prefer a non-empty value.
  */
@@ -48,8 +50,13 @@ const TokenSelector = ({
   excludeAddresses?: string[];
 }) => {
   const { account } = useWallet();
-  const { trendingTokens, tokenList, refreshTrendingTokens, refreshTokenList } =
-    useBirdeye();
+  const {
+    trendingTokens,
+    tokenList,
+    refreshTrendingTokens,
+    refreshTokenList,
+    getCachedTokensVisualData,
+  } = useBirdeye();
   const {
     walletState,
     tokenMetadata,
@@ -58,6 +65,8 @@ const TokenSelector = ({
     fetchTokenMetadata,
   } = useWalletContext();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoadingTokens, setIsLoadingTokens] = useState(true);
+  const [cachedVisualTokens, setCachedVisualTokens] = useState<TokenData[]>([]);
 
   // Build a map from Birdeye tokens (from both tokenList and trendingTokens)
   const buildBirdeyeMap = (): Map<string, TokenData> => {
@@ -90,6 +99,7 @@ const TokenSelector = ({
         price,
         balance: balanceValue,
         shortAddress: bal.coinType.slice(0, 6) + "…" + bal.coinType.slice(-4),
+        isLoading: isLoadingTokens && price === 0,
       };
     });
   }
@@ -122,18 +132,32 @@ const TokenSelector = ({
           price,
           balance: 0,
           shortAddress: t.address.slice(0, 6) + "…" + t.address.slice(-4),
+          isLoading: isLoadingTokens && price === 0,
         };
       });
   }
 
   // Final merged list: wallet tokens first, then the remaining tokens.
   const getMergedTokens = (): TokenData[] => {
+    // When loading and we have cached visual data but no API data yet,
+    // return cached visual tokens
+    if (
+      isLoadingTokens &&
+      tokenList.length === 0 &&
+      trendingTokens.length === 0
+    ) {
+      if (cachedVisualTokens.length > 0) {
+        return cachedVisualTokens;
+      }
+    }
+
     const walletTokens = buildWalletTokens();
     const birdeyeOnly = buildBirdeyeOnlyTokens();
     // Sort wallet tokens by descending (balance * price)
     walletTokens.sort(
-      (a, b) => (a.balance || 0) * a.price - (b.balance || 0) * b.price
+      (a, b) => (b.balance || 0) * b.price - (a.balance || 0) * a.price
     );
+
     return [...walletTokens, ...birdeyeOnly];
   };
 
@@ -153,11 +177,38 @@ const TokenSelector = ({
     return list;
   };
 
+  // Load cached visual data when the modal opens
   useEffect(() => {
     if (isOpen) {
-      refreshTrendingTokens();
-      refreshTokenList();
-      refreshBalances();
+      // Load cached tokens first for immediate display
+      const cached = tokenCacheService.getAllCachedTokens();
+      const visualTokens = cached.map((token) => ({
+        address: token.address,
+        symbol: token.symbol,
+        name: token.name,
+        logo: token.logo,
+        decimals: token.decimals,
+        price: 0, // No price yet
+        shortAddress: token.address.slice(0, 6) + "…" + token.address.slice(-4),
+        isLoading: true, // Indicate price is loading
+      }));
+
+      setCachedVisualTokens(visualTokens);
+      setIsLoadingTokens(true);
+
+      // Fetch fresh data
+      Promise.all([
+        refreshTrendingTokens(),
+        refreshTokenList(),
+        refreshBalances(),
+      ])
+        .then(() => {
+          setIsLoadingTokens(false);
+        })
+        .catch(() => {
+          setIsLoadingTokens(false);
+        });
+
       // Fetch metadata for all tokens in Birdeye so even zero-balance tokens are enriched.
       const allAddrs = [
         ...new Set([...tokenList, ...trendingTokens].map((t) => t.address)),
@@ -187,7 +238,9 @@ const TokenSelector = ({
         </div>
         <div className="token-list">
           {filteredTokens().length === 0 ? (
-            <div className="no-tokens">No tokens found</div>
+            <div className="no-tokens">
+              {isLoadingTokens ? "Loading tokens..." : "No tokens found"}
+            </div>
           ) : (
             filteredTokens().map((token) => (
               <div
@@ -201,6 +254,9 @@ const TokenSelector = ({
                       src={token.logo}
                       alt={token.symbol}
                       className="token-logo"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
                     />
                   )}
                   <div className="token-details">
@@ -216,7 +272,19 @@ const TokenSelector = ({
                       })}
                     </div>
                   )}
-                  <div className="token-price">{formatUsd(token.price)}</div>
+                  <div
+                    className={`token-price ${
+                      token.isLoading ? "loading-price" : ""
+                    }`}
+                  >
+                    {token.isLoading ? (
+                      <span className="loading-indicator">
+                        Loading price...
+                      </span>
+                    ) : (
+                      formatUsd(token.price)
+                    )}
+                  </div>
                   <div className="token-address">
                     {token.shortAddress
                       ? token.shortAddress

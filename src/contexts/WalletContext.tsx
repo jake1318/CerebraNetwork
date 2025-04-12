@@ -3,6 +3,7 @@ import { useWallet } from "@suiet/wallet-kit";
 import { CoinBalance } from "../types";
 import blockvisionService from "../services/blockvisionService";
 import { birdeyeService } from "../services/birdeyeService";
+import tokenCacheService from "../services/tokenCacheService";
 
 // We have removed the hard-coded coin mappings since metadata comes from Blockvision.
 
@@ -71,6 +72,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchAvailableCoins = async () => {
     try {
+      // First get cached coins so there's something to display immediately
+      const cachedTokens = tokenCacheService.getAllCachedTokens();
+      const cachedAddresses = cachedTokens.map((token) => token.address);
+      setAvailableCoins(cachedAddresses);
+
+      // Then fetch from API
       const tokenListData = await birdeyeService.getTokenList();
       let coins: string[] = [];
       if (
@@ -86,7 +93,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       setAvailableCoins(coins);
     } catch (error) {
       console.error("Error fetching available coins from Birdeye:", error);
-      setAvailableCoins(["0x2::sui::SUI"]);
+
+      // Fall back to cached data if API call fails
+      const cachedTokens = tokenCacheService.getAllCachedTokens();
+      const cachedAddresses = cachedTokens.map((token) => token.address);
+
+      if (cachedAddresses.length === 0) {
+        setAvailableCoins(["0x2::sui::SUI"]);
+      } else {
+        if (!cachedAddresses.includes("0x2::sui::SUI")) {
+          cachedAddresses.push("0x2::sui::SUI");
+        }
+        setAvailableCoins(cachedAddresses);
+      }
     }
   };
 
@@ -94,16 +113,57 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const newMetadata = { ...tokenMetadata };
       let hasChanges = false;
+
+      // First check if we have cached visual data
       for (const coinType of coinTypes) {
         const lower = coinType.toLowerCase();
-        if (!newMetadata[lower]) {
-          const metadata = await blockvisionService.getCoinDetail(coinType);
-          if (metadata && (metadata.data || metadata.result)) {
-            newMetadata[lower] = metadata.data || metadata.result;
+        const cachedToken = tokenCacheService.getTokenFromCache(lower);
+
+        if (cachedToken) {
+          // If current metadata doesn't exist or doesn't have visual elements,
+          // add visual elements from cache
+          if (!newMetadata[lower] || !newMetadata[lower].logo) {
+            if (!newMetadata[lower]) {
+              newMetadata[lower] = {};
+            }
+
+            // Add visual data from cache
+            newMetadata[lower].symbol =
+              newMetadata[lower].symbol || cachedToken.symbol;
+            newMetadata[lower].name =
+              newMetadata[lower].name || cachedToken.name;
+            newMetadata[lower].logo =
+              newMetadata[lower].logo || cachedToken.logo;
+            newMetadata[lower].decimals =
+              newMetadata[lower].decimals || cachedToken.decimals;
+
             hasChanges = true;
           }
         }
       }
+
+      // Then update with fresh data including prices
+      for (const coinType of coinTypes) {
+        const lower = coinType.toLowerCase();
+        const metadata = await blockvisionService.getCoinDetail(coinType);
+
+        if (metadata && (metadata.data || metadata.result)) {
+          const metadataResult = metadata.data || metadata.result;
+          newMetadata[lower] = metadataResult;
+
+          // Cache the visual elements
+          tokenCacheService.cacheToken({
+            address: lower,
+            symbol: metadataResult.symbol || "Unknown",
+            name: metadataResult.name || "Unknown Token",
+            logo: metadataResult.logo || "",
+            decimals: metadataResult.decimals || 9,
+          });
+
+          hasChanges = true;
+        }
+      }
+
       if (hasChanges) {
         setTokenMetadata(newMetadata);
       }
@@ -119,6 +179,47 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     setLoading(true);
+
+    // Get cached metadata to display visual elements immediately
+    const cachedData = tokenCacheService.getAllCachedTokens();
+    const cachedMetadata: Record<string, any> = {};
+
+    cachedData.forEach((token) => {
+      const lower = token.address.toLowerCase();
+
+      if (!tokenMetadata[lower] || !tokenMetadata[lower].logo) {
+        cachedMetadata[lower] = {
+          symbol: token.symbol,
+          name: token.name,
+          logo: token.logo,
+          decimals: token.decimals,
+          // Don't set price from cache
+        };
+      }
+    });
+
+    if (Object.keys(cachedMetadata).length > 0) {
+      setTokenMetadata((prevMetadata) => {
+        const merged = { ...prevMetadata };
+
+        // Merge cached visual data with existing metadata
+        // preserving prices from prevMetadata
+        for (const [addr, data] of Object.entries(cachedMetadata)) {
+          if (!merged[addr]) {
+            merged[addr] = data;
+          } else {
+            // Keep existing price but use cached visuals if needed
+            merged[addr].symbol = merged[addr].symbol || data.symbol;
+            merged[addr].name = merged[addr].name || data.name;
+            merged[addr].logo = merged[addr].logo || data.logo;
+            merged[addr].decimals = merged[addr].decimals || data.decimals;
+          }
+        }
+
+        return merged;
+      });
+    }
+
     try {
       const blockvisionData = await blockvisionService.getAccountCoins(
         account.address
@@ -137,7 +238,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
           name: coin.name || "Unknown Coin",
           logo: coin.logo || "",
         }));
+
+        // Cache visual data
+        coins.forEach((coin) => {
+          tokenCacheService.cacheToken({
+            address: coin.type,
+            symbol: coin.symbol,
+            name: coin.name,
+            logo: coin.logo,
+            decimals: coin.decimals,
+          });
+        });
       }
+
       const balancesByType: Record<
         string,
         { balance: bigint; metadata?: any }
@@ -151,8 +264,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         balancesByType[coinType].balance += bigBalance;
       }
+
       const formattedBalances: CoinBalance[] = [];
       const coinTypesToFetchMetadata: string[] = [];
+
       for (const [coinType, data] of Object.entries(balancesByType)) {
         if (data.balance > BigInt(0)) {
           formattedBalances.push({
@@ -165,6 +280,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
           coinTypesToFetchMetadata.push(coinType);
         }
       }
+
       let total = 0;
       for (const balance of formattedBalances) {
         const lower = balance.coinType.toLowerCase();
@@ -174,6 +290,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
           Number(balance.balance) / Math.pow(10, balance.decimals);
         total += numericBalance * price;
       }
+
       formattedBalances.sort((a, b) => {
         const aMeta = tokenMetadata[a.coinType.toLowerCase()] || {};
         const bMeta = tokenMetadata[b.coinType.toLowerCase()] || {};
@@ -183,6 +300,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         const bValue = (Number(b.balance) / Math.pow(10, b.decimals)) * bPrice;
         return bValue - aValue;
       });
+
       setBalances(formattedBalances);
       setTotalUsdValue(total);
       await fetchTokenMetadata(coinTypesToFetchMetadata);

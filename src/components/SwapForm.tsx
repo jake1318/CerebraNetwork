@@ -353,6 +353,7 @@ export default function SwapForm() {
             </div>
           )}
         </div>
+        {/* Updated Token Selector for "From" Field */}
         <div className="input-with-token">
           <input
             type="number"
@@ -374,6 +375,9 @@ export default function SwapForm() {
                       src={tokenIn.logo}
                       alt={tokenIn.symbol}
                       className="token-logo"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
                     />
                   )}
                   <span>{tokenIn.symbol}</span>

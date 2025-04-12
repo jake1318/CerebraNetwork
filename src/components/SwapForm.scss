@@ -1,4 +1,106 @@
-// Enhanced SwapForm styling with dual-color theme
+/* =========================
+   SwapForm.scss
+   Enhanced SwapForm styling with dual-color theme
+   ========================= */
+
+/* --- New Token Selector Styles (Updates) --- */
+.token-selector-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 120px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.token-selector-button:hover {
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2), 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+.token-selector-button:active {
+  transform: scale(0.98);
+}
+
+.token-select-wrapper {
+  position: relative;
+  min-width: 120px;
+  padding-right: 8px;
+}
+
+/* Enhance the selected token display in the token selector button */
+.selected-token {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selected-token .token-logo {
+  /* Use 32px to have a consistent icon size in the 'From'/'To' fields */
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 8px;
+  object-fit: cover;
+  background: rgba(40, 40, 60, 0.6);
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.2), 0 0 5px rgba(255, 0, 255, 0.2);
+}
+
+.selected-token span {
+  font-weight: 500;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* When no token is selected, style the "Select Token" text */
+.token-selector-button:not(:has(.selected-token)) {
+  background: linear-gradient(
+    45deg,
+    rgba(0, 255, 255, 0.1),
+    rgba(255, 0, 255, 0.1)
+  );
+  color: #fff;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
+}
+
+.token-selector-button:not(:has(.selected-token)):hover {
+  background: linear-gradient(
+    45deg,
+    rgba(0, 255, 255, 0.2),
+    rgba(255, 0, 255, 0.2)
+  );
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.5), 0 0 5px rgba(255, 0, 255, 0.5);
+}
+
+/* Ensure proper sizing of token selectors within the form */
+.input-with-token {
+  .token-select-wrapper {
+    margin-left: 4px;
+  }
+}
+
+/* --- Original SwapForm Styles --- */
 
 .swap-form {
   background: rgba(5, 15, 30, 0.7);
@@ -384,10 +486,7 @@
   }
 }
 
-/* 
-  ADDITION: Make the selected token's icon consistent size
-  when displayed in the 'From'/'To' fields 
-*/
+/* Original Additional .selected-token style for consistency */
 .selected-token {
   display: flex;
   align-items: center;
