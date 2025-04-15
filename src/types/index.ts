@@ -43,3 +43,10 @@ export interface SwapInfo {
   priceImpact: number;
   route: any;
 }
+export interface CachedToken {
+  address: string;
+  symbol: string;
+  name: string;
+  logo: string;
+  decimals: number;
+}

@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { CoinBalance } from "../types";
-import blockvisionService from "../services/blockvisionService";
+import blockvisionService, {
+  AccountCoin,
+} from "../services/blockvisionService";
 import { birdeyeService } from "../services/birdeyeService";
 import tokenCacheService from "../services/tokenCacheService";
 
@@ -221,89 +223,63 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     try {
-      const blockvisionData = await blockvisionService.getAccountCoins(
+      console.log("Fetching account coins from BlockVision API");
+      const response = await blockvisionService.getAccountCoins(
         account.address
       );
-      let coins: any[] = [];
-      if (
-        blockvisionData &&
-        blockvisionData.result &&
-        Array.isArray(blockvisionData.result.coins)
-      ) {
-        coins = blockvisionData.result.coins.map((coin: any) => ({
-          type: coin.coinType,
-          balance: coin.balance,
-          decimals: coin.decimals || 9,
-          symbol: coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
-          name: coin.name || "Unknown Coin",
-          logo: coin.logo || "",
-        }));
 
-        // Cache visual data
+      let coins: AccountCoin[] = [];
+      if (response && response.data && Array.isArray(response.data)) {
+        console.log(`Found ${response.data.length} coins in wallet`);
+        coins = response.data;
+
+        // Cache visual data immediately
         coins.forEach((coin) => {
           tokenCacheService.cacheToken({
-            address: coin.type,
+            address: coin.coinType,
             symbol: coin.symbol,
             name: coin.name,
             logo: coin.logo,
             decimals: coin.decimals,
           });
         });
+      } else {
+        console.warn(
+          "Unexpected response format from BlockVision API:",
+          response
+        );
       }
 
-      const balancesByType: Record<
-        string,
-        { balance: bigint; metadata?: any }
-      > = {};
-      for (const coin of coins) {
-        const coinType = (coin.type || coin.coinType).toLowerCase();
-        if (!coinType) continue;
-        const bigBalance = BigInt(coin.balance || 0);
-        if (!balancesByType[coinType]) {
-          balancesByType[coinType] = { balance: BigInt(0), metadata: null };
-        }
-        balancesByType[coinType].balance += bigBalance;
-      }
+      // Convert AccountCoin array to CoinBalance format expected by the app
+      const formattedBalances: CoinBalance[] = coins.map((coin) => ({
+        coinType: coin.coinType,
+        symbol: coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
+        name: coin.name || "Unknown Coin",
+        balance: BigInt(coin.balance),
+        decimals: coin.decimals,
+        // Add the price and usd value directly from API response
+        price: parseFloat(coin.price),
+        usdValue: parseFloat(coin.usdValue),
+      }));
 
-      const formattedBalances: CoinBalance[] = [];
-      const coinTypesToFetchMetadata: string[] = [];
+      // Calculate total USD value from the API response
+      const total = coins.reduce((sum, coin) => {
+        return sum + parseFloat(coin.usdValue || "0");
+      }, 0);
 
-      for (const [coinType, data] of Object.entries(balancesByType)) {
-        if (data.balance > BigInt(0)) {
-          formattedBalances.push({
-            coinType,
-            symbol: "UNKNOWN",
-            name: "Unknown Coin",
-            balance: data.balance,
-            decimals: 9,
-          });
-          coinTypesToFetchMetadata.push(coinType);
-        }
-      }
-
-      let total = 0;
-      for (const balance of formattedBalances) {
-        const lower = balance.coinType.toLowerCase();
-        const metadata = tokenMetadata[lower] || {};
-        const price = Number(metadata.price) || 0;
-        const numericBalance =
-          Number(balance.balance) / Math.pow(10, balance.decimals);
-        total += numericBalance * price;
-      }
-
+      // Sort by USD value (highest first)
       formattedBalances.sort((a, b) => {
-        const aMeta = tokenMetadata[a.coinType.toLowerCase()] || {};
-        const bMeta = tokenMetadata[b.coinType.toLowerCase()] || {};
-        const aPrice = Number(aMeta.price) || 0;
-        const bPrice = Number(bMeta.price) || 0;
-        const aValue = (Number(a.balance) / Math.pow(10, a.decimals)) * aPrice;
-        const bValue = (Number(b.balance) / Math.pow(10, b.decimals)) * bPrice;
+        const aValue = a.usdValue || 0;
+        const bValue = b.usdValue || 0;
         return bValue - aValue;
       });
 
       setBalances(formattedBalances);
       setTotalUsdValue(total);
-      await fetchTokenMetadata(coinTypesToFetchMetadata);
+
+      // Fetch additional metadata for all coins
+      const coinTypes = formattedBalances.map((b) => b.coinType);
+      await fetchTokenMetadata(coinTypes);
     } catch (error) {
       console.error("Error fetching balances:", error);
     } finally {
