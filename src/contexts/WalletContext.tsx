@@ -6,8 +6,12 @@ import blockvisionService, {
 } from "../services/blockvisionService";
 import { birdeyeService } from "../services/birdeyeService";
 import tokenCacheService from "../services/tokenCacheService";
+import {
+  enrichTokenMetadataFromBalances,
+  enrichTokenMetadataByAddresses,
+} from "../services/tokenService";
 
-// We have removed the hard-coded coin mappings since metadata comes from Blockvision.
+// We have removed the hard-coded coin mappings since metadata comes from BlockVision.
 
 interface WalletContextType {
   walletState: {
@@ -24,7 +28,10 @@ interface WalletContextType {
     displayDecimals?: number
   ) => string;
   formatUsd: (amount: number) => string;
-  fetchTokenMetadata: (coinTypes: string[]) => Promise<void>;
+  fetchTokenMetadata: (
+    coinTypes: string[],
+    coinsData?: AccountCoin[]
+  ) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -95,11 +102,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       setAvailableCoins(coins);
     } catch (error) {
       console.error("Error fetching available coins from Birdeye:", error);
-
       // Fall back to cached data if API call fails
       const cachedTokens = tokenCacheService.getAllCachedTokens();
       const cachedAddresses = cachedTokens.map((token) => token.address);
-
       if (cachedAddresses.length === 0) {
         setAvailableCoins(["0x2::sui::SUI"]);
       } else {
@@ -111,62 +116,26 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const fetchTokenMetadata = async (coinTypes: string[]) => {
+  // Updated fetchTokenMetadata to use enriched metadata from Birdeye (with BlockVision fallback)
+  const fetchTokenMetadata = async (
+    coinTypes: string[],
+    coinsData?: AccountCoin[]
+  ): Promise<void> => {
     try {
       const newMetadata = { ...tokenMetadata };
-      let hasChanges = false;
-
-      // First check if we have cached visual data
-      for (const coinType of coinTypes) {
-        const lower = coinType.toLowerCase();
-        const cachedToken = tokenCacheService.getTokenFromCache(lower);
-
-        if (cachedToken) {
-          // If current metadata doesn't exist or doesn't have visual elements,
-          // add visual elements from cache
-          if (!newMetadata[lower] || !newMetadata[lower].logo) {
-            if (!newMetadata[lower]) {
-              newMetadata[lower] = {};
-            }
-
-            // Add visual data from cache
-            newMetadata[lower].symbol =
-              newMetadata[lower].symbol || cachedToken.symbol;
-            newMetadata[lower].name =
-              newMetadata[lower].name || cachedToken.name;
-            newMetadata[lower].logo =
-              newMetadata[lower].logo || cachedToken.logo;
-            newMetadata[lower].decimals =
-              newMetadata[lower].decimals || cachedToken.decimals;
-
-            hasChanges = true;
-          }
-        }
+      let fetchedMeta: Record<string, any>;
+      if (coinsData && coinsData.length) {
+        // When coins data is provided (from wallet balances), use it to enrich metadata
+        fetchedMeta = await enrichTokenMetadataFromBalances(coinsData);
+      } else {
+        // Otherwise, enrich metadata for arbitrary addresses
+        fetchedMeta = await enrichTokenMetadataByAddresses(coinTypes);
       }
-
-      // Then update with fresh data including prices
-      for (const coinType of coinTypes) {
-        const lower = coinType.toLowerCase();
-        const metadata = await blockvisionService.getCoinDetail(coinType);
-
-        if (metadata && (metadata.data || metadata.result)) {
-          const metadataResult = metadata.data || metadata.result;
-          newMetadata[lower] = metadataResult;
-
-          // Cache the visual elements
-          tokenCacheService.cacheToken({
-            address: lower,
-            symbol: metadataResult.symbol || "Unknown",
-            name: metadataResult.name || "Unknown Token",
-            logo: metadataResult.logo || "",
-            decimals: metadataResult.decimals || 9,
-          });
-
-          hasChanges = true;
-        }
+      // Merge fetched metadata into existing token metadata state
+      for (const [addr, data] of Object.entries(fetchedMeta)) {
+        newMetadata[addr] = { ...(newMetadata[addr] || {}), ...data };
       }
-
-      if (hasChanges) {
+      if (Object.keys(fetchedMeta).length > 0) {
         setTokenMetadata(newMetadata);
       }
     } catch (error) {
@@ -185,39 +154,32 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     // Get cached metadata to display visual elements immediately
     const cachedData = tokenCacheService.getAllCachedTokens();
     const cachedMetadata: Record<string, any> = {};
-
     cachedData.forEach((token) => {
       const lower = token.address.toLowerCase();
-
       if (!tokenMetadata[lower] || !tokenMetadata[lower].logo) {
         cachedMetadata[lower] = {
           symbol: token.symbol,
           name: token.name,
           logo: token.logo,
           decimals: token.decimals,
-          // Don't set price from cache
+          // Do not cache price from static data
         };
       }
     });
-
     if (Object.keys(cachedMetadata).length > 0) {
       setTokenMetadata((prevMetadata) => {
         const merged = { ...prevMetadata };
-
-        // Merge cached visual data with existing metadata
-        // preserving prices from prevMetadata
+        // Merge cached visual data with existing metadata (keeping existing prices)
         for (const [addr, data] of Object.entries(cachedMetadata)) {
           if (!merged[addr]) {
             merged[addr] = data;
           } else {
-            // Keep existing price but use cached visuals if needed
             merged[addr].symbol = merged[addr].symbol || data.symbol;
             merged[addr].name = merged[addr].name || data.name;
             merged[addr].logo = merged[addr].logo || data.logo;
             merged[addr].decimals = merged[addr].decimals || data.decimals;
           }
         }
-
         return merged;
       });
     }
@@ -227,13 +189,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       const response = await blockvisionService.getAccountCoins(
         account.address
       );
-
       let coins: AccountCoin[] = [];
       if (response && response.data && Array.isArray(response.data)) {
         console.log(`Found ${response.data.length} coins in wallet`);
         coins = response.data;
-
-        // Cache visual data immediately
+        // Cache visual data immediately from BlockVision response
         coins.forEach((coin) => {
           tokenCacheService.cacheToken({
             address: coin.coinType,
@@ -257,29 +217,24 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         name: coin.name || "Unknown Coin",
         balance: BigInt(coin.balance),
         decimals: coin.decimals,
-        // Add the price and usd value directly from API response
         price: parseFloat(coin.price),
         usdValue: parseFloat(coin.usdValue),
       }));
 
       // Calculate total USD value from the API response
-      const total = coins.reduce((sum, coin) => {
-        return sum + parseFloat(coin.usdValue || "0");
-      }, 0);
-
-      // Sort by USD value (highest first)
-      formattedBalances.sort((a, b) => {
-        const aValue = a.usdValue || 0;
-        const bValue = b.usdValue || 0;
-        return bValue - aValue;
-      });
+      const total = coins.reduce(
+        (sum, coin) => sum + parseFloat(coin.usdValue || "0"),
+        0
+      );
+      // Sort tokens by USD value (highest first)
+      formattedBalances.sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0));
 
       setBalances(formattedBalances);
       setTotalUsdValue(total);
 
-      // Fetch additional metadata for all coins
-      const coinTypes = formattedBalances.map((b) => b.coinType);
-      await fetchTokenMetadata(coinTypes);
+      // Enrich tokens with additional metadata using Birdeye (with BlockVision as fallback)
+      const coinTypes = coins.map((c) => c.coinType);
+      await fetchTokenMetadata(coinTypes, coins);
     } catch (error) {
       console.error("Error fetching balances:", error);
     } finally {
