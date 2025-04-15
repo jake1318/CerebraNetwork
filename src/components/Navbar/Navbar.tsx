@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useWallet, ConnectButton } from "@suiet/wallet-kit";
 import { motion } from "framer-motion";
@@ -9,6 +9,8 @@ const Navbar: React.FC = () => {
   const { connected, account, disconnect } = useWallet();
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Check if page is scrolled
   useEffect(() => {
@@ -19,6 +21,23 @@ const Navbar: React.FC = () => {
     window.addEventListener("scroll", handleScroll);
     return () => {
       window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -69,6 +88,35 @@ const Navbar: React.FC = () => {
           >
             DEX
           </Link>
+          {/* Bridge Dropdown */}
+          <div className="dropdown" ref={dropdownRef}>
+            <button
+              className="dropdown-toggle"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+            >
+              Bridge
+            </button>
+            {dropdownOpen && (
+              <div className="dropdown-menu">
+                <a
+                  href="https://bridge.sui.io/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="dropdown-item"
+                >
+                  Sui Bridge
+                </a>
+                <a
+                  href="https://portalbridge.com/#/transfer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="dropdown-item"
+                >
+                  Wormhole
+                </a>
+              </div>
+            )}
+          </div>
           <Link
             to="/search"
             className={location.pathname === "/search" ? "active" : ""}
@@ -146,6 +194,28 @@ const Navbar: React.FC = () => {
           >
             DEX
           </Link>
+          {/* Bridge dropdown for mobile */}
+          <div className="mobile-dropdown">
+            <div className="mobile-dropdown-header">Bridge</div>
+            <div className="mobile-dropdown-items">
+              <a
+                href="https://bridge.sui.io/"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Sui Bridge
+              </a>
+              <a
+                href="https://portalbridge.com/#/transfer"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Wormhole
+              </a>
+            </div>
+          </div>
           <Link
             to="/search"
             className={location.pathname === "/search" ? "active" : ""}
