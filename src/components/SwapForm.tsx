@@ -20,10 +20,14 @@ export default function SwapForm() {
   const wallet = useWallet();
   const provider = useSuiProvider();
   const { balance: suiBalance } = useAccountBalance();
-  const { walletState, tokenMetadata, formatBalance, formatUsd } =
-    useWalletContext();
+  const {
+    walletState,
+    tokenMetadata,
+    formatBalance,
+    formatUsd,
+    refreshBalances,
+  } = useWalletContext();
 
-  // Remove the fallback default selections – start with null.
   const [tokenIn, setTokenIn] = useState<Token | null>(null);
   const [tokenOut, setTokenOut] = useState<Token | null>(null);
   const [amountIn, setAmountIn] = useState("");
@@ -84,7 +88,6 @@ export default function SwapForm() {
         const mergedTokens = Array.from(tokensMap.values());
         console.log("Merged tokens:", mergedTokens);
         setAvailableTokens(mergedTokens);
-        // Do not auto-select defaults; let the user choose.
         try {
           if (
             tokenMetadata["0x2::sui::SUI"] &&
@@ -272,6 +275,8 @@ export default function SwapForm() {
         setAmountIn("");
         setAmountOut("0");
         setEstimatedFee(null);
+        // Refresh balances after swap
+        refreshBalances();
       } catch (txErr: any) {
         console.error("Transaction error:", txErr);
         setError(txErr.message || "Transaction failed");
@@ -353,7 +358,6 @@ export default function SwapForm() {
             </div>
           )}
         </div>
-        {/* Updated Token Selector for "From" Field */}
         <div className="input-with-token">
           <input
             type="number"

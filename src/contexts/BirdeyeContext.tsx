@@ -10,6 +10,22 @@ import tokenCacheService, {
   CachedTokenData,
 } from "../services/tokenCacheService";
 
+// Helper: Sanitize logo URLs (rewrite ipfs links and force HTTPS)
+const sanitizeLogoUrl = (url: string): string => {
+  if (!url) return url;
+  if (url.startsWith("ipfs://")) {
+    return url.replace(/^ipfs:\/\//, "https://cloudflare-ipfs.com/ipfs/");
+  }
+  if (url.includes("ipfs.io")) {
+    url = url.replace("http://", "https://");
+    return url.replace("https://ipfs.io", "https://cloudflare-ipfs.com");
+  }
+  if (url.startsWith("http://")) {
+    return "https://" + url.slice(7);
+  }
+  return url;
+};
+
 export interface TokenData {
   address: string;
   symbol: string;
@@ -62,10 +78,10 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
   const getCachedTokensVisualData = (): TokenData[] => {
     const cached = tokenCacheService.getAllCachedTokens();
     return cached.map((token) => ({
-      address: token.address,
+      address: token.address.toLowerCase(),
       symbol: token.symbol,
       name: token.name,
-      logo: token.logo,
+      logo: sanitizeLogoUrl(token.logo),
       decimals: token.decimals,
       price: 0, // We don't use cached prices
       isLoading: true, // Indicate price is loading
@@ -75,10 +91,10 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
   // Cache only visual elements, not price data
   const cacheTokenVisualData = (tokens: TokenData[]) => {
     const tokensToCache = tokens.map((token) => ({
-      address: token.address,
+      address: token.address.toLowerCase(),
       symbol: token.symbol,
       name: token.name,
-      logo: token.logo,
+      logo: sanitizeLogoUrl(token.logo),
       decimals: token.decimals,
     }));
     tokenCacheService.cacheTokens(tokensToCache);
@@ -91,18 +107,16 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
       if (response && response.data) {
         const trendingArr = extractArray(response.data);
         const formattedTokens = trendingArr.map((token: any) => ({
-          address: token.address,
+          address: token.address.toLowerCase(),
           symbol: token.symbol || "Unknown",
           name: token.name || "Unknown Token",
-          logo: token.logo || "",
+          logo: sanitizeLogoUrl(token.logo || ""),
           decimals: token.decimals || 9,
           price: token.price || 0,
           change24h: token.priceChange24h || 0,
           isTrending: true,
         }));
         setTrendingTokens(formattedTokens);
-
-        // Cache trending tokens visual data
         cacheTokenVisualData(formattedTokens);
       }
     } catch (error) {
@@ -119,17 +133,15 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
       if (response && response.data) {
         const tokenListArr = extractArray(response.data);
         const formattedTokens = tokenListArr.map((token: any) => ({
-          address: token.address,
+          address: token.address.toLowerCase(),
           symbol: token.symbol || "Unknown",
           name: token.name || "Unknown Token",
-          logo: token.logo || "",
+          logo: sanitizeLogoUrl(token.logo || ""),
           decimals: token.decimals || 9,
           price: token.price || 0,
           change24h: token.priceChange24h || 0,
         }));
         setTokenList(formattedTokens);
-
-        // Cache token list visual data
         cacheTokenVisualData(formattedTokens);
       }
     } catch (error) {
@@ -141,7 +153,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
 
   const getTokenMetadata = async (tokenAddress: string) => {
     try {
-      // Check cache first for visual data
       const cachedToken = tokenCacheService.getTokenFromCache(tokenAddress);
       let visualDataFromCache = null;
 
@@ -150,55 +161,45 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
           address: cachedToken.address,
           symbol: cachedToken.symbol,
           name: cachedToken.name,
-          logo: cachedToken.logo,
+          logo: sanitizeLogoUrl(cachedToken.logo),
           decimals: cachedToken.decimals,
-          isLoading: true, // Price is loading
+          isLoading: true,
         };
       }
 
-      // Fetch from API for complete data
       const response = await birdeyeService.getSingleTokenMetadata(
         tokenAddress
       );
-
       if (response && response.data) {
-        // Cache the visual data
         tokenCacheService.cacheToken({
-          address: tokenAddress,
+          address: tokenAddress.toLowerCase(),
           symbol: response.data.symbol || "Unknown",
           name: response.data.name || "Unknown Token",
-          logo: response.data.logo || "",
+          logo: sanitizeLogoUrl(response.data.logo || ""),
           decimals: response.data.decimals || 9,
         });
-
         return response.data;
       }
-
-      // Return cached visual data as fallback if API fails
       return visualDataFromCache;
     } catch (error) {
       console.error("Error fetching token metadata:", error);
-
-      // Get cached visual data
       const cachedToken = tokenCacheService.getTokenFromCache(tokenAddress);
       if (cachedToken) {
         return {
           address: cachedToken.address,
           symbol: cachedToken.symbol,
           name: cachedToken.name,
-          logo: cachedToken.logo,
+          logo: sanitizeLogoUrl(cachedToken.logo),
           decimals: cachedToken.decimals,
-          isLoading: true, // Price is loading
+          isLoading: true,
         };
       }
-
       return null;
     }
   };
 
   const getWalletTokens = async (address: string): Promise<TokenData[]> => {
     try {
-      // Before API call, we can use cached visual data
       const cachedTokensMap = new Map<string, CachedTokenData>();
       tokenCacheService.getAllCachedTokens().forEach((token) => {
         cachedTokensMap.set(token.address.toLowerCase(), token);
@@ -207,13 +208,13 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
       const response = await birdeyeService.getWalletTokenList(address);
       const walletArr = extractArray(response.data || []);
       const tokens = walletArr.map((token: any) => {
-        const tokenData = {
-          address: token.coinType || token.address,
+        const tokenData: TokenData = {
+          address: (token.coinType || token.address).toLowerCase(),
           symbol:
             token.symbol ||
             (token.coinType ? token.coinType.split("::").pop() : "Unknown"),
           name: token.name || "Unknown Token",
-          logo: token.logo || "",
+          logo: sanitizeLogoUrl(token.logo || ""),
           decimals: token.decimals || 9,
           price: token.price || 0,
           balance:
@@ -221,7 +222,6 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
           change24h: token.priceChange24h || 0,
         };
 
-        // Cache the visual data
         tokenCacheService.cacheToken({
           address: tokenData.address,
           symbol: tokenData.symbol,
@@ -229,26 +229,23 @@ export const BirdeyeProvider: React.FC<{ children: ReactNode }> = ({
           logo: tokenData.logo,
           decimals: tokenData.decimals,
         });
-
         return tokenData;
       });
 
       return tokens;
     } catch (error) {
       console.error("Error fetching wallet tokens:", error);
-
-      // Fall back to cached visual data only if API fails
       const cached = tokenCacheService.getAllCachedTokens();
       return cached.map((token) => ({
         address: token.address,
         symbol: token.symbol,
         name: token.name,
-        logo: token.logo,
+        logo: sanitizeLogoUrl(token.logo),
         decimals: token.decimals,
-        price: 0, // No cached price, will need to be fetched
-        balance: 0, // Unknown until fetched
-        change24h: 0, // Unknown until fetched
-        isLoading: true, // Indicate price is loading
+        price: 0,
+        balance: 0,
+        change24h: 0,
+        isLoading: true,
       }));
     }
   };

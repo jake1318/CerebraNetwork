@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { CoinBalance } from "../types";
 import blockvisionService, {
@@ -10,8 +10,6 @@ import {
   enrichTokenMetadataFromBalances,
   enrichTokenMetadataByAddresses,
 } from "../services/tokenService";
-
-// We have removed the hard-coded coin mappings since metadata comes from BlockVision.
 
 interface WalletContextType {
   walletState: {
@@ -81,12 +79,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchAvailableCoins = async () => {
     try {
-      // First get cached coins so there's something to display immediately
       const cachedTokens = tokenCacheService.getAllCachedTokens();
       const cachedAddresses = cachedTokens.map((token) => token.address);
       setAvailableCoins(cachedAddresses);
 
-      // Then fetch from API
       const tokenListData = await birdeyeService.getTokenList();
       let coins: string[] = [];
       if (
@@ -102,7 +98,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       setAvailableCoins(coins);
     } catch (error) {
       console.error("Error fetching available coins from Birdeye:", error);
-      // Fall back to cached data if API call fails
       const cachedTokens = tokenCacheService.getAllCachedTokens();
       const cachedAddresses = cachedTokens.map((token) => token.address);
       if (cachedAddresses.length === 0) {
@@ -116,7 +111,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Updated fetchTokenMetadata to use enriched metadata from Birdeye (with BlockVision fallback)
   const fetchTokenMetadata = async (
     coinTypes: string[],
     coinsData?: AccountCoin[]
@@ -125,13 +119,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       const newMetadata = { ...tokenMetadata };
       let fetchedMeta: Record<string, any>;
       if (coinsData && coinsData.length) {
-        // When coins data is provided (from wallet balances), use it to enrich metadata
         fetchedMeta = await enrichTokenMetadataFromBalances(coinsData);
       } else {
-        // Otherwise, enrich metadata for arbitrary addresses
         fetchedMeta = await enrichTokenMetadataByAddresses(coinTypes);
       }
-      // Merge fetched metadata into existing token metadata state
       for (const [addr, data] of Object.entries(fetchedMeta)) {
         newMetadata[addr] = { ...(newMetadata[addr] || {}), ...data };
       }
@@ -143,6 +134,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Fetch balances only once on wallet connect (removed recurring setInterval)
   const fetchBalances = async () => {
     if (!connected || !account) {
       setBalances([]);
@@ -151,7 +143,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setLoading(true);
 
-    // Get cached metadata to display visual elements immediately
     const cachedData = tokenCacheService.getAllCachedTokens();
     const cachedMetadata: Record<string, any> = {};
     cachedData.forEach((token) => {
@@ -162,14 +153,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
           name: token.name,
           logo: token.logo,
           decimals: token.decimals,
-          // Do not cache price from static data
         };
       }
     });
     if (Object.keys(cachedMetadata).length > 0) {
       setTokenMetadata((prevMetadata) => {
         const merged = { ...prevMetadata };
-        // Merge cached visual data with existing metadata (keeping existing prices)
         for (const [addr, data] of Object.entries(cachedMetadata)) {
           if (!merged[addr]) {
             merged[addr] = data;
@@ -193,7 +182,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       if (response && response.data && Array.isArray(response.data)) {
         console.log(`Found ${response.data.length} coins in wallet`);
         coins = response.data;
-        // Cache visual data immediately from BlockVision response
         coins.forEach((coin) => {
           tokenCacheService.cacheToken({
             address: coin.coinType,
@@ -210,7 +198,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       }
 
-      // Convert AccountCoin array to CoinBalance format expected by the app
       const formattedBalances: CoinBalance[] = coins.map((coin) => ({
         coinType: coin.coinType,
         symbol: coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
@@ -221,19 +208,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         usdValue: parseFloat(coin.usdValue),
       }));
 
-      // Calculate total USD value from the API response
       const total = coins.reduce(
         (sum, coin) => sum + parseFloat(coin.usdValue || "0"),
         0
       );
-      // Sort tokens by USD value (highest first)
       formattedBalances.sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0));
 
       setBalances(formattedBalances);
       setTotalUsdValue(total);
 
-      // Enrich tokens with additional metadata using Birdeye (with BlockVision as fallback)
       const coinTypes = coins.map((c) => c.coinType);
+      // Ensure that token metadata is fetched only after coin addresses are available.
       await fetchTokenMetadata(coinTypes, coins);
     } catch (error) {
       console.error("Error fetching balances:", error);
@@ -249,8 +234,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (connected && account) {
       fetchBalances();
-      const balanceInterval = setInterval(fetchBalances, 60 * 1000);
-      return () => clearInterval(balanceInterval);
     } else {
       setBalances([]);
       setTotalUsdValue(null);

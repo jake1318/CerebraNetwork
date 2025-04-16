@@ -15,32 +15,99 @@ export interface Token {
   price?: number;
   balance?: string;
   balanceUsd?: string;
-  volume24h?: number; // 24-hour trading volume
-  marketCap?: number; // Market capitalization
+  volume24h?: number;
+  marketCap?: number;
+}
+
+// Helper to sanitize logo URLs
+export function sanitizeLogoUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("ipfs://")) {
+    return url.replace(/^ipfs:\/\//, "https://cloudflare-ipfs.com/ipfs/");
+  }
+  if (url.includes("ipfs.io")) {
+    url = url.replace("http://", "https://");
+    return url.replace("https://ipfs.io", "https://cloudflare-ipfs.com");
+  }
+  if (url.startsWith("http://")) {
+    return "https://" + url.slice(7);
+  }
+  return url;
+}
+
+/**
+ * Simple concurrency limiter:
+ * Processes items in the array using the provided async function,
+ * but limits the number of simultaneous calls.
+ */
+async function processWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  let index = 0;
+  return new Promise((resolve, reject) => {
+    let active = 0;
+    function next() {
+      if (index === items.length && active === 0) {
+        return resolve(results);
+      }
+      while (active < concurrency && index < items.length) {
+        active++;
+        const currentIndex = index;
+        fn(items[index])
+          .then((result) => {
+            results[currentIndex] = result;
+            active--;
+            next();
+          })
+          .catch(reject);
+        index++;
+      }
+    }
+    next();
+  });
+}
+
+/**
+ * Rate limiter for Birdeye API calls.
+ * This function ensures that no more than 15 requests are made per second.
+ */
+let birdeyeCallTimestamps: number[] = [];
+
+async function rateLimitBirdeye<T>(fn: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  // Remove timestamps older than 1 second.
+  birdeyeCallTimestamps = birdeyeCallTimestamps.filter((ts) => now - ts < 1000);
+  if (birdeyeCallTimestamps.length >= 15) {
+    // Wait until a slot is free. Calculate the delay from the oldest timestamp.
+    const delayTime = 1000 - (now - birdeyeCallTimestamps[0]);
+    await new Promise((resolve) => setTimeout(resolve, delayTime));
+    return rateLimitBirdeye(fn); // Retry after waiting.
+  }
+  // Slot available—record this call.
+  birdeyeCallTimestamps.push(Date.now());
+  return fn();
 }
 
 // ---------------------
 // Enrichment Functions
 // ---------------------
 
-/**
- * Enrich token metadata for tokens the user holds, using Birdeye for price and logo, with BlockVision data as fallback.
- * @param coins - Array of AccountCoin objects (from BlockVision) for the tokens held.
- * @returns Promise of a metadata map, keyed by lowercased token address.
- */
 export async function enrichTokenMetadataFromBalances(
   coins: AccountCoin[]
 ): Promise<Record<string, any>> {
   const metadataMap: Record<string, any> = {};
 
-  // Use a for...of loop so we can await inside it.
-  for (const coin of coins) {
+  // Process coins with limited concurrency (15 requests at a time)
+  await processWithConcurrency(coins, 15, async (coin) => {
     const addrLower = coin.coinType.toLowerCase();
     let enriched: any = {};
-
-    // Try to fetch data from Birdeye first
     try {
-      const resp = await birdeyeService.getPriceVolumeSingle(coin.coinType);
+      const resp = await rateLimitBirdeye(() =>
+        birdeyeService.getPriceVolumeSingle(coin.coinType)
+      );
       if (resp && resp.data) {
         const priceData = resp.data;
         enriched.price = parseFloat(
@@ -52,22 +119,19 @@ export async function enrichTokenMetadataFromBalances(
         );
         if (priceData.symbol) enriched.symbol = priceData.symbol;
         if (priceData.name) enriched.name = priceData.name;
-        if (priceData.logo) enriched.logo = priceData.logo;
+        if (priceData.logo) enriched.logo = sanitizeLogoUrl(priceData.logo);
         if (priceData.decimals !== undefined)
           enriched.decimals = priceData.decimals;
       }
     } catch (e) {
       console.error(`Birdeye price fetch failed for ${coin.coinType}:`, e);
     }
-
-    // Fallback using BlockVision data if necessary
     enriched.symbol = enriched.symbol || coin.symbol || "Unknown";
     enriched.name = enriched.name || coin.name || "Unknown Token";
-    enriched.logo = enriched.logo || coin.logo || "";
+    enriched.logo = enriched.logo || sanitizeLogoUrl(coin.logo || "");
     enriched.decimals = enriched.decimals ?? coin.decimals ?? 9;
-    enriched.price = enriched.price ?? parseFloat(coin.price || "0");
-
-    // Cache static metadata locally
+    enriched.price =
+      enriched.price ?? parseFloat(coin.price ? coin.price : "0");
     tokenCacheService.cacheToken({
       address: addrLower,
       symbol: enriched.symbol,
@@ -76,28 +140,22 @@ export async function enrichTokenMetadataFromBalances(
       decimals: enriched.decimals,
     });
     metadataMap[addrLower] = enriched;
-  }
+  });
   return metadataMap;
 }
 
-/**
- * Enrich token metadata for arbitrary token addresses (not necessarily in wallet), using Birdeye and BlockVision.
- * @param addresses - Array of token addresses for which to fetch metadata.
- * @returns Promise of a metadata map, keyed by lowercased token address.
- */
 export async function enrichTokenMetadataByAddresses(
   addresses: string[]
 ): Promise<Record<string, any>> {
   const metadataMap: Record<string, any> = {};
 
-  // Use a for...of loop to enable await calls inside the loop.
-  for (const addr of addresses) {
+  await processWithConcurrency(addresses, 15, async (addr) => {
     const addrLower = addr.toLowerCase();
     let enriched: any = {};
-
-    // Try to get metadata from Birdeye
     try {
-      const resp = await birdeyeService.getPriceVolumeSingle(addr);
+      const resp = await rateLimitBirdeye(() =>
+        birdeyeService.getPriceVolumeSingle(addr)
+      );
       if (resp && resp.data) {
         const priceData = resp.data;
         enriched.price = parseFloat(
@@ -109,36 +167,31 @@ export async function enrichTokenMetadataByAddresses(
         );
         if (priceData.symbol) enriched.symbol = priceData.symbol;
         if (priceData.name) enriched.name = priceData.name;
-        if (priceData.logo) enriched.logo = priceData.logo;
+        if (priceData.logo) enriched.logo = sanitizeLogoUrl(priceData.logo);
         if (priceData.decimals !== undefined)
           enriched.decimals = priceData.decimals;
       }
     } catch (e) {
       console.error(`Birdeye price fetch failed for ${addr}:`, e);
     }
-
-    // Use BlockVision to fill in any missing static metadata
     try {
       const resp = await blockvisionService.getCoinDetail(addr);
       if (resp && (resp.data || resp.result)) {
         const detail = resp.data || resp.result;
         enriched.symbol = enriched.symbol || detail.symbol || "Unknown";
         enriched.name = enriched.name || detail.name || "Unknown Token";
-        enriched.logo = enriched.logo || detail.logo || "";
+        enriched.logo =
+          enriched.logo || sanitizeLogoUrl(detail.logo || "") || "";
         enriched.decimals = enriched.decimals ?? detail.decimals ?? 9;
       }
     } catch (e) {
       console.error(`BlockVision metadata fetch failed for ${addr}:`, e);
     }
-
-    // Ensure default values are set
     enriched.symbol = enriched.symbol || "Unknown";
     enriched.name = enriched.name || "Unknown Token";
     enriched.logo = enriched.logo || "";
     enriched.decimals = enriched.decimals ?? 9;
     enriched.price = enriched.price ?? 0;
-
-    // Cache the static metadata locally
     tokenCacheService.cacheToken({
       address: addrLower,
       symbol: enriched.symbol,
@@ -147,49 +200,29 @@ export async function enrichTokenMetadataByAddresses(
       decimals: enriched.decimals,
     });
     metadataMap[addrLower] = enriched;
-  }
+  });
   return metadataMap;
 }
 
-// ---------------------
-// Token Fetching Functions
-// ---------------------
-
-/**
- * Fetch tokens from the SDK with error handling.
- * Returns an array of tokens sorted by trading volume (if available), limited to the top 50 tokens.
- */
 export async function fetchTokens(): Promise<Token[]> {
   try {
-    // Try to fetch tokens from the SDK
     const sdkTokens = await fetchSDKTokens();
     if (sdkTokens && sdkTokens.length > 0) {
-      // Sort by trading volume if available
       const sortedTokens = sdkTokens.sort((a, b) => {
         if (a.volume24h && b.volume24h) {
           return b.volume24h - a.volume24h;
         }
         return 0;
       });
-      // Return the top 50 tokens, or all if fewer than 50
       return sortedTokens.slice(0, 50);
     }
     throw new Error("No tokens returned from SDK");
   } catch (error) {
     console.error("Error fetching tokens:", error);
-    // Return an empty array if SDK call fails
     return [];
   }
 }
 
-// ---------------------
-// Backward Compatibility
-// ---------------------
-
-/**
- * Get user token balances - now handled directly in TokenSelector using Suiet hooks.
- * This function exists solely for backward compatibility.
- */
 export async function getUserTokenBalances(
   address: string,
   tokens: Token[]

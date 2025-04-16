@@ -1,9 +1,5 @@
-// src/services/birdeyeService.ts
 import axios from "axios";
 
-// ===========================
-// Birdeye API Configuration
-// ===========================
 const BIRDEYE_API_BASE_URL = "https://public-api.birdeye.so";
 const BIRDEYE_API_KEY =
   import.meta.env.VITE_BIRDEYE_API_KEY || "22430f5885a74d3b97e7cbd01c2140aa";
@@ -16,7 +12,6 @@ const birdeyeApi = axios.create({
   },
 });
 
-// Birdeye error interceptor
 birdeyeApi.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -25,11 +20,6 @@ birdeyeApi.interceptors.response.use(
   }
 );
 
-/**
- * Map user-friendly timeframe (like '1h', '1d', '1w')
- * to Birdeye official format ('1H', '1D', '1W', etc.).
- * Fallback to '15m' if unrecognized.
- */
 function normalizeHistoryType(input: string): string {
   const map: Record<string, string> = {
     "1m": "1m",
@@ -45,7 +35,6 @@ function normalizeHistoryType(input: string): string {
     "1d": "1D",
     "3d": "3D",
     "1w": "1W",
-    // optionally map '1mth' => '1M' if you want a month timeframe
   };
   return map[input.toLowerCase()] || "15m";
 }
@@ -61,11 +50,11 @@ export const birdeyeService = {
     chain: string = "sui"
   ) => {
     try {
+      // Remove manual encoding of the address. Axios will encode it automatically.
       const response = await birdeyeApi.get("/defi/price_volume/single", {
         headers: { "x-chain": chain },
         params: { address, type },
       });
-      // shape: { success: boolean, data: {...} }
       const { success, data } = response.data;
       if (success && data) {
         return { data };
@@ -137,9 +126,7 @@ export const birdeyeService = {
     chain: string = "sui"
   ) => {
     try {
-      // Normalize the 'type' to uppercase Birdeye format
       const normalizedType = normalizeHistoryType(type);
-
       const response = await birdeyeApi.get("/defi/ohlcv", {
         headers: { "x-chain": chain },
         params: { address: tokenAddress, type: normalizedType, currency },
@@ -164,24 +151,20 @@ export const birdeyeService = {
     chain: string = "sui"
   ) => {
     try {
-      // Normalize the user-friendly timeframe (e.g. '1h' -> '1H')
       const normalizedType = normalizeHistoryType(type);
-
-      // Keep your existing logic for calculating time_from
       const now = Math.floor(Date.now() / 1000);
       const durationMap: Record<string, number> = {
         "1m": 60 * 60,
         "5m": 60 * 60 * 3,
         "15m": 60 * 60 * 6,
         "30m": 60 * 60 * 12,
-        "1h": 60 * 60 * 24, // note: your code uses '1h' key
+        "1h": 60 * 60 * 24,
         "4h": 60 * 60 * 24 * 2,
         "1d": 60 * 60 * 24 * 7,
         "1w": 60 * 60 * 24 * 30,
       };
       const secondsAgo = durationMap[type] || 60 * 60 * 24;
       const time_from = now - secondsAgo;
-
       const response = await birdeyeApi.get("/defi/history_price", {
         headers: { "x-chain": chain },
         params: {
@@ -192,7 +175,6 @@ export const birdeyeService = {
           time_to: now,
         },
       });
-
       const { success, data } = response.data;
       if (success && data) {
         return { data };

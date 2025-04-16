@@ -1,4 +1,3 @@
-// src/services/blockvisionService.ts
 import axios from "axios";
 
 const BLOCKVISION_API_BASE_URL = "https://api.blockvision.org";
@@ -64,10 +63,8 @@ export const blockvisionService = {
       const response = await blockvisionApi.get("/v2/sui/account/coins", {
         params: { account },
       });
-
       const { code, message, result } = response.data;
       console.log(`BlockVision API response code: ${code}`);
-
       if (code === 200 && result && Array.isArray(result.coins)) {
         return { data: result.coins as AccountCoin[] };
       } else {
@@ -104,18 +101,15 @@ export const blockvisionService = {
   getWalletValue: async (account: string) => {
     try {
       const { data: coins } = await blockvisionService.getAccountCoins(account);
-
       if (!coins || !Array.isArray(coins)) {
         throw new Error("Invalid response format from getAccountCoins");
       }
-
       const totalUsdValue = coins
         .reduce((sum, coin) => {
           const usdValue = parseFloat(coin.usdValue || "0");
           return sum + usdValue;
         }, 0)
         .toFixed(2);
-
       return {
         totalUsdValue,
         coins,

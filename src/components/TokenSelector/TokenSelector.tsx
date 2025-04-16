@@ -12,18 +12,12 @@ export interface TokenData {
   logo: string;
   decimals: number;
   price: number;
-  balance?: number; // user's balance (if any)
-  isTrending?: boolean; // marks a trending token
-  // You can also add a computed field for shortAddress if needed:
+  balance?: number;
+  isTrending?: boolean;
   shortAddress?: string;
-  isLoading?: boolean; // indicates price is loading
+  isLoading?: boolean;
 }
 
-/**
- * Unifies two token objects' name and logo.
- * If Blockvision returns "Unknown Coin" for the name, we use the Birdeye name.
- * For the logo, we prefer a non-empty value.
- */
 function unifyNameAndLogo(
   blockvisionToken: Partial<TokenData>,
   birdeyeToken: Partial<TokenData>
@@ -37,6 +31,8 @@ function unifyNameAndLogo(
   const finalLogo = bvLogo || beLogo || "";
   return { name: finalName, logo: finalLogo };
 }
+
+const DEFAULT_ICON = "/assets/token-placeholder.png";
 
 const TokenSelector = ({
   isOpen,
@@ -68,7 +64,6 @@ const TokenSelector = ({
   const [isLoadingTokens, setIsLoadingTokens] = useState(true);
   const [cachedVisualTokens, setCachedVisualTokens] = useState<TokenData[]>([]);
 
-  // Build a map from Birdeye tokens (from both tokenList and trendingTokens)
   const buildBirdeyeMap = (): Map<string, TokenData> => {
     const map = new Map<string, TokenData>();
     [...tokenList, ...trendingTokens].forEach((t) => {
@@ -77,7 +72,6 @@ const TokenSelector = ({
     return map;
   };
 
-  // Build tokens that the user holds (from Blockvision via WalletContext)
   function buildWalletTokens(): TokenData[] {
     if (!walletState.balances || walletState.balances.length === 0) return [];
     const beMap = buildBirdeyeMap();
@@ -104,7 +98,6 @@ const TokenSelector = ({
     });
   }
 
-  // Build tokens from Birdeye that the user does not hold (i.e. zero-balance tokens)
   function buildBirdeyeOnlyTokens(): TokenData[] {
     const beMap = buildBirdeyeMap();
     const walletAddrs = new Set(
@@ -137,27 +130,20 @@ const TokenSelector = ({
       });
   }
 
-  // Final merged list: wallet tokens first, then the remaining tokens.
   const getMergedTokens = (): TokenData[] => {
-    // When loading and we have cached visual data but no API data yet,
-    // return cached visual tokens
     if (
       isLoadingTokens &&
       tokenList.length === 0 &&
-      trendingTokens.length === 0
+      trendingTokens.length === 0 &&
+      cachedVisualTokens.length > 0
     ) {
-      if (cachedVisualTokens.length > 0) {
-        return cachedVisualTokens;
-      }
+      return cachedVisualTokens;
     }
-
     const walletTokens = buildWalletTokens();
     const birdeyeOnly = buildBirdeyeOnlyTokens();
-    // Sort wallet tokens by descending (balance * price)
     walletTokens.sort(
       (a, b) => (b.balance || 0) * b.price - (a.balance || 0) * a.price
     );
-
     return [...walletTokens, ...birdeyeOnly];
   };
 
@@ -177,10 +163,9 @@ const TokenSelector = ({
     return list;
   };
 
-  // Load cached visual data when the modal opens
   useEffect(() => {
     if (isOpen) {
-      // Load cached tokens first for immediate display
+      // Load cached tokens visually while the refresh happens
       const cached = tokenCacheService.getAllCachedTokens();
       const visualTokens = cached.map((token) => ({
         address: token.address,
@@ -188,28 +173,27 @@ const TokenSelector = ({
         name: token.name,
         logo: token.logo,
         decimals: token.decimals,
-        price: 0, // No price yet
+        price: 0,
         shortAddress: token.address.slice(0, 6) + "…" + token.address.slice(-4),
-        isLoading: true, // Indicate price is loading
+        isLoading: true,
       }));
-
       setCachedVisualTokens(visualTokens);
       setIsLoadingTokens(true);
 
-      // Fetch fresh data
-      Promise.all([
-        refreshTrendingTokens(),
-        refreshTokenList(),
-        refreshBalances(),
-      ])
-        .then(() => {
+      // Ensure wallet balances (BlockVision) are fetched first,
+      // then refresh trending tokens and token list concurrently.
+      (async () => {
+        try {
+          await refreshBalances();
+          await Promise.all([refreshTrendingTokens(), refreshTokenList()]);
+        } catch (err) {
+          console.error(err);
+        } finally {
           setIsLoadingTokens(false);
-        })
-        .catch(() => {
-          setIsLoadingTokens(false);
-        });
+        }
+      })();
 
-      // Fetch metadata for all tokens in Birdeye so even zero-balance tokens are enriched.
+      // Optionally, fetch token metadata for all addresses in trending/token list
       const allAddrs = [
         ...new Set([...tokenList, ...trendingTokens].map((t) => t.address)),
       ];
@@ -255,7 +239,7 @@ const TokenSelector = ({
                       alt={token.symbol}
                       className="token-logo"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
+                        (e.target as HTMLImageElement).src = DEFAULT_ICON;
                       }}
                     />
                   )}
