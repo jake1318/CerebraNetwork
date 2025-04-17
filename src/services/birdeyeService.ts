@@ -1,9 +1,11 @@
 import axios from "axios";
+import blockvisionService from "./blockvisionService";
 
 const BIRDEYE_API_BASE_URL = "https://public-api.birdeye.so";
 const BIRDEYE_API_KEY =
   import.meta.env.VITE_BIRDEYE_API_KEY || "22430f5885a74d3b97e7cbd01c2140aa";
 
+// Axios instance for BirdEye API
 const birdeyeApi = axios.create({
   baseURL: BIRDEYE_API_BASE_URL,
   headers: {
@@ -12,6 +14,7 @@ const birdeyeApi = axios.create({
   },
 });
 
+// Response interceptor for logging BirdEye API errors
 birdeyeApi.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -20,6 +23,7 @@ birdeyeApi.interceptors.response.use(
   }
 );
 
+// Normalize history type for candlestick and line chart requests
 function normalizeHistoryType(input: string): string {
   const map: Record<string, string> = {
     "1m": "1m",
@@ -41,7 +45,7 @@ function normalizeHistoryType(input: string): string {
 
 export const birdeyeService = {
   /**
-   * Get price/volume data for a single token.
+   * Get price/volume data for a single token (includes token metadata).
    * Endpoint: GET /defi/price_volume/single
    */
   getPriceVolumeSingle: async (
@@ -50,7 +54,7 @@ export const birdeyeService = {
     chain: string = "sui"
   ) => {
     try {
-      // Remove manual encoding of the address. Axios will encode it automatically.
+      // Axios will encode the address automatically in params
       const response = await birdeyeApi.get("/defi/price_volume/single", {
         headers: { "x-chain": chain },
         params: { address, type },
@@ -67,7 +71,8 @@ export const birdeyeService = {
   },
 
   /**
-   * Get trending tokens: GET /defi/token_trending
+   * Get trending tokens list (with logo, symbol, name, price, etc).
+   * Endpoint: GET /defi/token_trending
    */
   getTrendingTokens: async (
     chain: string = "sui",
@@ -91,7 +96,8 @@ export const birdeyeService = {
   },
 
   /**
-   * Get full token list: GET /defi/tokenlist
+   * Get a comprehensive token list with metadata (filtered by liquidity/volume).
+   * Endpoint: GET /defi/tokenlist
    */
   getTokenList: async (chain: string = "sui") => {
     try {
@@ -117,7 +123,8 @@ export const birdeyeService = {
   },
 
   /**
-   * Get OHLCV (candlestick) chart data: GET /defi/ohlcv
+   * Get OHLCV candlestick data for a token.
+   * Endpoint: GET /defi/ohlcv
    */
   getCandlestickData: async (
     tokenAddress: string,
@@ -137,13 +144,14 @@ export const birdeyeService = {
       }
       return { data: null };
     } catch (error) {
-      console.error("Error fetching candlestick chart data:", error);
+      console.error("Error fetching candlestick data:", error);
       throw error;
     }
   },
 
   /**
-   * Get historical line chart data: GET /defi/history_price
+   * Get historical price data for a token (line chart).
+   * Endpoint: GET /defi/history_price
    */
   getLineChartData: async (
     tokenAddress: string,
@@ -181,7 +189,44 @@ export const birdeyeService = {
       }
       return { data: null };
     } catch (error) {
-      console.error("Error fetching line chart data:", error);
+      console.error("Error fetching historical price data:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get metadata (logo, symbol, name, decimals, price) for a single token.
+   * Uses BirdEye's price_volume endpoint for the token.
+   */
+  getSingleTokenMetadata: async (address: string, chain: string = "sui") => {
+    try {
+      const response = await birdeyeApi.get("/defi/price_volume/single", {
+        headers: { "x-chain": chain },
+        params: { address, type: "24h" },
+      });
+      const { success, data } = response.data;
+      if (success && data) {
+        return { data };
+      }
+      return { data: null };
+    } catch (error) {
+      console.error("Error fetching token metadata:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all tokens (with metadata and balances) held by a given wallet address.
+   * Leverages Blockvision API to batch-fetch the wallet's token list.
+   */
+  getWalletTokenList: async (walletAddress: string) => {
+    try {
+      const resp = await blockvisionService.getAccountCoins(walletAddress);
+      // Blockvision returns an array of coin objects in resp.data (or resp.result)
+      const coins = resp.data || resp.result || [];
+      return { data: coins };
+    } catch (error) {
+      console.error("Error fetching wallet tokens:", error);
       throw error;
     }
   },
