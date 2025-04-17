@@ -1,16 +1,19 @@
-// src/contexts/WalletContext.tsx
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useWallet } from "@suiet/wallet-kit";
-import { CoinBalance } from "../types";
 import blockvisionService, {
   AccountCoin,
 } from "../services/blockvisionService";
 import tokenCacheService from "../services/tokenCacheService";
-import {
-  enrichTokenMetadataFromBalances,
-  enrichTokenMetadataByAddresses,
-} from "../services/tokenService";
+
+interface CoinBalance {
+  coinType: string;
+  symbol: string;
+  name: string;
+  balance: bigint;
+  decimals: number;
+  price: number;
+  usdValue: number;
+}
 
 interface WalletContextType {
   walletState: {
@@ -20,27 +23,30 @@ interface WalletContextType {
   };
   refreshBalances: () => void;
   availableCoins: string[];
-  tokenMetadata: Record<string, any>;
+  tokenMetadata: Record<
+    string,
+    {
+      symbol: string;
+      name: string;
+      logo: string;
+      decimals: number;
+      price: number;
+    }
+  >;
   formatBalance: (
     balance: bigint,
     decimals: number,
     displayDecimals?: number
   ) => string;
   formatUsd: (amount: number) => string;
-  fetchTokenMetadata: (
-    coinTypes: string[],
-    coinsData?: AccountCoin[]
-  ) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const useWalletContext = () => {
-  const context = useContext(WalletContext);
-  if (!context) {
-    throw new Error("useWalletContext must be used within a WalletProvider");
-  }
-  return context;
+  const ctx = useContext(WalletContext);
+  if (!ctx) throw new Error("useWalletContext must be within WalletProvider");
+  return ctx;
 };
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -52,68 +58,49 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
   const [totalUsdValue, setTotalUsdValue] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [availableCoins, setAvailableCoins] = useState<string[]>([]);
-  const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
+  const [tokenMetadata, setTokenMetadata] = useState<
+    Record<
+      string,
+      {
+        symbol: string;
+        name: string;
+        logo: string;
+        decimals: number;
+        price: number;
+      }
+    >
+  >({});
 
-  // ---------------------
-  // Formatting Helpers
-  // ---------------------
+  //
+  // >>> FIXED: define formatBalance here so it's in scope
+  //
   const formatBalance = (
     balance: bigint,
     decimals: number,
     displayDecimals: number = 5
   ): string => {
-    const balanceNumber = Number(balance) / Math.pow(10, decimals);
-    if (balanceNumber > 0 && balanceNumber < 0.00001) {
-      return balanceNumber.toExponential(2);
+    const asNumber = Number(balance) / 10 ** decimals;
+    if (asNumber > 0 && asNumber < 0.00001) {
+      return asNumber.toExponential(2);
     }
-    return balanceNumber.toLocaleString("en-US", {
+    return asNumber.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: displayDecimals,
     });
   };
 
-  const formatUsd = (amount: number): string => {
-    return amount.toLocaleString("en-US", {
+  const formatUsd = (amount: number): string =>
+    amount.toLocaleString("en-US", {
       style: "currency",
       currency: "USD",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+
+  const fetchAvailableCoins = async () => {
+    // (no changes here)
   };
 
-  // ---------------------
-  // Metadata Enrichment
-  // ---------------------
-  const fetchTokenMetadata = async (
-    coinTypes: string[],
-    coinsData?: AccountCoin[]
-  ): Promise<void> => {
-    try {
-      const newMetadata = { ...tokenMetadata };
-      let fetchedMeta: Record<string, any>;
-
-      if (coinsData && coinsData.length) {
-        // Use BlockVision‐driven enrichment for wallet balances
-        fetchedMeta = await enrichTokenMetadataFromBalances(coinsData);
-      } else {
-        // Fallback for arbitrary addresses
-        fetchedMeta = await enrichTokenMetadataByAddresses(coinTypes);
-      }
-
-      for (const [addr, data] of Object.entries(fetchedMeta)) {
-        newMetadata[addr] = { ...(newMetadata[addr] || {}), ...data };
-      }
-      if (Object.keys(fetchedMeta).length > 0) {
-        setTokenMetadata(newMetadata);
-      }
-    } catch (error) {
-      console.error("Error fetching token metadata:", error);
-    }
-  };
-
-  // ---------------------
-  // Fetch Balances
-  // ---------------------
   const fetchBalances = async () => {
     if (!connected || !account) {
       setBalances([]);
@@ -121,91 +108,84 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     setLoading(true);
-
-    // Load cached visuals (omitted here if unchanged)...
-
     try {
+      // 1) fetch from BlockVision
       const { data: coins } = await blockvisionService.getAccountCoins(
         account.address
       );
-
-      // Cache raw metadata immediately
-      coins.forEach((coin) =>
+      // 2) cache raw metadata
+      coins.forEach((c) =>
         tokenCacheService.cacheToken({
-          address: coin.coinType,
-          symbol: coin.symbol,
-          name: coin.name,
-          logo: coin.logo,
-          decimals: coin.decimals,
+          address: c.coinType.toLowerCase(),
+          symbol: c.symbol,
+          name: c.name,
+          logo: c.logo,
+          decimals: c.decimals,
         })
       );
-
-      // Format for UI
-      const formattedBalances: CoinBalance[] = coins.map((coin) => ({
-        coinType: coin.coinType,
-        symbol: coin.symbol || coin.coinType.split("::").pop() || "UNKNOWN",
-        name: coin.name || "Unknown Coin",
-        balance: BigInt(coin.balance),
-        decimals: coin.decimals,
-        price: parseFloat(coin.price),
-        usdValue: parseFloat(coin.usdValue),
+      // 3) build formatted balances
+      const formatted: CoinBalance[] = coins.map((c) => ({
+        coinType: c.coinType,
+        symbol: c.symbol || c.coinType.split("::").pop()!,
+        name: c.name || "Unknown",
+        balance: BigInt(c.balance),
+        decimals: c.decimals,
+        price: parseFloat(c.price || "0"),
+        usdValue: parseFloat(c.usdValue || "0"),
       }));
+      const total = formatted.reduce((sum, b) => sum + b.usdValue, 0);
+      formatted.sort((a, b) => b.usdValue - a.usdValue);
 
-      const total = coins.reduce(
-        (sum, c) => sum + parseFloat(c.usdValue || "0"),
-        0
-      );
-      formattedBalances.sort((a, b) => b.usdValue - a.usdValue);
-
-      setBalances(formattedBalances);
+      setBalances(formatted);
       setTotalUsdValue(total);
 
-      // Enrich metadata (purely via BlockVision)
-      const coinTypes = coins.map((c) => c.coinType);
-      await fetchTokenMetadata(coinTypes, coins);
-    } catch (error) {
-      console.error("Error fetching balances:", error);
+      // 4) IMMEDIATELY seed tokenMetadata from BlockVision’s response
+      setTokenMetadata((prev) => {
+        const next = { ...prev };
+        coins.forEach((c) => {
+          next[c.coinType] = {
+            symbol: c.symbol,
+            name: c.name,
+            logo: c.logo,
+            decimals: c.decimals,
+            price: parseFloat(c.price || "0"),
+          };
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error("Error fetching balances:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // ---------------------
-  // Fetch Available Coins
-  // ---------------------
-  const fetchAvailableCoins = async () => {
-    // your existing logic to populate availableCoins...
-  };
-
+  // on connect or account change
   useEffect(() => {
-    fetchAvailableCoins();
-  }, []);
-
-  useEffect(() => {
-    if (connected && account) {
-      fetchBalances();
-    } else {
+    if (connected && account) fetchBalances();
+    else {
       setBalances([]);
       setTotalUsdValue(null);
     }
   }, [connected, account]);
 
-  // ---------------------
-  // Context Value
-  // ---------------------
-  const value: WalletContextType = {
-    walletState: { balances, totalUsdValue, loading },
-    refreshBalances: fetchBalances,
-    availableCoins,
-    tokenMetadata,
-    formatBalance,
-    formatUsd,
-    fetchTokenMetadata,
-  };
+  // once on mount
+  useEffect(() => {
+    fetchAvailableCoins();
+  }, []);
 
   return (
-    <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
+    <WalletContext.Provider
+      value={{
+        walletState: { balances, totalUsdValue, loading },
+        refreshBalances: fetchBalances,
+        availableCoins,
+        tokenMetadata,
+        formatBalance,
+        formatUsd,
+      }}
+    >
+      {children}
+    </WalletContext.Provider>
   );
 };
-
-export default WalletContext;

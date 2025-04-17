@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { useWalletContext } from "../../contexts/WalletContext";
 import { useBirdeye } from "../../contexts/BirdeyeContext";
@@ -18,21 +18,20 @@ export interface TokenData {
   isLoading?: boolean;
 }
 
+const DEFAULT_ICON = "/assets/token-placeholder.png";
+
+// Unify names/logos from both sources
 function unifyNameAndLogo(
-  blockvisionToken: Partial<TokenData>,
-  birdeyeToken: Partial<TokenData>
+  blockMeta: Partial<TokenData>,
+  beMeta: Partial<TokenData>
 ): { name: string; logo: string } {
-  const bvName = blockvisionToken.name || "";
-  const bvLogo = blockvisionToken.logo || "";
-  const beName = birdeyeToken.name || "";
-  const beLogo = birdeyeToken.logo || "";
   const finalName =
-    bvName && bvName !== "Unknown Coin" ? bvName : beName || "Unknown Coin";
-  const finalLogo = bvLogo || beLogo || "";
+    blockMeta.name && blockMeta.name !== "Unknown Coin"
+      ? blockMeta.name
+      : beMeta.name || "Unknown Coin";
+  const finalLogo = blockMeta.logo || beMeta.logo || "";
   return { name: finalName, logo: finalLogo };
 }
-
-const DEFAULT_ICON = "/assets/token-placeholder.png";
 
 const TokenSelector = ({
   isOpen,
@@ -46,6 +45,8 @@ const TokenSelector = ({
   excludeAddresses?: string[];
 }) => {
   const { account } = useWallet();
+  const { walletState, tokenMetadata, refreshBalances, formatUsd } =
+    useWalletContext();
   const {
     trendingTokens,
     tokenList,
@@ -53,152 +54,111 @@ const TokenSelector = ({
     refreshTokenList,
     getCachedTokensVisualData,
   } = useBirdeye();
-  const {
-    walletState,
-    tokenMetadata,
-    refreshBalances,
-    formatUsd,
-    fetchTokenMetadata,
-  } = useWalletContext();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingTokens, setIsLoadingTokens] = useState(true);
   const [cachedVisualTokens, setCachedVisualTokens] = useState<TokenData[]>([]);
 
-  const buildBirdeyeMap = (): Map<string, TokenData> => {
-    const map = new Map<string, TokenData>();
-    [...tokenList, ...trendingTokens].forEach((t) => {
-      map.set(t.address.toLowerCase(), t);
-    });
-    return map;
-  };
+  // Build maps for quick lookup
+  const birdeyeMap = new Map<string, TokenData>();
+  tokenList.forEach((t) => birdeyeMap.set(t.address.toLowerCase(), t));
+  trendingTokens.forEach((t) => birdeyeMap.set(t.address.toLowerCase(), t));
 
+  // Build wallet tokens first
   function buildWalletTokens(): TokenData[] {
-    if (!walletState.balances || walletState.balances.length === 0) return [];
-    const beMap = buildBirdeyeMap();
     return walletState.balances.map((bal) => {
-      const blockMeta = tokenMetadata[bal.coinType] || {};
-      const price = Number(blockMeta.price) || 0;
-      const balanceValue = Number(bal.balance) / Math.pow(10, bal.decimals);
-      const beToken = beMap.get(bal.coinType.toLowerCase()) || {};
+      const meta = tokenMetadata[bal.coinType] || {};
+      const be = birdeyeMap.get(bal.coinType.toLowerCase()) || {};
       const { name, logo } = unifyNameAndLogo(
-        { name: bal.name, logo: blockMeta.logo },
-        { name: beToken.name, logo: beToken.logo }
+        { name: bal.name, logo: meta.logo },
+        { name: be.name, logo: be.logo }
       );
       return {
         address: bal.coinType,
-        symbol: bal.symbol || blockMeta.symbol || beToken.symbol || "UNKNOWN",
+        symbol: bal.symbol,
         name,
         logo,
         decimals: bal.decimals,
-        price,
-        balance: balanceValue,
-        shortAddress: bal.coinType.slice(0, 6) + "…" + bal.coinType.slice(-4),
-        isLoading: isLoadingTokens && price === 0,
+        price: meta.price || 0,
+        balance: Number(bal.balance) / 10 ** bal.decimals,
+        shortAddress: `${bal.coinType.slice(0, 6)}…${bal.coinType.slice(-4)}`,
+        isLoading: false,
       };
     });
   }
 
+  // Build the rest (Birdeye only) tokens
   function buildBirdeyeOnlyTokens(): TokenData[] {
-    const beMap = buildBirdeyeMap();
     const walletAddrs = new Set(
       walletState.balances.map((b) => b.coinType.toLowerCase())
     );
-    return [...beMap.values()]
+    return Array.from(birdeyeMap.values())
       .filter((t) => !walletAddrs.has(t.address.toLowerCase()))
       .map((t) => {
-        const blockMeta = tokenMetadata[t.address.toLowerCase()] || {};
+        const meta = tokenMetadata[t.address.toLowerCase()] || {};
         const { name, logo } = unifyNameAndLogo(
-          { name: blockMeta.name, logo: blockMeta.logo },
+          { name: meta.name, logo: meta.logo },
           { name: t.name, logo: t.logo }
         );
-        const price = Number(blockMeta.price || t.price) || 0;
         return {
           address: t.address,
-          symbol:
-            blockMeta.symbol ||
-            t.symbol ||
-            t.address.split("::").pop() ||
-            "UNKNOWN",
+          symbol: t.symbol,
           name,
           logo,
-          decimals: blockMeta.decimals || t.decimals || 9,
-          price,
+          decimals: meta.decimals ?? t.decimals,
+          price: meta.price ?? t.price,
           balance: 0,
-          shortAddress: t.address.slice(0, 6) + "…" + t.address.slice(-4),
-          isLoading: isLoadingTokens && price === 0,
+          shortAddress: `${t.address.slice(0, 6)}…${t.address.slice(-4)}`,
+          isLoading: false,
         };
       });
   }
 
   const getMergedTokens = (): TokenData[] => {
-    if (
-      isLoadingTokens &&
-      tokenList.length === 0 &&
-      trendingTokens.length === 0 &&
-      cachedVisualTokens.length > 0
-    ) {
-      return cachedVisualTokens;
-    }
     const walletTokens = buildWalletTokens();
-    const birdeyeOnly = buildBirdeyeOnlyTokens();
-    walletTokens.sort(
-      (a, b) => (b.balance || 0) * b.price - (a.balance || 0) * a.price
-    );
-    return [...walletTokens, ...birdeyeOnly];
+    const other = buildBirdeyeOnlyTokens();
+    walletTokens.sort((a, b) => b.balance! * b.price - a.balance! * a.price);
+    return [...walletTokens, ...other];
   };
 
-  const filteredTokens = () => {
-    const query = searchQuery.toLowerCase().trim();
-    const list = getMergedTokens().filter(
-      (t) => !excludeAddresses.includes(t.address)
-    );
-    if (query) {
-      return list.filter(
-        (token) =>
-          token.symbol.toLowerCase().includes(query) ||
-          token.name.toLowerCase().includes(query) ||
-          token.address.toLowerCase().includes(query)
+  const filteredTokens = (): TokenData[] => {
+    const q = searchQuery.toLowerCase().trim();
+    return getMergedTokens().filter((t) => {
+      if (excludeAddresses.includes(t.address)) return false;
+      if (!q) return true;
+      return (
+        t.symbol.toLowerCase().includes(q) ||
+        t.name.toLowerCase().includes(q) ||
+        t.address.toLowerCase().includes(q)
       );
-    }
-    return list;
+    });
   };
 
   useEffect(() => {
-    if (isOpen) {
-      // Load cached tokens visually while the refresh happens
-      const cached = tokenCacheService.getAllCachedTokens();
-      const visualTokens = cached.map((token) => ({
-        address: token.address,
-        symbol: token.symbol,
-        name: token.name,
-        logo: token.logo,
-        decimals: token.decimals,
+    if (!isOpen) return;
+    setIsLoadingTokens(true);
+
+    // show cached visual tokens immediately
+    const cached = tokenCacheService.getAllCachedTokens();
+    setCachedVisualTokens(
+      cached.map((c) => ({
+        address: c.address,
+        symbol: c.symbol,
+        name: c.name,
+        logo: c.logo,
+        decimals: c.decimals,
         price: 0,
-        shortAddress: token.address.slice(0, 6) + "…" + token.address.slice(-4),
+        shortAddress: `${c.address.slice(0, 6)}…${c.address.slice(-4)}`,
         isLoading: true,
-      }));
-      setCachedVisualTokens(visualTokens);
-      setIsLoadingTokens(true);
+      }))
+    );
 
-      // Ensure wallet balances (BlockVision) are fetched first,
-      // then refresh trending tokens and token list concurrently.
-      (async () => {
-        try {
-          await refreshBalances();
-          await Promise.all([refreshTrendingTokens(), refreshTokenList()]);
-        } catch (err) {
-          console.error(err);
-        } finally {
-          setIsLoadingTokens(false);
-        }
-      })();
-
-      // Optionally, fetch token metadata for all addresses in trending/token list
-      const allAddrs = [
-        ...new Set([...tokenList, ...trendingTokens].map((t) => t.address)),
-      ];
-      fetchTokenMetadata(allAddrs);
-    }
+    // 1️⃣ fetch wallet balances first
+    refreshBalances()
+      // 2️⃣ then refresh trending & token list
+      .then(() => Promise.all([refreshTrendingTokens(), refreshTokenList()]))
+      .catch(console.error)
+      .finally(() => setIsLoadingTokens(false));
   }, [isOpen, account?.address]);
 
   if (!isOpen) return null;
@@ -233,16 +193,14 @@ const TokenSelector = ({
                 onClick={() => onSelect(token)}
               >
                 <div className="token-info">
-                  {token.logo && (
-                    <img
-                      src={token.logo}
-                      alt={token.symbol}
-                      className="token-logo"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_ICON;
-                      }}
-                    />
-                  )}
+                  <img
+                    src={token.logo || DEFAULT_ICON}
+                    alt={token.symbol}
+                    className="token-logo"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_ICON;
+                    }}
+                  />
                   <div className="token-details">
                     <div className="token-symbol">{token.symbol}</div>
                     <div className="token-name">{token.name}</div>
@@ -256,24 +214,8 @@ const TokenSelector = ({
                       })}
                     </div>
                   )}
-                  <div
-                    className={`token-price ${
-                      token.isLoading ? "loading-price" : ""
-                    }`}
-                  >
-                    {token.isLoading ? (
-                      <span className="loading-indicator">
-                        Loading price...
-                      </span>
-                    ) : (
-                      formatUsd(token.price)
-                    )}
-                  </div>
-                  <div className="token-address">
-                    {token.shortAddress
-                      ? token.shortAddress
-                      : token.address.slice(0, 9) + "…"}
-                  </div>
+                  <div className="token-price">{formatUsd(token.price)}</div>
+                  <div className="token-address">{token.shortAddress}</div>
                 </div>
               </div>
             ))
