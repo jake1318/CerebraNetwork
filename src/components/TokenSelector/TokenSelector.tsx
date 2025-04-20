@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from "react";
+// src/components/TokenSelector/TokenSelector.tsx
+import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { useWalletContext } from "../../contexts/WalletContext";
-import { useBirdeye } from "../../contexts/BirdeyeContext";
-import tokenCacheService from "../../services/tokenCacheService";
+import {
+  useBirdeye,
+  TokenData as BirdToken,
+} from "../../contexts/BirdeyeContext";
 import "./TokenSelector.scss";
 
 export interface TokenData {
@@ -12,28 +15,14 @@ export interface TokenData {
   logo: string;
   decimals: number;
   price: number;
-  balance?: number;
+  balance: number;
+  shortAddress: string;
   isTrending?: boolean;
-  shortAddress?: string;
-  isLoading?: boolean;
 }
 
 const DEFAULT_ICON = "/assets/token-placeholder.png";
 
-// Unify names/logos from both sources
-function unifyNameAndLogo(
-  blockMeta: Partial<TokenData>,
-  beMeta: Partial<TokenData>
-): { name: string; logo: string } {
-  const finalName =
-    blockMeta.name && blockMeta.name !== "Unknown Coin"
-      ? blockMeta.name
-      : beMeta.name || "Unknown Coin";
-  const finalLogo = blockMeta.logo || beMeta.logo || "";
-  return { name: finalName, logo: finalLogo };
-}
-
-const TokenSelector = ({
+export default function TokenSelector({
   isOpen,
   onClose,
   onSelect,
@@ -41,160 +30,129 @@ const TokenSelector = ({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (token: TokenData) => void;
+  onSelect: (t: TokenData) => void;
   excludeAddresses?: string[];
-}) => {
+}) {
   const { account } = useWallet();
   const { walletState, tokenMetadata, refreshBalances, formatUsd } =
     useWalletContext();
-  const {
-    trendingTokens,
-    tokenList,
-    refreshTrendingTokens,
-    refreshTokenList,
-    getCachedTokensVisualData,
-  } = useBirdeye();
+  const { trendingTokens, tokenList, refreshTrendingTokens, refreshTokenList } =
+    useBirdeye();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoadingTokens, setIsLoadingTokens] = useState(true);
-  const [cachedVisualTokens, setCachedVisualTokens] = useState<TokenData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Build maps for quick lookup
-  const birdeyeMap = new Map<string, TokenData>();
-  tokenList.forEach((t) => birdeyeMap.set(t.address.toLowerCase(), t));
-  trendingTokens.forEach((t) => birdeyeMap.set(t.address.toLowerCase(), t));
-
-  // Build wallet tokens first
-  function buildWalletTokens(): TokenData[] {
-    return walletState.balances.map((bal) => {
-      const meta = tokenMetadata[bal.coinType] || {};
-      const be = birdeyeMap.get(bal.coinType.toLowerCase()) || {};
-      const { name, logo } = unifyNameAndLogo(
-        { name: bal.name, logo: meta.logo },
-        { name: be.name, logo: be.logo }
-      );
-      return {
-        address: bal.coinType,
-        symbol: bal.symbol,
-        name,
-        logo,
-        decimals: bal.decimals,
-        price: meta.price || 0,
-        balance: Number(bal.balance) / 10 ** bal.decimals,
-        shortAddress: `${bal.coinType.slice(0, 6)}…${bal.coinType.slice(-4)}`,
-        isLoading: false,
-      };
-    });
-  }
-
-  // Build the rest (Birdeye only) tokens
-  function buildBirdeyeOnlyTokens(): TokenData[] {
-    const walletAddrs = new Set(
-      walletState.balances.map((b) => b.coinType.toLowerCase())
-    );
-    return Array.from(birdeyeMap.values())
-      .filter((t) => !walletAddrs.has(t.address.toLowerCase()))
-      .map((t) => {
-        const meta = tokenMetadata[t.address.toLowerCase()] || {};
-        const { name, logo } = unifyNameAndLogo(
-          { name: meta.name, logo: meta.logo },
-          { name: t.name, logo: t.logo }
-        );
-        return {
-          address: t.address,
-          symbol: t.symbol,
-          name,
-          logo,
-          decimals: meta.decimals ?? t.decimals,
-          price: meta.price ?? t.price,
-          balance: 0,
-          shortAddress: `${t.address.slice(0, 6)}…${t.address.slice(-4)}`,
-          isLoading: false,
-        };
-      });
-  }
-
-  const getMergedTokens = (): TokenData[] => {
-    const walletTokens = buildWalletTokens();
-    const other = buildBirdeyeOnlyTokens();
-    walletTokens.sort((a, b) => b.balance! * b.price - a.balance! * a.price);
-    return [...walletTokens, ...other];
-  };
-
-  const filteredTokens = (): TokenData[] => {
-    const q = searchQuery.toLowerCase().trim();
-    return getMergedTokens().filter((t) => {
-      if (excludeAddresses.includes(t.address)) return false;
-      if (!q) return true;
-      return (
-        t.symbol.toLowerCase().includes(q) ||
-        t.name.toLowerCase().includes(q) ||
-        t.address.toLowerCase().includes(q)
-      );
-    });
-  };
-
+  // on modal open, reload balances & Birdeye lists
   useEffect(() => {
     if (!isOpen) return;
-    setIsLoadingTokens(true);
-
-    // show cached visual tokens immediately
-    const cached = tokenCacheService.getAllCachedTokens();
-    setCachedVisualTokens(
-      cached.map((c) => ({
-        address: c.address,
-        symbol: c.symbol,
-        name: c.name,
-        logo: c.logo,
-        decimals: c.decimals,
-        price: 0,
-        shortAddress: `${c.address.slice(0, 6)}…${c.address.slice(-4)}`,
-        isLoading: true,
-      }))
-    );
-
-    // 1️⃣ fetch wallet balances first
+    setLoading(true);
     refreshBalances()
-      // 2️⃣ then refresh trending & token list
       .then(() => Promise.all([refreshTrendingTokens(), refreshTokenList()]))
       .catch(console.error)
-      .finally(() => setIsLoadingTokens(false));
+      .finally(() => setLoading(false));
   }, [isOpen, account?.address]);
+
+  // build on‑chain wallet tokens
+  const walletTokens = useMemo<TokenData[]>(
+    () =>
+      walletState.balances.map((b) => ({
+        address: b.coinType,
+        symbol: b.symbol,
+        name: b.name,
+        logo: tokenMetadata[b.coinType]?.logo || DEFAULT_ICON,
+        decimals: b.decimals,
+        price: tokenMetadata[b.coinType]?.price || 0,
+        balance: Number(b.balance) / 10 ** b.decimals,
+        shortAddress: `${b.coinType.slice(0, 6)}…${b.symbol}`,
+      })),
+    [walletState.balances, tokenMetadata]
+  );
+
+  // helper: turn a Birdeye TokenData into our TokenData
+  const fromBirdeye = (t: BirdToken): TokenData => {
+    const onChain = walletState.balances.find((b) => b.coinType === t.address);
+    return {
+      address: t.address,
+      symbol: t.symbol,
+      name: t.name,
+      logo: t.logo || DEFAULT_ICON,
+      decimals: t.decimals,
+      price: t.price,
+      balance: onChain ? Number(onChain.balance) / 10 ** onChain.decimals : 0,
+      shortAddress: `${t.address.slice(0, 6)}…${t.symbol}`,
+      isTrending: t.isTrending,
+    };
+  };
+
+  // merge: trending → wallet → full list (tokenList)
+  const merged = useMemo<TokenData[]>(() => {
+    const map = new Map<string, TokenData>();
+    // wallet first
+    walletTokens.forEach((t) => map.set(t.address, t));
+    // then full tokenList
+    tokenList.forEach((t) => {
+      if (!map.has(t.address)) map.set(t.address, fromBirdeye(t));
+    });
+    // finally flag trending
+    trendingTokens.forEach((t) => {
+      if (!map.has(t.address)) map.set(t.address, fromBirdeye(t));
+      else map.get(t.address)!.isTrending = true;
+    });
+    return Array.from(map.values());
+  }, [walletTokens, tokenList, trendingTokens]);
+
+  // apply search & exclusion
+  const filtered = useMemo(
+    () =>
+      merged.filter((t) => {
+        if (excludeAddresses.includes(t.address)) return false;
+        const q = searchQuery.toLowerCase().trim();
+        if (!q) return true;
+        return (
+          t.symbol.toLowerCase().includes(q) ||
+          t.name.toLowerCase().includes(q) ||
+          t.address.toLowerCase().includes(q)
+        );
+      }),
+    [merged, searchQuery, excludeAddresses]
+  );
 
   if (!isOpen) return null;
 
   return (
     <div className="token-selector-modal">
       <div className="token-selector-content">
-        <div className="token-selector-header">
+        <header className="token-selector-header">
           <h2>Select Token</h2>
-          <button className="close-button" onClick={onClose}>
+          <button onClick={onClose} className="close-button">
             &times;
           </button>
-        </div>
+        </header>
+
         <div className="token-search">
           <input
             type="text"
-            placeholder="Search by name or address"
+            placeholder="Search by name, symbol, or address"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
         <div className="token-list">
-          {filteredTokens().length === 0 ? (
-            <div className="no-tokens">
-              {isLoadingTokens ? "Loading tokens..." : "No tokens found"}
-            </div>
+          {loading ? (
+            <div className="no-tokens">Loading tokens…</div>
+          ) : filtered.length === 0 ? (
+            <div className="no-tokens">No tokens found</div>
           ) : (
-            filteredTokens().map((token) => (
+            filtered.map((token) => (
               <div
                 key={token.address}
-                className="token-item"
+                className={`token-item${token.isTrending ? " trending" : ""}`}
                 onClick={() => onSelect(token)}
               >
                 <div className="token-info">
                   <img
-                    src={token.logo || DEFAULT_ICON}
+                    src={token.logo}
                     alt={token.symbol}
                     className="token-logo"
                     onError={(e) => {
@@ -204,18 +162,16 @@ const TokenSelector = ({
                   <div className="token-details">
                     <div className="token-symbol">{token.symbol}</div>
                     <div className="token-name">{token.name}</div>
+                    <div className="token-address">{token.shortAddress}</div>
                   </div>
                 </div>
                 <div className="token-data">
-                  {token.balance !== undefined && (
-                    <div className="token-balance">
-                      {token.balance.toLocaleString(undefined, {
-                        maximumFractionDigits: 6,
-                      })}
-                    </div>
-                  )}
+                  <div className="token-balance">
+                    {token.balance.toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })}
+                  </div>
                   <div className="token-price">{formatUsd(token.price)}</div>
-                  <div className="token-address">{token.shortAddress}</div>
                 </div>
               </div>
             ))
@@ -224,6 +180,4 @@ const TokenSelector = ({
       </div>
     </div>
   );
-};
-
-export default TokenSelector;
+}

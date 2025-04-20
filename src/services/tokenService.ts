@@ -1,5 +1,3 @@
-// src/services/tokenService.ts
-
 import { fetchSupportedTokens as fetchSDKTokens } from "./sdkService";
 import blockvisionService, { AccountCoin } from "./blockvisionService";
 import { birdeyeService } from "./birdeyeService";
@@ -77,27 +75,24 @@ async function processWithConcurrency<T, R>(
 // ---------------------
 
 /**
- * Enrich token metadata for a user’s wallet‐balances.
+ * Enrich token metadata for a user’s wallet balances.
  * Uses BlockVision’s `getAccountCoins` response for all fields:
- *   symbol, name, logo, decimals, price.
- * No Birdeye calls here—BlockVision already returns everything.
+ * symbol, name, logo, decimals, price.
+ * No Birdeye calls here — BlockVision already returns everything.
  */
 export async function enrichTokenMetadataFromBalances(
   coins: AccountCoin[]
 ): Promise<Record<string, any>> {
   const metadataMap: Record<string, any> = {};
-
   await processWithConcurrency(coins, 15, async (coin) => {
     const addrLower = coin.coinType.toLowerCase();
-
     const enriched = {
       symbol: coin.symbol || "Unknown",
       name: coin.name || "Unknown Token",
       logo: sanitizeLogoUrl(coin.logo || ""),
       decimals: coin.decimals ?? 9,
-      price: parseFloat(coin.price || "0"),
+      price: parseFloat(coin.price || "0").toFixed(7),
     };
-
     // Cache the metadata for quick subsequent loads
     tokenCacheService.cacheToken({
       address: addrLower,
@@ -106,22 +101,19 @@ export async function enrichTokenMetadataFromBalances(
       logo: enriched.logo,
       decimals: enriched.decimals,
     });
-
     metadataMap[addrLower] = enriched;
   });
-
   return metadataMap;
 }
 
 /**
- * Enrich token metadata by arbitrary addresses (non‐wallet or fallback),
+ * Enrich token metadata by arbitrary addresses (non-wallet or fallback),
  * via Birdeye price/volume API + BlockVision coin detail as needed.
  */
 export async function enrichTokenMetadataByAddresses(
   addresses: string[]
 ): Promise<Record<string, any>> {
   const metadataMap: Record<string, any> = {};
-
   await processWithConcurrency(addresses, 15, async (addr) => {
     const addrLower = addr.toLowerCase();
     let enriched: any = {};
@@ -154,7 +146,7 @@ export async function enrichTokenMetadataByAddresses(
       enriched.logo = enriched.logo || sanitizeLogoUrl(detail.logo || "");
       enriched.decimals = enriched.decimals ?? detail.decimals;
     } catch {
-      // swallow
+      // swallow any errors
     }
 
     // 3) Final defaults
@@ -163,6 +155,9 @@ export async function enrichTokenMetadataByAddresses(
     enriched.logo = enriched.logo || "";
     enriched.decimals = enriched.decimals ?? 9;
     enriched.price = enriched.price ?? 0;
+    if (typeof enriched.price === "number") {
+      enriched.price = enriched.price.toFixed(7);
+    }
 
     tokenCacheService.cacheToken({
       address: addrLower,
@@ -171,14 +166,12 @@ export async function enrichTokenMetadataByAddresses(
       logo: enriched.logo,
       decimals: enriched.decimals,
     });
-
     metadataMap[addrLower] = enriched;
   });
-
   return metadataMap;
 }
 
-// SDK‐based fetch for top tokens (unchanged)
+// SDK-based fetch for top tokens (unchanged)
 export async function fetchTokens(): Promise<Token[]> {
   try {
     const sdkTokens = await fetchSDKTokens();
@@ -198,7 +191,7 @@ export async function fetchTokens(): Promise<Token[]> {
   }
 }
 
-// Placeholder: original getUserTokenBalances remains a no‑op
+// Placeholder: original getUserTokenBalances remains a no-op
 export async function getUserTokenBalances(
   address: string,
   tokens: Token[]
