@@ -88,10 +88,60 @@ export default function SwapForm() {
     loadTokens();
   }, [walletState.balances, tokenMetadata]);
 
-  const handlePercentageClick = async (pct: number) => {
-    if (!tokenIn) return;
-    // your existing percentage logic...
+  const handlePercentageClick = async (percentage: number) => {
+    if (!tokenIn || !wallet.account?.address) return;
+
+    try {
+      // Handle SUI token separately since we might have direct access to balance
+      if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
+        const balanceInSui = parseInt(suiBalance) / 1e9;
+        // Reserve a small amount of SUI for gas fees (0.05 SUI)
+        const maxAmount = Math.max(0, balanceInSui - 0.05);
+        const percentAmount = (maxAmount * percentage) / 100;
+        setAmountIn(percentAmount.toFixed(6));
+        return;
+      }
+
+      // For other tokens, check if we have the token in our wallet balances
+      const walletToken = walletState.balances.find(
+        (b) => b.coinType === tokenIn.address
+      );
+
+      if (walletToken) {
+        // We have the token in our wallet balances
+        const decimals = walletToken.decimals;
+        const balanceNum = Number(walletToken.balance) / Math.pow(10, decimals);
+        const percentAmount = (balanceNum * percentage) / 100;
+        setAmountIn(percentAmount.toFixed(6));
+      }
+      // Check if the token has a balance property (from convertWalletBalancesToTokens)
+      else if (tokenIn.balance) {
+        const balanceNum = parseFloat(tokenIn.balance);
+        const percentAmount = (balanceNum * percentage) / 100;
+        setAmountIn(percentAmount.toFixed(6));
+      }
+      // As a fallback, try to fetch the balance directly from the provider
+      else if (provider) {
+        const result = await provider.getBalance({
+          owner: wallet.account.address,
+          coinType: tokenIn.address,
+        });
+
+        if (result?.totalBalance) {
+          const decimals = tokenIn.decimals;
+          const balanceNum =
+            parseInt(result.totalBalance) / Math.pow(10, decimals);
+          const percentAmount = (balanceNum * percentage) / 100;
+          setAmountIn(percentAmount.toFixed(6));
+        }
+      }
+    } catch (error) {
+      console.error(`Error setting ${percentage}% amount:`, error);
+    }
   };
+
+  // Helper function to make MAX button more accessible
+  const getMaxAmount = () => handlePercentageClick(100);
 
   const formatSlippage = (s: number) => (s * 100).toFixed(1);
 
@@ -209,6 +259,7 @@ export default function SwapForm() {
               <button
                 className="max-button"
                 onClick={() => handlePercentageClick(100)}
+                type="button"
               >
                 MAX
               </button>

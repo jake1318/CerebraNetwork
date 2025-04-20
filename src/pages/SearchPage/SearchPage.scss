@@ -234,7 +234,51 @@
     font-size: 16px;
     color: rgba(255, 255, 255, 0.9);
     letter-spacing: 0.2px;
-    padding: 0 4px;
+    padding: 4px 8px;
+    max-height: 400px; /* Increased height to show more content */
+    overflow-y: auto; /* Enable vertical scrolling */
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: rgba(0, 255, 255, 0.5) rgba(0, 0, 0, 0.2); /* For Firefox */
+    word-wrap: break-word;
+
+    /* Custom scrollbar styling for Chrome/Safari/Edge */
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+      margin: 2px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.5),
+        rgba(255, 0, 255, 0.5)
+      );
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.7),
+        rgba(255, 0, 255, 0.7)
+      );
+    }
+
+    /* Make scrollbar always visible in WebKit browsers */
+    &::-webkit-scrollbar-thumb:vertical {
+      min-height: 30px;
+    }
+
+    /* Allow text selection within the scrollable area */
+    user-select: text;
   }
 }
 // Video Results Carousel - NEW DESIGN

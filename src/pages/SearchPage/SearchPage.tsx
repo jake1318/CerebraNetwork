@@ -213,7 +213,18 @@ const Search: React.FC = () => {
                 <div className="result-header">
                   <h2>AI</h2>
                 </div>
-                <div className="result-content">{results.aiAnswer}</div>
+                <div className="result-content">
+                  {typeof results.aiAnswer === "string"
+                    ? results.aiAnswer.split("\n").map((line, i) => (
+                        <React.Fragment key={i}>
+                          {line}
+                          {i < results.aiAnswer.split("\n").length - 1 && (
+                            <br />
+                          )}
+                        </React.Fragment>
+                      ))
+                    : results.aiAnswer}
+                </div>
               </div>
             )}
 
