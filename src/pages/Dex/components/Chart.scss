@@ -1,6 +1,7 @@
 /* src/pages/Dex/components/Chart.scss */
+
 .trading-chart {
-  background: #0a0f1e; /* solid background for the entire chart container */
+  background: #0a0f1e;
   border-radius: 12px;
   border: 1px solid;
   border-image: linear-gradient(
@@ -9,12 +10,12 @@
       rgba(255, 0, 255, 0.2)
     )
     1;
-  /* Instead of overflow: hidden, allow vertical overflow */
-  overflow-x: hidden;
-  overflow-y: visible;
   display: flex;
   flex-direction: column;
   min-height: 400px;
+
+  /* Remove all scrollbars */
+  overflow: hidden;
 
   .chart-header {
     padding: 1rem 1rem 0.6rem;
@@ -75,35 +76,19 @@
   .chart-content {
     flex: 1;
     position: relative;
-    /* We no longer hide vertical overflow */
-    overflow-x: hidden;
-    overflow-y: visible;
     display: flex;
     flex-direction: column;
+    /* Ensure no scrollbars inside chart-content */
+    overflow: hidden;
 
     .chart-area {
       width: 100%;
       height: 100%;
       position: relative;
-      background: #0a0f1e; /* same background if you want it behind apex chart canvas */
+      background: #0a0f1e;
     }
 
-    .chart-loading {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(10, 15, 30, 0.85);
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 1rem;
-      z-index: 10;
-    }
-
+    .chart-loading,
     .chart-error {
       position: absolute;
       top: 0;
@@ -115,10 +100,11 @@
       align-items: center;
       justify-content: center;
       background: rgba(10, 15, 30, 0.85);
-      color: rgba(255, 77, 109, 0.8);
-      text-align: center;
-      padding: 1rem;
       z-index: 10;
+      padding: 1rem;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 1rem;
 
       button {
         margin-top: 1rem;

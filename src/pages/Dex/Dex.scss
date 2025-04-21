@@ -1,4 +1,6 @@
 /* src/pages/Dex/Dex.scss */
+
+/* ============ Base Page & Background ============ */
 .dex-page {
   width: 100%;
   min-height: calc(100vh - 80px);
@@ -26,10 +28,7 @@
   &::before {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: linear-gradient(
         90deg,
         rgba(0, 255, 255, 0.05) 1px,
@@ -67,30 +66,28 @@
     box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
   }
 
-  .glow-1 {
+  .glow-1,
+  .glow-2 {
     position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: 0;
+    animation: pulse 20s ease-in-out infinite alternate;
+  }
+  .glow-1 {
     width: 300px;
     height: 300px;
     background: rgba(0, 255, 255, 0.12);
-    border-radius: 50%;
-    filter: blur(70px);
     top: 20%;
     left: 15%;
-    z-index: 0;
-    animation: pulse 15s ease-in-out infinite alternate;
   }
-
   .glow-2 {
-    position: absolute;
     width: 400px;
     height: 400px;
     background: rgba(255, 0, 255, 0.12);
-    border-radius: 50%;
-    filter: blur(90px);
     bottom: 10%;
     right: 10%;
-    z-index: 0;
-    animation: pulse 20s ease-in-out infinite alternate-reverse;
+    animation-duration: 25s;
   }
 
   @keyframes horizonScan {
@@ -104,7 +101,6 @@
       top: 10%;
     }
   }
-
   @keyframes verticalScan {
     0% {
       left: 10%;
@@ -116,7 +112,6 @@
       left: 10%;
     }
   }
-
   @keyframes pulse {
     0% {
       opacity: 0.6;
@@ -128,23 +123,52 @@
     }
   }
 
-  .dex-page__container {
+  /* ============ Container & Header ============ */
+  &__container {
     max-width: 1400px;
     margin: 0 auto;
     position: relative;
     z-index: 2;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
-  .dex-page__header {
+  &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
+
     h1 {
       font-size: 2rem;
       color: #fff;
       text-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
       margin: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+
+      .loading-indicator {
+        font-size: 0.9rem;
+        color: #bbb;
+      }
+
+      button {
+        padding: 0.4rem 0.8rem;
+        background: rgba(0, 255, 255, 0.2);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #fff;
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
     }
   }
 
@@ -157,12 +181,59 @@
     border-radius: 8px;
   }
 
-  /* TRADING STATS: Two-line grid with the ticker cell spanning two rows */
-  .dex-page__trading-stats.two-line-stats {
-    display: flex;
-    justify-content: space-between;
+  /* ============ New Grid Layout ============ */
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 1.5rem;
+    height: 100%;
+
+    /* Top row: stats bar spans all three columns */
+    .top-stats {
+      grid-column: 1 / span 3;
+    }
+
+    /* Recent Trades spans both middle and bottom rows */
+    .trading-history-container {
+      grid-column: 1;
+      grid-row: 2 / span 2;
+    }
+
+    /* Chart in center, only middle row */
+    .chart-panel {
+      grid-column: 2;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Pair selector on the right, only middle row */
+    .pair-selector-container {
+      grid-column: 3;
+      grid-row: 2;
+    }
+
+    /* Order form under the chart */
+    .order-form-container {
+      grid-column: 2;
+      grid-row: 3;
+    }
+
+    /* Open/Closed orders under the selector */
+    .my-orders-container {
+      grid-column: 3;
+      grid-row: 3;
+    }
+  }
+
+  /* ============ Panel Styling ============ */
+  .trading-history-container,
+  .pair-selector-container,
+  .order-form-container,
+  .my-orders-container,
+  .chart-panel {
     background: rgba(5, 15, 30, 0.5);
-    padding: 1rem;
     border: 1px solid;
     border-image: linear-gradient(
         45deg,
@@ -171,146 +242,61 @@
       )
       1;
     border-radius: 12px;
-    backdrop-filter: blur(10px);
-    margin-bottom: 1.5rem;
+    padding: 1rem;
+    overflow: auto;
+  }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: auto repeat(5, minmax(80px, auto));
-      grid-template-rows: auto auto;
-      gap: 1rem 2rem; /* row gap: 1rem, column gap: 2rem */
-      /* Ticker cell (first column) spans both rows */
+  /* ============ Stats Grid (Top Stats) ============ */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: auto auto;
+    gap: 0.5rem;
+
+    &.two-line-stats {
       .ticker-cell {
         grid-row: 1 / span 2;
+        grid-column: 1;
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        padding-right: 1rem;
+        align-items: center;
         gap: 0.4rem;
-        .ticker-text {
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #fff;
-        }
+
         .token-logo {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          object-fit: cover;
+          width: 1.2rem;
+          height: 1.2rem;
         }
       }
-      /* Top row: labels for columns 2 to 6 */
-      .stats-top-row {
-        grid-column: 2 / span 5;
-        display: flex;
-        justify-content: flex-start;
-        gap: 2rem;
-        .cell {
-          font-size: 0.85rem;
-          font-weight: 600;
-          color: rgba(255, 255, 255, 0.6);
-          text-align: center;
-          min-width: 80px;
-        }
+      .label {
+        font-size: 0.85rem;
+        color: #bbb;
+        text-transform: uppercase;
+        grid-row: 1;
       }
-      /* Bottom row: values for columns 2 to 6 */
-      .stats-bottom-row {
-        grid-column: 2 / span 5;
-        display: flex;
-        justify-content: flex-start;
-        gap: 2rem;
-        .cell {
-          font-size: 0.95rem;
-          font-weight: 600;
-          color: #fff;
-          text-align: center;
-          min-width: 80px;
+      .value {
+        font-weight: 600;
+        grid-row: 2;
+        &.positive {
+          color: #4caf50;
         }
-        .positive {
-          color: #00ff88;
-        }
-        .negative {
-          color: #ff4d6d;
+        &.negative {
+          color: #f44336;
         }
       }
     }
-
-    .pair-selector-slot {
-      margin-left: 1.5rem;
-      align-self: center;
-      max-width: 300px;
-    }
   }
 
-  .dex-page__content {
-    display: grid;
-    grid-template-rows: auto auto;
-    gap: 1.5rem;
-  }
-
-  .chart-order-section {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1.5rem;
-    align-items: stretch;
-    min-height: 500px;
-  }
-
-  .chart-wrapper,
-  .order-form-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-
-  .chart-wrapper .chart {
+  /* ============ Chart Wrapper ============ */
+  .chart-wrapper {
     flex: 1;
     min-height: 0;
   }
 
-  .trading-history-section {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-  }
-
-  .order-form-container,
-  .trading-history-container,
-  .my-orders-container {
-    background: rgba(5, 15, 30, 0.5);
-    border-radius: 12px;
-    padding: 1rem;
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
-      )
-      1;
-  }
-
+  /* ============ Responsive Fallback ============ */
   @media (max-width: 992px) {
-    .dex-page__content {
-      display: block;
-    }
-    .chart-order-section {
-      display: block;
-      margin-bottom: 1.5rem;
-    }
-    .trading-history-section {
-      display: block;
-    }
-    .dex-page__trading-stats.two-line-stats {
+    &__grid {
+      display: flex;
       flex-direction: column;
-      .stats-grid {
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto;
-      }
-      .pair-selector-slot {
-        margin-top: 1rem;
-        align-self: flex-start;
-        max-width: 100%;
-      }
+      gap: 1rem;
     }
   }
 }
