@@ -1,5 +1,5 @@
 // src/services/cetusVaultsProcessor.ts
-// Last Updated: 2025-05-22 06:18:05 UTC by jake1318
+// Last Updated: 2025-06-22 23:21:25 UTC by jake1318
 
 import { getAllAvailableVaults } from "./cetusVaultService";
 
@@ -51,6 +51,7 @@ const vaultApyCache = new Map<string, number>();
 
 /**
  * Process vault data from BlockVision API
+ * Updated to maintain compatibility with Cetus Vaults SDK v1.1.4
  */
 export async function processCetusVaults(
   vaultsData: BlockVisionVaultData[]
@@ -105,13 +106,13 @@ export function getVaultApy(vaultId: string): number | undefined {
 
 /**
  * Update our vault service data with APYs from BlockVision
+ * Updated to maintain compatibility with Cetus Vaults SDK v1.1.4
  */
 export async function updateVaultApysFromBlockVision(
   blockVisionVaults: BlockVisionVaultData[]
 ): Promise<void> {
-  // Get all available vaults from our service
+  // Store APYs in cache for later use by the vault service
   try {
-    // Store APYs in cache for later use by the vault service
     blockVisionVaults.forEach((vault) => {
       const apyValue = parseFloat(vault.apy);
       if (!isNaN(apyValue)) {
