@@ -1,6 +1,34 @@
+// vite.config.js
+// Last updated: 2025-06-21 23:10:36 UTC by jake1318
+
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
+import { NodeModulesPolyfillPlugin } from "@esbuild-plugins/node-modules-polyfill";
 
 export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      process: "process/browser",
+      buffer: "buffer/",
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: "globalThis",
+        "process.env": "{}",
+      },
+      plugins: [
+        NodeGlobalsPolyfillPlugin({
+          process: true,
+          buffer: true,
+        }),
+        NodeModulesPolyfillPlugin(),
+      ],
+    },
+  },
   server: {
     proxy: {
       "/sui": {
