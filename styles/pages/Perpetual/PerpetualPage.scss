@@ -1,0 +1,980 @@
+// src/styles/pages/Perpetual/PerpetualPage.scss
+// Last Updated: 2025-05-08 17:52:57 UTC by jake1318
+
+.perpetual-page {
+  width: 100%;
+  min-height: 100vh;
+  padding: 2rem;
+  position: relative;
+  color: #fff;
+
+  // Add cyberpunk-style gradient background with grid overlay to match homepage
+  background: radial-gradient(
+      circle at top left,
+      rgba(0, 255, 255, 0.15),
+      rgba(5, 15, 30, 0.3) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 0, 255, 0.15),
+      rgba(5, 15, 30, 0.3) 40%
+    ),
+    #0f1624;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .content-container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+
+    .page-title {
+      h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(90deg, #00e7ff, #a15ffe);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+      }
+
+      .subtitle {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 1.1rem;
+      }
+    }
+  }
+
+  // Tab navigation
+  .tabs-navigation {
+    display: flex;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+    margin-bottom: 1.5rem;
+
+    .tab-button {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1.1rem;
+      font-weight: 600;
+      padding: 1rem 2rem;
+      position: relative;
+      cursor: pointer;
+      transition: color 0.3s ease;
+
+      &:hover {
+        color: #ffffff;
+      }
+
+      &.active {
+        color: #00e7ff;
+
+        &::after {
+          content: "";
+          position: absolute;
+          bottom: -1px;
+          left: 0;
+          width: 100%;
+          height: 3px;
+          background: linear-gradient(90deg, #00e7ff, #a15ffe);
+          border-radius: 3px 3px 0 0;
+          box-shadow: 0 0 10px rgba(0, 231, 255, 0.5),
+            0 0 10px rgba(161, 95, 254, 0.5);
+        }
+      }
+    }
+  }
+
+  // Trading layout
+  .trading-layout {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "chart sidebar"
+      "positions positions";
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .chart-container {
+    grid-area: chart;
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
+      0 8px 32px rgba(255, 0, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .trading-sidebar {
+    grid-area: sidebar;
+  }
+
+  .positions-section {
+    grid-area: positions;
+  }
+
+  // Market selector and info
+  .market-selector {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+
+    .market-select {
+      background: rgba(10, 20, 35, 0.7);
+      border: 1px solid rgba(75, 85, 99, 0.5);
+      color: #ffffff;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 200px;
+      font-size: 1rem;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      cursor: pointer;
+
+      &:focus {
+        outline: none;
+        border-color: #00e7ff;
+      }
+
+      option {
+        background-color: #0f1624;
+        color: #ffffff;
+      }
+    }
+  }
+
+  .market-info {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+
+    .market-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      .market-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+      }
+
+      .market-pair {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      .market-price {
+        text-align: right;
+
+        .price-value {
+          font-size: 1.4rem;
+          font-weight: 700;
+        }
+
+        .price-change {
+          font-size: 0.9rem;
+          font-weight: 600;
+
+          &.positive {
+            color: #10f0b0;
+          }
+
+          &.negative {
+            color: #ff5a5a;
+          }
+        }
+      }
+    }
+
+    .market-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem 2rem;
+
+      .stat-item {
+        display: flex;
+        flex-direction: column;
+        min-width: 100px;
+
+        .stat-label {
+          font-size: 0.8rem;
+          color: rgba(255, 255, 255, 0.6);
+          margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+          font-size: 0.9rem;
+          font-weight: 600;
+        }
+      }
+    }
+  }
+
+  // Chart styling
+  .chart-wrapper {
+    flex: 1;
+    min-height: 350px;
+    position: relative;
+    overflow: hidden;
+
+    .chart {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .chart-loading {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 25, 40, 0.7);
+
+      .spinner {
+        width: 2.5rem;
+        height: 2.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .loading-text {
+        font-size: 1rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+    }
+  }
+
+  // Trading form
+  .trading-form {
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    padding: 1.25rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
+      0 8px 32px rgba(255, 0, 255, 0.05);
+
+    .form-section {
+      margin-bottom: 1.25rem;
+
+      &.order-summary {
+        background: rgba(10, 20, 35, 0.5);
+        border-radius: 8px;
+        padding: 1rem;
+      }
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    // Order type selector
+    .order-type-buttons {
+      display: flex;
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(10, 20, 35, 0.5);
+
+      .order-type-btn {
+        flex: 1;
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.7);
+        padding: 0.6rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover:not(.active) {
+          background: rgba(255, 255, 255, 0.1);
+          color: #ffffff;
+        }
+
+        &.active {
+          background: linear-gradient(90deg, #00e7ff, #a15ffe);
+          color: #000;
+        }
+      }
+    }
+
+    // Position type selector
+    .position-type-buttons {
+      display: flex;
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(10, 20, 35, 0.5);
+
+      .position-type-btn {
+        flex: 1;
+        background: none;
+        border: none;
+        padding: 0.6rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &.long {
+          color: rgba(16, 240, 176, 0.7);
+
+          &:hover:not(.active) {
+            background: rgba(16, 240, 176, 0.1);
+            color: #10f0b0;
+          }
+
+          &.active {
+            background: rgba(16, 240, 176, 0.8);
+            color: #000;
+          }
+        }
+
+        &.short {
+          color: rgba(255, 90, 90, 0.7);
+
+          &:hover:not(.active) {
+            background: rgba(255, 90, 90, 0.1);
+            color: #ff5a5a;
+          }
+
+          &.active {
+            background: rgba(255, 90, 90, 0.8);
+            color: #000;
+          }
+        }
+      }
+    }
+
+    // Amount input
+    .amount-input-wrapper {
+      .amount-input {
+        width: 100%;
+        background: rgba(10, 20, 35, 0.5);
+        border: 1px solid rgba(75, 85, 99, 0.5);
+        color: #ffffff;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+
+        &:focus {
+          outline: none;
+          border-color: #00e7ff;
+        }
+      }
+
+      .amount-buttons {
+        display: flex;
+        gap: 0.5rem;
+
+        .amount-preset-btn {
+          flex: 1;
+          background: rgba(10, 20, 35, 0.5);
+          border: 1px solid rgba(75, 85, 99, 0.3);
+          color: rgba(255, 255, 255, 0.8);
+          padding: 0.4rem 0;
+          border-radius: 6px;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(75, 85, 99, 0.6);
+          }
+        }
+      }
+    }
+
+    // Price input for limit orders
+    .price-input {
+      width: 100%;
+      background: rgba(10, 20, 35, 0.5);
+      border: 1px solid rgba(75, 85, 99, 0.5);
+      color: #ffffff;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 1rem;
+
+      &:focus {
+        outline: none;
+        border-color: #00e7ff;
+      }
+    }
+
+    // Leverage slider
+    .leverage-slider-container {
+      margin-top: 1rem;
+
+      .leverage-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        outline: none;
+        position: relative;
+        cursor: pointer;
+
+        &::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: var(--value);
+          height: 100%;
+          border-radius: 3px;
+          background: linear-gradient(90deg, #00e7ff, #a15ffe);
+        }
+
+        &::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #ffffff;
+          cursor: pointer;
+          position: relative;
+          z-index: 2;
+          box-shadow: 0 0 10px rgba(0, 231, 255, 0.5);
+        }
+      }
+
+      .leverage-marks {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 8px;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.6);
+      }
+    }
+
+    // Order summary
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .summary-label {
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .summary-value {
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+    }
+
+    // Submit trade button
+    .trade-submit-btn {
+      width: 100%;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 1rem;
+
+      &.long {
+        background: rgba(16, 240, 176, 0.8);
+        color: #000;
+
+        &:hover:not(:disabled) {
+          background: #10f0b0;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(16, 240, 176, 0.3);
+        }
+      }
+
+      &.short {
+        background: rgba(255, 90, 90, 0.8);
+        color: #000;
+
+        &:hover:not(:disabled) {
+          background: #ff5a5a;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(255, 90, 90, 0.3);
+        }
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+    }
+  }
+
+  // User positions
+  .user-positions {
+    margin-bottom: 1.5rem;
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    padding: 1rem;
+
+    h3 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    .positions-table {
+      overflow-x: auto;
+
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+
+        th {
+          padding: 0.75rem;
+          text-align: left;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.7);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+
+          &.align-right {
+            text-align: right;
+          }
+
+          &.align-center {
+            text-align: center;
+          }
+
+          &.actions-column {
+            text-align: right;
+          }
+        }
+
+        td {
+          padding: 0.85rem;
+          border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+
+          &.align-right {
+            text-align: right;
+          }
+
+          &.align-center {
+            text-align: center;
+          }
+
+          &.actions-cell {
+            text-align: right;
+          }
+        }
+      }
+
+      .market-cell {
+        .market-info {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          border: none;
+          padding: 0;
+        }
+      }
+
+      .position-type-cell {
+        .position-badge {
+          display: inline-block;
+          padding: 0.25rem 0.75rem;
+          border-radius: 99px;
+          font-size: 0.8rem;
+          font-weight: 600;
+
+          &.long {
+            background: rgba(16, 240, 176, 0.1);
+            color: #10f0b0;
+            border: 1px solid rgba(16, 240, 176, 0.3);
+          }
+
+          &.short {
+            background: rgba(255, 90, 90, 0.1);
+            color: #ff5a5a;
+            border: 1px solid rgba(255, 90, 90, 0.3);
+          }
+        }
+      }
+
+      .pnl-cell {
+        font-weight: 600;
+
+        &.positive {
+          color: #10f0b0;
+        }
+
+        &.negative {
+          color: #ff5a5a;
+        }
+      }
+
+      .position-actions {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+      }
+    }
+  }
+
+  // Markets table
+  .markets-table-container {
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
+      0 8px 32px rgba(255, 0, 255, 0.05);
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+
+      thead {
+        background: rgba(10, 20, 35, 0.8);
+
+        th {
+          padding: 1rem;
+          font-size: 0.85rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: rgba(255, 255, 255, 0.7);
+          text-align: left;
+          border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+
+          &.align-right {
+            text-align: right;
+          }
+
+          &.align-center {
+            text-align: center;
+          }
+
+          &.actions-column {
+            text-align: right;
+          }
+        }
+      }
+
+      tbody {
+        tr.market-row {
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(30, 40, 55, 0.4);
+          }
+
+          td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+
+            &.align-right {
+              text-align: right;
+            }
+
+            &.align-center {
+              text-align: center;
+            }
+
+            &.actions-cell {
+              text-align: right;
+            }
+
+            &.positive {
+              color: #10f0b0;
+            }
+
+            &.negative {
+              color: #ff5a5a;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Empty states
+  .connect-wallet-prompt,
+  .empty-positions {
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    padding: 2rem;
+    text-align: center;
+    margin-bottom: 2rem;
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+
+      .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+
+      h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+      }
+
+      p {
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 1.5rem;
+        max-width: 400px;
+      }
+    }
+  }
+
+  // Loading state
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+
+    .spinner {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      border: 3px solid rgba(0, 255, 255, 0.15);
+      border-top-color: #00ffff;
+      border-right-color: #ff00ff;
+      animation: spin 1.2s linear infinite;
+      margin-bottom: 1.5rem;
+    }
+
+    .loading-text {
+      font-size: 1.1rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+  }
+
+  // Button styles - Keep consistent with app
+  .btn {
+    display: inline-block;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+
+    &--primary {
+      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      color: #000;
+      border: none;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.2),
+        0 0 15px rgba(255, 0, 255, 0.2);
+
+      &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3),
+          0 5px 20px rgba(255, 0, 255, 0.3);
+      }
+    }
+
+    &--secondary {
+      background: rgba(15, 25, 40, 0.7);
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.6),
+          rgba(255, 0, 255, 0.6)
+        )
+        1;
+      color: #fff;
+
+      &:hover:not(:disabled) {
+        background: rgba(25, 35, 50, 0.8);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 255, 255, 0.1),
+          0 5px 15px rgba(255, 0, 255, 0.1);
+      }
+    }
+
+    &--accent {
+      background: linear-gradient(45deg, #00ffff, #a15ffe);
+      color: #000;
+      box-shadow: 0 0 15px rgba(0, 231, 255, 0.2),
+        0 0 15px rgba(161, 95, 254, 0.2);
+
+      &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(0, 231, 255, 0.3),
+          0 5px 20px rgba(161, 95, 254, 0.3);
+      }
+    }
+
+    &--sm {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+  }
+
+  // Animation
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  // Responsive adjustments
+  @media (max-width: 1200px) {
+    .trading-layout {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "chart"
+        "sidebar"
+        "positions";
+    }
+  }
+
+  @media (max-width: 768px) {
+    padding: 1rem;
+
+    .trading-form {
+      .position-type-buttons,
+      .order-type-buttons {
+        flex-wrap: wrap;
+
+        button {
+          flex-basis: calc(50% - 0.25rem);
+        }
+      }
+    }
+
+    .market-info {
+      .market-stats {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+    }
+
+    .user-positions,
+    .markets-table-container {
+      overflow-x: auto;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .page-header {
+      .page-title {
+        h1 {
+          font-size: 1.5rem;
+        }
+
+        .subtitle {
+          font-size: 0.9rem;
+        }
+      }
+    }
+
+    .tabs-navigation {
+      .tab-button {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+      }
+    }
+  }
+}

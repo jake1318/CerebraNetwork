@@ -1,0 +1,550 @@
+// src/styles/Vaults.scss
+// Last Updated: 2025-05-22 19:39:34 UTC by jake1318
+
+// Main variables to match project theme
+$background-color: #0a1120;
+$card-background: rgba(20, 30, 48, 0.6);
+$border-color: rgba(255, 255, 255, 0.05);
+$text-color: #fff;
+$text-secondary: #a0a7b8;
+$accent-color: #00c2ff;
+$success-color: #00c48c;
+$danger-color: #ff5252;
+$warning-color: #ffc107;
+$high-apy-color: #ff00ff; // Bright pink for high APY
+$medium-apy-color: #00c2ff; // Blue for medium APY
+
+$border-radius: 8px;
+$box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+
+// Animation keyframes
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// Base styles
+.vaults-page {
+  color: $text-color;
+  padding: 20px 0;
+  animation: fadeIn 0.3s ease;
+  font-family: "Inter", sans-serif;
+
+  // Content container
+  .content-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  // Header styling
+  .vaults-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+
+    h2 {
+      font-size: 32px;
+      font-weight: 600;
+      margin: 0;
+      color: $accent-color;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .description {
+      color: $text-secondary;
+      margin-top: 8px;
+      font-size: 16px;
+    }
+
+    .refresh-button {
+      background: rgba(0, 194, 255, 0.2);
+      color: $text-color;
+      padding: 8px 16px;
+      border-radius: $border-radius;
+      border: 1px solid $accent-color;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+
+      &:hover {
+        background: rgba(0, 194, 255, 0.3);
+      }
+
+      .refresh-icon {
+        margin-right: 6px;
+      }
+
+      &.refreshing .refresh-icon {
+        animation: spin 1s linear infinite;
+      }
+    }
+  }
+
+  // Tab navigation
+  .vaults-tabs {
+    display: flex;
+    margin-bottom: 24px;
+    border-bottom: 1px solid $border-color;
+
+    .tab-button {
+      background: transparent;
+      border: none;
+      color: $text-secondary;
+      font-size: 16px;
+      padding: 12px 24px;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+
+      &:hover {
+        color: lighten($text-secondary, 10%);
+      }
+
+      &.active {
+        color: $accent-color;
+        border-bottom: 2px solid $accent-color;
+      }
+
+      .tab-count {
+        display: inline-block;
+        background: rgba(0, 194, 255, 0.2);
+        padding: 2px 8px;
+        border-radius: 10px;
+        margin-left: 8px;
+        font-size: 12px;
+        font-weight: normal;
+      }
+    }
+  }
+
+  // Table styles
+  .positions-table-container {
+    margin-bottom: 30px;
+    overflow: hidden;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+
+      th,
+      td {
+        padding: 12px 16px;
+        text-align: left;
+
+        &.align-right {
+          text-align: right;
+        }
+      }
+
+      th {
+        color: $text-secondary;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      td {
+        vertical-align: middle;
+      }
+
+      tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        &:hover {
+          background-color: rgba(0, 194, 255, 0.05);
+        }
+      }
+
+      .actions-column {
+        text-align: right;
+      }
+
+      .actions-cell {
+        text-align: right;
+        white-space: nowrap;
+
+        button {
+          margin-left: 8px;
+          background-color: $accent-color;
+          border: none;
+          color: $background-color;
+          padding: 8px 16px;
+          border-radius: $border-radius;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+
+          &:hover {
+            background-color: lighten($accent-color, 10%);
+          }
+
+          &:first-child {
+            margin-left: 0;
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
+  }
+
+  // Token pairs display
+  .token-pair-display,
+  .vault-name {
+    display: flex;
+    align-items: center;
+
+    .token-icons {
+      display: flex;
+      margin-right: 12px;
+
+      .token-icon,
+      img {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: $background-color;
+        border: 1px solid $accent-color;
+        object-fit: cover;
+
+        &.token-b {
+          margin-left: -10px;
+          z-index: 1;
+        }
+      }
+    }
+
+    .pair-name,
+    .name-text {
+      font-weight: 500;
+    }
+  }
+
+  // APY display
+  .apy-display {
+    display: flex;
+    align-items: center;
+
+    .apr-value {
+      font-weight: 600;
+
+      &.high {
+        color: $high-apy-color;
+      }
+
+      &.medium {
+        color: $medium-apy-color;
+      }
+
+      &.low {
+        color: $success-color;
+      }
+    }
+
+    .verified-icon {
+      margin-left: 6px;
+      color: $accent-color;
+      font-size: 14px;
+    }
+  }
+
+  // Token balance display
+  .token-balance-display {
+    display: flex;
+    align-items: center;
+
+    .token-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      margin-right: 8px;
+      border: 1px solid $accent-color;
+      object-fit: cover;
+    }
+
+    .balance-text {
+      .amount {
+        font-weight: 500;
+      }
+
+      .symbol {
+        margin-left: 4px;
+        color: $text-secondary;
+      }
+    }
+  }
+
+  // Loading state
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 0;
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 194, 255, 0.3);
+      border-top-color: $accent-color;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    .loading-text {
+      color: $text-secondary;
+    }
+  }
+
+  // Empty state
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 0;
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 24px;
+    }
+
+    h3 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    p {
+      color: $text-secondary;
+      margin-bottom: 24px;
+      text-align: center;
+      max-width: 400px;
+    }
+  }
+
+  // Connect wallet prompt
+  .connect-wallet-prompt {
+    background-color: rgba(0, 194, 255, 0.1);
+    border: 1px solid $accent-color;
+    border-radius: $border-radius;
+    padding: 40px;
+    text-align: center;
+    margin-top: 20px;
+
+    h3 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    p {
+      color: $text-secondary;
+      margin-bottom: 24px;
+    }
+
+    .connect-button {
+      background-color: $accent-color;
+      color: $background-color;
+      border: none;
+      padding: 12px 24px;
+      border-radius: $border-radius;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background-color: lighten($accent-color, 10%);
+      }
+    }
+  }
+
+  // Section divider
+  .section-divider {
+    border: none;
+    height: 1px;
+    background-color: $border-color;
+    margin: 30px 0;
+  }
+
+  // Button styling
+  .btn {
+    padding: 8px 16px;
+    border-radius: $border-radius;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &--primary {
+      background-color: $accent-color;
+      color: $background-color;
+      border: none;
+
+      &:hover {
+        background-color: lighten($accent-color, 10%);
+      }
+    }
+  }
+
+  // BlockVision section
+  .blockVision-section {
+    margin-bottom: 30px;
+
+    h4 {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      font-size: 18px;
+    }
+  }
+
+  // Balance info for withdrawal
+  .balance-info {
+    margin-top: 6px;
+    font-size: 14px;
+    color: $text-secondary;
+  }
+
+  // Modal input group
+  .input-group {
+    display: flex;
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    overflow: hidden;
+
+    .input-addon {
+      padding: 0 12px;
+      background-color: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+    }
+
+    input {
+      flex: 1;
+      background-color: rgba(0, 0, 0, 0.2);
+      border: none;
+      color: $text-color;
+      padding: 10px 12px;
+      font-size: 16px;
+
+      &:focus {
+        outline: none;
+      }
+    }
+
+    .max-button {
+      background-color: $accent-color;
+      color: $background-color;
+      border: none;
+      padding: 0 12px;
+      font-weight: 500;
+      cursor: pointer;
+
+      &:hover {
+        background-color: lighten($accent-color, 10%);
+      }
+    }
+  }
+
+  // Form group
+  .form-group {
+    margin-bottom: 16px;
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: $text-secondary;
+    }
+  }
+
+  // Custom select
+  .select-wrapper {
+    position: relative;
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    overflow: hidden;
+
+    select {
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.2);
+      border: none;
+      color: $text-color;
+      padding: 10px 12px;
+      font-size: 16px;
+      appearance: none;
+      cursor: pointer;
+
+      &:focus {
+        outline: none;
+      }
+    }
+
+    &:after {
+      content: "▼";
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: $text-secondary;
+      font-size: 12px;
+      pointer-events: none;
+    }
+  }
+}
+
+// Responsive styles
+@media (max-width: 768px) {
+  .vaults-page {
+    .vaults-header {
+      flex-direction: column;
+      align-items: flex-start;
+
+      .refresh-button {
+        margin-top: 16px;
+      }
+    }
+
+    .vaults-tabs {
+      .tab-button {
+        padding: 12px 16px;
+        font-size: 14px;
+      }
+    }
+
+    .positions-table-container {
+      overflow-x: auto;
+
+      table {
+        min-width: 700px;
+      }
+    }
+  }
+}

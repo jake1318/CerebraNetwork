@@ -1,0 +1,442 @@
+// src/styles/components/TransactionNotification.scss
+// Last Updated: 2025-05-08 07:20:14 UTC by jake1318
+
+// Modal overlay styling
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    rgba(13, 19, 33, 0.95) 0%,
+    rgba(18, 24, 45, 0.95) 50%,
+    rgba(26, 16, 51, 0.95) 100%
+  );
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  padding-top: 70px; // Prevent navbar overlap
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+    pointer-events: none;
+  }
+}
+
+// Transaction modal styling
+.transaction-modal {
+  background-color: rgba(13, 19, 33, 0.95);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  position: relative;
+  animation: modalFadeIn 0.3s ease-out;
+  margin: 0 20px;
+  overflow: hidden;
+
+  // Gradient border for the modal
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    padding: 1px;
+    background: linear-gradient(135deg, #00e7ff, #a15ffe);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(135deg, #00e7ff, #a15ffe);
+      opacity: 0.5;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: transparent;
+      background: linear-gradient(135deg, #00e7ff, #a15ffe);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .close-button {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+
+      &:hover {
+        color: #ffffff;
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
+  // Modal success content
+  .modal-success-content {
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+
+    .success-check-icon {
+      margin-bottom: 1.5rem;
+      animation: scaleIn 0.5s ease-out;
+    }
+
+    .success-title {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin: 0 0 0.75rem 0;
+      color: #ffffff;
+    }
+
+    .success-message {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 1.5rem;
+    }
+
+    .transaction-id {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 2rem;
+      word-break: break-all;
+      padding: 0 1rem;
+    }
+
+    .success-actions {
+      display: flex;
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+      gap: 1rem;
+      justify-content: center;
+
+      .view-tx-link,
+      .done-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1.25rem;
+        background: linear-gradient(90deg, #00e7ff, #a15ffe);
+        color: black;
+        font-weight: 600;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        flex: 1;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        max-width: 160px;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 231, 255, 0.3),
+            0 4px 12px rgba(161, 95, 254, 0.3);
+        }
+
+        &:active {
+          transform: translateY(0);
+          box-shadow: 0 2px 8px rgba(0, 231, 255, 0.2),
+            0 2px 8px rgba(161, 95, 254, 0.2);
+        }
+      }
+    }
+  }
+}
+
+// Standard notification styling (original)
+.transaction-notification {
+  display: flex;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background-color: var(--bg-card, rgba(13, 19, 33, 0.95));
+  border: 1px solid transparent;
+  animation: fadeIn 0.3s ease-out;
+  width: 100%;
+  max-width: 600px;
+
+  &.success {
+    border-color: var(--color-success-border, #2ec37c);
+    background-color: var(--color-success-bg, rgba(46, 195, 124, 0.1));
+    color: var(--color-success-text, #2ec37c);
+  }
+
+  &.error {
+    border-color: var(--color-error-border, #f25050);
+    background-color: var(--color-error-bg, rgba(242, 80, 80, 0.1));
+    color: var(--color-error-text, #f25050);
+  }
+
+  .notification-content {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .notification-icon {
+    margin-right: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  .notification-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+
+    .message-text {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary, #ffffff);
+    }
+
+    .transaction-details {
+      display: flex;
+      flex-direction: column;
+      margin-top: 0.75rem;
+
+      .transaction-id {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        font-family: monospace;
+        font-size: 0.9rem;
+        color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+
+        .label {
+          margin-right: 0.5rem;
+        }
+
+        .value {
+          opacity: 0.8;
+        }
+      }
+
+      .transaction-link {
+        display: inline-flex;
+        align-items: center;
+        color: var(--color-primary, #00e7ff);
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-top: 0.25rem;
+
+        &:hover {
+          text-decoration: underline;
+          color: var(--color-primary-hover, #a15ffe);
+        }
+
+        svg {
+          margin-left: 0.4rem;
+          width: 14px;
+          height: 14px;
+        }
+      }
+    }
+  }
+
+  .close-button {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+    cursor: pointer;
+    padding: 0.25rem;
+    margin-left: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      color: var(--text-primary, #ffffff);
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+// Animation
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// Spinner for loading state
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: var(--color-primary, #00e7ff);
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 0.75rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Responsive styling
+@media (max-width: 768px) {
+  .transaction-notification {
+    padding: 0.75rem;
+    max-width: 100%;
+
+    .transaction-details {
+      flex-direction: column;
+
+      .transaction-id,
+      .transaction-link {
+        font-size: 0.8rem;
+      }
+    }
+  }
+
+  .transaction-modal {
+    width: 90%;
+    margin: 0 16px;
+
+    .modal-success-content {
+      padding: 1.5rem 1rem;
+
+      .success-actions {
+        flex-direction: column;
+
+        .view-tx-link,
+        .done-button {
+          max-width: none;
+        }
+      }
+    }
+  }
+}
+
+// For small screens
+@media (max-width: 480px) {
+  .notification-container {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    max-width: none;
+  }
+
+  .modal-success-content {
+    .success-title {
+      font-size: 1.5rem;
+    }
+
+    .transaction-id {
+      font-size: 0.75rem;
+    }
+  }
+}
+
+// Fix for notification container
+.notification-container {
+  &.floating {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1010;
+    max-width: 360px;
+  }
+
+  &.inside-modal {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+
+    .transaction-notification {
+      margin-bottom: 0;
+    }
+  }
+}

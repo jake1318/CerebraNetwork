@@ -1,0 +1,182 @@
+.pool-table {
+  color: #fff;
+  .section-title {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: #00fff0; /* neon cyan for heading text */
+  }
+
+  /* Controls (search and filter) */
+  .pool-table-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    gap: 0.5rem;
+  }
+  /* Search bar styling */
+  .search-bar {
+    position: relative;
+    flex: 1;
+    max-width: 300px;
+  }
+  .search-bar input[type="text"] {
+    width: 100%;
+    padding: 0.4rem 2.2rem 0.4rem 2rem; /* space for icon on left */
+    background: #111;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .search-bar input::placeholder {
+    color: #777;
+  }
+  .search-bar .search-icon {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    color: #888;
+  }
+
+  /* DEX filter label and select */
+  .dex-filter {
+    font-size: 0.9rem;
+    color: #ccc;
+    margin-right: 0.5rem;
+  }
+  .dex-filter .dex-select {
+    margin-left: 0.25rem;
+    background: #111;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0.3rem 1.5rem 0.3rem 0.5rem;
+    /* Remove default arrow and add custom if needed */
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg fill='%23ccc' height='12' viewBox='0 0 20 20' width='12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 8l4 4 4-4z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 4px center;
+    background-size: 8px 8px;
+  }
+  .reset-btn {
+    /* Inherits base .btn styles, but override if needed */
+    color: #00fff0;
+    border-color: #00fff0;
+  }
+  .reset-btn:hover {
+    background: #00fff022;
+  }
+
+  /* Table header */
+  .pool-table-header {
+    display: flex;
+    padding: 0.5rem;
+    background: #181818;
+    border-bottom: 1px solid #333;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #888;
+  }
+  .pool-table-header .col {
+    flex: 1;
+    text-align: left;
+  }
+  .pool-name-col {
+    flex: 2;
+  } /* Pool name column wider */
+  .pool-action-col {
+    text-align: right;
+  }
+
+  /* Pool rows container */
+  .pool-table-body {
+    .no-pools {
+      padding: 1rem;
+      text-align: center;
+      color: #888;
+    }
+  }
+
+  /* Individual pool row */
+  .pool-row {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    background: #101010;
+    border-bottom: 1px solid #222;
+    transition: background 0.2s;
+  }
+  .pool-row:hover {
+    background: #1a1a1a;
+  }
+  .pool-row .col {
+    flex: 1;
+    text-align: left;
+    font-size: 0.95rem;
+  }
+  .pool-row .pool-name-col {
+    flex: 2;
+    display: flex;
+    align-items: center;
+  }
+  /* Token pair section within name col */
+  .token-pair {
+    display: flex;
+    align-items: center;
+  }
+  .token-icons {
+    position: relative;
+    width: 32px;
+    height: 24px;
+    margin-right: 0.5rem;
+  }
+  .token-logo {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .token-logo-base {
+    left: 0;
+    z-index: 2;
+  }
+  .token-logo-quote {
+    right: 0;
+    z-index: 1;
+  }
+  .token-names {
+    margin-right: 0.25rem;
+  }
+  .fee-tier {
+    background: #222;
+    color: #ccc;
+    font-size: 0.8rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+  }
+
+  /* Numeric columns (optionally you can right-align numbers for consistency) */
+  .pool-liquidity-col,
+  .pool-volume-col,
+  .pool-fees-col,
+  .pool-apr-col {
+    font-family: monospace, sans-serif;
+  }
+  .pool-apr-col {
+    color: #0f0; /* you can color APR if desired, or keep white */
+  }
+
+  .pool-action-col {
+    text-align: right;
+  }
+  .deposit-btn {
+    /* Uses .btn-primary styles; additional styling if needed */
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
