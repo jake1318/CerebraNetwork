@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@7kprotocol/sdk-ts": "^2.3.4",
-    "@cetusprotocol/cetus-sui-clmm-sdk": "^5.3.4",
-    "@cetusprotocol/vaults-sdk": "^1.0.4",
+    "@cetusprotocol/cetus-sui-clmm-sdk": "^5.4.0",
+    "@cetusprotocol/vaults-sdk": "^1.1.4",
     "@mysten/deepbook-v3": "^0.13.2",
     "@mysten/sui": "^1.21.2",
     "@suiet/wallet-kit": "^0.3.4",
