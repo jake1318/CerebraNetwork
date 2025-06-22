@@ -24,6 +24,52 @@ const Search: React.FC = () => {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [maxScroll, setMaxScroll] = useState(0);
 
+  // For AI answer collapsible functionality
+  const [aiExpanded, setAiExpanded] = useState(false);
+  const [showToggle, setShowToggle] = useState(false);
+  const aiTextRef = useRef<HTMLDivElement>(null);
+
+  // Effect to determine if toggle is needed (if content overflows 5 lines)
+  useEffect(() => {
+    if (results.aiAnswer && aiTextRef.current) {
+      // Create a temporary div to measure full content height
+      const tempDiv = document.createElement("div");
+      tempDiv.style.cssText = `
+        position: absolute;
+        visibility: hidden;
+        width: ${aiTextRef.current.clientWidth}px;
+        font-size: 16px;
+        line-height: 1.7;
+        font-family: "Inter", "Segoe UI", Roboto, sans-serif;
+        white-space: pre-wrap;
+      `;
+
+      // Same content formatting as the original div
+      tempDiv.innerHTML =
+        typeof results.aiAnswer === "string"
+          ? results.aiAnswer
+              .split("\n")
+              .map(
+                (line, i) =>
+                  line +
+                  (i < results.aiAnswer.split("\n").length - 1 ? "<br>" : "")
+              )
+              .join("")
+          : results.aiAnswer;
+
+      document.body.appendChild(tempDiv);
+      const fullHeight = tempDiv.clientHeight;
+      document.body.removeChild(tempDiv);
+
+      // Calculate approximate 5-line height
+      const lineHeight = 16 * 1.7; // font-size * line-height
+      const approxFiveLines = lineHeight * 5;
+
+      // Show toggle if content is taller than ~5 lines
+      setShowToggle(fullHeight > approxFiveLines);
+    }
+  }, [results.aiAnswer]);
+
   // Update scroll position indicator
   useEffect(() => {
     if (!carouselRef.current) return;
@@ -64,6 +110,8 @@ const Search: React.FC = () => {
     // Reset pagination when starting a new search
     setVideoPage(1);
     setWebPage(1);
+    // Reset AI expanded state for new searches
+    setAiExpanded(false);
 
     try {
       const res = await axios.get(`/api/search?q=${encodeURIComponent(query)}`);
@@ -213,18 +261,38 @@ const Search: React.FC = () => {
                 <div className="result-header">
                   <h2>AI</h2>
                 </div>
-                <div className="result-content">
-                  {typeof results.aiAnswer === "string"
-                    ? results.aiAnswer.split("\n").map((line, i) => (
-                        <React.Fragment key={i}>
-                          {line}
-                          {i < results.aiAnswer.split("\n").length - 1 && (
-                            <br />
-                          )}
-                        </React.Fragment>
-                      ))
-                    : results.aiAnswer}
+                <div className="result-content-wrapper">
+                  <div
+                    id="aiAnswerText"
+                    ref={aiTextRef}
+                    style={{
+                      maxHeight: aiExpanded ? "none" : "136px", // ~5 lines
+                      overflow: aiExpanded ? "visible" : "hidden",
+                    }}
+                    className="result-content"
+                  >
+                    {typeof results.aiAnswer === "string"
+                      ? results.aiAnswer.split("\n").map((line, i) => (
+                          <React.Fragment key={i}>
+                            {line}
+                            {i < results.aiAnswer.split("\n").length - 1 && (
+                              <br />
+                            )}
+                          </React.Fragment>
+                        ))
+                      : results.aiAnswer}
+                  </div>
                 </div>
+                {showToggle && (
+                  <button
+                    className="toggle-btn"
+                    onClick={() => setAiExpanded((prev) => !prev)}
+                    aria-expanded={aiExpanded}
+                    aria-controls="aiAnswerText"
+                  >
+                    {aiExpanded ? "Show Less" : "Show More"}
+                  </button>
+                )}
               </div>
             )}
 

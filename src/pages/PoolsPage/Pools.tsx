@@ -1,201 +1,1348 @@
-import React, { useEffect, useState } from "react";
+// src/pages/Pools.tsx
+// Last Updated: 2025-05-28 23:19:55 UTC by jake1318
 
-// Define the shape of pool data based on API fields
-interface PoolInfo {
-  symbolA: string;
-  symbolB: string;
-  poolAddress: string;
-  feeRatePct?: number; // fee tier percentage (if provided by API)
-  apr?: number; // pool APR (if provided by API, used if feeRatePct is not present)
-  tvlUsd: number; // total value locked in USD
-  rewardApy?: number; // reward APY (if any)
+import React, { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useWallet } from "@suiet/wallet-kit";
+import DepositModal from "../../components/DepositModal";
+import TurbosDepositModal from "../../components/TurbosDepositModal";
+import KriyaDepositModal from "../../components/KriyaDepositModal"; // Import the new Kriya modal
+import TransactionNotification from "../../components/TransactionNotification";
+import EnhancedTokenIcon from "../../components/EnhancedTokenIcon";
+import ProtocolBadge from "./ProtocolBadge";
+import { VaultSection } from "../../components/VaultSection";
+import { PoolInfo } from "../../services/coinGeckoService";
+import * as coinGeckoService from "../../services/coinGeckoService";
+import * as cetusService from "../../services/cetusService";
+import * as bluefinService from "../../services/bluefinService";
+import * as turbosService from "../../services/turbosService";
+import * as kriyadexService from "../../services/kriyadexService"; // Import the new Kriya service
+import * as birdeyeService from "../../services/birdeyeService";
+import * as blockvisionService from "../../services/blockvisionService";
+import "../../styles/pages/Pools.scss";
+import "./protocolBadges.scss";
+
+// Define all supported DEXes from CoinGecko
+interface DexInfo {
+  id: string;
+  name: string;
+}
+
+// Pre-defined list of DEXes that CoinGecko supports
+// Keep Bluefin in the list since we want to display their pools
+const SUPPORTED_DEXES: DexInfo[] = [
+  { id: "bluemove", name: "BlueMove" },
+  { id: "cetus", name: "Cetus" },
+  { id: "kriya-dex", name: "KriyaDEX" },
+  { id: "turbos-finance", name: "Turbos Finance" },
+  { id: "bluefin", name: "Bluefin" },
+  { id: "flow-x", name: "FlowX" },
+  { id: "aftermath", name: "Aftermath" },
+  { id: "alphafi", name: "AlphaFi" },
+  { id: "alphalend", name: "AlphaLend" },
+  { id: "bucket", name: "Bucket" },
+  { id: "haedal", name: "Haedal" },
+  { id: "kai", name: "Kai" },
+  { id: "navi", name: "Navi" },
+  { id: "scallop", name: "Scallop" },
+  { id: "suilend", name: "SuiLend" },
+  { id: "suistake", name: "Suistake" },
+  { id: "typus", name: "Typus" },
+  { id: "walrus", name: "Walrus" },
+];
+
+const DEFAULT_TOKEN_ICON = "/assets/token-placeholder.png";
+
+// Define the tab types
+enum TabType {
+  POOLS = "pools",
+  MY_POSITIONS = "positions",
+  PORTFOLIO = "portfolio",
+  VAULTS = "vaults",
 }
 
 const Pools: React.FC = () => {
-  // State for pool list, current page, loading status, error message, and all-loaded flag
+  const wallet = useWallet();
+  const { connected, account } = wallet;
+  const navigate = useNavigate();
+
+  // State to track active tab
+  const [activeTab, setActiveTab] = useState<TabType>(TabType.POOLS);
+
+  const [originalPools, setOriginalPools] = useState<PoolInfo[]>([]);
   const [pools, setPools] = useState<PoolInfo[]>([]);
-  const [page, setPage] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [allLoaded, setAllLoaded] = useState<boolean>(false);
+  const [filteredPools, setFilteredPools] = useState<PoolInfo[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [search, setSearch] = useState<string>("");
+  const [sortColumn, setSortColumn] = useState<
+    "liquidityUSD" | "volumeUSD" | "feesUSD" | "apr" | "dex"
+  >("apr");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // Helper function to format large numbers (TVL) into human-readable strings (e.g., 1.2M)
-  const formatNumber = (value: number): string => {
-    return new Intl.NumberFormat("en-US", {
-      notation: "compact",
-      compactDisplay: "short",
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
+  // State for deposit modals - separate state for each modal type
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState<boolean>(false);
+  const [isTurbosModalOpen, setIsTurbosModalOpen] = useState<boolean>(false);
+  const [isKriyaModalOpen, setIsKriyaModalOpen] = useState<boolean>(false); // New state for Kriya modal
+  const [selectedPool, setSelectedPool] = useState<PoolInfo | null>(null);
 
-  // Fetch pool data for a given page from the API
-  const fetchPools = async (pageToLoad: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Assuming your backend is running on port 5000
-      const API_BASE_URL = "http://localhost:5000";
-      const res = await fetch(
-        `${API_BASE_URL}/api/pools?page=${pageToLoad}&limit=8`
-      );
+  const [notification, setNotification] = useState<{
+    message: string;
+    isSuccess: boolean;
+    txDigest?: string;
+  } | null>(null);
 
-      console.log(
-        `Fetching pools from: ${API_BASE_URL}/api/pools?page=${pageToLoad}&limit=8`
-      );
+  // State for token balances to pass to deposit modals
+  const [tokenABalance, setTokenABalance] = useState<string>("0");
+  const [tokenBBalance, setTokenBBalance] = useState<string>("0");
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+  // Track selected DEX filter
+  const [selectedDex, setSelectedDex] = useState<string | null>(null);
 
-      const data = await res.json();
-      console.log("API Response:", data); // Debug logging
+  // Add search debounce timer
+  const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null);
 
-      // Assume the data is either an array of pools or an object with a 'pools' array
-      const newPools: PoolInfo[] = Array.isArray(data) ? data : data.pools;
+  // Cache BirdEye metadata for all token addresses
+  const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
 
-      // Update state: append new pools if not the first page, otherwise replace
-      setPools((prevPools) =>
-        pageToLoad === 1 ? newPools : [...prevPools, ...newPools]
-      );
+  // Currently supported DEXes for deposit
+  const supportedDexes = [
+    "cetus",
+    "bluefin",
+    "turbos-finance",
+    "turbos",
+    "kriya-dex",
+    "kriya",
+  ]; // Added Kriya
 
-      setPage(pageToLoad); // update current page
+  // Set maximum number of pools to show in results
+  const MAX_POOLS_TO_DISPLAY = 20;
 
-      // Check if we've reached the end of available pools
-      const isLastPage = pageToLoad >= data.totalPages;
-      const hasFullPage = newPools.length === 8;
-
-      if (!hasFullPage || isLastPage) {
-        setAllLoaded(true);
-      }
-    } catch (err: any) {
-      console.error("Failed to fetch pools:", err);
-      setError("Failed to load pools. Please try again.");
-    } finally {
-      setLoading(false);
+  // Handle navigation to other pages
+  const navigateToPage = (tab: TabType) => {
+    if (tab === TabType.MY_POSITIONS) {
+      navigate("/positions");
+    } else if (tab === TabType.PORTFOLIO) {
+      navigate("/portfolio");
+    } else if (tab === TabType.VAULTS) {
+      setActiveTab(TabType.VAULTS);
+    } else {
+      setActiveTab(TabType.POOLS);
     }
   };
 
-  // Load initial pools on component mount (page 1)
-  useEffect(() => {
-    fetchPools(1);
+  /** ------------------------------------------------------------
+   * Fetch pools from CoinGecko + enrich with BirdEye logos + merge with Kriya pools
+   * ----------------------------------------------------------- */
+  const fetchPools = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Get CoinGecko pools
+      const poolsFromCoingecko = await coinGeckoService.getDefaultPools();
+      console.log(`Fetched ${poolsFromCoingecko.length} pools from CoinGecko`);
+
+      // 2. Merge in ALL Kriya pools using our new service function
+      const mergedPools = await kriyadexService.getMergedPoolsWithKriya(
+        poolsFromCoingecko
+      );
+      console.log(
+        `Total pools after merging with Kriya: ${mergedPools.length}`
+      );
+
+      // 3. Collect all token addresses for logo fetching
+      const addrs = new Set<string>();
+      mergedPools.forEach((p) => {
+        if (p.tokenAAddress) addrs.add(p.tokenAAddress);
+        if (p.tokenBAddress) addrs.add(p.tokenBAddress);
+      });
+
+      // 4. Fetch BirdEye metadata in one batch
+      if (addrs.size) {
+        console.log(
+          `Fetching BirdEye metadata for ${addrs.size} token addresses`
+        );
+        const meta = await birdeyeService.getMultipleTokenMetadata(
+          Array.from(addrs)
+        );
+        console.log(
+          `Retrieved metadata for ${Object.keys(meta).length} tokens`
+        );
+
+        // Log a sample of the metadata to check format
+        if (Object.keys(meta).length > 0) {
+          const sampleKey = Object.keys(meta)[0];
+          console.log(`Sample metadata for ${sampleKey}:`, meta[sampleKey]);
+        }
+
+        setTokenMetadata(meta);
+      }
+
+      // 5. Save to state and sort by APR by default
+      setOriginalPools(mergedPools);
+      setPools(mergedPools);
+
+      const sortedPools = [...mergedPools].sort((a, b) => b.apr - a.apr);
+      setFilteredPools(sortedPools.slice(0, MAX_POOLS_TO_DISPLAY));
+    } catch (error) {
+      console.error("Failed to fetch pools:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Handler for clicking "Load More"
-  const handleLoadMore = () => {
-    if (loading || allLoaded) return;
-    fetchPools(page + 1);
+  // Initial data fetch
+  useEffect(() => {
+    fetchPools();
+  }, [fetchPools]);
+
+  /**
+   * Fetch pools by DEX + enrich with BirdEye logos
+   */
+  const fetchPoolsByDex = useCallback(
+    async (dex: string) => {
+      setLoading(true);
+      try {
+        console.log(`Fetching top pools for DEX: ${dex}`);
+
+        // Special case for Kriya - use our bulletproof implementation with CoinGecko data + fallbacks
+        if (
+          dex.toLowerCase() === "kriya-dex" ||
+          dex.toLowerCase() === "kriya"
+        ) {
+          console.log("Using optimized Kriya pool fetching with fallbacks");
+          const kriyaPools = await kriyadexService.getKriyaPoolsWithFallback();
+          console.log(
+            `Retrieved ${kriyaPools.length} Kriya pools with fallbacks`
+          );
+
+          // Sort by APR by default
+          const sortedPools = [...kriyaPools].sort((a, b) => b.apr - a.apr);
+
+          // Update state
+          setPools(sortedPools);
+          setFilteredPools(sortedPools.slice(0, MAX_POOLS_TO_DISPLAY));
+          setLoading(false);
+          return;
+        }
+
+        // For other DEXes, continue with existing logic...
+        let dexPools: PoolInfo[] = [];
+
+        // Try to use cached data first
+        dexPools = originalPools.filter(
+          (p) => p.dex.toLowerCase() === dex.toLowerCase()
+        );
+
+        // If not enough pools in cache, fetch from CoinGecko
+        if (dexPools.length < MAX_POOLS_TO_DISPLAY) {
+          const poolsByDex = await coinGeckoService.getPoolsByDex(
+            dex,
+            MAX_POOLS_TO_DISPLAY
+          );
+          dexPools = poolsByDex;
+        }
+
+        console.log(`Found ${dexPools.length} pools for ${dex}`);
+
+        // Collect addresses & fetch metadata
+        const addrs = new Set<string>();
+        dexPools.forEach((p) => {
+          if (p.tokenAAddress) addrs.add(p.tokenAAddress);
+          if (p.tokenBAddress) addrs.add(p.tokenBAddress);
+        });
+
+        if (addrs.size) {
+          const meta = await birdeyeService.getMultipleTokenMetadata(
+            Array.from(addrs)
+          );
+          setTokenMetadata((prev) => ({ ...prev, ...meta }));
+        }
+
+        setPools(dexPools);
+        setFilteredPools(dexPools.slice(0, MAX_POOLS_TO_DISPLAY));
+      } catch (error) {
+        console.error(`Failed to fetch pools for DEX ${dex}:`, error);
+        // Fallback to cached
+        const dexPools = originalPools.filter(
+          (p) => p.dex.toLowerCase() === dex.toLowerCase()
+        );
+        setPools(dexPools);
+        setFilteredPools(dexPools.slice(0, MAX_POOLS_TO_DISPLAY));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [originalPools]
+  );
+
+  /**
+   * Search pools + enrich with BirdEye logos
+   */
+  const performSearch = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        if (selectedDex) {
+          setFilteredPools(
+            pools
+              .filter((p) => p.dex.toLowerCase() === selectedDex.toLowerCase())
+              .slice(0, MAX_POOLS_TO_DISPLAY)
+          );
+        } else {
+          setFilteredPools(pools.slice(0, MAX_POOLS_TO_DISPLAY));
+        }
+        return;
+      }
+
+      setLoading(true);
+      try {
+        let searchResults: PoolInfo[] = [];
+
+        // If we're filtering by Kriya DEX, search in our direct API data
+        if (
+          selectedDex &&
+          (selectedDex.toLowerCase() === "kriya-dex" ||
+            selectedDex.toLowerCase() === "kriya")
+        ) {
+          const kriyaPools = await kriyadexService.getKriyaPoolsWithFallback();
+          const lowerQuery = query.toLowerCase();
+
+          searchResults = kriyaPools.filter(
+            (p) =>
+              p.tokenA?.toLowerCase().includes(lowerQuery) ||
+              p.tokenB?.toLowerCase().includes(lowerQuery) ||
+              p.name?.toLowerCase().includes(lowerQuery) ||
+              (p.rewardSymbols &&
+                p.rewardSymbols.some((s) =>
+                  s.toLowerCase().includes(lowerQuery)
+                ))
+          );
+
+          console.log(
+            `Found ${searchResults.length} matching Kriya pools for "${query}"`
+          );
+        } else {
+          // Otherwise use CoinGecko search
+          searchResults = await coinGeckoService.searchPools(
+            query,
+            MAX_POOLS_TO_DISPLAY
+          );
+          console.log(
+            `Search returned ${searchResults.length} results from CoinGecko`
+          );
+
+          // If we have Kriya pools loaded, also search those
+          if (!selectedDex) {
+            try {
+              const kriyaPools =
+                await kriyadexService.getKriyaPoolsWithFallback();
+              const lowerQuery = query.toLowerCase();
+
+              const matchingKriyaPools = kriyaPools.filter(
+                (p) =>
+                  p.tokenA?.toLowerCase().includes(lowerQuery) ||
+                  p.tokenB?.toLowerCase().includes(lowerQuery) ||
+                  p.name?.toLowerCase().includes(lowerQuery) ||
+                  (p.rewardSymbols &&
+                    p.rewardSymbols.some((s) =>
+                      s?.toLowerCase().includes(lowerQuery)
+                    ))
+              );
+
+              // Add Kriya pools to results if not already there (case-insensitive check)
+              const existingAddresses = new Set(
+                searchResults.map((p) => p.address.toLowerCase())
+              );
+              const addedKriyaPools = matchingKriyaPools.filter(
+                (pool) => !existingAddresses.has(pool.address.toLowerCase())
+              );
+
+              if (addedKriyaPools.length > 0) {
+                searchResults.push(...addedKriyaPools);
+                console.log(
+                  `Added ${addedKriyaPools.length} matching Kriya pools to search results`
+                );
+              }
+            } catch (error) {
+              console.error("Error searching Kriya pools:", error);
+            }
+          }
+        }
+
+        // Enrich logos
+        const addrs = new Set<string>();
+        searchResults.forEach((p) => {
+          if (p.tokenAAddress) addrs.add(p.tokenAAddress);
+          if (p.tokenBAddress) addrs.add(p.tokenBAddress);
+        });
+        if (addrs.size) {
+          const meta = await birdeyeService.getMultipleTokenMetadata(
+            Array.from(addrs)
+          );
+          setTokenMetadata((prev) => ({ ...prev, ...meta }));
+        }
+
+        let result = searchResults;
+        if (selectedDex) {
+          result = result.filter(
+            (p) => p.dex.toLowerCase() === selectedDex.toLowerCase()
+          );
+        }
+
+        result.sort((a, b) => {
+          const va = a[sortColumn];
+          const vb = b[sortColumn];
+          if (sortOrder === "asc") return va > vb ? 1 : -1;
+          return va < vb ? 1 : -1;
+        });
+
+        setFilteredPools(result.slice(0, MAX_POOLS_TO_DISPLAY));
+      } catch (error) {
+        console.error("Error during search:", error);
+        // fallback filter
+        const lower = query.toLowerCase();
+        let result = pools.filter(
+          (p) =>
+            (p.tokenA && p.tokenA.toLowerCase().includes(lower)) ||
+            (p.tokenB && p.tokenB.toLowerCase().includes(lower)) ||
+            (p.name && p.name.toLowerCase().includes(lower)) ||
+            (p.dex && p.dex.toLowerCase().includes(lower)) ||
+            (p.rewardSymbols &&
+              p.rewardSymbols.some((s) => s && s.toLowerCase().includes(lower)))
+        );
+        if (selectedDex) {
+          result = result.filter(
+            (p) => p.dex.toLowerCase() === selectedDex.toLowerCase()
+          );
+        }
+        setFilteredPools(result.slice(0, MAX_POOLS_TO_DISPLAY));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [pools, selectedDex, sortColumn, sortOrder]
+  );
+
+  // Debounced search handler
+  const handleSearch = useCallback(
+    (query: string) => {
+      setSearch(query);
+      if (searchTimer) clearTimeout(searchTimer);
+      const t = setTimeout(() => performSearch(query), 300);
+      setSearchTimer(t);
+    },
+    [searchTimer, performSearch]
+  );
+
+  // Cleanup debounce on unmount
+  useEffect(
+    () => () => {
+      if (searchTimer) clearTimeout(searchTimer);
+    },
+    [searchTimer]
+  );
+
+  // Reset filters
+  const handleReset = useCallback(() => {
+    setSearch("");
+    setSelectedDex(null);
+    setSortColumn("apr");
+    setSortOrder("desc");
+    setPools(originalPools);
+    setFilteredPools(
+      [...originalPools]
+        .sort((a, b) => b.apr - a.apr)
+        .slice(0, MAX_POOLS_TO_DISPLAY)
+    );
+  }, [originalPools]);
+
+  // Sorting
+  const handleSort = (col: typeof sortColumn) => {
+    if (sortColumn === col) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(col);
+      setSortOrder("desc");
+    }
   };
 
-  // Placeholder: Add Liquidity action
-  const handleAddLiquidity = (pool: PoolInfo) => {
-    console.log(`Add Liquidity clicked for pool: ${pool.poolAddress}`);
-    // TODO: open a form/modal to specify amounts, then call transaction logic
+  useEffect(() => {
+    setFilteredPools((prev) =>
+      [...prev].sort((a, b) => {
+        const va = a[sortColumn],
+          vb = b[sortColumn];
+        if (sortOrder === "asc") return va > vb ? 1 : -1;
+        return va < vb ? 1 : -1;
+      })
+    );
+  }, [sortColumn, sortOrder]);
+
+  // DEX filter
+  const handleDexChange = useCallback(
+    (dex: string | null) => {
+      setSelectedDex(dex);
+      if (dex) {
+        fetchPoolsByDex(dex);
+      } else {
+        setPools(originalPools);
+        if (search.trim()) performSearch(search);
+        else setFilteredPools(originalPools.slice(0, MAX_POOLS_TO_DISPLAY));
+      }
+    },
+    [
+      originalPools,
+      fetchPoolsByDex,
+      search,
+      performSearch,
+      MAX_POOLS_TO_DISPLAY,
+    ]
+  );
+
+  /**
+   * Check if a pool is a Turbos pool
+   */
+  const isTurbosPool = (pool: PoolInfo): boolean => {
+    // Check if the pool belongs to Turbos Finance
+    return (
+      turbosService.isTurbosPool(pool.address, pool.dex) ||
+      pool.dex.toLowerCase() === "turbos" ||
+      pool.dex.toLowerCase() === "turbos-finance"
+    );
   };
 
-  // Placeholder: Withdraw action
-  const handleWithdraw = (pool: PoolInfo) => {
-    console.log(`Withdraw clicked for pool: ${pool.poolAddress}`);
-    // TODO: open a form/modal to specify how much to withdraw, then call transaction logic
+  /**
+   * Check if a pool is a Kriya pool
+   */
+  const isKriyaPool = (pool: PoolInfo): boolean => {
+    // Check if the pool belongs to Kriya DEX
+    return (
+      kriyadexService.isKriyaPool(pool.address) ||
+      pool.dex.toLowerCase() === "kriya" ||
+      pool.dex.toLowerCase() === "kriya-dex"
+    );
+  };
+
+  /**
+   * Fetch token balances for the deposit modals
+   */
+  const fetchTokenBalances = async (pool: PoolInfo) => {
+    if (!account?.address) return;
+
+    try {
+      // First try to get balances from blockvisionService
+      if (pool.tokenAAddress && pool.tokenBAddress) {
+        try {
+          console.log("Fetching token balances from BlockVision API");
+          const coinsResponse = await blockvisionService.getAccountCoins(
+            account.address
+          );
+
+          if (coinsResponse && coinsResponse.data) {
+            const coins = coinsResponse.data;
+
+            // Find tokens in the coins list
+            const tokenACoin = coins.find(
+              (coin) =>
+                coin.coinType?.toLowerCase() ===
+                pool.tokenAAddress?.toLowerCase()
+            );
+
+            const tokenBCoin = coins.find(
+              (coin) =>
+                coin.coinType?.toLowerCase() ===
+                pool.tokenBAddress?.toLowerCase()
+            );
+
+            if (tokenACoin) {
+              const decimals = tokenACoin.decimals || 9;
+              const normalizedBalance = tokenACoin.balance / 10 ** decimals;
+              setTokenABalance(normalizedBalance.toString());
+              console.log(
+                `Found ${pool.tokenA} balance:`,
+                normalizedBalance.toString()
+              );
+            }
+
+            if (tokenBCoin) {
+              const decimals = tokenBCoin.decimals || 9;
+              const normalizedBalance = tokenBCoin.balance / 10 ** decimals;
+              setTokenBBalance(normalizedBalance.toString());
+              console.log(
+                `Found ${pool.tokenB} balance:`,
+                normalizedBalance.toString()
+              );
+            }
+
+            // If we found at least one token, return early
+            if (tokenACoin || tokenBCoin) return;
+          }
+        } catch (error) {
+          console.log(
+            "Error fetching from BlockVision, falling back to BirdEye:",
+            error
+          );
+        }
+      }
+
+      // Fallback to BirdEye if BlockVision didn't work
+      if (birdeyeService.getTokenBalance) {
+        try {
+          const tokenABalance = await birdeyeService.getTokenBalance(
+            account.address,
+            pool.tokenAAddress || pool.tokenA
+          );
+          const tokenBBalance = await birdeyeService.getTokenBalance(
+            account.address,
+            pool.tokenBAddress || pool.tokenB
+          );
+
+          setTokenABalance(tokenABalance);
+          setTokenBBalance(tokenBBalance);
+        } catch (error) {
+          console.error("Error fetching balances from BirdEye:", error);
+          setTokenABalance("0");
+          setTokenBBalance("0");
+        }
+      } else {
+        console.error("birdeyeService.getTokenBalance is not a function");
+        setTokenABalance("0");
+        setTokenBBalance("0");
+      }
+    } catch (error) {
+      console.error("Failed to fetch token balances:", error);
+      setTokenABalance("0");
+      setTokenBBalance("0");
+    }
+  };
+
+  // Deposit modal
+  const handleOpenDepositModal = async (pool: PoolInfo) => {
+    setSelectedPool(pool);
+
+    // Fetch token balances
+    await fetchTokenBalances(pool);
+
+    // Check which modal to open based on the pool type
+    if (isKriyaPool(pool)) {
+      console.log("Opening Kriya deposit modal for pool:", pool.address);
+      setIsKriyaModalOpen(true);
+    } else if (isTurbosPool(pool)) {
+      console.log("Opening Turbos deposit modal for pool:", pool.address);
+      setIsTurbosModalOpen(true);
+    } else {
+      console.log("Opening standard deposit modal for pool:", pool.address);
+      setIsDepositModalOpen(true);
+    }
+  };
+
+  const handleCloseDepositModal = () => {
+    setIsDepositModalOpen(false);
+    setIsTurbosModalOpen(false);
+    setIsKriyaModalOpen(false); // Close Kriya modal too
+    setSelectedPool(null);
+  };
+
+  /**
+   * Determine which service to use based on the pool
+   */
+  const getServiceForPool = (pool: PoolInfo) => {
+    if (isKriyaPool(pool)) {
+      return kriyadexService;
+    } else if (bluefinService.isBluefinPool(pool.address, pool.dex)) {
+      return bluefinService;
+    } else if (turbosService.isTurbosPool(pool.address, pool.dex)) {
+      return turbosService;
+    } else {
+      return cetusService; // Default to Cetus
+    }
+  };
+
+  /**
+   * Handle deposit submission from standard deposit modal
+   */
+  const handleDeposit = async (
+    amountA: string,
+    amountB: string,
+    slippage: string,
+    tickLower?: number,
+    tickUpper?: number,
+    deltaLiquidity?: string
+  ) => {
+    if (!selectedPool || !connected || !account) {
+      console.error("Cannot deposit: missing context");
+      return { success: false, digest: "" };
+    }
+    try {
+      console.log("Initiating deposit to", selectedPool.address);
+      console.log("Amount A:", amountA, selectedPool.tokenA);
+      console.log("Amount B:", amountB, selectedPool.tokenB);
+      console.log("Slippage:", slippage + "%");
+
+      if (tickLower !== undefined && tickUpper !== undefined) {
+        console.log("Tick Range:", tickLower, "to", tickUpper);
+      }
+
+      const aNum = parseFloat(amountA);
+      const bNum = parseFloat(amountB);
+      if (isNaN(aNum) || isNaN(bNum)) {
+        throw new Error("Invalid amount");
+      }
+
+      // Determine which service to use
+      const service = getServiceForPool(selectedPool);
+      const serviceName =
+        service === kriyadexService
+          ? "Kriya"
+          : service === bluefinService
+          ? "Bluefin"
+          : service === turbosService
+          ? "Turbos"
+          : "Cetus";
+
+      console.log(
+        `Using ${serviceName} service for deposit to ${selectedPool.address}`
+      );
+
+      let txResult;
+
+      // Handle deposit based on the service
+      if (service === kriyadexService) {
+        // Kriya DEX deposit
+        txResult = await service.deposit(
+          wallet,
+          selectedPool.address,
+          aNum,
+          bNum,
+          selectedPool,
+          tickLower,
+          tickUpper,
+          parseFloat(slippage) // Pass slippage percentage
+        );
+      } else if (service === turbosService) {
+        // Turbos finance deposit
+        txResult = await service.deposit(
+          wallet,
+          selectedPool.address,
+          aNum,
+          bNum,
+          selectedPool,
+          tickLower,
+          tickUpper,
+          parseFloat(slippage) // Pass slippage percentage
+        );
+      } else if (service === bluefinService) {
+        // Bluefin deposit (doesn't use tick ranges)
+        txResult = await service.deposit(
+          wallet,
+          selectedPool.address,
+          aNum,
+          bNum,
+          selectedPool
+        );
+      } else {
+        // Cetus deposit
+        txResult = await service.deposit(
+          wallet,
+          selectedPool.address,
+          aNum,
+          bNum,
+          selectedPool,
+          tickLower,
+          tickUpper
+        );
+      }
+
+      console.log("Deposit transaction completed:", txResult);
+
+      setNotification({
+        message: `Successfully deposited ${amountA} ${selectedPool.tokenA} and ${amountB} ${selectedPool.tokenB} to ${selectedPool.dex} pool`,
+        isSuccess: true,
+        txDigest: txResult.digest,
+      });
+
+      // Refresh positions after a delay
+      setTimeout(() => {
+        if (account?.address) {
+          // Refresh positions logic would go here
+        }
+      }, 3000);
+
+      return txResult;
+    } catch (err: any) {
+      console.error("Deposit failed:", err);
+      setNotification({
+        message: `Failed to deposit: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        isSuccess: false,
+      });
+      throw err;
+    }
+  };
+
+  /**
+   * Handle deposit submission from Turbos deposit modal
+   */
+  const handleTurbosDeposit = async (
+    poolId: string,
+    amountA: number,
+    amountB: number,
+    tickLower: number,
+    tickUpper: number,
+    slippage: number
+  ) => {
+    if (!selectedPool || !connected || !account) {
+      console.error("Cannot deposit: missing context");
+      return { success: false, digest: "" };
+    }
+
+    try {
+      console.log("Initiating Turbos deposit to", poolId);
+      console.log("Amount A:", amountA, selectedPool.tokenA);
+      console.log("Amount B:", amountB, selectedPool.tokenB);
+      console.log("Slippage:", slippage + "%");
+      console.log("Tick Range:", tickLower, "to", tickUpper);
+
+      // Use the Turbos service for the deposit
+      console.log("Using Turbos service for deposit to", poolId);
+
+      const result = await turbosService.deposit(
+        wallet,
+        poolId,
+        amountA,
+        amountB,
+        selectedPool, // Pass pool info
+        tickLower,
+        tickUpper,
+        slippage
+      );
+
+      if (result.success) {
+        setNotification({
+          message: `Successfully deposited ${amountA} ${selectedPool.tokenA} and ${amountB} ${selectedPool.tokenB} to Turbos pool`,
+          isSuccess: true,
+          txDigest: result.digest,
+        });
+
+        // Refresh positions after a delay
+        setTimeout(() => {
+          if (account?.address) {
+            // Refresh positions logic would go here
+          }
+        }, 3000);
+      }
+
+      return result;
+    } catch (err: any) {
+      console.error("Turbos deposit failed:", err);
+      setNotification({
+        message: `Failed to deposit: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        isSuccess: false,
+      });
+      throw err;
+    }
+  };
+
+  /**
+   * Handle deposit submission from Kriya deposit modal
+   */
+  const handleKriyaDeposit = async (
+    poolId: string,
+    amountA: number,
+    amountB: number,
+    tickLower: number,
+    tickUpper: number,
+    slippage: number
+  ) => {
+    if (!selectedPool || !connected || !account) {
+      console.error("Cannot deposit: missing context");
+      return { success: false, digest: "" };
+    }
+
+    try {
+      console.log("Initiating Kriya deposit to", poolId);
+      console.log("Amount A:", amountA, selectedPool.tokenA);
+      console.log("Amount B:", amountB, selectedPool.tokenB);
+      console.log("Slippage:", slippage + "%");
+      console.log("Tick Range:", tickLower, "to", tickUpper);
+
+      // Use the Kriya service for the deposit
+      console.log("Using Kriya service for deposit to", poolId);
+
+      const result = await kriyadexService.deposit(
+        wallet,
+        poolId,
+        amountA,
+        amountB,
+        selectedPool, // Pass pool info
+        tickLower,
+        tickUpper,
+        slippage
+      );
+
+      if (result.success) {
+        setNotification({
+          message: `Successfully deposited ${amountA} ${selectedPool.tokenA} and ${amountB} ${selectedPool.tokenB} to Kriya pool`,
+          isSuccess: true,
+          txDigest: result.digest,
+        });
+
+        // Refresh positions after a delay
+        setTimeout(() => {
+          if (account?.address) {
+            // Refresh positions logic would go here
+          }
+        }, 3000);
+      }
+
+      return result;
+    } catch (err: any) {
+      console.error("Kriya deposit failed:", err);
+      setNotification({
+        message: `Failed to deposit: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        isSuccess: false,
+      });
+      throw err;
+    }
+  };
+
+  const dismissNotification = () => setNotification(null);
+
+  const getAprClass = (apr: number) => {
+    if (apr >= 100) return "high";
+    if (apr >= 50) return "medium";
+    return "low";
+  };
+
+  const isDexSupported = (dex: string) => {
+    const normalizedDex = dex.toLowerCase();
+    return supportedDexes.some(
+      (supported) =>
+        normalizedDex === supported.toLowerCase() ||
+        normalizedDex.includes(supported.toLowerCase())
+    );
+  };
+
+  const getDexDisplayName = (id: string) => {
+    const d = SUPPORTED_DEXES.find(
+      (x) => x.id.toLowerCase() === id.toLowerCase()
+    );
+    return d ? d.name : id.charAt(0).toUpperCase() + id.slice(1);
+  };
+
+  const normalizeProtocolName = (dexId: string) => {
+    const special: Record<string, string> = {
+      "flow-x": "flowx",
+      "turbos-finance": "turbos",
+      "kriya-dex": "kriya",
+    };
+    const norm = dexId.toLowerCase();
+    return special[norm] ?? norm.replace(/[-_]/g, "");
+  };
+
+  // Helper to get the best logo URL for a token
+  const getTokenLogoUrl = (pool: PoolInfo, isTokenA: boolean) => {
+    // First try logos directly provided in pool info
+    if (isTokenA && pool.tokenALogo) return pool.tokenALogo;
+    if (!isTokenA && pool.tokenBLogo) return pool.tokenBLogo;
+
+    // Then try to get token address
+    const address = isTokenA ? pool.tokenAAddress : pool.tokenBAddress;
+    const symbol = isTokenA ? pool.tokenA : pool.tokenB;
+
+    // For debugging, log what we have
+    console.debug(
+      `Getting logo for ${symbol} (${isTokenA ? "token A" : "token B"})${
+        address ? ` address ${address}` : ""
+      }`
+    );
+
+    // First try BirdEye metadata
+    if (address && tokenMetadata[address]) {
+      const metadata = tokenMetadata[address];
+
+      console.debug(`Found BirdEye metadata for ${symbol}`, metadata);
+
+      // Check all possible logo fields
+      if (metadata.logo_uri) return metadata.logo_uri;
+      if (metadata.logoUrl) return metadata.logoUrl;
+      if (metadata.logoURI) return metadata.logoURI;
+      if (metadata.logo) return metadata.logo;
+    } else if (address) {
+      console.debug(`No BirdEye metadata found for ${symbol} (${address})`);
+    }
+
+    // Then try pool metadata
+    const poolMetadata = isTokenA ? pool.tokenAMetadata : pool.tokenBMetadata;
+    if (poolMetadata) {
+      console.debug(`Found pool metadata for ${symbol}`, poolMetadata);
+
+      // Check all possible logo fields
+      const logo =
+        poolMetadata.logo_uri ||
+        poolMetadata.logoUrl ||
+        poolMetadata.logoURI ||
+        poolMetadata.logo;
+
+      if (logo) return logo;
+    }
+
+    // No logo found in metadata
+    console.debug(`No logo URL found for ${symbol}`);
+    return undefined;
+  };
+
+  // Add a helper function to check if a pool has complete data
+  // This can be used to visually distinguish fallback/stub pools from complete ones
+  const hasCompleteData = (pool: PoolInfo): boolean => {
+    // Check if this is a known fallback pool with minimal data
+    if (
+      pool.tokenA === "Unknown" &&
+      pool.tokenB === "Unknown" &&
+      pool._rawData?.infoSource?.includes("fallback")
+    ) {
+      return false;
+    }
+
+    // Check if essential data is available
+    return !!(
+      pool.tokenA &&
+      pool.tokenB &&
+      (pool.liquidityUSD > 0 || pool.volumeUSD > 0 || pool.apr > 0)
+    );
+  };
+
+  // Render the pool content
+  const renderPoolContent = () => {
+    return (
+      <>
+        <div className="controls-section">
+          <div className="search-container">
+            <div className="search-icon">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search pools or tokens..."
+            />
+          </div>
+
+          <div className="filter-section">
+            <div className="filter-label">DEX:</div>
+            <div className="filter-control">
+              <select
+                value={selectedDex || "all"}
+                onChange={(e) =>
+                  handleDexChange(
+                    e.target.value === "all" ? null : e.target.value
+                  )
+                }
+              >
+                <option value="all">All DEXes</option>
+                {SUPPORTED_DEXES.map((dex) => (
+                  <option key={dex.id} value={dex.id}>
+                    {dex.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="action-button" onClick={handleReset}>
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <div className="loading-text">Loading pools...</div>
+          </div>
+        ) : (
+          <div className="pools-table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pool</th>
+                  <th className="dex-column" onClick={() => handleSort("dex")}>
+                    DEX
+                    {sortColumn === "dex" && (
+                      <span className="sort-indicator">
+                        {sortOrder === "asc" ? " ↑" : " ↓"}
+                      </span>
+                    )}
+                  </th>
+                  <th
+                    className="align-right"
+                    onClick={() => handleSort("liquidityUSD")}
+                  >
+                    Liquidity (USD)
+                    {sortColumn === "liquidityUSD" && (
+                      <span className="sort-indicator">
+                        {sortOrder === "asc" ? " ↑" : " ↓"}
+                      </span>
+                    )}
+                  </th>
+                  <th
+                    className="align-right"
+                    onClick={() => handleSort("volumeUSD")}
+                  >
+                    Volume (24h)
+                    {sortColumn === "volumeUSD" && (
+                      <span className="sort-indicator">
+                        {sortOrder === "asc" ? " ↑" : " ↓"}
+                      </span>
+                    )}
+                  </th>
+                  <th
+                    className="align-right"
+                    onClick={() => handleSort("feesUSD")}
+                  >
+                    Fees (24h)
+                    {sortColumn === "feesUSD" && (
+                      <span className="sort-indicator">
+                        {sortOrder === "asc" ? " ↑" : " ↓"}
+                      </span>
+                    )}
+                  </th>
+                  <th className="align-right" onClick={() => handleSort("apr")}>
+                    APR
+                    {sortColumn === "apr" && (
+                      <span className="sort-indicator">
+                        {sortOrder === "asc" ? " ↑" : " ↓"}
+                      </span>
+                    )}
+                  </th>
+                  <th className="actions-column">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPools.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty-state">
+                      <div className="empty-icon">🔍</div>
+                      <div>No pools found matching your criteria</div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPools.map((pool) => {
+                    const isStubPool = !hasCompleteData(pool);
+                    return (
+                      <tr
+                        key={pool.address}
+                        className={isStubPool ? "stub-pool" : ""}
+                      >
+                        <td className="pool-cell">
+                          <div className="pool-item">
+                            <div className="token-icons">
+                              <EnhancedTokenIcon
+                                symbol={pool.tokenA}
+                                logoUrl={getTokenLogoUrl(pool, true)}
+                                address={pool.tokenAAddress}
+                                size="md"
+                                className="token-a"
+                              />
+                              <EnhancedTokenIcon
+                                symbol={pool.tokenB}
+                                logoUrl={getTokenLogoUrl(pool, false)}
+                                address={pool.tokenBAddress}
+                                size="md"
+                                className="token-b"
+                              />
+                            </div>
+                            <div className="pool-info">
+                              <div className="pair-name">
+                                {isStubPool && (
+                                  <span className="stub-indicator">
+                                    Coming Soon
+                                  </span>
+                                )}
+                                {pool.tokenA} / {pool.tokenB}
+                              </div>
+                              {pool.name?.match(/(\d+(\.\d+)?)%/) && (
+                                <div className="fee-tier">
+                                  {pool.name.match(/(\d+(\.\d+)?)%/)![0]}
+                                </div>
+                              )}
+                              {pool.fee &&
+                                !pool.name?.match(/(\d+(\.\d+)?)%/) && (
+                                  <div className="fee-tier">
+                                    {(pool.fee * 100).toFixed(2)}%
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+                        </td>
+
+                        <td>
+                          <ProtocolBadge
+                            protocol={getDexDisplayName(pool.dex)}
+                            protocolClass={normalizeProtocolName(pool.dex)}
+                          />
+                        </td>
+
+                        <td className="align-right">
+                          ${formatNumber(pool.liquidityUSD)}
+                        </td>
+                        <td className="align-right">
+                          ${formatNumber(pool.volumeUSD)}
+                        </td>
+                        <td className="align-right">
+                          ${formatNumber(pool.feesUSD)}
+                        </td>
+
+                        <td className="align-right">
+                          <span
+                            className={`apr-value ${getAprClass(pool.apr)}`}
+                          >
+                            {formatNumber(pool.apr)}%
+                          </span>
+                        </td>
+
+                        <td className="actions-cell">
+                          <button
+                            className={`btn ${
+                              isDexSupported(pool.dex) && !isStubPool
+                                ? "btn--primary"
+                                : "btn--secondary"
+                            }`}
+                            onClick={() =>
+                              isDexSupported(pool.dex) && !isStubPool
+                                ? handleOpenDepositModal(pool)
+                                : undefined
+                            }
+                            disabled={
+                              !isDexSupported(pool.dex) ||
+                              !connected ||
+                              isStubPool
+                            }
+                          >
+                            {isStubPool
+                              ? "Coming Soon"
+                              : isDexSupported(pool.dex)
+                              ? "Deposit"
+                              : "Coming Soon"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>
+    );
   };
 
   return (
-    <div className="pools-container">
-      {/* Error message */}
-      {error && (
-        <div
-          className="error-message"
-          style={{ color: "red", marginBottom: "1rem" }}
-        >
-          {error}
+    <div className="pools-page">
+      <div className="content-container">
+        <div className="main-navigation">
+          <div
+            className={`nav-link ${
+              activeTab === TabType.POOLS ? "active" : ""
+            }`}
+            onClick={() => navigateToPage(TabType.POOLS)}
+          >
+            Pools
+          </div>
+          <Link to="/positions" className="nav-link">
+            My Positions
+          </Link>
+          <Link to="/portfolio" className="nav-link">
+            Portfolio
+          </Link>
+          <div
+            className={`nav-link ${
+              activeTab === TabType.VAULTS ? "active" : ""
+            }`}
+            onClick={() => navigateToPage(TabType.VAULTS)}
+          >
+            Vaults
+          </div>
         </div>
-      )}
 
-      {/* No pools found message */}
-      {!loading && !error && pools.length === 0 && (
-        <div className="no-pools" style={{ fontStyle: "italic" }}>
-          No pools found.
-        </div>
-      )}
+        {activeTab === TabType.POOLS && renderPoolContent()}
+        {activeTab === TabType.VAULTS && <VaultSection />}
 
-      {/* Pools table */}
-      {pools.length > 0 && (
-        <table
-          className="pool-list"
-          style={{ width: "100%", borderCollapse: "collapse" }}
-        >
-          <thead>
-            <tr>
-              <th align="left">Pair</th>
-              <th align="left">Pool Address</th>
-              <th align="right">Fee Tier</th>
-              <th align="right">TVL (USD)</th>
-              <th align="right">Reward APY</th>
-              {/* New Actions column */}
-              <th align="right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pools.map((pool) => {
-              // Determine fee or APR display value
-              const feeValue =
-                pool.feeRatePct !== undefined ? pool.feeRatePct : pool.apr;
-              const feeDisplay =
-                feeValue !== undefined ? `${feeValue}%` : "N/A";
+        {/* Standard Deposit Modal for non-Turbos, non-Kriya pools */}
+        {selectedPool &&
+          !isTurbosPool(selectedPool) &&
+          !isKriyaPool(selectedPool) && (
+            <DepositModal
+              isOpen={isDepositModalOpen}
+              onClose={handleCloseDepositModal}
+              onDeposit={handleDeposit}
+              pool={selectedPool}
+              walletConnected={connected}
+            />
+          )}
 
-              // Format TVL with abbreviation and prepend $
-              const tvlDisplay = `$${formatNumber(pool.tvlUsd)}`;
+        {/* Turbos-specific Deposit Modal */}
+        {selectedPool && isTurbosPool(selectedPool) && (
+          <TurbosDepositModal
+            visible={isTurbosModalOpen}
+            onCancel={handleCloseDepositModal}
+            onDeposit={handleTurbosDeposit}
+            poolInfo={selectedPool}
+            tokenABalance={tokenABalance}
+            tokenBBalance={tokenBBalance}
+          />
+        )}
 
-              // Reward APY display
-              const apyDisplay =
-                pool.rewardApy !== undefined ? `${pool.rewardApy}%` : "—";
+        {/* Kriya-specific Deposit Modal */}
+        {selectedPool && isKriyaPool(selectedPool) && (
+          <KriyaDepositModal
+            visible={isKriyaModalOpen}
+            onCancel={handleCloseDepositModal}
+            onDeposit={handleKriyaDeposit}
+            poolInfo={selectedPool}
+            tokenABalance={tokenABalance}
+            tokenBBalance={tokenBBalance}
+          />
+        )}
 
-              return (
-                <tr key={pool.poolAddress}>
-                  <td>
-                    {pool.symbolA} / {pool.symbolB}
-                  </td>
-                  <td>{pool.poolAddress}</td>
-                  <td align="right">{feeDisplay}</td>
-                  <td align="right">{tvlDisplay}</td>
-                  <td align="right">{apyDisplay}</td>
-                  {/* Render Add Liquidity & Withdraw buttons */}
-                  <td align="right">
-                    <button
-                      onClick={() => handleAddLiquidity(pool)}
-                      style={{ marginRight: "0.5rem" }}
-                    >
-                      Add Liquidity
-                    </button>
-                    <button onClick={() => handleWithdraw(pool)}>
-                      Withdraw
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-
-      {/* Loading indicator */}
-      {loading && (
-        <div className="loading" style={{ margin: "1rem 0" }}>
-          Loading...
-        </div>
-      )}
-
-      {/* Load More button */}
-      {!loading && !allLoaded && pools.length > 0 && (
-        <button
-          className="load-more"
-          onClick={handleLoadMore}
-          style={{ marginTop: "1rem" }}
-        >
-          Load More
-        </button>
-      )}
+        {notification && (
+          <div className="notification-container">
+            <TransactionNotification
+              message={notification.message}
+              isSuccess={notification.isSuccess}
+              txDigest={notification.txDigest}
+              onClose={dismissNotification}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
+
+// Helper function to format numbers with commas and limited decimal places
+function formatNumber(value: number, decimals: number = 2): string {
+  if (!value && value !== 0) return "0";
+  if (value > 0 && value < 0.01) return "<0.01";
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
 
 export default Pools;

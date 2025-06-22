@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./PairSelector.scss";
 
-interface TradingPair {
+export interface TradingPair {
   id: string;
   name: string;
   baseAsset: string;
@@ -16,90 +16,159 @@ interface PairSelectorProps {
   onSelectPair: (pair: TradingPair) => void;
 }
 
+const INITIAL_DISPLAY_COUNT = 9;
+const LOAD_MORE_COUNT = 5;
+
 const PairSelector: React.FC<PairSelectorProps> = ({
   pairs,
   selectedPair,
   onSelectPair,
 }) => {
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
+  const [isLoading, setIsLoading] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const toggleDropdown = () => {
-    setIsDropdownOpen((prev) => !prev);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    const saved = localStorage.getItem("favoritePairs");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("favoritePairs", JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (symbol: string) => {
+    setFavorites((prev) =>
+      prev.includes(symbol)
+        ? prev.filter((s) => s !== symbol)
+        : [...prev, symbol]
+    );
   };
 
-  const handlePairSelect = (pair: TradingPair) => {
-    onSelectPair(pair);
-    setIsDropdownOpen(false);
-  };
+  const filtered = pairs.filter((p) => {
+    if (
+      searchTerm &&
+      !p.baseAsset.toLowerCase().includes(searchTerm.toLowerCase())
+    ) {
+      return false;
+    }
+    if (showFavorites && !favorites.includes(p.name)) {
+      return false;
+    }
+    return true;
+  });
 
-  const filteredPairs = pairs.filter(
-    (pair) =>
-      pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pair.baseAsset.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pair.quoteAsset.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleScroll = useCallback(() => {
+    if (!listRef.current || isLoading) return;
+    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+    if (
+      scrollTop + clientHeight >= scrollHeight - 50 &&
+      displayCount < filtered.length
+    ) {
+      setIsLoading(true);
+      setTimeout(() => {
+        setDisplayCount((prev) =>
+          Math.min(prev + LOAD_MORE_COUNT, filtered.length)
+        );
+        setIsLoading(false);
+      }, 300);
+    }
+  }, [filtered.length, isLoading, displayCount]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) {
+      el.addEventListener("scroll", handleScroll);
+      return () => el.removeEventListener("scroll", handleScroll);
+    }
+  }, [handleScroll]);
+
+  useEffect(() => {
+    setDisplayCount(INITIAL_DISPLAY_COUNT);
+  }, [searchTerm, showFavorites]);
+
+  const displayedPairs = filtered.slice(0, displayCount);
+  const hasMoreToLoad = displayCount < filtered.length;
 
   return (
     <div className="pair-selector">
-      <div className="selected-pair" onClick={toggleDropdown}>
-        <span className="pair-name">{selectedPair.name}</span>
-        <span
-          className={`pair-change ${
-            selectedPair.change24h >= 0 ? "positive" : "negative"
-          }`}
-        >
-          {selectedPair.change24h >= 0 ? "+" : ""}
-          {selectedPair.change24h.toFixed(2)}%
-        </span>
-        <span className="dropdown-arrow">▼</span>
+      <div className="search-bar">
+        <input
+          type="text"
+          placeholder="Search pairs..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
-      {isDropdownOpen && (
-        <div className="pair-dropdown">
-          <div className="search-container">
-            <input
-              type="text"
-              placeholder="Search pairs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="pair-list">
-            {filteredPairs.map((pair) => (
+
+      <div className="filter-bar">
+        <button
+          className={!showFavorites ? "active" : ""}
+          onClick={() => setShowFavorites(false)}
+        >
+          All
+        </button>
+        <button
+          className={showFavorites ? "active" : ""}
+          onClick={() => setShowFavorites(true)}
+        >
+          Favorites
+        </button>
+      </div>
+
+      <div className="pair-list-container">
+        <div className="pair-list" ref={listRef}>
+          {displayedPairs.map((p) => {
+            const symbol = p.name;
+            const isActive = selectedPair.id === p.id;
+            const positive = p.change24h > 0;
+            const changeClass = positive
+              ? "positive"
+              : p.change24h < 0
+              ? "negative"
+              : "neutral";
+
+            return (
               <div
-                key={pair.id}
-                className={`pair-option ${
-                  selectedPair.id === pair.id ? "selected" : ""
-                }`}
-                onClick={() => handlePairSelect(pair)}
+                key={p.id}
+                className={`pair-item ${isActive ? "active" : ""}`}
+                onClick={() => onSelectPair(p)}
               >
-                <span className="pair-name">{pair.name}</span>
-                <div className="pair-details">
-                  <span className="pair-price">
-                    $
-                    {pair.price.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 6,
-                    })}
-                  </span>
+                <div className="pair-info">
                   <span
-                    className={`pair-change ${
-                      pair.change24h >= 0 ? "positive" : "negative"
+                    className={`star ${
+                      favorites.includes(symbol) ? "favorite" : ""
                     }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(symbol);
+                    }}
                   >
-                    {pair.change24h >= 0 ? "+" : ""}
-                    {pair.change24h.toFixed(2)}%
+                    {favorites.includes(symbol) ? "★" : "☆"}
+                  </span>
+                  <span className="pair-symbol">{p.baseAsset}</span>
+                </div>
+                <div className="pair-stats">
+                  <span className="pair-price">{p.price.toFixed(4)}</span>
+                  <span className={`pair-change ${changeClass}`}>
+                    {positive ? "+" : ""}
+                    {p.change24h.toFixed(2)}%
                   </span>
                 </div>
               </div>
-            ))}
-            {filteredPairs.length === 0 && (
-              <div className="no-results">No pairs found</div>
-            )}
-          </div>
+            );
+          })}
+
+          {isLoading && hasMoreToLoad && (
+            <div className="loading-indicator">Loading more…</div>
+          )}
+          {!displayedPairs.length && !isLoading && (
+            <div className="no-results">No pairs found</div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

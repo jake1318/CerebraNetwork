@@ -25,7 +25,7 @@ const Footer: React.FC = () => {
               <Link to="/swap">Swap</Link>
             </li>
             <li>
-              <Link to="/pools">LP Pools</Link>
+              <Link to="/pools">Yield</Link>
             </li>
             <li>
               <Link to="/dex">DEX</Link>
@@ -50,11 +50,11 @@ const Footer: React.FC = () => {
             </li>
             <li>
               <a
-                href="https://aftermath.finance/"
+                href="https://port.7k.ag/docs"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Aftermath Finance
+                7K Aggregator
               </a>
             </li>
             <li>
@@ -83,7 +83,7 @@ const Footer: React.FC = () => {
           <ul className="footer__links">
             <li>
               <a
-                href="https://twitter.com/7kprotocol"
+                href="https://x.com/Cerebra_Net"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -92,7 +92,7 @@ const Footer: React.FC = () => {
             </li>
             <li>
               <a
-                href="https://discord.gg/7kprotocol"
+                href="https://discord.com/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -101,7 +101,7 @@ const Footer: React.FC = () => {
             </li>
             <li>
               <a
-                href="https://github.com/7kprotocol"
+                href="https://github.com/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -110,7 +110,7 @@ const Footer: React.FC = () => {
             </li>
             <li>
               <a
-                href="https://medium.com/@7kprotocol"
+                href="https://medium.com/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -124,6 +124,12 @@ const Footer: React.FC = () => {
       {/* Add background effects */}
       <div className="footer-glow footer-glow-1"></div>
       <div className="footer-glow footer-glow-2"></div>
+
+      {/* Copyright line with current year and last updated info */}
+      <div className="footer__copyright">
+        © {new Date().getFullYear()} Cerebra Network. All rights reserved.
+        <span className="footer__updated">Last updated: 2025-05-09</span>
+      </div>
     </footer>
   );
 };

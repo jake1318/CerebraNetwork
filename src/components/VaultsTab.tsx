@@ -1,7 +1,8 @@
-// src/components/VaultsTab.tsx
 import React, { useEffect, useState } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { sdk } from "../utils/sdkSetup";
+import { Tag } from "antd";
+import "../styles/Vaults.scss";
 
 interface VaultStrategy {
   strategyId: string;
@@ -12,7 +13,7 @@ interface VaultStrategy {
 }
 
 const VaultsTab: React.FC = () => {
-  const { address, connected } = useWallet();
+  const { connected } = useWallet();
   const [vaultStrategies, setVaultStrategies] = useState<VaultStrategy[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,40 +34,69 @@ const VaultsTab: React.FC = () => {
     loadVaults();
   }, []);
 
-  if (loading) return <div>Loading vault strategies...</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (loading) {
+    return (
+      <div className="vaults-page loading-state">
+        <div className="spinner" />
+        Loading vault strategies...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="vaults-page empty-state">
+        <h3>Error</h3>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="vaults-tab">
-      <h2>Vault Strategies (Mainnet)</h2>
-      <ul>
-        {vaultStrategies.map((strategy) => {
-          const symbolA = strategy.coinTypeA
-            ? strategy.coinTypeA.split("::").pop()
-            : "Unknown";
-          const symbolB = strategy.coinTypeB
-            ? strategy.coinTypeB.split("::").pop()
-            : "Unknown";
-          const pairLabel = strategy.poolId
-            ? `${symbolA}/${symbolB}`
-            : "Unknown Pair";
+    <div className="vaults-page">
+      <div className="vaults-header">
+        <h2>Vault Strategies (Mainnet)</h2>
+        <p className="description">
+          Automated LP strategies—deposit assets and earn with auto-compounding.
+        </p>
+      </div>
+
+      <ul className="vaults-grid">
+        {vaultStrategies.map((s) => {
+          const symbolA = s.coinTypeA?.split("::").pop() || "Unknown";
+          const symbolB = s.coinTypeB?.split("::").pop() || "Unknown";
+          const pairLabel = s.poolId ? `${symbolA}/${symbolB}` : "Unknown Pair";
+
           return (
-            <li key={strategy.strategyId}>
-              <strong>{pairLabel}</strong> {strategy.isActive ? "" : "(Paused)"}
-              <button
-                onClick={() =>
-                  alert(`Deposit into vault ${strategy.strategyId}`)
-                }
-              >
-                Deposit
-              </button>
-              <button
-                onClick={() =>
-                  alert(`Withdraw from vault ${strategy.strategyId}`)
-                }
-              >
-                Withdraw
-              </button>
+            <li key={s.strategyId} className="vault-card">
+              <div className="vault-header">
+                <div className="vault-title">
+                  <h3>{pairLabel}</h3>
+                  {!s.isActive && (
+                    <Tag color="warning" className="protocol-badge">
+                      Paused
+                    </Tag>
+                  )}
+                </div>
+              </div>
+              <div className="vault-body">
+                <div className="action-buttons">
+                  <button
+                    className="btn btn--primary"
+                    onClick={() => alert(`Deposit into ${s.strategyId}`)}
+                    disabled={!connected}
+                  >
+                    Deposit
+                  </button>
+                  <button
+                    className="btn btn--secondary"
+                    onClick={() => alert(`Withdraw from ${s.strategyId}`)}
+                    disabled={!connected}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+              </div>
             </li>
           );
         })}

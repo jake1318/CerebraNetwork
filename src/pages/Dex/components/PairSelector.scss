@@ -1,179 +1,285 @@
 /* src/pages/Dex/components/PairSelector.scss */
+
 .pair-selector {
+  background: rgba(5, 15, 30, 0.95); /* Made background more opaque */
+  border-radius: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+    0 8px 32px rgba(255, 0, 255, 0.1);
+  overflow: hidden;
   position: relative;
-  min-width: 180px;
-  z-index: 50;
 
-  .selected-pair {
-    background: rgba(5, 15, 30, 0.8);
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.3),
-        rgba(255, 0, 255, 0.3)
-      )
-      1;
-    border-radius: 8px;
-    padding: 0.7rem 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+  /* Add solid background to search bar */
+  .search-bar {
+    padding: 0.8rem 1rem;
+    position: relative;
+    flex: 0 0 auto;
+    z-index: 2;
+    background: rgba(5, 15, 30, 0.95); /* Match parent background */
+    border-bottom: 1px solid rgba(0, 255, 255, 0.1);
 
-    &:hover {
-      background: rgba(5, 15, 30, 0.9);
-    }
-
-    .pair-name {
-      font-size: 1.1rem;
-      font-weight: 600;
+    input {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
       color: #fff;
-    }
-
-    .pair-change {
       font-size: 0.9rem;
-      font-weight: 600;
-      &.positive {
-        color: #00ff88;
-      }
-      &.negative {
-        color: #ff4d6d;
-      }
-    }
 
-    .dropdown-arrow {
-      font-size: 0.8rem;
-      color: rgba(255, 255, 255, 0.7);
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      &:focus {
+        outline: none;
+        border-color: rgba(0, 255, 255, 0.5);
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+      }
     }
   }
 
-  .pair-dropdown {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    min-width: 240px;
-    max-width: 280px;
-    background: rgba(5, 15, 30, 0.95);
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.3),
-        rgba(255, 0, 255, 0.3)
-      )
-      1;
-    border-radius: 8px;
+  .filter-bar {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 0 0.5rem;
+    flex: 0 0 auto;
+    z-index: 2;
+    background: rgba(5, 15, 30, 0.95); /* Match parent background */
+
+    button {
+      flex: 1;
+      background: none;
+      border: none;
+      padding: 0.6rem;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      font-size: 0.9rem;
+      position: relative;
+
+      &.active {
+        color: #00ffff;
+        font-weight: 500;
+
+        &::after {
+          content: "";
+          position: absolute;
+          bottom: 0;
+          left: 15%;
+          width: 70%;
+          height: 2px;
+          background: linear-gradient(
+            90deg,
+            rgba(0, 255, 255, 0.3),
+            rgba(255, 0, 255, 0.7)
+          );
+        }
+      }
+    }
+  }
+
+  /* Important - this is the scrollable container */
+  .pair-list-container {
+    flex: 1;
+    position: relative;
     overflow: hidden;
-    z-index: 100;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    background: rgba(5, 15, 30, 0.7);
+  }
 
-    .search-container {
-      padding: 0.8rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  .pair-list {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    padding-right: 2px;
+    /* Add box shadow at the top to enhance separation */
+    box-shadow: inset 0 10px 10px -10px rgba(0, 0, 0, 0.5);
 
-      input {
-        width: 100%;
-        background: rgba(0, 0, 0, 0.2);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: #fff;
-        padding: 0.6rem 0.8rem;
-        border-radius: 6px;
-        font-size: 0.9rem;
-        outline: none;
+    /* Explicitly define scrollbar styles for webkit browsers */
+    &::-webkit-scrollbar {
+      width: 10px;
+      background-color: rgba(5, 15, 30, 0.8);
+    }
 
-        &:focus {
-          border-color: rgba(0, 255, 255, 0.5);
-          box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.2);
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(
+        to bottom,
+        rgba(0, 255, 255, 0.6),
+        rgba(255, 0, 255, 0.6)
+      );
+      border-radius: 10px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      margin: 2px;
+    }
+
+    /* Firefox scrollbar styles */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 255, 255, 0.6) rgba(5, 15, 30, 0.8);
+
+    .pair-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-left: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      flex-shrink: 0;
+      min-height: 48px;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &.active {
+        background: rgba(0, 255, 255, 0.05);
+        border-left: 3px solid rgba(0, 255, 255, 0.7);
+      }
+
+      .pair-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+
+        .star {
+          color: rgba(255, 255, 255, 0.3);
+          cursor: pointer;
+          transition: all 0.3s;
+          font-size: 0.9rem;
+
+          &.favorite {
+            color: rgba(0, 255, 255, 0.9);
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+          }
         }
 
-        &::placeholder {
-          color: rgba(255, 255, 255, 0.4);
+        .pair-symbol {
+          color: #fff;
+          font-weight: 500;
+          font-size: 0.9rem;
+        }
+      }
+
+      .pair-stats {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+
+        .pair-price {
+          color: #fff;
+          font-family: "Courier New", monospace;
+          font-size: 0.9rem;
+          min-width: 80px;
+          text-align: right;
+        }
+
+        .pair-change {
+          min-width: 60px;
+          text-align: right;
+          font-size: 0.85rem;
+          font-weight: 500;
+
+          &.positive {
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+          }
+
+          &.negative {
+            color: #ff4d6d;
+            text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
+          }
+
+          &.neutral {
+            color: rgba(255, 255, 255, 0.7);
+          }
         }
       }
     }
 
-    .pair-list {
-      max-height: 180px;
-      overflow-y: auto;
-      padding: 0.5rem;
-      scrollbar-width: thin;
+    .loading-indicator {
+      padding: 1rem;
+      text-align: center;
+      color: rgba(0, 255, 255, 0.7);
+      font-size: 0.9rem;
+      background: rgba(0, 0, 0, 0.2);
+      margin: 0.5rem;
+      border-radius: 4px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
 
-      &::-webkit-scrollbar {
-        width: 4px;
+    .no-results {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.4);
+      font-style: italic;
+    }
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 768px) {
+  .pair-selector {
+    .search-bar {
+      padding: 0.6rem 0.8rem;
+
+      input {
+        padding: 0.5rem 0.7rem;
+        font-size: 0.85rem;
+      }
+    }
+
+    .filter-bar {
+      padding: 0;
+
+      button {
+        padding: 0.5rem;
+        font-size: 0.85rem;
+      }
+    }
+
+    .pair-list .pair-item {
+      padding: 0.5rem 0.8rem;
+
+      .pair-symbol {
+        font-size: 0.85rem;
       }
 
-      &::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.2);
+      .pair-price {
+        font-size: 0.8rem;
       }
 
-      &::-webkit-scrollbar-thumb {
-        background: rgba(0, 255, 255, 0.3);
-        border-radius: 3px;
-      }
-
-      &::-webkit-scrollbar-thumb:hover {
-        background: rgba(0, 255, 255, 0.5);
-      }
-
-      .pair-option {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.6rem 0.8rem;
-        cursor: pointer;
-        border-radius: 6px;
-        margin-bottom: 2px;
-        transition: background 0.2s ease;
-
-        &:hover {
-          background: rgba(0, 255, 255, 0.05);
-        }
-
-        &.selected {
-          background: rgba(0, 255, 255, 0.1);
-        }
-
-        .pair-name {
-          font-size: 0.95rem;
-          font-weight: 500;
-          color: #fff;
-        }
-
-        .pair-details {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 4px;
-
-          .pair-price {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.9);
-          }
-
-          .pair-change {
-            font-size: 0.75rem;
-            font-weight: 600;
-            &.positive {
-              color: #00ff88;
-            }
-            &.negative {
-              color: #ff4d6d;
-            }
-          }
-        }
-      }
-
-      .no-results {
-        padding: 1.5rem;
-        text-align: center;
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 0.9rem;
+      .pair-change {
+        font-size: 0.75rem;
       }
     }
   }

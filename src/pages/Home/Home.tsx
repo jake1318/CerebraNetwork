@@ -1,52 +1,59 @@
-// Home.tsx
+// src/pages/Home.tsx
+// Last Updated: 2025-04-27 22:43:53 UTC by jake1318
 
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { formatUsd, formatPercentage } from "../../utils/format";
+import { getAggregatePoolStats } from "../../services/coinGeckoService";
 import "./Home.scss";
 
-// Define the Pool interface based on your backend response
-interface Pool {
-  id: string;
-  name: string;
-  tvl: number;
-  volume24h: number;
-  apr: number;
+interface PoolStats {
+  totalTvlUsd: number;
+  totalPools: number;
+  highestApr: number;
+  isLoading: boolean;
+  error?: string;
 }
 
-// Set up the API URL using Vite environment variables.
-// Ensure you have a .env file with VITE_API_URL defined.
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
 const Home: React.FC = () => {
-  // Local state for pools data and initialization flag.
-  const [pools, setPools] = useState<Pool[]>([]);
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  // State for pool statistics
+  const [poolStats, setPoolStats] = useState<PoolStats>({
+    totalTvlUsd: 0,
+    totalPools: 0,
+    highestApr: 0,
+    isLoading: true,
+  });
 
-  // Fetch pool data from your backend on component mount.
+  // Fetch aggregated pool data on component mount
   useEffect(() => {
-    async function fetchPools() {
+    async function fetchPoolStats() {
       try {
-        const response = await fetch(`${API_URL}/pools`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch pools");
-        }
-        const data: Pool[] = await response.json();
-        setPools(data);
-        setIsInitialized(true);
+        const stats = await getAggregatePoolStats();
+        setPoolStats(stats);
       } catch (error) {
-        console.error("Error fetching pools:", error);
+        console.error("Failed to fetch pool statistics:", error);
+        setPoolStats((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: error instanceof Error ? error.message : "Failed to load data",
+        }));
       }
     }
-    fetchPools();
+
+    fetchPoolStats();
   }, []);
 
-  // Calculate total TVL across all pools
-  const totalTVL = pools.reduce((sum, pool) => sum + pool.tvl, 0);
-
-  // Get top performing pools by APR (top 3)
-  const topPools = [...pools].sort((a, b) => b.apr - a.apr).slice(0, 3);
+  // Format currency with commas and appropriate decimals
+  const formatCurrency = (value: number): string => {
+    if (value > 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    } else if (value > 1000) {
+      return `$${(value / 1000).toFixed(2)}K`;
+    } else {
+      return `$${value.toFixed(2)}`;
+    }
+  };
 
   return (
     <div className="home">
@@ -87,7 +94,15 @@ const Home: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <h3>Total Value Locked</h3>
-            <p className="stat-value">{formatUsd(totalTVL)}</p>
+            {poolStats.isLoading ? (
+              <p className="stat-value">Loading...</p>
+            ) : poolStats.error ? (
+              <p className="stat-value">Error loading data</p>
+            ) : (
+              <p className="stat-value">
+                {formatCurrency(poolStats.totalTvlUsd)}
+              </p>
+            )}
           </motion.div>
 
           <motion.div
@@ -97,7 +112,13 @@ const Home: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.4 }}
           >
             <h3>Total Pools</h3>
-            <p className="stat-value">{pools.length}</p>
+            {poolStats.isLoading ? (
+              <p className="stat-value">Loading...</p>
+            ) : poolStats.error ? (
+              <p className="stat-value">Error loading data</p>
+            ) : (
+              <p className="stat-value">{poolStats.totalPools}</p>
+            )}
           </motion.div>
 
           <motion.div
@@ -107,11 +128,17 @@ const Home: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.6 }}
           >
             <h3>Highest APR</h3>
-            <p className="stat-value">
-              {pools.length > 0
-                ? formatPercentage(Math.max(...pools.map((p) => p.apr)))
-                : "N/A"}
-            </p>
+            {poolStats.isLoading ? (
+              <p className="stat-value">Loading...</p>
+            ) : poolStats.error ? (
+              <p className="stat-value">Error loading data</p>
+            ) : (
+              <p className="stat-value">
+                {poolStats.highestApr > 0
+                  ? `${poolStats.highestApr.toFixed(2)}%`
+                  : "N/A"}
+              </p>
+            )}
           </motion.div>
         </div>
       </section>
@@ -257,42 +284,6 @@ const Home: React.FC = () => {
           </motion.div>
         </div>
       </section>
-
-      {topPools.length > 0 && (
-        <section className="top-pools">
-          <h2>Top Performing Pools</h2>
-          <div className="pools-grid">
-            {topPools.map((pool) => (
-              <Link
-                to={`/pools/${pool.id}`}
-                key={pool.id}
-                className="pool-card"
-              >
-                <h3>{pool.name}</h3>
-                <div className="pool-stats">
-                  <div className="pool-stat">
-                    <span className="label">APR</span>
-                    <span className="value">{formatPercentage(pool.apr)}</span>
-                  </div>
-                  <div className="pool-stat">
-                    <span className="label">TVL</span>
-                    <span className="value">{formatUsd(pool.tvl)}</span>
-                  </div>
-                  <div className="pool-stat">
-                    <span className="label">Volume (24h)</span>
-                    <span className="value">{formatUsd(pool.volume24h)}</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <div className="view-all">
-            <Link to="/pools" className="btn btn--outline">
-              View All Pools
-            </Link>
-          </div>
-        </section>
-      )}
 
       <section className="cta">
         <motion.div

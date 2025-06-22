@@ -649,3 +649,43 @@
     transform: translateY(0);
   }
 }
+/* SwapForm.scss */
+.dca-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 1px solid #277;
+  background: #06182e;
+  color: #38dfff;
+  font-weight: 500;
+  transition: background 0.2s;
+  &:hover {
+    background: #0b294d;
+  }
+}
+/* Add to your SwapForm.scss file */
+
+.tx-success-content {
+  /* existing styles remain the same */
+
+  .powered-by {
+    margin-top: 15px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    a {
+      color: #00ffff;
+      text-decoration: none;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: #00ccff;
+        text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+      }
+    }
+  }
+}

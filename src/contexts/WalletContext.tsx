@@ -21,7 +21,7 @@ interface WalletContextType {
     totalUsdValue: number | null;
     loading: boolean;
   };
-  refreshBalances: () => void;
+  refreshBalances: () => Promise<void>;
   availableCoins: string[];
   tokenMetadata: Record<
     string,
@@ -38,7 +38,7 @@ interface WalletContextType {
     decimals: number,
     displayDecimals?: number
   ) => string;
-  formatUsd: (amount: number) => string;
+  formatUsd: (amount: number, decimals?: number) => string;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -71,31 +71,53 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
     >
   >({});
 
-  //
-  // >>> FIXED: define formatBalance here so it's in scope
-  //
+  /**
+   * Format a balance with appropriate decimal places
+   * @param balance The bigint balance to format
+   * @param decimals The number of decimals the token uses
+   * @param displayDecimals Optional number of decimals to display (default 7)
+   */
   const formatBalance = (
     balance: bigint,
     decimals: number,
-    displayDecimals: number = 5
+    displayDecimals: number = 7
   ): string => {
     const asNumber = Number(balance) / 10 ** decimals;
-    if (asNumber > 0 && asNumber < 0.00001) {
+
+    // Handle very small numbers with exponential notation
+    if (asNumber > 0 && asNumber < 0.0000001) {
       return asNumber.toExponential(2);
     }
+
+    // Format with appropriate number of decimals
     return asNumber.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: displayDecimals,
     });
   };
 
-  const formatUsd = (amount: number): string =>
-    amount.toLocaleString("en-US", {
+  /**
+   * Format a number as USD currency with configurable decimal places
+   * @param amount The amount to format
+   * @param decimals The number of decimal places to show (default 2)
+   */
+  const formatUsd = (amount: number, decimals: number = 2): string => {
+    // Handle zero amount
+    if (!amount) return "$0";
+
+    // Handle very small amounts with exponential notation
+    if (amount > 0 && amount < 0.0000001) {
+      return "$" + amount.toExponential(2);
+    }
+
+    // Format as currency with specified decimal places
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimals,
+    }).format(amount);
+  };
 
   const fetchAvailableCoins = async () => {
     // (no changes here)
@@ -113,6 +135,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       const { data: coins } = await blockvisionService.getAccountCoins(
         account.address
       );
+
       // 2) cache raw metadata
       coins.forEach((c) =>
         tokenCacheService.cacheToken({
@@ -123,6 +146,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
           decimals: c.decimals,
         })
       );
+
       // 3) build formatted balances
       const formatted: CoinBalance[] = coins.map((c) => ({
         coinType: c.coinType,
@@ -133,13 +157,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
         price: parseFloat(c.price || "0"),
         usdValue: parseFloat(c.usdValue || "0"),
       }));
+
       const total = formatted.reduce((sum, b) => sum + b.usdValue, 0);
       formatted.sort((a, b) => b.usdValue - a.usdValue);
 
       setBalances(formatted);
       setTotalUsdValue(total);
 
-      // 4) IMMEDIATELY seed tokenMetadata from BlockVision’s response
+      // 4) IMMEDIATELY seed tokenMetadata from BlockVision's response
       setTokenMetadata((prev) => {
         const next = { ...prev };
         coins.forEach((c) => {

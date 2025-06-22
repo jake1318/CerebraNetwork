@@ -1,0 +1,275 @@
+// src/pages/Swap/components/DcaModal.module.scss
+// Last Updated: 2025-05-04 01:50:15 UTC by jake1318
+
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #1a1d2e;
+  border-radius: 16px;
+  padding: 24px;
+  width: 420px;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  z-index: 1001;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  h2 {
+    margin: 0;
+    font-size: 22px;
+    color: #ffffff;
+    text-align: center;
+  }
+
+  .subtitle {
+    color: #a0aec0;
+    text-align: center;
+    margin: -8px 0 8px;
+    font-size: 14px;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 14px;
+    position: relative;
+    color: #a0aec0;
+  }
+
+  input,
+  select {
+    background-color: #252a3d;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #ffffff;
+    padding: 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: #3294f0;
+    }
+
+    &[type="number"] {
+      padding-right: 50px; // Make room for the token symbol
+    }
+  }
+
+  .tokenRow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin: 8px 0;
+
+    button {
+      background-color: #252a3d;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+      justify-content: center;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background-color: #2d3548;
+      }
+    }
+  }
+
+  .tokenButton {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+  }
+
+  .tokenLabel,
+  .rateLabel,
+  .percentLabel {
+    position: absolute;
+    right: 12px;
+    top: 38px;
+    color: #a0aec0;
+    pointer-events: none;
+  }
+
+  .slippageRow {
+    position: relative;
+  }
+
+  .rateSection {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .buttonRow {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .cancelButton,
+  .submitButton {
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+  }
+
+  .cancelButton {
+    background-color: transparent;
+    border: 1px solid #4a5568;
+    color: #e2e8f0;
+
+    &:hover:not(:disabled) {
+      background-color: #2d3748;
+    }
+
+    &:disabled {
+      border-color: #2d3748;
+      color: #718096;
+      cursor: not-allowed;
+    }
+  }
+
+  .submitButton {
+    background-color: #3182ce;
+    border: none;
+    color: white;
+
+    &:hover:not(:disabled) {
+      background-color: #2b6cb0;
+    }
+
+    &:disabled {
+      background-color: #4a5568;
+      cursor: not-allowed;
+    }
+  }
+
+  .error {
+    padding: 12px;
+    background-color: rgba(245, 101, 101, 0.1);
+    border: 1px solid #f56565;
+    border-radius: 8px;
+    color: #f56565;
+    font-size: 14px;
+    margin-top: 8px;
+  }
+
+  .walletNotice {
+    margin-top: 16px;
+    padding: 12px;
+    background-color: rgba(66, 153, 225, 0.1);
+    border: 1px solid #4299e1;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #63b3ed;
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
+
+  // Success state styles
+  .successState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    text-align: center;
+
+    h3 {
+      margin: 16px 0 8px;
+      font-size: 22px;
+      color: #ffffff;
+    }
+
+    p {
+      color: #a0aec0;
+      margin-bottom: 24px;
+      font-size: 16px;
+    }
+  }
+
+  .successIcon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: rgba(72, 187, 120, 0.2);
+    color: #48bb78;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin-bottom: 16px;
+  }
+
+  .txLink {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: rgba(66, 153, 225, 0.2);
+    border-radius: 8px;
+    color: #4299e1;
+    text-decoration: none;
+    margin-bottom: 16px;
+    font-size: 14px;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: rgba(66, 153, 225, 0.3);
+    }
+  }
+
+  .successCloseBtn {
+    background-color: #3182ce;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: #2b6cb0;
+    }
+  }
+}

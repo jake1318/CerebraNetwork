@@ -12,7 +12,6 @@
     ),
     rgba(5, 15, 30, 0.7);
   border-radius: 16px;
-  height: 100%;
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(12px);
@@ -36,18 +35,6 @@
       0 8px 32px rgba(255, 0, 255, 0.15);
   }
 
-  /* Unified neon gradient style for any h3 heading in the order form */
-  h3 {
-    background: linear-gradient(90deg, #00ffff, #ff00ff);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-    text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-    font-weight: bold;
-    letter-spacing: 0.5px;
-  }
-
   .order-form-tabs {
     display: flex;
     border-bottom: 1px solid;
@@ -61,38 +48,35 @@
     .tab {
       flex: 1;
       background: rgba(5, 15, 30, 0.5);
-      border: none;
       color: rgba(255, 255, 255, 0.8);
       padding: 1rem 0;
       font-size: 18px;
       font-weight: 600;
+      text-transform: uppercase;
       cursor: pointer;
-      transition: all 0.3s ease;
-      letter-spacing: 0.5px;
+      transition: background 0.3s ease, transform 0.2s ease;
 
       &:hover {
         background: rgba(255, 255, 255, 0.05);
       }
 
-      &.active {
-        &[class*="buy"] {
-          background: rgba(0, 255, 136, 0.15);
-          color: #00ff88;
-          text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
-        }
-        &[class*="sell"] {
-          background: rgba(255, 77, 109, 0.15);
-          color: #ff4d6d;
-          text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
-        }
+      &.buy.active {
+        background: rgba(0, 255, 136, 0.15);
+        color: #00ff88;
+        text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+      }
+      &.sell.active {
+        background: rgba(255, 77, 109, 0.15);
+        color: #ff4d6d;
+        text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
       }
     }
   }
 
   .order-form-mode-selector {
     display: flex;
-    padding: 22px;
     gap: 12px;
+    padding: 1rem;
     border-bottom: 1px solid;
     border-image: linear-gradient(
         90deg,
@@ -106,13 +90,13 @@
       background: rgba(5, 15, 30, 0.5);
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: rgba(255, 255, 255, 0.8);
-      padding: 12px 0;
+      padding: 0.75rem 0;
       border-radius: 10px;
       font-size: 15px;
       font-weight: 500;
+      text-transform: uppercase;
       cursor: pointer;
-      transition: all 0.3s ease;
-      letter-spacing: 0.5px;
+      transition: background 0.3s ease, transform 0.2s ease;
 
       &:hover {
         background: rgba(255, 255, 255, 0.05);
@@ -127,7 +111,6 @@
         );
         border-color: rgba(255, 255, 255, 0.2);
         color: #fff;
-        text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
         box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
           0 0 15px rgba(255, 0, 255, 0.15);
       }
@@ -138,7 +121,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 22px;
+    padding: 1rem;
     overflow-y: auto;
     scrollbar-width: thin;
 
@@ -154,75 +137,61 @@
     }
 
     .form-group {
-      margin-bottom: 16px;
+      margin-bottom: 1rem;
 
       label {
         display: block;
-        font-size: 14px;
+        margin-bottom: 0.5rem;
         color: rgba(255, 255, 255, 0.7);
-        margin-bottom: 8px;
-        letter-spacing: 0.5px;
+        font-size: 0.9rem;
+        text-transform: uppercase;
       }
 
       .input-container {
-        position: relative;
-
         input {
           width: 100%;
+          padding: 0.75rem;
           background: rgba(5, 15, 30, 0.5);
           border: 1px solid rgba(255, 255, 255, 0.1);
-          color: white;
-          padding: 12px;
-          border-radius: 10px;
-          font-size: 15px;
-          transition: all 0.3s ease;
-
+          color: #fff;
+          border-radius: 8px;
+          font-size: 1rem;
+          &::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+          }
           &:focus {
             outline: none;
             border-color: rgba(0, 255, 255, 0.3);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
-              0 0 15px rgba(255, 0, 255, 0.15);
-          }
-
-          &::placeholder {
-            color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.15);
           }
         }
       }
 
       .balance-info {
-        display: flex;
-        justify-content: flex-end;
-        font-size: 14px;
+        text-align: right;
+        font-size: 0.85rem;
         color: rgba(255, 255, 255, 0.7);
-        margin-top: 8px;
-        letter-spacing: 0.5px;
+        margin-top: 0.5rem;
       }
 
       .percentage-buttons {
         display: flex;
-        gap: 10px;
-        margin-top: 10px;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
 
         .pct-btn {
           flex: 1;
           background: rgba(5, 15, 30, 0.5);
           border: 1px solid rgba(255, 255, 255, 0.1);
           color: rgba(255, 255, 255, 0.8);
-          padding: 8px 0;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 500;
+          padding: 0.5rem;
+          border-radius: 6px;
           cursor: pointer;
-          transition: all 0.3s ease;
+          transition: all 0.2s ease;
 
           &:hover {
             background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(0, 255, 255, 0.3);
-            color: #fff;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 255, 255, 0.1),
-              0 4px 12px rgba(255, 0, 255, 0.1);
           }
         }
       }
@@ -231,95 +200,73 @@
     .total-value {
       background: rgba(5, 15, 30, 0.5);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.9);
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
+      padding: 0.75rem;
+      border-radius: 8px;
       text-align: right;
+      color: #fff;
+      font-weight: 600;
+      margin-bottom: 1rem;
     }
 
     .market-notice {
-      padding: 24px;
-      text-align: center;
-      color: rgba(255, 255, 255, 0.7);
-      font-style: italic;
+      padding: 1rem;
       background: rgba(5, 15, 30, 0.5);
-      border-radius: 10px;
-      border: 1px dashed;
-      border-image: linear-gradient(
-          45deg,
-          rgba(0, 255, 255, 0.3),
-          rgba(255, 0, 255, 0.3)
-        )
-        1;
-      margin: 16px 0;
-      letter-spacing: 0.5px;
+      border-radius: 8px;
+      border: 1px dashed rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+      font-style: italic;
+      margin-bottom: 1rem;
     }
 
     .order-status {
-      margin: 16px 0;
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 14px;
-      letter-spacing: 0.5px;
-      animation: fadeIn 0.5s ease-out;
-
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      text-align: center;
       &.success {
         background: rgba(0, 255, 136, 0.1);
         color: #00ff88;
         border: 1px solid rgba(0, 255, 136, 0.3);
-        text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
       }
       &.error {
         background: rgba(255, 77, 109, 0.1);
         color: #ff4d6d;
         border: 1px solid rgba(255, 77, 109, 0.3);
-        text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
       }
     }
 
     .submit-order-btn {
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      margin-top: auto;
+      padding: 0.75rem;
       border: none;
-      letter-spacing: 0.5px;
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.15),
-        0 0 10px rgba(255, 0, 255, 0.15);
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: auto;
 
       &.buy {
         background: linear-gradient(45deg, #00aa5b, #00ff88);
         color: #002211;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
       }
       &.sell {
         background: linear-gradient(45deg, #d32f4a, #ff4d6d);
         color: #fff;
-        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
       }
-
-      &:hover {
+      &:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
-          0 0 20px rgba(255, 0, 255, 0.3);
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
+          0 0 10px rgba(255, 0, 255, 0.2);
       }
       &:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-        transform: none !important;
-        box-shadow: none !important;
       }
-
       &.loading {
-        position: relative;
         color: transparent;
-
+        position: relative;
         &::after {
           content: "";
           position: absolute;
@@ -327,10 +274,9 @@
           left: 50%;
           width: 20px;
           height: 20px;
-          margin-top: -10px;
-          margin-left: -10px;
+          margin: -10px 0 0 -10px;
           border: 3px solid rgba(255, 255, 255, 0.3);
-          border-top-color: white;
+          border-top-color: #fff;
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
@@ -338,7 +284,7 @@
     }
   }
 
-  /* Horizontal scanning line effect */
+  /* scanning line */
   &::before {
     content: "";
     position: absolute;
@@ -354,10 +300,8 @@
     left: 0;
     transform: translateY(-50%);
     animation: horizonScan 15s linear infinite;
-    z-index: 1;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-    opacity: 0.3;
     pointer-events: none;
+    opacity: 0.3;
   }
 }
 
@@ -386,30 +330,9 @@
   }
 }
 
-/* Responsive styling */
+/* Responsive */
 @media (max-width: 768px) {
   .dex-order-form {
-    .order-form-tabs {
-      .tab {
-        font-size: 16px;
-        padding: 12px 0;
-      }
-    }
-    .order-form-mode-selector {
-      padding: 16px;
-
-      .mode-btn {
-        padding: 10px 0;
-        font-size: 14px;
-      }
-    }
-    .order-form-content {
-      padding: 16px;
-
-      .submit-order-btn {
-        font-size: 14px;
-        padding: 12px;
-      }
-    }
+    /* shrink paddings/font-sizes for mobile */
   }
 }

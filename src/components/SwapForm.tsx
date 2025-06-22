@@ -1,3 +1,7 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   src/pages/Dex/components/SwapForm.tsx
+   ─ Fully–integrated version – ready for the repo ─
+   ──────────────────────────────────────────────────────────────────────────── */
 import React, { useState, useEffect } from "react";
 import {
   useWallet,
@@ -6,65 +10,78 @@ import {
 } from "@suiet/wallet-kit";
 import { getQuote, buildTx, estimateGasFee } from "@7kprotocol/sdk-ts";
 import BigNumber from "bignumber.js";
+
+/* local components */
 import TokenSelector from "./TokenSelector/TokenSelector";
+
+/* hooks / services / styles */
 import { useWalletContext } from "../contexts/WalletContext";
 import { Token, fetchTokens } from "../services/tokenService";
 import "./SwapForm.scss";
 
+/* ─────────────────────────────────────────────────────────────────── */
+
 export default function SwapForm() {
+  /* ─────────── hooks ─────────── */
   const wallet = useWallet();
   const provider = useSuiProvider();
   const { balance: suiBalance } = useAccountBalance();
-  const { walletState, tokenMetadata, formatUsd, refreshBalances } =
-    useWalletContext();
+  const { walletState, tokenMetadata, refreshBalances } = useWalletContext();
 
+  /* ─────────── state ─────────── */
   const [tokenIn, setTokenIn] = useState<Token | null>(null);
   const [tokenOut, setTokenOut] = useState<Token | null>(null);
+
   const [amountIn, setAmountIn] = useState("");
   const [amountOut, setAmountOut] = useState("0");
+
   const [loading, setLoading] = useState(false);
   const [quoting, setQuoting] = useState(false);
   const [error, setError] = useState("");
+
   const [slippage, setSlippage] = useState(0.01);
   const [customSlippage, setCustomSlippage] = useState("");
-  const [showCustomSlippage, setShowCustomSlippage] = useState(false);
+  const [showCustomSlip, setShowCustomSlip] = useState(false);
+
   const [estimatedFee, setEstimatedFee] = useState<number | null>(null);
   const [suiPrice, setSuiPrice] = useState<number | null>(null);
-  const [loadingTokens, setLoadingTokens] = useState(true);
 
-  const [isTokenInSelectorOpen, setIsTokenInSelectorOpen] = useState(false);
-  const [isTokenOutSelectorOpen, setIsTokenOutSelectorOpen] = useState(false);
+  const [loadingTokens, setLoadingTokens] = useState(true);
   const [availableTokens, setAvailableTokens] = useState<Token[]>([]);
 
-  // NEW: store transaction digest
+  const [isInSelectorOpen, setInSelectorOpen] = useState(false);
+  const [isOutSelectorOpen, setOutSelectorOpen] = useState(false);
+
   const [txDigest, setTxDigest] = useState<string | null>(null);
 
-  const convertWalletBalancesToTokens = (): Token[] => {
-    return walletState.balances.map((balance) => {
-      const meta = tokenMetadata[balance.coinType] || {};
-      const price = Number(meta.price) || 0;
-      const bal = Number(balance.balance) / 10 ** balance.decimals;
+  /* ───────────────── helper: balances → Token[] ───────────────── */
+  const balancesToTokens = (): Token[] =>
+    walletState.balances.map((b) => {
+      const m = tokenMetadata[b.coinType] ?? {};
+      const price = Number(m.price) || 0;
+      const bal = Number(b.balance) / 10 ** b.decimals;
       return {
-        address: balance.coinType,
-        symbol: balance.symbol || meta.symbol || "Unknown",
-        name: balance.name || meta.name || "Unknown Token",
-        logo: meta.logo || "",
-        decimals: balance.decimals,
+        address: b.coinType,
+        symbol: b.symbol || m.symbol || "UNKNOWN",
+        name: b.name || m.name || "Unknown Token",
+        logo: m.logo || "",
+        decimals: b.decimals,
         price,
         balance: bal.toString(),
       } as Token;
     });
-  };
 
+  /* ───────────────── load tokens when balances / metadata ready ── */
   useEffect(() => {
-    const loadTokens = async () => {
+    (async () => {
       setLoadingTokens(true);
       try {
-        const apiTokens = await fetchTokens();
-        const walletTokens = convertWalletBalancesToTokens();
+        const api = await fetchTokens();
+        const wallet = balancesToTokens();
         const map = new Map<string, Token>();
-        apiTokens.forEach((t) => map.set(t.address, t));
-        walletTokens.forEach((t) => {
+
+        api.forEach((t) => map.set(t.address, t));
+        wallet.forEach((t) => {
           if (map.has(t.address)) {
             const ex = map.get(t.address)!;
             map.set(t.address, {
@@ -72,123 +89,117 @@ export default function SwapForm() {
               balance: t.balance,
               price: t.price || ex.price,
             });
-          } else {
-            map.set(t.address, t);
-          }
+          } else map.set(t.address, t);
         });
         setAvailableTokens(Array.from(map.values()));
+
         const suiMeta = tokenMetadata["0x2::sui::SUI"];
         setSuiPrice(suiMeta?.price ? Number(suiMeta.price) : 0);
       } catch (e) {
-        console.error("Error loading tokens:", e);
+        console.error("token load error", e);
       } finally {
         setLoadingTokens(false);
       }
-    };
-    loadTokens();
+    })();
   }, [walletState.balances, tokenMetadata]);
 
-  const handlePercentageClick = async (percentage: number) => {
+  /* ───────────────── %-quick-fill helper ──────────────────────── */
+  const handlePct = async (pct: number) => {
     if (!tokenIn || !wallet.account?.address) return;
-
     try {
-      // Handle SUI token separately since we might have direct access to balance
       if (tokenIn.address === "0x2::sui::SUI" && suiBalance) {
-        const balanceInSui = parseInt(suiBalance) / 1e9;
-        // Reserve a small amount of SUI for gas fees (0.05 SUI)
-        const maxAmount = Math.max(0, balanceInSui - 0.05);
-        const percentAmount = (maxAmount * percentage) / 100;
-        setAmountIn(percentAmount.toFixed(6));
+        const suiBal = parseInt(suiBalance) / 1e9 - 0.05; // reserve gas
+        setAmountIn(((suiBal * pct) / 100).toFixed(6));
         return;
       }
-
-      // For other tokens, check if we have the token in our wallet balances
-      const walletToken = walletState.balances.find(
+      const wBal = walletState.balances.find(
         (b) => b.coinType === tokenIn.address
       );
-
-      if (walletToken) {
-        // We have the token in our wallet balances
-        const decimals = walletToken.decimals;
-        const balanceNum = Number(walletToken.balance) / Math.pow(10, decimals);
-        const percentAmount = (balanceNum * percentage) / 100;
-        setAmountIn(percentAmount.toFixed(6));
+      if (wBal) {
+        const num = Number(wBal.balance) / 10 ** wBal.decimals;
+        setAmountIn(((num * pct) / 100).toFixed(6));
+        return;
       }
-      // Check if the token has a balance property (from convertWalletBalancesToTokens)
-      else if (tokenIn.balance) {
-        const balanceNum = parseFloat(tokenIn.balance);
-        const percentAmount = (balanceNum * percentage) / 100;
-        setAmountIn(percentAmount.toFixed(6));
+      if (tokenIn.balance) {
+        setAmountIn(((+tokenIn.balance * pct) / 100).toFixed(6));
+        return;
       }
-      // As a fallback, try to fetch the balance directly from the provider
-      else if (provider) {
-        const result = await provider.getBalance({
-          owner: wallet.account.address,
-          coinType: tokenIn.address,
-        });
-
-        if (result?.totalBalance) {
-          const decimals = tokenIn.decimals;
-          const balanceNum =
-            parseInt(result.totalBalance) / Math.pow(10, decimals);
-          const percentAmount = (balanceNum * percentage) / 100;
-          setAmountIn(percentAmount.toFixed(6));
-        }
+      const res = await provider.getBalance({
+        owner: wallet.account.address,
+        coinType: tokenIn.address,
+      });
+      if (res?.totalBalance) {
+        const num = parseInt(res.totalBalance) / 10 ** tokenIn.decimals;
+        setAmountIn(((num * pct) / 100).toFixed(6));
       }
-    } catch (error) {
-      console.error(`Error setting ${percentage}% amount:`, error);
+    } catch (e) {
+      console.error(`handlePct ${pct}`, e);
     }
   };
 
-  // Helper function to make MAX button more accessible
-  const getMaxAmount = () => handlePercentageClick(100);
+  /* ───────────────── fallback estimate via prices ─────────────── */
+  const priceEstimate = (): string => {
+    if (!tokenIn || !tokenOut || !amountIn || +amountIn <= 0) return "0";
+    const inP = tokenIn.price,
+      outP = tokenOut.price;
+    if (!inP || !outP || inP <= 0 || outP <= 0) return "0";
+    const out = new BigNumber(amountIn).times(inP).div(outP);
+    return out.isFinite() && !out.isNaN() && out.gt(0) ? out.toFixed(6) : "0";
+  };
 
-  const formatSlippage = (s: number) => (s * 100).toFixed(1);
-
+  /* ───────────────── debounce quoting ─────────────────────────── */
   useEffect(() => {
     if (loadingTokens) return;
-    const timer = setTimeout(() => {
-      if (tokenIn && tokenOut && amountIn && +amountIn > 0) {
-        getQuoteForSwap();
-      } else {
+    const t = setTimeout(() => {
+      if (tokenIn && tokenOut && amountIn && +amountIn > 0) quote();
+      else {
         setAmountOut("0");
         setEstimatedFee(null);
       }
     }, 500);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(t);
   }, [tokenIn, tokenOut, amountIn, loadingTokens]);
 
-  const getQuoteForSwap = async () => {
+  /* ───────────────── quote ------------------------------ */
+  const quote = async () => {
     try {
       setQuoting(true);
       setError("");
-      const inDecimals = tokenIn!.decimals;
-      const inBase = new BigNumber(amountIn).times(10 ** inDecimals).toString();
+      const inBase = new BigNumber(amountIn)
+        .times(10 ** tokenIn!.decimals)
+        .toString();
       const qr = await getQuote({
         tokenIn: tokenIn!.address,
         tokenOut: tokenOut!.address,
         amountIn: inBase,
       });
       if (qr) {
-        const outDecimals = tokenOut!.decimals;
-        const outAmt = new BigNumber(qr.outAmount)
-          .div(10 ** outDecimals)
+        const out = new BigNumber(qr.outAmount)
+          .div(10 ** tokenOut!.decimals)
           .toString();
-        setAmountOut(outAmt);
+        setAmountOut(isNaN(+out) ? priceEstimate() : out);
+
         if (wallet.account?.address) {
-          const feeUsd = await estimateGasFee({
-            quoteResponse: qr,
-            accountAddress: wallet.account.address,
-            slippage,
-            suiPrice: suiPrice || undefined,
-            commission: { partner: wallet.account.address, commissionBps: 0 },
-          });
-          setEstimatedFee(feeUsd);
+          try {
+            const feeUsd = await estimateGasFee({
+              quoteResponse: qr,
+              accountAddress: wallet.account.address,
+              slippage,
+              suiPrice: suiPrice ?? undefined,
+              commission: { partner: wallet.account.address, commissionBps: 0 },
+            });
+            setEstimatedFee(feeUsd);
+          } catch (e) {
+            console.error("fee", e);
+            setEstimatedFee(null);
+          }
         }
+      } else {
+        setAmountOut(priceEstimate());
       }
     } catch (e: any) {
-      console.error("Quote error:", e);
-      setError(e.message || "Failed to get quote");
+      console.error("quote error", e);
+      setError(e.message || "Quote failed");
       setAmountOut("0");
       setEstimatedFee(null);
     } finally {
@@ -196,16 +207,18 @@ export default function SwapForm() {
     }
   };
 
-  const swapTokens = async () => {
+  /* ───────────────── execute swap ─────────────────────── */
+  const swap = async () => {
     if (!wallet.connected || !tokenIn || !tokenOut || +amountIn <= 0) {
-      setError("Missing parameters or wallet not connected");
+      setError("Missing parameters / wallet not connected");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const inDecimals = tokenIn.decimals;
-      const inBase = new BigNumber(amountIn).times(10 ** inDecimals).toString();
+      const inBase = new BigNumber(amountIn)
+        .times(10 ** tokenIn.decimals)
+        .toString();
       const qr = await getQuote({
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,
@@ -221,26 +234,27 @@ export default function SwapForm() {
         transactionBlock: tx,
       });
       if (res.digest) setTxDigest(res.digest);
-      // reset & refresh
+
       setAmountIn("");
       setAmountOut("0");
       setEstimatedFee(null);
       await refreshBalances();
     } catch (e: any) {
-      console.error("Swap error:", e);
+      console.error("swap", e);
       setError(e.message || "Swap failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const closeModal = () => setTxDigest(null);
+  const closeSuccess = () => setTxDigest(null);
 
+  /* ───────────────────────────── JSX ───────────────────────────── */
   return (
     <div className="swap-form">
       <h2>Swap Tokens</h2>
 
-      {/* From */}
+      {/* FROM */}
       <div className="form-group">
         <div className="form-label-row">
           <label>From</label>
@@ -249,23 +263,19 @@ export default function SwapForm() {
               {[25, 50, 75].map((p) => (
                 <button
                   key={p}
+                  onClick={() => handlePct(p)}
                   className="percent-button"
-                  onClick={() => handlePercentageClick(p)}
-                  type="button"
                 >
                   {p}%
                 </button>
               ))}
-              <button
-                className="max-button"
-                onClick={() => handlePercentageClick(100)}
-                type="button"
-              >
+              <button onClick={() => handlePct(100)} className="max-button">
                 MAX
               </button>
             </div>
           )}
         </div>
+
         <div className="input-with-token">
           <input
             type="number"
@@ -278,7 +288,7 @@ export default function SwapForm() {
           <div className="token-select-wrapper">
             <button
               className="token-selector-button"
-              onClick={() => setIsTokenInSelectorOpen(true)}
+              onClick={() => setInSelectorOpen(true)}
             >
               {tokenIn ? (
                 <div className="selected-token">
@@ -296,13 +306,14 @@ export default function SwapForm() {
                 "Select Token"
               )}
             </button>
-            {isTokenInSelectorOpen && (
+
+            {isInSelectorOpen && (
               <TokenSelector
                 isOpen
-                onClose={() => setIsTokenInSelectorOpen(false)}
+                onClose={() => setInSelectorOpen(false)}
                 onSelect={(t) => {
-                  setTokenIn(t);
-                  setIsTokenInSelectorOpen(false);
+                  setTokenIn({ ...t, price: t.price || 0 });
+                  setInSelectorOpen(false);
                 }}
                 excludeAddresses={tokenOut ? [tokenOut.address] : []}
               />
@@ -311,7 +322,7 @@ export default function SwapForm() {
         </div>
       </div>
 
-      {/* Switch Button */}
+      {/* SWITCH */}
       <button
         className="switch-button"
         onClick={() => {
@@ -325,20 +336,26 @@ export default function SwapForm() {
         ↓↑
       </button>
 
-      {/* To */}
+      {/* TO */}
       <div className="form-group">
         <label>To (Estimated)</label>
         <div className="input-with-token">
           <input
             type="text"
-            value={quoting ? "Loading..." : amountOut}
+            value={
+              quoting
+                ? "Calculating…"
+                : amountOut === "NaN" || isNaN(+amountOut)
+                ? "0"
+                : amountOut
+            }
             disabled
             placeholder="0.0"
           />
           <div className="token-select-wrapper">
             <button
               className="token-selector-button"
-              onClick={() => setIsTokenOutSelectorOpen(true)}
+              onClick={() => setOutSelectorOpen(true)}
             >
               {tokenOut ? (
                 <div className="selected-token">
@@ -346,6 +363,9 @@ export default function SwapForm() {
                     src={tokenOut.logo}
                     alt={tokenOut.symbol}
                     className="token-logo"
+                    onError={(e) =>
+                      ((e.target as HTMLImageElement).style.display = "none")
+                    }
                   />
                   <span>{tokenOut.symbol}</span>
                 </div>
@@ -353,13 +373,14 @@ export default function SwapForm() {
                 "Select Token"
               )}
             </button>
-            {isTokenOutSelectorOpen && (
+
+            {isOutSelectorOpen && (
               <TokenSelector
                 isOpen
-                onClose={() => setIsTokenOutSelectorOpen(false)}
+                onClose={() => setOutSelectorOpen(false)}
                 onSelect={(t) => {
-                  setTokenOut(t);
-                  setIsTokenOutSelectorOpen(false);
+                  setTokenOut({ ...t, price: t.price || 0 });
+                  setOutSelectorOpen(false);
                 }}
                 excludeAddresses={tokenIn ? [tokenIn.address] : []}
               />
@@ -368,15 +389,20 @@ export default function SwapForm() {
         </div>
       </div>
 
-      {/* Rate Info */}
+      {/* Rate line */}
       <div className="rate-info">
-        {!quoting && tokenIn && tokenOut && +amountIn > 0 && +amountOut > 0 && (
-          <div>
-            1 {tokenIn.symbol} ≈{" "}
-            {(Number(amountOut) / Number(amountIn)).toFixed(6)}{" "}
-            {tokenOut.symbol}
-          </div>
-        )}
+        {!quoting &&
+          tokenIn &&
+          tokenOut &&
+          +amountIn > 0 &&
+          +amountOut > 0 &&
+          !isNaN(+amountOut) && (
+            <div>
+              1 {tokenIn.symbol} ≈{" "}
+              {new BigNumber(amountOut).div(amountIn).toFixed(6)}{" "}
+              {tokenOut.symbol}
+            </div>
+          )}
       </div>
 
       {/* Slippage */}
@@ -386,33 +412,34 @@ export default function SwapForm() {
           {[0.005, 0.01, 0.02].map((s) => (
             <button
               key={s}
-              className={!showCustomSlippage && slippage === s ? "active" : ""}
+              className={!showCustomSlip && slippage === s ? "active" : ""}
               onClick={() => {
                 setSlippage(s);
-                setShowCustomSlippage(false);
+                setShowCustomSlip(false);
                 setCustomSlippage("");
               }}
             >
               {(s * 100).toFixed(1)}%
             </button>
           ))}
-          <div
-            className={`custom-slippage ${showCustomSlippage ? "active" : ""}`}
-          >
+
+          {/* custom */}
+          <div className={`custom-slippage ${showCustomSlip ? "active" : ""}`}>
             <button
-              className={showCustomSlippage ? "active" : ""}
               onClick={() => {
-                setShowCustomSlippage(true);
+                setShowCustomSlip(true);
                 if (!customSlippage)
-                  setCustomSlippage(formatSlippage(slippage));
+                  setCustomSlippage((slippage * 100).toFixed(1));
               }}
             >
               Custom
             </button>
-            {showCustomSlippage && (
+            {showCustomSlip && (
               <div className="custom-slippage-input">
                 <input
                   type="text"
+                  placeholder="0.0"
+                  autoFocus
                   value={customSlippage}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^\d.]/g, "");
@@ -426,22 +453,20 @@ export default function SwapForm() {
                       setSlippage(+v / 100);
                     }
                   }}
-                  placeholder="0.0"
-                  autoFocus
                 />
                 <span className="percentage-symbol">%</span>
               </div>
             )}
           </div>
         </div>
-        {showCustomSlippage && +customSlippage > 5 && (
+        {showCustomSlip && +customSlippage > 5 && (
           <div className="slippage-warning">
-            High slippage tolerance. Your trade may be frontrun.
+            High slippage – trade may be frontrun.
           </div>
         )}
       </div>
 
-      {/* Fee & Error */}
+      {/* Fee & error */}
       {estimatedFee !== null && (
         <div className="fee-estimate">
           Estimated Gas Fee: ${estimatedFee.toFixed(4)} USD
@@ -449,10 +474,10 @@ export default function SwapForm() {
       )}
       {error && <div className="error-message">{error}</div>}
 
-      {/* Swap Button */}
+      {/* Swap */}
       <button
         className="swap-button"
-        onClick={swapTokens}
+        onClick={swap}
         disabled={
           loading ||
           !wallet.connected ||
@@ -462,17 +487,16 @@ export default function SwapForm() {
           quoting
         }
       >
-        {loading ? "Processing..." : "Swap"}
+        {loading ? "Processing…" : "Swap"}
       </button>
 
-      {/* Connect Prompt */}
       {!wallet.connected && (
         <div className="connect-wallet-prompt">
           Please connect your wallet to perform swaps
         </div>
       )}
 
-      {/* ===== Swap Completed Modal ===== */}
+      {/* Success modal */}
       {txDigest && (
         <div className="tx-success-modal">
           <div className="tx-success-content">
@@ -487,9 +511,19 @@ export default function SwapForm() {
                 {txDigest.slice(0, 6)}…{txDigest.slice(-6)}
               </a>
             </p>
-            <button className="tx-close-button" onClick={closeModal}>
+            <button className="tx-close-button" onClick={closeSuccess}>
               Close
             </button>
+            <div className="powered-by">
+              Swap powered by{" "}
+              <a
+                href="https://port.7k.ag/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                7K Aggregator
+              </a>
+            </div>
           </div>
         </div>
       )}

@@ -1,0 +1,36 @@
+/* src/pages/Swap/components/DcaModalOverrides.scss */
+/* Last Updated: 2025-05-04 00:59:05 UTC by jake1318 */
+
+/* Ensure token selector appears on top */
+.token-selector-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* All elements inside the token selector wrapper should receive pointer events */
+.token-selector-wrapper > * {
+  pointer-events: auto;
+}
+
+/* Target any modals from the TokenSelector component */
+[class*="modal"],
+[class*="Modal"],
+[class*="selector"],
+[class*="Selector"],
+[class*="backdrop"],
+[class*="Backdrop"] {
+  z-index: 9999 !important;
+}
+
+/* Special styling for TokenSelector when used from DCA modal */
+.token-selector-wrapper .token-selector,
+.token-selector-wrapper [class*="selector"],
+.token-selector-wrapper [class*="Selector"] {
+  max-height: 80vh !important;
+  margin-top: 10vh !important;
+}

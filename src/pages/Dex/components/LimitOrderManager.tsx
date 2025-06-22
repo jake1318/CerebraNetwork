@@ -1,39 +1,48 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   getOpenLimitOrders,
   getClosedLimitOrders,
   cancelLimitOrder,
   claimExpiredLimitOrder,
 } from "@7kprotocol/sdk-ts";
-// Import your wallet hook (adjust path if needed)
 import { useWallet } from "@suiet/wallet-kit";
 import "./LimitOrderManager.scss";
 
 interface LimitOrder {
   orderId: string;
-  payCoinType: string;
-  targetCoinType: string;
-  expireTs: bigint | number | string;
-  payCoinAmount?: bigint | string;
-  targetCoinAmount?: bigint | string;
-  filledTargetAmount?: bigint | string;
-  filledPayAmount?: bigint | string;
-  rate?: bigint | string;
-  status?: string; // possibly provided for closed orders
+  /* SDK returns these two sets of fields, so we cover both */
+  payCoinType?: string;
+  targetCoinType?: string;
+  payCoinName?: string;
+  targetCoinName?: string;
+
+  expireTs?: bigint | number | string;
+  rate?: string;
+  targetBalance?: string;
+  status?: string;
+  closedAt?: string;
 }
 
-type LimitOrderManagerProps = {
-  selectedPair?: string; // optional filter like "TOKENA-TOKENB"
-};
+interface StatusMessage {
+  type: "success" | "error" | "info";
+  text: string;
+}
+interface ActionProgress {
+  id: string;
+  action: "cancel" | "claim";
+}
 
-const LimitOrderManager: React.FC<LimitOrderManagerProps> = ({
-  selectedPair,
-}) => {
-  const { address: ownerAddress } = useWallet(); // assume useWallet provides the connected address
-  const owner = ownerAddress; // rename for clarity
+type Props = { selectedPair?: string };
+
+const LimitOrderManager: React.FC<Props> = ({ selectedPair }) => {
+  const { address: owner, signAndExecuteTransactionBlock } = useWallet();
   const [activeTab, setActiveTab] = useState<"open" | "closed">("open");
 
-  // Open orders state
+  // Refs for scroll control
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scrollbarRef = useRef<HTMLDivElement>(null);
+
+  // Open orders
   const [openOrders, setOpenOrders] = useState<LimitOrder[]>([]);
   const [openLoading, setOpenLoading] = useState(false);
   const [openError, setOpenError] = useState<Error | null>(null);
@@ -41,7 +50,7 @@ const LimitOrderManager: React.FC<LimitOrderManagerProps> = ({
   const openLimit = 10;
   const [openHasMore, setOpenHasMore] = useState(true);
 
-  // Closed orders state
+  // Closed orders
   const [closedOrders, setClosedOrders] = useState<LimitOrder[]>([]);
   const [closedLoading, setClosedLoading] = useState(false);
   const [closedError, setClosedError] = useState<Error | null>(null);
@@ -49,400 +58,401 @@ const LimitOrderManager: React.FC<LimitOrderManagerProps> = ({
   const closedLimit = 10;
   const [closedHasMore, setClosedHasMore] = useState(true);
 
-  // Helper: format coin type string to a short symbol (e.g., extract "USDC" from the type string)
-  const formatCoinSymbol = (coinType: string): string => {
-    if (!coinType) return "";
-    const parts = coinType.split("::");
-    return parts[parts.length - 1] || coinType;
+  // Status & actions
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
+    null
+  );
+  const [actionInProgress, setActionInProgress] =
+    useState<ActionProgress | null>(null);
+
+  // Helpers
+  const formatSymbol = (order: LimitOrder, side: "pay" | "target") => {
+    // prefer Name, fallback to Type
+    const raw =
+      side === "pay"
+        ? order.payCoinName ?? order.payCoinType
+        : order.targetCoinName ?? order.targetCoinType;
+    if (!raw) return "";
+    const parts = raw.split("::");
+    return parts[parts.length - 1] || raw;
   };
 
-  // Helper: shorten a long ID (order ID) for display (e.g., show first 6 and last 4 chars)
-  const shortenId = (id: string): string => {
-    if (!id) return "";
-    if (id.length <= 10) return id;
-    return `${id.slice(0, 6)}...${id.slice(-4)}`;
+  const shorten = (id: string) =>
+    id.length > 10 ? `${id.slice(0, 6)}...${id.slice(-4)}` : id;
+
+  const expired = (ts?: bigint | number | string) => {
+    if (!ts) return false;
+    let n =
+      typeof ts === "bigint"
+        ? Number(ts)
+        : typeof ts === "string"
+        ? parseInt(ts, 10)
+        : ts;
+    if (n < 1e10) n *= 1000;
+    return n <= Date.now();
   };
 
-  // Helper: determine if an open order is expired (based on current time and expireTs)
-  const isOrderExpired = (order: LimitOrder): boolean => {
-    if (!order.expireTs) return false;
-    const now = Date.now();
-    const expTs =
-      typeof order.expireTs === "bigint"
-        ? Number(order.expireTs)
-        : Number(order.expireTs);
-    // If expireTs is likely in milliseconds (typically Unix timestamp in ms):
-    return expTs <= now;
+  const fmtDate = (ts?: bigint | number | string) => {
+    if (!ts) return "–";
+    let n =
+      typeof ts === "bigint"
+        ? Number(ts)
+        : typeof ts === "string"
+        ? parseInt(ts, 10)
+        : ts;
+    if (n < 1e10) n *= 1000;
+    return new Date(n).toLocaleString();
   };
 
-  // Fetch open orders (with current offset and filters)
-  const fetchOpenOrders = async (reset: boolean = false) => {
+  // Scroll handling
+  const handleScrollBarScroll = () => {
+    if (scrollbarRef.current && contentRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollbarRef.current;
+      const scrollPercentage = scrollLeft / (scrollWidth - clientWidth);
+
+      const content = contentRef.current;
+      const maxContentScroll = content.scrollWidth - content.clientWidth;
+      content.scrollLeft = maxContentScroll * scrollPercentage;
+    }
+  };
+
+  // Fetch
+  const fetchOpen = async (reset = false) => {
     if (!owner) return;
     setOpenLoading(true);
     setOpenError(null);
     try {
-      const result: LimitOrder[] = await getOpenLimitOrders({
+      const orders = await getOpenLimitOrders({
         owner,
         offset: reset ? 0 : openOffset,
         limit: openLimit,
         ...(selectedPair ? { tokenPair: selectedPair } : {}),
       });
-      if (reset) {
-        setOpenOrders(result);
-        setOpenOffset(0);
-      } else {
-        setOpenOrders((prev) => [...prev, ...result]);
-      }
-      // Determine if more data might be available
-      if (result.length < openLimit) {
-        setOpenHasMore(false);
-      } else {
-        setOpenHasMore(true);
-      }
-    } catch (err: any) {
-      setOpenError(err);
+      setOpenOrders(reset ? orders : openOrders.concat(orders));
+      setOpenOffset(reset ? 0 : openOffset);
+      setOpenHasMore(orders.length >= openLimit);
+    } catch (e: any) {
+      setOpenError(e);
+      setStatusMessage({
+        type: "error",
+        text: `Open orders failed: ${e.message}`,
+      });
     } finally {
       setOpenLoading(false);
     }
   };
 
-  // Fetch closed orders (with current offset and filters)
-  const fetchClosedOrders = async (reset: boolean = false) => {
+  const fetchClosed = async (reset = false) => {
     if (!owner) return;
     setClosedLoading(true);
     setClosedError(null);
     try {
-      const result: LimitOrder[] = await getClosedLimitOrders({
+      const orders = await getClosedLimitOrders({
         owner,
         offset: reset ? 0 : closedOffset,
         limit: closedLimit,
         ...(selectedPair ? { tokenPair: selectedPair } : {}),
       });
-      if (reset) {
-        setClosedOrders(result);
-        setClosedOffset(0);
-      } else {
-        setClosedOrders((prev) => [...prev, ...result]);
-      }
-      if (result.length < closedLimit) {
-        setClosedHasMore(false);
-      } else {
-        setClosedHasMore(true);
-      }
-    } catch (err: any) {
-      setClosedError(err);
+      setClosedOrders(reset ? orders : closedOrders.concat(orders));
+      setClosedOffset(reset ? 0 : closedOffset);
+      setClosedHasMore(orders.length >= closedLimit);
+    } catch (e: any) {
+      setClosedError(e);
+      setStatusMessage({
+        type: "error",
+        text: `Closed orders failed: ${e.message}`,
+      });
     } finally {
       setClosedLoading(false);
     }
   };
 
-  // Initial load: fetch open orders when component mounts or when owner/selectedPair changes
+  // Actions
+  const doCancel = async (o: LimitOrder) => {
+    if (!owner || !signAndExecuteTransactionBlock) {
+      return setStatusMessage({ type: "error", text: "Connect your wallet" });
+    }
+    setActionInProgress({ id: o.orderId, action: "cancel" });
+    try {
+      const tx = await cancelLimitOrder({
+        orderId: o.orderId,
+        payCoinType: o.payCoinName ?? o.payCoinType!,
+        targetCoinType: o.targetCoinName ?? o.targetCoinType!,
+      });
+      await signAndExecuteTransactionBlock({ transactionBlock: tx });
+      setOpenOrders(openOrders.filter((x) => x.orderId !== o.orderId));
+      setStatusMessage({ type: "success", text: "Order cancelled" });
+    } catch (e: any) {
+      setStatusMessage({ type: "error", text: `Cancel failed: ${e.message}` });
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const doClaim = async (o: LimitOrder) => {
+    if (!owner || !signAndExecuteTransactionBlock) {
+      return setStatusMessage({ type: "error", text: "Connect your wallet" });
+    }
+    setActionInProgress({ id: o.orderId, action: "claim" });
+    try {
+      const tx = await claimExpiredLimitOrder({
+        orderId: o.orderId,
+        payCoinType: o.payCoinName ?? o.payCoinType!,
+        targetCoinType: o.targetCoinName ?? o.targetCoinType!,
+      });
+      await signAndExecuteTransactionBlock({ transactionBlock: tx });
+      setOpenOrders(openOrders.filter((x) => x.orderId !== o.orderId));
+      setStatusMessage({ type: "success", text: "Expired order claimed" });
+    } catch (e: any) {
+      setStatusMessage({ type: "error", text: `Claim failed: ${e.message}` });
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // Effects
   useEffect(() => {
     if (owner) {
-      setOpenOffset(0);
-      setClosedOffset(0);
-      fetchOpenOrders(true); // reset and fetch open orders
-      // We will fetch closed orders on demand (when the tab is activated)
+      fetchOpen(true);
       setClosedOrders([]);
       setClosedHasMore(true);
     } else {
-      // If no wallet connected, clear any existing data
       setOpenOrders([]);
       setClosedOrders([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [owner, selectedPair]);
 
-  // Fetch closed orders the first time the Closed tab is shown (or if owner/pair changed)
   useEffect(() => {
     if (
       owner &&
       activeTab === "closed" &&
-      closedOrders.length === 0 &&
-      !closedLoading
+      !closedLoading &&
+      !closedOrders.length
     ) {
-      fetchClosedOrders(true);
+      fetchClosed(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, owner]);
 
-  // Handler: switch tabs
-  const handleTabSwitch = (tab: "open" | "closed") => {
-    setActiveTab(tab);
-    // If switching to closed and we haven't loaded them yet, trigger fetch (covered in useEffect above)
-  };
+  // Connect scrollbar to content
+  useEffect(() => {
+    const handleContentScroll = () => {
+      if (contentRef.current && scrollbarRef.current) {
+        const content = contentRef.current;
+        const scrollbar = scrollbarRef.current;
 
-  // Handler: Cancel an open order
-  const handleCancel = async (order: LimitOrder) => {
-    if (!owner) return;
-    try {
-      // Call the SDK to cancel the order
-      await cancelLimitOrder({
-        orderId: order.orderId,
-        payCoinType: order.payCoinType,
-        targetCoinType: order.targetCoinType,
-      });
-      // On success, update the open orders list by removing the cancelled order
-      setOpenOrders((prev) => prev.filter((o) => o.orderId !== order.orderId));
-      // Optionally, you could refresh closed orders to reflect the newly closed order
-      // but this may not be necessary until the user switches tab.
-    } catch (error: any) {
-      console.error("Cancel order failed:", error);
-      alert(`Failed to cancel order: ${error.message}`);
+        if (content.scrollWidth <= content.clientWidth) {
+          // No scroll needed
+          return;
+        }
+
+        const contentScrollPercentage =
+          content.scrollLeft / (content.scrollWidth - content.clientWidth);
+        const scrollbarMaxScroll =
+          scrollbar.scrollWidth - scrollbar.clientWidth;
+
+        // Update scrollbar position without triggering its scroll event
+        scrollbar.removeEventListener("scroll", handleScrollBarScroll);
+        scrollbar.scrollLeft = contentScrollPercentage * scrollbarMaxScroll;
+        setTimeout(() => {
+          scrollbar.addEventListener("scroll", handleScrollBarScroll);
+        }, 10);
+      }
+    };
+
+    const content = contentRef.current;
+    const scrollbar = scrollbarRef.current;
+
+    if (content && scrollbar) {
+      content.addEventListener("scroll", handleContentScroll);
+      scrollbar.addEventListener("scroll", handleScrollBarScroll);
     }
-  };
 
-  // Handler: Claim an expired order
-  const handleClaim = async (order: LimitOrder) => {
-    if (!owner) return;
-    try {
-      await claimExpiredLimitOrder({
-        orderId: order.orderId,
-        payCoinType: order.payCoinType,
-        targetCoinType: order.targetCoinType,
-      });
-      // Remove the order from open list after claiming
-      setOpenOrders((prev) => prev.filter((o) => o.orderId !== order.orderId));
-      // (You might also refresh closed orders here to show it under closed tab if needed)
-    } catch (error: any) {
-      console.error("Claim order failed:", error);
-      alert(`Failed to claim order: ${error.message}`);
-    }
-  };
+    return () => {
+      if (content && scrollbar) {
+        content.removeEventListener("scroll", handleContentScroll);
+        scrollbar.removeEventListener("scroll", handleScrollBarScroll);
+      }
+    };
+  }, [activeTab, openOrders.length, closedOrders.length]);
 
-  // If no wallet is connected, prompt to connect
+  // Render
   if (!owner) {
     return (
-      <div className="limit-order-manager">
-        <p>Please connect your wallet to view your orders.</p>
-      </div>
+      <div className="limit-order-manager">Please connect your wallet.</div>
     );
   }
 
   return (
     <div className="limit-order-manager">
-      {/* Tab Switch Buttons */}
+      {statusMessage && (
+        <div className={`status-message ${statusMessage.type}`}>
+          {statusMessage.text}
+          <button onClick={() => setStatusMessage(null)}>×</button>
+        </div>
+      )}
+
       <div className="order-tabs">
         <button
           className={activeTab === "open" ? "active" : ""}
-          onClick={() => handleTabSwitch("open")}
+          onClick={() => setActiveTab("open")}
         >
           Open Orders
         </button>
         <button
           className={activeTab === "closed" ? "active" : ""}
-          onClick={() => handleTabSwitch("closed")}
+          onClick={() => setActiveTab("closed")}
         >
           Closed Orders
         </button>
+        <button
+          className="refresh-btn"
+          onClick={() =>
+            activeTab === "open" ? fetchOpen(true) : fetchClosed(true)
+          }
+          disabled={activeTab === "open" ? openLoading : closedLoading}
+        >
+          ↻
+        </button>
       </div>
 
-      {/* Open Orders List */}
-      {activeTab === "open" && (
-        <div className="open-orders-section">
-          {openLoading && openOrders.length === 0 && (
-            <p>Loading open orders...</p>
+      {activeTab === "open" ? (
+        <div className="orders-section">
+          {openLoading && !openOrders.length && <p>Loading…</p>}
+          {openError && <p className="error">{openError.message}</p>}
+          {!openLoading && !openOrders.length && !openError && (
+            <p>No open orders.</p>
           )}
-          {openError && (
-            <p className="error">
-              Error loading open orders: {openError.message}
-            </p>
-          )}
-          {!openLoading && openOrders.length === 0 && !openError && (
-            <p>No open orders to show.</p>
-          )}
-          {openOrders.length > 0 && (
-            <table className="orders-table open-orders-table">
-              <thead>
-                <tr>
-                  <th>Pair</th>
-                  <th>Price</th>
-                  <th>Amount</th>
-                  <th>Expiration</th>
-                  <th>Order ID</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {openOrders.map((order) => {
-                  const paySymbol = formatCoinSymbol(order.payCoinType);
-                  const targetSymbol = formatCoinSymbol(order.targetCoinType);
-                  // Determine price and amount display:
-                  // Assume the pair format is Target-Pay (e.g. SUI-USDC), treat target as base asset and pay as quote.
-                  // Price: quote per base (e.g. USDC per SUI), Amount: base amount.
-                  let priceDisplay: string;
-                  let amountDisplay: string;
-                  if (order.rate && order.payCoinAmount) {
-                    // Calculate target (base) amount from pay amount and rate if possible
-                    // (This assumes rate is scaled as per SDK docs: rate = target_per_pay * 10^(12 + decimalsDiff))
-                    const payAmt = Number(order.payCoinAmount);
-                    const rateBig = Number(order.rate);
-                    // If we had coin decimals, we could compute precisely. For simplicity, derive target amount and price approximately:
-                    // targetAmount = payAmt * (rate / 10^12) (assuming rate already adjusted for decimals difference)
-                    const targetAmt =
-                      rateBig && payAmt ? payAmt * (rateBig / 1e12) : 0;
-                    // Price as quote per base = payAmt / targetAmt (if targetAmt > 0)
-                    const price = targetAmt ? payAmt / targetAmt : 0;
-                    priceDisplay = price ? price.toFixed(6) : "-";
-                    amountDisplay = targetAmt ? targetAmt.toFixed(4) : "-";
-                  } else {
-                    // Fallback if rate or amount not available
-                    priceDisplay = "-";
-                    amountDisplay = "-";
-                  }
-                  // Format expiration timestamp to readable date/time
-                  const expTs =
-                    typeof order.expireTs === "bigint"
-                      ? Number(order.expireTs)
-                      : Number(order.expireTs);
-                  const expDate = expTs ? new Date(expTs) : null;
-                  const expDisplay = expDate ? expDate.toLocaleString() : "-";
 
-                  return (
-                    <tr key={order.orderId}>
-                      <td>
-                        {targetSymbol}/{paySymbol}
-                      </td>
-                      <td>
-                        {priceDisplay} {paySymbol}
-                      </td>
-                      <td>
-                        {amountDisplay} {targetSymbol}
-                      </td>
-                      <td>{expDisplay}</td>
-                      <td title={order.orderId}>{shortenId(order.orderId)}</td>
-                      <td>
-                        {!isOrderExpired(order) ? (
-                          <button onClick={() => handleCancel(order)}>
-                            Cancel
-                          </button>
-                        ) : (
-                          <button onClick={() => handleClaim(order)}>
-                            Claim
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-          {/* Pagination - Load more open orders if available */}
-          {openOrders.length > 0 && openHasMore && !openLoading && (
-            <div className="load-more">
-              <button
-                onClick={() => {
-                  setOpenOffset((prev) => prev + openLimit);
-                  fetchOpenOrders(false);
-                }}
-              >
-                Load More
-              </button>
+          {!!openOrders.length && (
+            <div className="content-wrapper" ref={contentRef}>
+              <table className="orders-table">
+                <thead>
+                  <tr>
+                    <th>Pair</th>
+                    <th>Amount</th>
+                    <th>Price</th>
+                    <th>Expires</th>
+                    <th>Order ID</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openOrders.map((o) => {
+                    const pay = formatSymbol(o, "pay");
+                    const tgt = formatSymbol(o, "target");
+                    const isExp = expired(o.expireTs);
+
+                    return (
+                      <tr key={o.orderId}>
+                        <td>
+                          {tgt}/{pay}
+                        </td>
+                        <td>
+                          {o.targetBalance ?? "–"} {tgt}
+                        </td>
+                        <td>
+                          {o.rate ?? "–"} {pay}
+                        </td>
+                        <td>{fmtDate(o.expireTs)}</td>
+                        <td title={o.orderId}>{shorten(o.orderId)}</td>
+                        <td>
+                          {!isExp ? (
+                            <button
+                              disabled={actionInProgress?.action === "cancel"}
+                              onClick={() => doCancel(o)}
+                            >
+                              {actionInProgress?.action === "cancel"
+                                ? "Cancelling…"
+                                : "Cancel"}
+                            </button>
+                          ) : (
+                            <button
+                              disabled={actionInProgress?.action === "claim"}
+                              onClick={() => doClaim(o)}
+                            >
+                              {actionInProgress?.action === "claim"
+                                ? "Claiming…"
+                                : "Claim"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
+          )}
+
+          {openHasMore && !openLoading && (
+            <button onClick={() => fetchOpen()} className="load-more">
+              Load More
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="orders-section">
+          {closedLoading && !closedOrders.length && <p>Loading…</p>}
+          {closedError && <p className="error">{closedError.message}</p>}
+          {!closedLoading && !closedOrders.length && !closedError && (
+            <p>No closed orders.</p>
+          )}
+
+          {!!closedOrders.length && (
+            <div className="content-wrapper" ref={contentRef}>
+              <table className="orders-table">
+                <thead>
+                  <tr>
+                    <th>Pair</th>
+                    <th>Amount</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Closed At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {closedOrders.map((o) => {
+                    const pay = formatSymbol(o, "pay");
+                    const tgt = formatSymbol(o, "target");
+                    return (
+                      <tr key={o.orderId}>
+                        <td>
+                          {tgt}/{pay}
+                        </td>
+                        <td>
+                          {o.targetBalance ?? "–"} {tgt}
+                        </td>
+                        <td>
+                          {o.rate ?? "–"} {pay}
+                        </td>
+                        <td>{o.status ?? "Closed"}</td>
+                        <td>
+                          {o.closedAt
+                            ? new Date(o.closedAt).toLocaleString()
+                            : "–"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {closedHasMore && !closedLoading && (
+            <button onClick={() => fetchClosed()} className="load-more">
+              Load More
+            </button>
           )}
         </div>
       )}
 
-      {/* Closed Orders List */}
-      {activeTab === "closed" && (
-        <div className="closed-orders-section">
-          {closedLoading && closedOrders.length === 0 && (
-            <p>Loading closed orders...</p>
-          )}
-          {closedError && (
-            <p className="error">
-              Error loading closed orders: {closedError.message}
-            </p>
-          )}
-          {!closedLoading && closedOrders.length === 0 && !closedError && (
-            <p>No closed orders to show.</p>
-          )}
-          {closedOrders.length > 0 && (
-            <table className="orders-table closed-orders-table">
-              <thead>
-                <tr>
-                  <th>Pair</th>
-                  <th>Status</th>
-                  <th>Fill Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {closedOrders.map((order) => {
-                  const paySymbol = formatCoinSymbol(order.payCoinType);
-                  const targetSymbol = formatCoinSymbol(order.targetCoinType);
-                  // Determine final status
-                  let statusText = order.status || "Closed";
-                  let detailsText = "";
-                  // If status not directly provided, infer from filled amounts vs total
-                  const filled = order.filledTargetAmount
-                    ? Number(order.filledTargetAmount)
-                    : 0;
-                  const totalTarget = order.targetCoinAmount
-                    ? Number(order.targetCoinAmount)
-                    : 0;
-                  const expTs =
-                    typeof order.expireTs === "bigint"
-                      ? Number(order.expireTs)
-                      : Number(order.expireTs);
-                  const isExpired = expTs && expTs <= Date.now();
-                  if (!order.status) {
-                    if (filled > 0 && totalTarget > 0) {
-                      if (filled >= totalTarget) {
-                        statusText = "Filled";
-                      } else if (isExpired) {
-                        statusText = "Expired";
-                      } else {
-                        statusText = "Cancelled";
-                      }
-                    } else {
-                      // No fill at all
-                      statusText = isExpired ? "Expired" : "Cancelled";
-                    }
-                  }
-                  // Fill details text
-                  if (filled > 0) {
-                    if (totalTarget > 0) {
-                      // Partial or full fill
-                      const filledAmt = filled.toFixed(4);
-                      const totalAmt = totalTarget.toFixed(4);
-                      detailsText =
-                        filled >= totalTarget
-                          ? `Filled ${filledAmt} ${targetSymbol}`
-                          : `Filled ${filledAmt} of ${totalAmt} ${targetSymbol}`;
-                    } else {
-                      detailsText = `Filled ${filled} ${targetSymbol}`;
-                    }
-                  } else {
-                    detailsText = "No fills"; // not filled at all
-                  }
-
-                  return (
-                    <tr key={order.orderId}>
-                      <td>
-                        {targetSymbol}/{paySymbol}
-                      </td>
-                      <td>{statusText}</td>
-                      <td>{detailsText}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-          {/* Pagination - Load more closed orders if available */}
-          {closedOrders.length > 0 && closedHasMore && !closedLoading && (
-            <div className="load-more">
-              <button
-                onClick={() => {
-                  setClosedOffset((prev) => prev + closedLimit);
-                  fetchClosedOrders(false);
-                }}
-              >
-                Load More
-              </button>
-            </div>
-          )}
+      {/* The table container at the bottom of the component */}
+      {((activeTab === "open" && !!openOrders.length) ||
+        (activeTab === "closed" && !!closedOrders.length)) && (
+        <div className="table-container" ref={scrollbarRef}>
+          {/* This is just a wrapper for the horizontal scrollbar */}
+          <div className="scrollbar-content"></div>
         </div>
       )}
     </div>

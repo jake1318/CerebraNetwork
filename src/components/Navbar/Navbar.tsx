@@ -7,55 +7,36 @@ import "./Navbar.scss";
 const Navbar: React.FC = () => {
   const location = useLocation();
   const { connected, account, disconnect } = useWallet();
-  const [isScrolled, setIsScrolled] = useState<boolean>(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Check if page is scrolled
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [yieldDropdown, setYieldDropdown] = useState(false);
+  const [bridgeDropdown, setBridgeDropdown] = useState(false);
+  const yieldRef = useRef<HTMLDivElement>(null);
+  const bridgeRef = useRef<HTMLDivElement>(null);
+
+  // scroll effect
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    const onScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close dropdown when clicking outside
+  // close any dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setDropdownOpen(false);
+    const onClick = (e: MouseEvent) => {
+      if (yieldRef.current && !yieldRef.current.contains(e.target as Node)) {
+        setYieldDropdown(false);
+      }
+      if (bridgeRef.current && !bridgeRef.current.contains(e.target as Node)) {
+        setBridgeDropdown(false);
       }
     };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  // Format address for display
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  // Custom styled wallet connect button
-  const CustomConnectButton = () => {
-    return (
-      <div className="custom-connect-wrapper">
-        <ConnectButton className="custom-connect-button">
-          Connect Wallet
-        </ConnectButton>
-      </div>
-    );
-  };
+  const fmtAddr = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`;
 
   return (
     <nav className={`navbar ${isScrolled ? "scrolled" : ""}`}>
@@ -64,9 +45,16 @@ const Navbar: React.FC = () => {
           Cerebra Network
         </Link>
 
+        {/* desktop links */}
         <div className="navbar__links">
           <Link to="/" className={location.pathname === "/" ? "active" : ""}>
             Home
+          </Link>
+          <Link
+            to="/search"
+            className={location.pathname === "/search" ? "active" : ""}
+          >
+            Search
           </Link>
           <Link
             to="/swap"
@@ -74,29 +62,66 @@ const Navbar: React.FC = () => {
           >
             Swap
           </Link>
-          <Link
-            to="/pools-and-vaults"
-            className={
-              location.pathname === "/pools-and-vaults" ? "active" : ""
-            }
+
+          {/* Yield dropdown */}
+          <div
+            className="dropdown"
+            ref={yieldRef}
+            onMouseEnter={() => setYieldDropdown(true)}
+            onMouseLeave={() => setYieldDropdown(false)}
           >
-            Pools & Vaults
-          </Link>
+            <button
+              className={`dropdown-toggle ${yieldDropdown ? "open" : ""}`}
+            >
+              Yield
+            </button>
+            {yieldDropdown && (
+              <div className="dropdown-menu">
+                <Link to="/pools" className="dropdown-item">
+                  Pools
+                </Link>
+                <Link to="/positions" className="dropdown-item">
+                  Positions
+                </Link>
+                <Link to="/portfolio" className="dropdown-item">
+                  Portfolio
+                </Link>
+              </div>
+            )}
+          </div>
+
           <Link
             to="/dex"
             className={location.pathname === "/dex" ? "active" : ""}
           >
             DEX
           </Link>
-          {/* Bridge Dropdown */}
-          <div className="dropdown" ref={dropdownRef}>
+          <Link
+            to="/lending"
+            className={location.pathname === "/lending" ? "active" : ""}
+          >
+            Lending
+          </Link>
+          <Link
+            to="/perpetual"
+            className={location.pathname === "/perpetual" ? "active" : ""}
+          >
+            Perps
+          </Link>
+
+          {/* Bridge dropdown */}
+          <div
+            className="dropdown"
+            ref={bridgeRef}
+            onMouseEnter={() => setBridgeDropdown(true)}
+            onMouseLeave={() => setBridgeDropdown(false)}
+          >
             <button
-              className="dropdown-toggle"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className={`dropdown-toggle ${bridgeDropdown ? "open" : ""}`}
             >
               Bridge
             </button>
-            {dropdownOpen && (
+            {bridgeDropdown && (
               <div className="dropdown-menu">
                 <a
                   href="https://bridge.sui.io/"
@@ -117,84 +142,91 @@ const Navbar: React.FC = () => {
               </div>
             )}
           </div>
-          <Link
-            to="/search"
-            className={location.pathname === "/search" ? "active" : ""}
-          >
-            Search
-          </Link>
         </div>
 
+        {/* wallet/connect */}
         <div className="navbar__actions">
           {connected && account ? (
             <div className="wallet-info">
-              <div className="wallet-address">
-                {formatAddress(account.address)}
-              </div>
-              <button
-                className="disconnect-button"
-                onClick={() => disconnect()}
-              >
-                Disconnect
-              </button>
+              <span>{fmtAddr(account.address)}</span>
+              <button onClick={() => disconnect()}>Disconnect</button>
             </div>
           ) : (
-            <div className="connect-wrapper">
-              <CustomConnectButton />
-            </div>
+            <ConnectButton className="connect-button">
+              Connect Wallet
+            </ConnectButton>
           )}
         </div>
 
+        {/* mobile toggle */}
         <button
           className="navbar__mobile-toggle"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          onClick={() => setMobileOpen((o) => !o)}
         >
-          <div className={`hamburger ${isMobileMenuOpen ? "active" : ""}`}>
-            <span></span>
-            <span></span>
-            <span></span>
+          <div className={`hamburger ${mobileOpen ? "active" : ""}`}>
+            <span />
+            <span />
+            <span />
           </div>
         </button>
       </div>
 
-      {isMobileMenuOpen && (
+      {/* mobile menu */}
+      {mobileOpen && (
         <motion.div
           className="navbar__mobile-menu"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
         >
-          <Link
-            to="/"
-            className={location.pathname === "/" ? "active" : ""}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Home
-          </Link>
-          <Link
-            to="/swap"
-            className={location.pathname === "/swap" ? "active" : ""}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Swap
-          </Link>
-          <Link
-            to="/pools-and-vaults"
-            className={
-              location.pathname === "/pools-and-vaults" ? "active" : ""
-            }
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Pools & Vaults
-          </Link>
-          <Link
-            to="/dex"
-            className={location.pathname === "/dex" ? "active" : ""}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            DEX
-          </Link>
-          {/* Bridge dropdown for mobile */}
+          {/* primary links */}
+          {[
+            { to: "/", label: "Home" },
+            { to: "/search", label: "Search" },
+            { to: "/swap", label: "Swap" },
+          ].map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className={location.pathname === to ? "active" : ""}
+              onClick={() => setMobileOpen(false)}
+            >
+              {label}
+            </Link>
+          ))}
+
+          {/* mobile Yield */}
+          <div className="mobile-dropdown">
+            <div className="mobile-dropdown-header">Yield</div>
+            <div className="mobile-dropdown-items">
+              {[
+                { to: "/pools", label: "Pools" },
+                { to: "/positions", label: "Positions" },
+                { to: "/portfolio", label: "Portfolio" },
+              ].map(({ to, label }) => (
+                <Link key={to} to={to} onClick={() => setMobileOpen(false)}>
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* rest of links */}
+          {[
+            { to: "/dex", label: "DEX" },
+            { to: "/lending", label: "Lending" },
+            { to: "/perpetual", label: "Perps" },
+          ].map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className={location.pathname === to ? "active" : ""}
+              onClick={() => setMobileOpen(false)}
+            >
+              {label}
+            </Link>
+          ))}
+
+          {/* mobile Bridge */}
           <div className="mobile-dropdown">
             <div className="mobile-dropdown-header">Bridge</div>
             <div className="mobile-dropdown-items">
@@ -202,7 +234,7 @@ const Navbar: React.FC = () => {
                 href="https://bridge.sui.io/"
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={() => setMobileOpen(false)}
               >
                 Sui Bridge
               </a>
@@ -210,41 +242,36 @@ const Navbar: React.FC = () => {
                 href="https://portalbridge.com/#/transfer"
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={() => setMobileOpen(false)}
               >
                 Wormhole
               </a>
             </div>
           </div>
-          <Link
-            to="/search"
-            className={location.pathname === "/search" ? "active" : ""}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Search
-          </Link>
 
+          {/* wallet mobile */}
           {connected && account ? (
             <>
               <div className="wallet-info-mobile">
-                <div className="wallet-address">
-                  {formatAddress(account.address)}
-                </div>
+                {fmtAddr(account.address)}
               </div>
               <button
                 className="disconnect-button mobile"
                 onClick={() => {
                   disconnect();
-                  setIsMobileMenuOpen(false);
+                  setMobileOpen(false);
                 }}
               >
                 Disconnect
               </button>
             </>
           ) : (
-            <div className="connect-wrapper-mobile">
-              <CustomConnectButton />
-            </div>
+            <ConnectButton
+              className="connect-button mobile"
+              onClick={() => setMobileOpen(false)}
+            >
+              Connect Wallet
+            </ConnectButton>
           )}
         </motion.div>
       )}

@@ -1,0 +1,918 @@
+// src/styles/pages/Portfolio.scss
+// Last Updated: 2025-05-08 02:30:10 UTC by jake1318
+
+.portfolio-page {
+  width: 100%;
+  min-height: 100vh;
+  padding: 2rem;
+  position: relative;
+  color: #fff;
+
+  // Add cyberpunk-style gradient background with grid overlay to match homepage
+  background: radial-gradient(
+      circle at top left,
+      rgba(0, 255, 255, 0.15),
+      rgba(5, 15, 30, 0.3) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 0, 255, 0.15),
+      rgba(5, 15, 30, 0.3) 40%
+    ),
+    #0f1624;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .content-container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  // New main navigation styling with gradient text
+  .main-navigation {
+    display: flex;
+    margin-bottom: 2.5rem;
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -10px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: rgba(75, 85, 99, 0.2);
+    }
+
+    .nav-link {
+      padding: 0.5rem 1.5rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      text-decoration: none;
+      color: #ffffff;
+      position: relative;
+      transition: all 0.2s ease;
+      opacity: 0.7;
+
+      &:first-child {
+        padding-left: 0;
+      }
+
+      &:hover {
+        opacity: 1;
+      }
+
+      &.active {
+        color: transparent;
+        background: linear-gradient(90deg, #00e7ff, #a15ffe);
+        -webkit-background-clip: text;
+        background-clip: text;
+        opacity: 1;
+
+        &::after {
+          content: "";
+          position: absolute;
+          bottom: -12px;
+          left: 0;
+          width: 100%;
+          height: 3px;
+          background: linear-gradient(90deg, #00e7ff, #a15ffe);
+          border-radius: 3px;
+          box-shadow: 0 0 10px rgba(0, 231, 255, 0.5),
+            0 0 10px rgba(161, 95, 254, 0.5);
+          z-index: 2;
+        }
+      }
+    }
+  }
+
+  // Refresh button styling
+  .refresh-container {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+
+    .last-updated {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.9rem;
+    }
+
+    .refresh-button {
+      background: rgba(15, 25, 40, 0.7);
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.6),
+          rgba(255, 0, 255, 0.6)
+        )
+        1;
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+
+      &:hover:not(:disabled) {
+        background: rgba(25, 35, 50, 0.8);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 255, 255, 0.1),
+          0 5px 15px rgba(255, 0, 255, 0.1);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  // Tabs styling
+  .tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+    padding-bottom: 10px;
+
+    .tab {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1.1rem;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.3s ease;
+
+      &:hover {
+        color: #fff;
+      }
+
+      &.active {
+        color: transparent;
+        background: linear-gradient(90deg, #00e7ff, #a15ffe);
+        -webkit-background-clip: text;
+        background-clip: text;
+
+        &:after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: -10px;
+          height: 3px;
+          background: linear-gradient(90deg, #00e7ff, #a15ffe);
+          border-radius: 3px;
+          box-shadow: 0 0 10px rgba(0, 231, 255, 0.3),
+            0 0 10px rgba(161, 95, 254, 0.3);
+        }
+      }
+    }
+  }
+
+  // Dashboard view styling
+  .dashboard-view {
+    max-width: 1200px;
+    margin: 0 auto;
+
+    .summary-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+
+      .card {
+        background: rgba(15, 25, 40, 0.5);
+        border-radius: 12px;
+        border: 1px solid;
+        border-image: linear-gradient(
+            45deg,
+            rgba(0, 255, 255, 0.2),
+            rgba(255, 0, 255, 0.2)
+          )
+          1;
+        padding: 1.5rem;
+        box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
+          0 8px 32px rgba(255, 0, 255, 0.05);
+        backdrop-filter: blur(10px);
+
+        h3 {
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.8);
+          margin-bottom: 0.75rem;
+        }
+
+        .value {
+          font-size: 1.8rem;
+          font-weight: 700;
+          color: transparent;
+          background: linear-gradient(90deg, #00ffff, #ff00ff);
+          -webkit-background-clip: text;
+          background-clip: text;
+        }
+
+        &.primary {
+          background: rgba(15, 25, 40, 0.6);
+          padding: 2rem;
+
+          h3 {
+            font-size: 1.3rem;
+          }
+
+          .value {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+          }
+
+          .details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 2rem;
+            margin-top: 1rem;
+
+            .detail-item {
+              display: flex;
+              align-items: baseline;
+              gap: 0.5rem;
+
+              .label {
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 0.9rem;
+              }
+
+              .value {
+                font-size: 1.1rem;
+                font-weight: 600;
+              }
+            }
+          }
+        }
+      }
+
+      .secondary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+      }
+    }
+
+    .protocol-breakdown {
+      margin-top: 2rem;
+
+      h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 1.5rem;
+      }
+
+      .protocol-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+
+        .protocol-item {
+          background: rgba(15, 25, 40, 0.5);
+          border-radius: 12px;
+          padding: 1rem;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 1rem;
+          border: 1px solid rgba(75, 85, 99, 0.2);
+
+          .protocol-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 180px;
+
+            .protocol-badge {
+              display: inline-block;
+              padding: 0.35rem 0.75rem;
+              border-radius: 999px;
+              background-color: rgba(0, 255, 255, 0.1);
+              color: #00ffff;
+              font-size: 0.75rem;
+              font-weight: 500;
+              border: 1px solid rgba(0, 255, 255, 0.2);
+
+              &.cetus {
+                background-color: rgba(0, 255, 255, 0.1);
+                color: #00ffff;
+                border-color: rgba(0, 255, 255, 0.2);
+              }
+
+              &.suilend,
+              &.scallop,
+              &.navi {
+                background-color: rgba(255, 0, 255, 0.1);
+                color: #ff00ff;
+                border-color: rgba(255, 0, 255, 0.2);
+              }
+
+              &.turbos,
+              &.flowx {
+                background-color: rgba(255, 165, 0, 0.1);
+                color: #ffa500;
+                border-color: rgba(255, 165, 0, 0.2);
+              }
+
+              &.kriya {
+                background-color: rgba(0, 191, 255, 0.1);
+                color: #00bfff;
+                border-color: rgba(0, 191, 255, 0.2);
+              }
+
+              &.aftermath,
+              &.suistake {
+                background-color: rgba(50, 205, 50, 0.1);
+                color: #32cd32;
+                border-color: rgba(50, 205, 50, 0.2);
+              }
+            }
+
+            .protocol-value {
+              color: #fff;
+              font-weight: 500;
+            }
+          }
+
+          .progress-bar {
+            flex-grow: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+
+            .progress {
+              height: 100%;
+              background: linear-gradient(90deg, #00e7ff, #a15ffe);
+              border-radius: 4px;
+            }
+          }
+
+          .percentage {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            min-width: 50px;
+            text-align: right;
+          }
+        }
+      }
+    }
+  }
+
+  // Protocol view styling
+  .protocol-view {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+
+    .protocol-section {
+      background: rgba(15, 25, 40, 0.5);
+      border-radius: 12px;
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(255, 0, 255, 0.2)
+        )
+        1;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
+        0 8px 32px rgba(255, 0, 255, 0.05);
+
+      .protocol-header {
+        padding: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.03);
+        }
+
+        .protocol-info {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+
+          h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            align-items: center;
+
+            .pool-pair {
+              display: flex;
+              align-items: center;
+              gap: 0.75rem;
+
+              .token-icons {
+                display: flex;
+                position: relative;
+                min-width: 36px;
+
+                .token-logo-sm:nth-child(2) {
+                  margin-left: -12px;
+                }
+              }
+
+              .pair-name {
+                font-weight: 600;
+                color: white;
+                font-size: 0.95rem;
+              }
+            }
+          }
+
+          .protocol-badge {
+            display: inline-block;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            background-color: rgba(0, 255, 255, 0.1);
+            color: #00ffff;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+
+            &.wallet {
+              background: rgba(0, 231, 255, 0.1);
+              color: #00e7ff;
+              border-color: rgba(0, 231, 255, 0.2);
+            }
+
+            &.cetus {
+              background-color: rgba(0, 255, 255, 0.1);
+              color: #00ffff;
+              border-color: rgba(0, 255, 255, 0.2);
+            }
+
+            &.suilend,
+            &.scallop,
+            &.navi {
+              background-color: rgba(255, 0, 255, 0.1);
+              color: #ff00ff;
+              border-color: rgba(255, 0, 255, 0.2);
+            }
+
+            &.turbos,
+            &.flowx {
+              background-color: rgba(255, 165, 0, 0.1);
+              color: #ffa500;
+              border-color: rgba(255, 165, 0, 0.2);
+            }
+
+            &.kriya {
+              background-color: rgba(0, 191, 255, 0.1);
+              color: #00bfff;
+              border-color: rgba(0, 191, 255, 0.2);
+            }
+
+            &.aftermath,
+            &.suistake {
+              background-color: rgba(50, 205, 50, 0.1);
+              color: #32cd32;
+              border-color: rgba(50, 205, 50, 0.2);
+            }
+          }
+        }
+
+        .protocol-metrics {
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+
+          .metric {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+
+            .label {
+              font-size: 0.8rem;
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            .value {
+              font-size: 1rem;
+              font-weight: 600;
+              color: #fff;
+
+              &.apr {
+                color: #10f0b0;
+              }
+            }
+          }
+
+          .expand-button {
+            background: rgba(15, 25, 40, 0.7);
+            border: 1px solid;
+            border-image: linear-gradient(
+                45deg,
+                rgba(0, 255, 255, 0.6),
+                rgba(255, 0, 255, 0.6)
+              )
+              1;
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+
+            &:hover:not(:disabled) {
+              background: rgba(25, 35, 50, 0.8);
+              transform: translateY(-2px);
+              box-shadow: 0 5px 15px rgba(0, 255, 255, 0.1),
+                0 5px 15px rgba(255, 0, 255, 0.1);
+            }
+          }
+        }
+      }
+
+      .protocol-details {
+        padding: 1.5rem;
+        background: rgba(11, 15, 25, 0.5);
+
+        .positions-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 1.5rem;
+
+          .position-card {
+            background: rgba(15, 25, 40, 0.7);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 1.25rem;
+
+            .position-id {
+              font-family: monospace;
+              font-size: 0.8rem;
+              color: rgba(255, 255, 255, 0.6);
+              margin-bottom: 1rem;
+            }
+
+            .position-info {
+              .info-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 0.5rem 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+                &:last-child {
+                  border-bottom: none;
+                }
+
+                .label {
+                  color: rgba(255, 255, 255, 0.6);
+                  font-size: 0.9rem;
+                }
+
+                .value {
+                  color: #fff;
+                  font-weight: 500;
+                }
+
+                .status {
+                  font-size: 0.8rem;
+                  font-weight: 500;
+                  padding: 0.25rem 0.5rem;
+                  border-radius: 4px;
+
+                  &.in-range {
+                    background-color: rgba(16, 240, 176, 0.1);
+                    color: #10f0b0;
+                    border: 1px solid rgba(16, 240, 176, 0.3);
+                  }
+
+                  &.out-of-range {
+                    background-color: rgba(255, 165, 0, 0.1);
+                    color: #ffa500;
+                    border: 1px solid rgba(255, 165, 0, 0.3);
+                  }
+                }
+              }
+            }
+
+            .position-rewards {
+              margin-top: 1rem;
+              padding-top: 1rem;
+              border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+              h4 {
+                font-size: 1rem;
+                font-weight: 600;
+                color: #fff;
+                margin-bottom: 0.75rem;
+              }
+
+              .reward-item {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                padding: 0.5rem 0;
+                font-size: 0.9rem;
+
+                .reward-token {
+                  color: rgba(255, 255, 255, 0.7);
+                }
+
+                .reward-amount {
+                  color: #10f0b0;
+                  font-weight: 500;
+                  margin-right: 0.5rem;
+                }
+
+                .reward-value {
+                  color: rgba(255, 255, 255, 0.5);
+                  font-size: 0.8rem;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Token logo styling
+  .token-logo,
+  .token-logo-sm,
+  .token-logo-lg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: #1e293b;
+    border: 2px solid #0f172a;
+    position: relative;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    &.token-fallback {
+      background: linear-gradient(135deg, #1e293b, #1f2937);
+      color: white;
+      font-weight: bold;
+    }
+  }
+
+  .token-logo-sm {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .token-logo {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+
+  .token-logo-lg {
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
+
+  // Wallet tokens table styling
+  .wallet-tokens-table {
+    width: 100%;
+    margin-top: 1rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(15, 25, 40, 0.5);
+    border: 1px solid rgba(75, 85, 99, 0.2);
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+
+      th {
+        padding: 1rem;
+        text-align: left;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: rgba(255, 255, 255, 0.7);
+        background: rgba(10, 20, 35, 0.8);
+        border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+      }
+
+      td {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+        font-size: 0.95rem;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      .align-right {
+        text-align: right;
+      }
+
+      .token-cell {
+        min-width: 180px;
+      }
+
+      .token-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .token-symbol {
+        font-weight: 600;
+        color: #fff;
+      }
+    }
+  }
+
+  // Empty state styling
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(90deg, #00e7ff, #a15ffe);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #fff;
+    }
+
+    p {
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 1.5rem;
+    }
+  }
+
+  // Loading state styling
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+
+    .spinner {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      border: 3px solid rgba(0, 255, 255, 0.15);
+      border-top-color: #00ffff;
+      border-right-color: #ff00ff;
+      animation: spin 1.2s linear infinite;
+      margin-bottom: 1.5rem;
+    }
+
+    .loading-text {
+      font-size: 1.1rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+  }
+
+  // Error state styling
+  .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 107, 107, 0.4);
+
+    .error-icon {
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
+      color: #ff6b6b;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #ff6b6b;
+    }
+
+    p {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 1.5rem;
+    }
+
+    .refresh-button {
+      background: rgba(255, 107, 107, 0.15);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.4);
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+
+      &:hover {
+        background: rgba(255, 107, 107, 0.25);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(255, 107, 107, 0.2);
+      }
+    }
+  }
+
+  // Wallet summary styling
+  .wallet-summary {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    background: rgba(15, 25, 40, 0.5);
+    border-radius: 12px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
+      0 8px 32px rgba(255, 0, 255, 0.05);
+
+    h2 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #fff;
+    }
+  }
+
+  // Spinner animation
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}

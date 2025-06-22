@@ -46,6 +46,7 @@
     text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
     font-weight: bold;
     letter-spacing: 0.5px;
+    margin: 0; /* Ensure proper spacing */
   }
 
   .trading-history-header {
@@ -57,6 +58,14 @@
         rgba(255, 0, 255, 0.2)
       )
       1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .refresh-info {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+    }
   }
 
   .trading-history-content {
@@ -64,6 +73,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    height: 100%; /* Ensure this takes full height */
 
     .history-header-row {
       display: grid;
@@ -81,6 +91,8 @@
       flex: 1;
       overflow-y: auto;
       scrollbar-width: thin;
+      max-height: 100%; /* Ensure this respects container height */
+      overscroll-behavior: contain; /* Prevent scroll chaining */
 
       &::-webkit-scrollbar {
         width: 4px;
@@ -91,6 +103,13 @@
       &::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.3);
         border-radius: 2px;
+      }
+      &::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.5),
+          rgba(255, 0, 255, 0.5)
+        );
       }
 
       .history-row {

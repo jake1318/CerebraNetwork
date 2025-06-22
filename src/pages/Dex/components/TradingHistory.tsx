@@ -18,6 +18,7 @@ interface Trade {
   total: number;
   time: string;
   type: "buy" | "sell";
+  timestamp: number; // Store timestamp in milliseconds
 }
 
 // Define the Birdeye API response interfaces
@@ -59,15 +60,29 @@ const TradingHistory: React.FC<TradingHistoryProps> = ({ pair }) => {
     return now.toLocaleTimeString();
   };
 
+  // Helper function to check if addresses match, accounting for case sensitivity
+  const addressesMatch = (addr1: string, addr2: string): boolean => {
+    return addr1.toLowerCase() === addr2.toLowerCase();
+  };
+
   useEffect(() => {
+    console.log("Trading pair changed:", pair);
+    // Clear trades state immediately when pair changes to reset UI
+    setTrades([]);
+    setLoading(true);
+    setError(null);
+
+    let intervalId: NodeJS.Timeout;
+    let abortController: AbortController;
+
     const fetchTrades = async () => {
-      if (!pair.baseAddress) {
+      if (!pair.baseAddress || !pair.quoteAddress) {
         setLoading(false);
         return;
       }
 
-      setLoading(true);
-      setError(null);
+      // Create a new AbortController for this fetch request
+      abortController = new AbortController();
 
       try {
         // Encode the address properly for the API call
@@ -80,6 +95,7 @@ const TradingHistory: React.FC<TradingHistoryProps> = ({ pair }) => {
             "x-chain": "sui",
             "X-API-KEY": "22430f5885a74d3b97e7cbd01c2140aa",
           },
+          signal: abortController.signal,
         };
 
         const response = await fetch(
@@ -97,21 +113,36 @@ const TradingHistory: React.FC<TradingHistoryProps> = ({ pair }) => {
           throw new Error("Invalid response format");
         }
 
-        // Filter trades involving our pair
-        const relevantTrades = data.data.items.filter((item) => {
-          const hasBase =
-            item.from.address === pair.baseAddress ||
-            item.to.address === pair.baseAddress;
-          const hasQuote =
-            item.from.address === pair.quoteAddress ||
-            item.to.address === pair.quoteAddress;
-          return hasBase && hasQuote;
+        console.log("API Response:", data.data.items.length, "items");
+        console.log("Current pair:", {
+          baseAddress: pair.baseAddress,
+          quoteAddress: pair.quoteAddress,
         });
+
+        // Filter trades involving EXACTLY our pair - both base and quote must match
+        const relevantTrades = data.data.items.filter((item) => {
+          const isBaseFrom = addressesMatch(
+            item.from.address,
+            pair.baseAddress
+          );
+          const isQuoteTo = addressesMatch(item.to.address, pair.quoteAddress);
+
+          const isBaseTo = addressesMatch(item.to.address, pair.baseAddress);
+          const isQuoteFrom = addressesMatch(
+            item.from.address,
+            pair.quoteAddress
+          );
+
+          // Either: base→quote OR quote→base swap
+          return (isBaseFrom && isQuoteTo) || (isBaseTo && isQuoteFrom);
+        });
+
+        console.log("Filtered trades:", relevantTrades.length);
 
         // Transform the Birdeye response to our Trade interface
         const formattedTrades: Trade[] = relevantTrades.map((item) => {
           // Determine trade type (buy/sell) based on whether base token is being bought or sold
-          const isBuy = item.to.address === pair.baseAddress;
+          const isBuy = addressesMatch(item.to.address, pair.baseAddress);
 
           // Get price by dividing the quote amount by the base amount
           const baseAmount = isBuy ? item.to.uiAmount : item.from.uiAmount;
@@ -124,35 +155,75 @@ const TradingHistory: React.FC<TradingHistoryProps> = ({ pair }) => {
 
           return {
             id: item.txHash,
-            price: price,
+            price,
             amount: baseAmount,
             total: quoteAmount,
             time: formattedTime,
+            timestamp: item.blockUnixTime * 1000, // convert to ms
             type: isBuy ? "buy" : "sell",
           };
         });
 
-        // Limit to the requested number of trades
-        const limitedTrades = formattedTrades.slice(0, tradeLimit);
+        // *** NEW: Accumulate until you've got 20, then cap at 20 ***
+        setTrades((prev) => {
+          // sort fetched newest-first
+          const fetchedSorted = formattedTrades
+            .slice() // clone
+            .sort((a, b) => b.timestamp - a.timestamp);
 
-        setTrades(limitedTrades);
+          let merged: Trade[];
+          if (prev.length < tradeLimit) {
+            // build a Map of unique trades by id:
+            const byId = new Map<string, Trade>();
+            // 1) add newly fetched trades first (newest → oldest)
+            for (const t of fetchedSorted) {
+              byId.set(t.id, t);
+            }
+            // 2) then fill in with any previous trades we don't have yet
+            for (const t of prev) {
+              if (!byId.has(t.id)) {
+                byId.set(t.id, t);
+              }
+            }
+            // collect & resort
+            merged = Array.from(byId.values()).sort(
+              (a, b) => b.timestamp - a.timestamp
+            );
+          } else {
+            // once we have 20, just take the top 20 from fresh data
+            merged = fetchedSorted;
+          }
+
+          // cap at the tradeLimit (20)
+          return merged.slice(0, tradeLimit);
+        });
+
         setLastRefresh(formatRefreshTime());
       } catch (err) {
-        console.error("Error fetching trades:", err);
-        setError((err as Error).message || "Failed to fetch trading history");
+        // Only log errors that aren't abort errors (which happen during cleanup)
+        if ((err as Error).name !== "AbortError") {
+          console.error("Error fetching trades:", err);
+          setError((err as Error).message || "Failed to fetch trading history");
+        }
       } finally {
         setLoading(false);
       }
     };
 
+    // Initial fetch
     fetchTrades();
 
-    // Set up polling to refresh trades every 15 seconds
-    const intervalId = setInterval(fetchTrades, 15000);
+    // Set up polling to refresh trades every 5 seconds
+    intervalId = setInterval(fetchTrades, 5000);
 
-    // Clean up the interval on component unmount
-    return () => clearInterval(intervalId);
-  }, [pair.baseAddress, pair.quoteAddress]);
+    // Clean up the interval and abort any pending fetch on component unmount or when pair changes
+    return () => {
+      clearInterval(intervalId);
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, [pair.baseAddress, pair.quoteAddress]); // Re-run effect when pair changes
 
   return (
     <div className="trading-history">
