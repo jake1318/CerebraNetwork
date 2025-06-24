@@ -1,4 +1,5 @@
 /* src/pages/Dex/components/Chart.scss */
+/* Last Updated: 2025-06-24 03:48:46 UTC by jake1318 */
 
 .trading-chart {
   background: #0a0f1e;
@@ -70,6 +71,40 @@
           }
         }
       }
+
+      .chart-type-toggle {
+        display: flex;
+        gap: 0.4rem;
+
+        .chart-type-btn {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.7);
+          padding: 0.35rem 0.7rem;
+          border-radius: 4px;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.12);
+          }
+
+          &.active {
+            background: linear-gradient(
+              45deg,
+              rgba(0, 255, 255, 0.3),
+              rgba(255, 0, 255, 0.3)
+            );
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #fff;
+          }
+
+          i {
+            font-size: 1rem;
+          }
+        }
+      }
     }
   }
 
@@ -108,16 +143,68 @@
 
       button {
         margin-top: 1rem;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: rgba(255, 255, 255, 0.8);
+        background: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.3),
+          rgba(255, 0, 255, 0.3)
+        );
+        color: white;
+        border: none;
         padding: 0.5rem 1rem;
-        border-radius: 6px;
+        border-radius: 4px;
         cursor: pointer;
         transition: all 0.2s ease;
 
         &:hover {
-          background: rgba(255, 255, 255, 0.2);
+          background: linear-gradient(
+            45deg,
+            rgba(0, 255, 255, 0.5),
+            rgba(255, 0, 255, 0.5)
+          );
+        }
+      }
+
+      .spinner {
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top: 3px solid rgba(0, 255, 255, 0.7);
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 1rem;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .trading-chart {
+    .chart-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.8rem;
+
+      .chart-controls {
+        width: 100%;
+        justify-content: space-between;
+
+        .timeframe-selector {
+          flex-wrap: wrap;
+
+          button {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+          }
         }
       }
     }

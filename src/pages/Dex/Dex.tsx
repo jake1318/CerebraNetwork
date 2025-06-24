@@ -1,4 +1,6 @@
 // src/pages/Dex/Dex.tsx
+// Last Updated: 2025-06-24 03:48:46 UTC by jake1318
+
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 
@@ -8,7 +10,11 @@ import TradingHistory from "./components/TradingHistory";
 import PairSelector from "./components/PairSelector";
 import LimitOrderManager from "./components/LimitOrderManager";
 
-import { blockvisionService } from "../../services/blockvisionService";
+import {
+  blockvisionService,
+  getCoinMarketDataPro,
+  getCoinOhlcv,
+} from "../../services/blockvisionService";
 import { birdeyeService } from "../../services/birdeyeService";
 
 import "./Dex.scss";
@@ -64,6 +70,21 @@ interface TokenMarketData {
   low24h: number;
 }
 
+// New interface for the enhanced market data from BlockVision
+interface EnhancedMarketData {
+  price: number;
+  change24h: number;
+  volume24h: number;
+  high24h: number;
+  low24h: number;
+  marketCap: string;
+  fdvUsd: string;
+  circulating: string;
+  totalSupply: string;
+  isLoading: boolean;
+  hasError: boolean;
+}
+
 const Dex: React.FC = () => {
   const { connected } = useWallet();
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
@@ -73,6 +94,22 @@ const Dex: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // New state for enhanced market data using BlockVision API
+  const [enhancedMarketData, setEnhancedMarketData] =
+    useState<EnhancedMarketData>({
+      price: 0,
+      change24h: 0,
+      volume24h: 0,
+      high24h: 0,
+      low24h: 0,
+      marketCap: "0",
+      fdvUsd: "0",
+      circulating: "0",
+      totalSupply: "0",
+      isLoading: false,
+      hasError: false,
+    });
 
   // For tracking progress during data fetch
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -294,6 +331,89 @@ const Dex: React.FC = () => {
     return results;
   };
 
+  // NEW FUNCTION: Fetch enhanced market data from BlockVision
+  const fetchEnhancedMarketData = async (baseAddress: string) => {
+    if (!baseAddress) return;
+
+    setEnhancedMarketData((prev) => ({
+      ...prev,
+      isLoading: true,
+      hasError: false,
+    }));
+
+    try {
+      // Get detailed market data from BlockVision
+      const marketData = await getCoinMarketDataPro(baseAddress);
+      console.log("BlockVision market data:", marketData);
+
+      // Get OHLCV data to calculate 24h high/low if needed
+      const now = Math.floor(Date.now() / 1000);
+      const yesterdayTimestamp = now - 24 * 3600;
+      const ohlcvData = await getCoinOhlcv(
+        baseAddress,
+        "1h",
+        yesterdayTimestamp
+      );
+
+      // Calculate high/low from OHLCV data
+      let high24h = 0;
+      let low24h = Number.MAX_VALUE;
+
+      if (ohlcvData && ohlcvData.length > 0) {
+        ohlcvData.forEach((point) => {
+          high24h = Math.max(high24h, point.high);
+          low24h = Math.min(low24h, point.low);
+        });
+      } else {
+        // Fallback if no OHLCV data
+        high24h = parseFloat(marketData.priceInUsd);
+        low24h = parseFloat(marketData.priceInUsd) * 0.95; // 95% of current price as fallback
+      }
+
+      // If low24h is still MAX_VALUE, set it to a reasonable value
+      if (low24h === Number.MAX_VALUE) {
+        low24h = parseFloat(marketData.priceInUsd) * 0.95;
+      }
+
+      // Update the enhanced market data state
+      setEnhancedMarketData({
+        price: parseFloat(marketData.priceInUsd),
+        change24h: parseFloat(marketData.market.hour24.priceChange),
+        volume24h: marketData.volume24H,
+        high24h: high24h,
+        low24h: low24h,
+        marketCap: marketData.marketCap,
+        fdvUsd: marketData.fdvInUsd,
+        circulating: marketData.circulating,
+        totalSupply: marketData.supply,
+        isLoading: false,
+        hasError: false,
+      });
+
+      // Also update the selected pair with this new data
+      if (selectedPair && selectedPair.baseAddress === baseAddress) {
+        setSelectedPair((prevPair) => {
+          if (!prevPair) return null;
+          return {
+            ...prevPair,
+            price: parseFloat(marketData.priceInUsd),
+            change24h: parseFloat(marketData.market.hour24.priceChange),
+            volume24h: marketData.volume24H,
+            high24h: high24h,
+            low24h: low24h,
+          };
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching enhanced market data:", error);
+      setEnhancedMarketData((prev) => ({
+        ...prev,
+        isLoading: false,
+        hasError: true,
+      }));
+    }
+  };
+
   // Build trading pairs
   const loadPairs = async () => {
     setIsLoading(true);
@@ -337,7 +457,11 @@ const Dex: React.FC = () => {
       });
 
       setTradingPairs(pairs);
-      if (pairs.length) setSelectedPair(pairs[0]);
+      if (pairs.length) {
+        setSelectedPair(pairs[0]);
+        // Also fetch enhanced data for the first pair
+        fetchEnhancedMarketData(pairs[0].baseAddress);
+      }
     } catch (e: any) {
       console.error("loadPairs error:", e);
       setError(e.message || "Failed to load pairs");
@@ -349,40 +473,12 @@ const Dex: React.FC = () => {
 
   // Auto‑refresh price & change
   const refreshSelectedPair = async (pair: TradingPair) => {
+    // Modified to use new BlockVision API
+    if (!pair?.baseAddress) return;
+
     try {
-      // Use rate-limited version to avoid hitting limits during auto-refresh
-      const bvData = await fetchBlockvisionData(pair.baseAddress);
-
-      // Also refresh the volume and high/low data
-      const beData = await fetchBirdeyeData(pair.baseAddress);
-
-      setTradingPairs((prev) =>
-        prev.map((p) =>
-          p.baseAddress === pair.baseAddress
-            ? {
-                ...p,
-                price: bvData.price,
-                change24h: bvData.change24h,
-                volume24h: beData.volume24h,
-                high24h: beData.high24h || bvData.price,
-                low24h: beData.low24h || bvData.price * 0.95,
-              }
-            : p
-        )
-      );
-
-      setSelectedPair((curr) =>
-        curr?.baseAddress === pair.baseAddress
-          ? {
-              ...curr,
-              price: bvData.price,
-              change24h: bvData.change24h,
-              volume24h: beData.volume24h,
-              high24h: beData.high24h || bvData.price,
-              low24h: beData.low24h || bvData.price * 0.95,
-            }
-          : curr
-      );
+      // Use BlockVision API for enhanced market data
+      fetchEnhancedMarketData(pair.baseAddress);
     } catch (e) {
       console.error("Refresh error:", e);
     }
@@ -403,7 +499,12 @@ const Dex: React.FC = () => {
 
   useEffect(() => {
     if (selectedPair) {
+      // Immediately fetch enhanced market data when pair changes
+      fetchEnhancedMarketData(selectedPair.baseAddress);
+
+      // Start the refresh interval
       startRefreshInterval(selectedPair);
+
       // cleanup on unmount or when selectedPair changes
       return () => {
         if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
@@ -415,23 +516,25 @@ const Dex: React.FC = () => {
     setSelectedPair(pair);
   };
 
-  const stats = selectedPair
-    ? {
-        price: selectedPair.price,
-        change24h: selectedPair.change24h,
-        volume24h: selectedPair.volume24h,
-        high24h: selectedPair.high24h,
-        low24h: selectedPair.low24h,
-        logo: selectedPair.logo,
-      }
-    : {
-        price: 0,
-        change24h: 0,
-        volume24h: 0,
-        high24h: 0,
-        low24h: 0,
-        logo: "",
-      };
+  // Use enhanced market data when available, fall back to selectedPair
+  const stats =
+    enhancedMarketData.isLoading || enhancedMarketData.hasError
+      ? {
+          price: selectedPair?.price || 0,
+          change24h: selectedPair?.change24h || 0,
+          volume24h: selectedPair?.volume24h || 0,
+          high24h: selectedPair?.high24h || 0,
+          low24h: selectedPair?.low24h || 0,
+          logo: selectedPair?.logo || "",
+        }
+      : {
+          price: enhancedMarketData.price,
+          change24h: enhancedMarketData.change24h,
+          volume24h: enhancedMarketData.volume24h,
+          high24h: enhancedMarketData.high24h,
+          low24h: enhancedMarketData.low24h,
+          logo: selectedPair?.logo || "",
+        };
 
   // Format volume for display - improved
   const formatVolume = (volume: number) => {
@@ -476,7 +579,7 @@ const Dex: React.FC = () => {
 
         {selectedPair && (
           <div className="dex-page__grid">
-            {/* Top Stats */}
+            {/* Top Stats - Updated to show enhanced market data */}
             <div className="top-stats">
               <div className="stats-grid two-line-stats">
                 <div className="ticker-cell">
@@ -489,11 +592,11 @@ const Dex: React.FC = () => {
                     />
                   )}
                 </div>
-                <span className="cell label">Price</span>
-                <span className="cell label">24h Change</span>
-                <span className="cell label">24h Volume</span>
-                <span className="cell label">24h High</span>
-                <span className="cell label">24h Low</span>
+                <span className="cell label">PRICE</span>
+                <span className="cell label">24H CHANGE</span>
+                <span className="cell label">24H VOLUME</span>
+                <span className="cell label">24H HIGH</span>
+                <span className="cell label">24H LOW</span>
 
                 <span
                   className={`cell value ${
@@ -527,9 +630,16 @@ const Dex: React.FC = () => {
               <TradingHistory pair={selectedPair} />
             </div>
 
-            {/* Chart */}
+            {/* Chart - updated to support candlestick */}
             <div className="chart-panel">
-              <Chart pair={selectedPair} />
+              <Chart
+                pair={selectedPair}
+                enhancedData={
+                  !enhancedMarketData.isLoading && !enhancedMarketData.hasError
+                    ? enhancedMarketData
+                    : undefined
+                }
+              />
             </div>
 
             {/* Pair Selector */}
