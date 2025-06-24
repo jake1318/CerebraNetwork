@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-05-22 06:58:18 UTC by jake1318
+// Last Updated: 2025-06-24 02:01:15 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -788,6 +788,123 @@ export function clearVaultApyCache(): void {
   console.log("Vault APY cache cleared");
 }
 
+// ---------------------------------------------------------------------------
+//  BlockVision – *extra* market‑data helpers (PRO endpoints)
+//  last‑updated: 2025‑06‑24
+// ---------------------------------------------------------------------------
+
+/** One point returned by /coin/ohlcv                                         */
+export interface OhlcvPoint {
+  /** start‑time of candle (unix **seconds**)            */ timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  /** buy‑side volume (token units)                      */ buyVolume: number;
+  /** sell‑side volume (token units)                     */ sellVolume: number;
+  /** buy + sell volume (token units)                    */ volume: number;
+  /** BlockVision also echoes 'price' (avg)              */ price: number;
+}
+
+/** Real‑time market snapshot returned by /coin/market/pro                  */
+export interface CoinMarketData {
+  priceInUsd: string;
+  marketCap: string;
+  liquidityInUsd: string;
+  fdvInUsd: string;
+  circulating: string;
+  supply: string;
+  volume24H: number;
+  market: {
+    /** 30‑minute window   */ m30: MarketWindow;
+    /** 1‑hour window      */ hour1: MarketWindow;
+    /** 4‑hour window      */ hour4: MarketWindow;
+    /** 24‑hour window     */ hour24: MarketWindow;
+  };
+}
+
+export interface MarketWindow {
+  tokenId: string;
+  interval: string; // 30m / 1h / …
+  priceChange: string; // percent (‑ve, +ve)
+  buys: number;
+  sells: number;
+  buyVolume: number;
+  sellVolume: number;
+  buyers: number;
+  sellers: number;
+  txn: number;
+  volume: number;
+  markers: number;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Shared low‑level helper                                                 */
+
+const BLOCKVISION_BASE = "https://api.blockvision.org/v2/sui";
+const BV_API_KEY =
+  import.meta.env.VITE_BLOCKVISION_API_KEY || // ← Vite
+  process.env.REACT_APP_BLOCKVISION_API_KEY || // ← CRA
+  process.env.NEXT_PUBLIC_BLOCKVISION_API_KEY || // ← Next
+  "YOUR_API_KEY_HERE"; //  Fallback
+
+async function bvGet<T>(
+  path: string,
+  params: Record<string, string>
+): Promise<T> {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${BLOCKVISION_BASE}${path}?${qs}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      "x-api-key": BV_API_KEY,
+    },
+  });
+
+  if (!res.ok) throw new Error(`BlockVision ${path} failed – ${res.status}`);
+
+  const json = await res.json();
+  if (json.code !== 200 || !json.result)
+    throw new Error(`BlockVision ${path} unexpected payload`);
+
+  return json.result as T;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  1.  Real‑time market‑data snapshot                                       */
+
+export async function getCoinMarketDataPro(
+  coinType: string // full type tag
+): Promise<CoinMarketData> {
+  // API default is SUI if param omitted, so always pass ours
+  return await bvGet<CoinMarketData>("/coin/market/pro", { coinType });
+}
+
+/* ------------------------------------------------------------------------ */
+/*  2.  OHLCV candlesticks                                                  */
+
+export async function getCoinOhlcv(
+  token: string, // full type tag
+  interval:
+    | "30s"
+    | "1m"
+    | "5m"
+    | "15m"
+    | "1h"
+    | "4h"
+    | "1d"
+    | "1w"
+    | "1M" = "1d",
+  start?: number // unix seconds – default handled by API
+): Promise<OhlcvPoint[]> {
+  const params: Record<string, string> = { token, interval };
+  if (start) params.start = String(start);
+  const result = await bvGet<{ ohlcs: OhlcvPoint[] }>("/coin/ohlcv", params);
+  return result.ohlcs;
+}
+
 export const blockvisionService = {
   getCoinDetail: async (coinType: string) => {
     try {
@@ -1028,7 +1145,7 @@ export const blockvisionService = {
         }
       }
 
-      // ─── patch START ────────────────────────────────────────────────────────────────
+      // ─── patch START ────────────────────────────────────────────────────────�[...]
       // Now "enrich" every poolGroup & each position with real USD values
       await Promise.all(
         poolGroups.map(async (pool) => {
@@ -1533,7 +1650,7 @@ export const blockvisionService = {
           }
         }
       }
-      // ─── patch END ──────────────────────────────────────────────────────────────────
+      // ─── patch END ─────────────────────────────────────────────────────────[...]
 
       return poolGroups;
     } catch (error) {
@@ -1703,8 +1820,15 @@ export const blockvisionService = {
   getVaultApy,
   clearVaultApyCache,
   extractCetusVaultData,
+
+  // Export new market data functions
+  getCoinMarketDataPro,
+  getCoinOhlcv,
 };
 
 export default blockvisionService;
 // Make getDefiPortfolioData available as a named export
 export const getDefiPortfolioData = blockvisionService.getDefiPortfolioData;
+// Export the new functions as named exports
+export const getScallopPortfolioData =
+  blockvisionService.getScallopPortfolioData;
