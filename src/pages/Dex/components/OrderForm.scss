@@ -1,338 +1,304 @@
 /* src/pages/Dex/components/OrderForm.scss */
-.dex-order-form {
-  background: radial-gradient(
-      circle at top left,
-      rgba(0, 255, 255, 0.1) 0%,
-      rgba(5, 15, 30, 0.5) 40%
-    ),
-    radial-gradient(
-      circle at bottom right,
-      rgba(255, 0, 255, 0.1) 0%,
-      rgba(5, 15, 30, 0.5) 40%
-    ),
-    rgba(5, 15, 30, 0.7);
-  border-radius: 16px;
+/* Last Updated: 2025-06-24 19:37:13 UTC by jake1318 */
+
+.order-form {
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid;
-  border-image: linear-gradient(
-      45deg,
-      rgba(0, 255, 255, 0.2),
-      rgba(255, 0, 255, 0.2)
-    )
-    1;
-  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
-    0 8px 32px rgba(255, 0, 255, 0.1);
-  overflow: hidden;
-  position: relative;
-  transition: all 0.3s ease;
-  animation: fadeIn 0.5s ease-out;
+  gap: 12px;
+  height: 100%;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto; /* Allow scrolling if content is too tall */
+  -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS */
+  padding-right: 5px; /* Add space for scrollbar */
 
-  &:hover {
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-      0 8px 32px rgba(255, 0, 255, 0.15);
-  }
-
-  .order-form-tabs {
+  /* Buy/Sell Tabs */
+  .order-tabs {
     display: flex;
-    border-bottom: 1px solid;
-    border-image: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
-      )
-      1;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 5px;
+    flex-shrink: 0; /* Prevent this from shrinking */
 
-    .tab {
+    button {
       flex: 1;
-      background: rgba(5, 15, 30, 0.5);
-      color: rgba(255, 255, 255, 0.8);
-      padding: 1rem 0;
-      font-size: 18px;
-      font-weight: 600;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.3s ease, transform 0.2s ease;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.05);
-      }
-
-      &.buy.active {
-        background: rgba(0, 255, 136, 0.15);
-        color: #00ff88;
-        text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
-      }
-      &.sell.active {
-        background: rgba(255, 77, 109, 0.15);
-        color: #ff4d6d;
-        text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
-      }
-    }
-  }
-
-  .order-form-mode-selector {
-    display: flex;
-    gap: 12px;
-    padding: 1rem;
-    border-bottom: 1px solid;
-    border-image: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
-      )
-      1;
-
-    .mode-btn {
-      flex: 1;
-      background: rgba(5, 15, 30, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.8);
-      padding: 0.75rem 0;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 500;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.3s ease, transform 0.2s ease;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.05);
-        transform: translateY(-2px);
-      }
-
-      &.active {
-        background: linear-gradient(
-          45deg,
-          rgba(0, 255, 255, 0.2),
-          rgba(255, 0, 255, 0.2)
-        );
-        border-color: rgba(255, 255, 255, 0.2);
-        color: #fff;
-        box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
-          0 0 15px rgba(255, 0, 255, 0.15);
-      }
-    }
-  }
-
-  .order-form-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    overflow-y: auto;
-    scrollbar-width: thin;
-
-    &::-webkit-scrollbar {
-      width: 4px;
-    }
-    &::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.2);
-    }
-    &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.3);
-      border-radius: 2px;
-    }
-
-    .form-group {
-      margin-bottom: 1rem;
-
-      label {
-        display: block;
-        margin-bottom: 0.5rem;
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 0.9rem;
-        text-transform: uppercase;
-      }
-
-      .input-container {
-        input {
-          width: 100%;
-          padding: 0.75rem;
-          background: rgba(5, 15, 30, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #fff;
-          border-radius: 8px;
-          font-size: 1rem;
-          &::placeholder {
-            color: rgba(255, 255, 255, 0.3);
-          }
-          &:focus {
-            outline: none;
-            border-color: rgba(0, 255, 255, 0.3);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.15);
-          }
-        }
-      }
-
-      .balance-info {
-        text-align: right;
-        font-size: 0.85rem;
-        color: rgba(255, 255, 255, 0.7);
-        margin-top: 0.5rem;
-      }
-
-      .percentage-buttons {
-        display: flex;
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-
-        .pct-btn {
-          flex: 1;
-          background: rgba(5, 15, 30, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: rgba(255, 255, 255, 0.8);
-          padding: 0.5rem;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-
-          &:hover {
-            background: rgba(255, 255, 255, 0.05);
-            transform: translateY(-2px);
-          }
-        }
-      }
-    }
-
-    .total-value {
-      background: rgba(5, 15, 30, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 0.75rem;
-      border-radius: 8px;
-      text-align: right;
-      color: #fff;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-
-    .market-notice {
-      padding: 1rem;
-      background: rgba(5, 15, 30, 0.5);
-      border-radius: 8px;
-      border: 1px dashed rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.7);
-      text-align: center;
-      font-style: italic;
-      margin-bottom: 1rem;
-    }
-
-    .order-status {
-      padding: 0.75rem;
-      border-radius: 6px;
-      margin-bottom: 1rem;
-      text-align: center;
-      &.success {
-        background: rgba(0, 255, 136, 0.1);
-        color: #00ff88;
-        border: 1px solid rgba(0, 255, 136, 0.3);
-      }
-      &.error {
-        background: rgba(255, 77, 109, 0.1);
-        color: #ff4d6d;
-        border: 1px solid rgba(255, 77, 109, 0.3);
-      }
-    }
-
-    .submit-order-btn {
-      padding: 0.75rem;
+      background: rgba(10, 15, 30, 0.4);
+      color: #f0f0f0;
       border: none;
-      border-radius: 8px;
-      font-size: 1rem;
+      padding: 10px;
+      font-size: 16px;
       font-weight: 600;
-      text-transform: uppercase;
       cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: auto;
+      transition: all 0.2s;
+      text-transform: uppercase;
 
       &.buy {
-        background: linear-gradient(45deg, #00aa5b, #00ff88);
-        color: #002211;
-      }
-      &.sell {
-        background: linear-gradient(45deg, #d32f4a, #ff4d6d);
-        color: #fff;
-      }
-      &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
-          0 0 10px rgba(255, 0, 255, 0.2);
-      }
-      &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      &.loading {
-        color: transparent;
-        position: relative;
-        &::after {
-          content: "";
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 20px;
-          height: 20px;
-          margin: -10px 0 0 -10px;
-          border: 3px solid rgba(255, 255, 255, 0.3);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
+        color: #4bffb5;
+
+        &.active {
+          background: rgba(75, 255, 181, 0.2);
         }
+      }
+
+      &.sell {
+        color: #ff4976;
+
+        &.active {
+          background: rgba(255, 73, 118, 0.2);
+        }
+      }
+    }
+
+    @media (max-width: 768px) {
+      button {
+        padding: 8px;
+        font-size: 14px;
       }
     }
   }
 
-  /* scanning line */
-  &::before {
-    content: "";
-    position: absolute;
+  /* Limit/Market Tabs */
+  .order-mode-tabs {
+    display: flex;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    flex-shrink: 0; /* Prevent this from shrinking */
+
+    button {
+      flex: 1;
+      background: rgba(10, 15, 30, 0.4);
+      color: #9ba6bd;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+
+      &.active {
+        background: rgba(0, 194, 255, 0.2);
+        color: #00c2ff;
+        border-color: #00c2ff;
+      }
+    }
+
+    @media (max-width: 768px) {
+      button {
+        padding: 6px;
+        font-size: 12px;
+      }
+    }
+  }
+
+  /* Price and Amount Fields */
+  .form-field {
+    position: relative;
     width: 100%;
-    height: 1px;
+    flex-shrink: 0; /* Prevent fields from shrinking */
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #9ba6bd;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+
+    input {
+      width: 100%;
+      background: rgba(10, 15, 30, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f0f0f0;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 6px;
+
+      &:focus {
+        outline: none;
+        border-color: #00c2ff;
+      }
+    }
+
+    @media (max-width: 768px) {
+      label {
+        font-size: 11px;
+      }
+
+      input {
+        padding: 8px;
+        font-size: 14px;
+      }
+    }
+  }
+
+  /* Available Balance */
+  .available-balance {
+    text-align: right;
+    color: #9ba6bd;
+    font-size: 12px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    flex-shrink: 0; /* Prevent this from shrinking */
+  }
+
+  /* Amount Percentage Buttons */
+  .amount-percentages {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-shrink: 0; /* Prevent this from shrinking */
+
+    button {
+      flex: 1;
+      background: rgba(10, 15, 30, 0.4);
+      color: #9ba6bd;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px;
+      font-size: 13px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(0, 194, 255, 0.1);
+        color: #00c2ff;
+        border-color: rgba(0, 194, 255, 0.3);
+      }
+    }
+
+    @media (max-width: 768px) {
+      gap: 4px;
+      margin-top: 6px;
+
+      button {
+        padding: 4px 2px;
+        font-size: 11px;
+      }
+    }
+  }
+
+  /* Total Section */
+  .total-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    flex-shrink: 0; /* Prevent this from shrinking */
+
+    .total-label {
+      color: #9ba6bd;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+
+    .total-amount {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f0f0f0;
+    }
+
+    @media (max-width: 768px) {
+      margin-top: 6px;
+
+      .total-label {
+        font-size: 11px;
+      }
+
+      .total-amount {
+        font-size: 14px;
+      }
+    }
+  }
+
+  /* Submit Button */
+  .submit-button {
+    margin-top: 10px; /* Add spacing above button */
     background: linear-gradient(
       90deg,
-      transparent,
-      rgba(0, 255, 255, 0.5),
-      transparent
+      rgba(0, 194, 255, 0.2),
+      rgba(0, 194, 255, 0.4)
     );
-    top: 50%;
-    left: 0;
-    transform: translateY(-50%);
-    animation: horizonScan 15s linear infinite;
-    pointer-events: none;
-    opacity: 0.3;
-  }
-}
+    color: #f0f0f0;
+    border: 1px solid #00c2ff;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0; /* Prevent this from shrinking */
 
-/* Keyframes */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes horizonScan {
-  0% {
-    transform: translateX(-150vw);
-  }
-  100% {
-    transform: translateX(150vw);
-  }
-}
+    &:hover {
+      background: linear-gradient(
+        90deg,
+        rgba(0, 194, 255, 0.3),
+        rgba(0, 194, 255, 0.5)
+      );
+    }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .dex-order-form {
-    /* shrink paddings/font-sizes for mobile */
+    &.buy {
+      background: linear-gradient(
+        90deg,
+        rgba(75, 255, 181, 0.2),
+        rgba(75, 255, 181, 0.4)
+      );
+      border-color: #4bffb5;
+
+      &:hover {
+        background: linear-gradient(
+          90deg,
+          rgba(75, 255, 181, 0.3),
+          rgba(75, 255, 181, 0.5)
+        );
+      }
+    }
+
+    &.sell {
+      background: linear-gradient(
+        90deg,
+        rgba(255, 73, 118, 0.2),
+        rgba(255, 73, 118, 0.4)
+      );
+      border-color: #ff4976;
+
+      &:hover {
+        background: linear-gradient(
+          90deg,
+          rgba(255, 73, 118, 0.3),
+          rgba(255, 73, 118, 0.5)
+        );
+      }
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 768px) {
+      padding: 8px;
+      font-size: 14px;
+    }
+  }
+
+  /* Scrollbar styling */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 194, 255, 0.3);
+    border-radius: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 194, 255, 0.5);
   }
 }

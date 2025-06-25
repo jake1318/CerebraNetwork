@@ -1,5 +1,5 @@
 // src/pages/Dex/Dex.tsx
-// Last Updated: 2025-06-24 03:48:46 UTC by jake1318
+// Last Updated: 2025-06-24 19:21:30 UTC by jake1318
 
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -14,6 +14,7 @@ import {
   blockvisionService,
   getCoinMarketDataPro,
   getCoinOhlcv,
+  CoinMarketData,
 } from "../../services/blockvisionService";
 import { birdeyeService } from "../../services/birdeyeService";
 
@@ -26,16 +27,17 @@ const DELAY_BETWEEN_REQUESTS = Math.floor(1000 / BIRDEYE_REQUESTS_PER_SECOND); /
 
 // --- Token addresses for building your pairs list ---
 const BASE_TOKEN_ADDRESSES = [
+  "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+  "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+  "0x3e8e9423d80e1774a7ca128fccd8bf5f1f7753be658c5e645929037f7c819040::lbtc::LBTC",
+  "0x7016aae72cfc67f2fadf55769c0a7dd54291a583b63051a5ed71081cce836ac6::sca::SCA",
   "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS",
-  "0x2::sui::SUI",
   "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
   "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
   "0xaafb102dd0902f5055cadecd687fb5b71ca82ef0e0285d90afde828ec58ca96b::btc::BTC",
   "0xa99b8952d4f7d947ea77fe0ecdcc9e5fc0bcab2841d6e2a5aa00c3044e5544b5::navx::NAVX",
-  "0x7016aae72cfc67f2fadf55769c0a7dd54291a583b63051a5ed71081cce836ac6::sca::SCA",
   "0xb7844e289a8410e50fb3ca48d69eb9cf29e27d223ef90353fe1bd8e27ff8f3f8::coin::COIN",
   "0x3a5143bb1196e3bcdfab6203d1683ae29edd26294fc8bfeafe4aaa9d2704df37::coin::COIN",
-  "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
   "0x8993129d72e733985f7f1a00396cbd055bad6f817fee36576ce483c8bbb8b87b::sudeng::SUDENG",
   "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178::ns::NS",
   "0xb45fcfcc2cc07ce0702cc2d229621e046c906ef14d9b25e8e4d25f6e8763fef7::send::SEND",
@@ -70,21 +72,6 @@ interface TokenMarketData {
   low24h: number;
 }
 
-// New interface for the enhanced market data from BlockVision
-interface EnhancedMarketData {
-  price: number;
-  change24h: number;
-  volume24h: number;
-  high24h: number;
-  low24h: number;
-  marketCap: string;
-  fdvUsd: string;
-  circulating: string;
-  totalSupply: string;
-  isLoading: boolean;
-  hasError: boolean;
-}
-
 const Dex: React.FC = () => {
   const { connected } = useWallet();
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
@@ -95,21 +82,10 @@ const Dex: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // New state for enhanced market data using BlockVision API
-  const [enhancedMarketData, setEnhancedMarketData] =
-    useState<EnhancedMarketData>({
-      price: 0,
-      change24h: 0,
-      volume24h: 0,
-      high24h: 0,
-      low24h: 0,
-      marketCap: "0",
-      fdvUsd: "0",
-      circulating: "0",
-      totalSupply: "0",
-      isLoading: false,
-      hasError: false,
-    });
+  // State for market data from BlockVision API
+  const [marketData, setMarketData] = useState<CoinMarketData | null>(null);
+  const [marketDataLoading, setMarketDataLoading] = useState<boolean>(false);
+  const [marketDataError, setMarketDataError] = useState<string | null>(null);
 
   // For tracking progress during data fetch
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -331,86 +307,37 @@ const Dex: React.FC = () => {
     return results;
   };
 
-  // NEW FUNCTION: Fetch enhanced market data from BlockVision
-  const fetchEnhancedMarketData = async (baseAddress: string) => {
+  // Function to fetch market data from BlockVision
+  const fetchMarketData = async (baseAddress: string) => {
     if (!baseAddress) return;
 
-    setEnhancedMarketData((prev) => ({
-      ...prev,
-      isLoading: true,
-      hasError: false,
-    }));
+    setMarketDataLoading(true);
+    setMarketDataError(null);
 
     try {
       // Get detailed market data from BlockVision
-      const marketData = await getCoinMarketDataPro(baseAddress);
-      console.log("BlockVision market data:", marketData);
+      const data = await getCoinMarketDataPro(baseAddress);
+      console.log("BlockVision market data:", data);
+      setMarketData(data);
 
-      // Get OHLCV data to calculate 24h high/low if needed
-      const now = Math.floor(Date.now() / 1000);
-      const yesterdayTimestamp = now - 24 * 3600;
-      const ohlcvData = await getCoinOhlcv(
-        baseAddress,
-        "1h",
-        yesterdayTimestamp
-      );
-
-      // Calculate high/low from OHLCV data
-      let high24h = 0;
-      let low24h = Number.MAX_VALUE;
-
-      if (ohlcvData && ohlcvData.length > 0) {
-        ohlcvData.forEach((point) => {
-          high24h = Math.max(high24h, point.high);
-          low24h = Math.min(low24h, point.low);
-        });
-      } else {
-        // Fallback if no OHLCV data
-        high24h = parseFloat(marketData.priceInUsd);
-        low24h = parseFloat(marketData.priceInUsd) * 0.95; // 95% of current price as fallback
-      }
-
-      // If low24h is still MAX_VALUE, set it to a reasonable value
-      if (low24h === Number.MAX_VALUE) {
-        low24h = parseFloat(marketData.priceInUsd) * 0.95;
-      }
-
-      // Update the enhanced market data state
-      setEnhancedMarketData({
-        price: parseFloat(marketData.priceInUsd),
-        change24h: parseFloat(marketData.market.hour24.priceChange),
-        volume24h: marketData.volume24H,
-        high24h: high24h,
-        low24h: low24h,
-        marketCap: marketData.marketCap,
-        fdvUsd: marketData.fdvInUsd,
-        circulating: marketData.circulating,
-        totalSupply: marketData.supply,
-        isLoading: false,
-        hasError: false,
-      });
-
-      // Also update the selected pair with this new data
+      // Also update the selected pair with this new data if needed
       if (selectedPair && selectedPair.baseAddress === baseAddress) {
         setSelectedPair((prevPair) => {
           if (!prevPair) return null;
           return {
             ...prevPair,
-            price: parseFloat(marketData.priceInUsd),
-            change24h: parseFloat(marketData.market.hour24.priceChange),
-            volume24h: marketData.volume24H,
-            high24h: high24h,
-            low24h: low24h,
+            price: parseFloat(data.priceInUsd),
+            change24h: parseFloat(data.market.hour24.priceChange),
+            volume24h: data.volume24H,
+            // You might want to update high24h and low24h from OHLCV data
           };
         });
       }
     } catch (error) {
-      console.error("Error fetching enhanced market data:", error);
-      setEnhancedMarketData((prev) => ({
-        ...prev,
-        isLoading: false,
-        hasError: true,
-      }));
+      console.error("Error fetching market data:", error);
+      setMarketDataError("Failed to load market data");
+    } finally {
+      setMarketDataLoading(false);
     }
   };
 
@@ -459,8 +386,8 @@ const Dex: React.FC = () => {
       setTradingPairs(pairs);
       if (pairs.length) {
         setSelectedPair(pairs[0]);
-        // Also fetch enhanced data for the first pair
-        fetchEnhancedMarketData(pairs[0].baseAddress);
+        // Also fetch market data for the first pair
+        fetchMarketData(pairs[0].baseAddress);
       }
     } catch (e: any) {
       console.error("loadPairs error:", e);
@@ -477,8 +404,8 @@ const Dex: React.FC = () => {
     if (!pair?.baseAddress) return;
 
     try {
-      // Use BlockVision API for enhanced market data
-      fetchEnhancedMarketData(pair.baseAddress);
+      // Use BlockVision API for market data
+      fetchMarketData(pair.baseAddress);
     } catch (e) {
       console.error("Refresh error:", e);
     }
@@ -488,7 +415,7 @@ const Dex: React.FC = () => {
     if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
     refreshTimerRef.current = setInterval(
       () => refreshSelectedPair(pair),
-      120_000
+      20000 // Update every 20 seconds
     );
   };
 
@@ -499,8 +426,8 @@ const Dex: React.FC = () => {
 
   useEffect(() => {
     if (selectedPair) {
-      // Immediately fetch enhanced market data when pair changes
-      fetchEnhancedMarketData(selectedPair.baseAddress);
+      // Immediately fetch market data when pair changes
+      fetchMarketData(selectedPair.baseAddress);
 
       // Start the refresh interval
       startRefreshInterval(selectedPair);
@@ -516,9 +443,9 @@ const Dex: React.FC = () => {
     setSelectedPair(pair);
   };
 
-  // Use enhanced market data when available, fall back to selectedPair
+  // Use market data when available, fall back to selectedPair
   const stats =
-    enhancedMarketData.isLoading || enhancedMarketData.hasError
+    marketDataLoading || marketDataError || !marketData
       ? {
           price: selectedPair?.price || 0,
           change24h: selectedPair?.change24h || 0,
@@ -528,11 +455,11 @@ const Dex: React.FC = () => {
           logo: selectedPair?.logo || "",
         }
       : {
-          price: enhancedMarketData.price,
-          change24h: enhancedMarketData.change24h,
-          volume24h: enhancedMarketData.volume24h,
-          high24h: enhancedMarketData.high24h,
-          low24h: enhancedMarketData.low24h,
+          price: parseFloat(marketData.priceInUsd),
+          change24h: parseFloat(marketData.market.hour24.priceChange),
+          volume24h: marketData.volume24H,
+          high24h: selectedPair?.high24h || 0, // keep original high/low for now
+          low24h: selectedPair?.low24h || 0,
           logo: selectedPair?.logo || "",
         };
 
@@ -549,6 +476,23 @@ const Dex: React.FC = () => {
     }
 
     return `$${volume.toFixed(2)}`;
+  };
+
+  // Format large numbers for display
+  const formatLargeNumber = (value: string | number): string => {
+    const num = typeof value === "string" ? parseFloat(value) : value;
+
+    if (isNaN(num)) return "N/A";
+
+    if (num >= 1_000_000_000) {
+      return `${(num / 1_000_000_000).toFixed(2)}B`;
+    } else if (num >= 1_000_000) {
+      return `${(num / 1_000_000).toFixed(2)}M`;
+    } else if (num >= 1_000) {
+      return `${(num / 1_000).toFixed(2)}K`;
+    } else {
+      return num.toFixed(2);
+    }
   };
 
   return (
@@ -579,9 +523,9 @@ const Dex: React.FC = () => {
 
         {selectedPair && (
           <div className="dex-page__grid">
-            {/* Top Stats - Updated to show enhanced market data */}
+            {/* Top Stats Bar */}
             <div className="top-stats">
-              <div className="stats-grid two-line-stats">
+              <div className="stats-grid">
                 <div className="ticker-cell">
                   <span className="ticker-text">{selectedPair.baseAsset}</span>
                   {stats.logo && (
@@ -592,57 +536,53 @@ const Dex: React.FC = () => {
                     />
                   )}
                 </div>
-                <span className="cell label">PRICE</span>
-                <span className="cell label">24H CHANGE</span>
-                <span className="cell label">24H VOLUME</span>
-                <span className="cell label">24H HIGH</span>
-                <span className="cell label">24H LOW</span>
-
-                <span
-                  className={`cell value ${
-                    stats.change24h >= 0 ? "positive" : "negative"
-                  }`}
-                >
-                  ${stats.price.toFixed(stats.price < 1 ? 6 : 4)}
-                </span>
-                <span
-                  className={`cell value ${
-                    stats.change24h >= 0 ? "positive" : "negative"
-                  }`}
-                >
-                  {stats.change24h >= 0 ? "+" : ""}
-                  {stats.change24h.toFixed(2)}%
-                </span>
-                <span className="cell value">
-                  {formatVolume(stats.volume24h)}
-                </span>
-                <span className="cell value">
-                  ${stats.high24h.toFixed(stats.high24h < 1 ? 6 : 4)}
-                </span>
-                <span className="cell value">
-                  ${stats.low24h.toFixed(stats.low24h < 1 ? 6 : 4)}
-                </span>
+                <div>
+                  <span className="cell label">PRICE</span>
+                  <span
+                    className={`cell value ${
+                      stats.change24h >= 0 ? "positive" : "negative"
+                    }`}
+                  >
+                    ${stats.price.toFixed(stats.price < 1 ? 6 : 4)}
+                  </span>
+                </div>
+                <div>
+                  <span className="cell label">24H CHANGE</span>
+                  <span
+                    className={`cell value ${
+                      stats.change24h >= 0 ? "positive" : "negative"
+                    }`}
+                  >
+                    {stats.change24h >= 0 ? "+" : ""}
+                    {stats.change24h.toFixed(2)}%
+                  </span>
+                </div>
+                <div>
+                  <span className="cell label">24H VOLUME</span>
+                  <span className="cell value">
+                    {formatVolume(stats.volume24h)}
+                  </span>
+                </div>
+                <div>
+                  <span className="cell label">MARKET CAP</span>
+                  <span className="cell value">
+                    ${formatLargeNumber(marketData?.marketCap || "0")}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Recent Trades */}
+            {/* Trading History - First column, spanning 2 rows */}
             <div className="trading-history-container">
               <TradingHistory pair={selectedPair} />
             </div>
 
-            {/* Chart - updated to support candlestick */}
+            {/* Chart - Second and third columns, first row */}
             <div className="chart-panel">
-              <Chart
-                pair={selectedPair}
-                enhancedData={
-                  !enhancedMarketData.isLoading && !enhancedMarketData.hasError
-                    ? enhancedMarketData
-                    : undefined
-                }
-              />
+              <Chart pair={selectedPair} />
             </div>
 
-            {/* Pair Selector */}
+            {/* Pair Selector - Fourth column, first row */}
             <div className="pair-selector-container">
               <PairSelector
                 pairs={tradingPairs}
@@ -651,7 +591,7 @@ const Dex: React.FC = () => {
               />
             </div>
 
-            {/* Order Form */}
+            {/* Order Form - Second and third columns, second row */}
             <div className="order-form-container">
               <OrderForm
                 pair={selectedPair}
@@ -662,7 +602,7 @@ const Dex: React.FC = () => {
               />
             </div>
 
-            {/* Open/Closed Orders */}
+            {/* Limit Order Manager - Fourth column, second row */}
             <div className="my-orders-container">
               <LimitOrderManager
                 selectedPair={`${selectedPair.baseAddress}-${selectedPair.quoteAddress}`}

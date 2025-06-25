@@ -1,14 +1,18 @@
+// src/pages/Dex/components/TradingHistory.tsx
+// Last Updated: 2025-06-25 01:17:42 UTC by jake1318
+
 import React, { useState, useEffect } from "react";
 import "./TradingHistory.scss";
 
 interface TradingHistoryProps {
-  pair: {
-    name: string;
-    baseAsset: string;
-    quoteAsset: string;
-    baseAddress: string;
-    quoteAddress: string;
-  };
+  pair?: {
+    // Make the entire pair prop optional
+    name?: string;
+    baseAsset?: string;
+    quoteAsset?: string;
+    baseAddress?: string;
+    quoteAddress?: string;
+  } | null; // Allow null value
 }
 
 interface Trade {
@@ -61,11 +65,19 @@ const TradingHistory: React.FC<TradingHistoryProps> = ({ pair }) => {
   };
 
   // Helper function to check if addresses match, accounting for case sensitivity
-  const addressesMatch = (addr1: string, addr2: string): boolean => {
+  const addressesMatch = (addr1?: string, addr2?: string): boolean => {
+    if (!addr1 || !addr2) return false;
     return addr1.toLowerCase() === addr2.toLowerCase();
   };
 
   useEffect(() => {
+    // Check if pair exists and has valid properties
+    if (!pair?.baseAddress || !pair?.quoteAddress) {
+      console.warn("Trading pair not fully initialized or missing addresses");
+      setLoading(false);
+      return;
+    }
+
     console.log("Trading pair changed:", pair);
     // Clear trades state immediately when pair changes to reset UI
     setTrades([]);
@@ -223,8 +235,9 @@ const TradingHistory: React.FC<TradingHistoryProps> = ({ pair }) => {
         abortController.abort();
       }
     };
-  }, [pair.baseAddress, pair.quoteAddress]); // Re-run effect when pair changes
+  }, [pair?.baseAddress, pair?.quoteAddress]); // Use optional chaining in dependencies
 
+  // Render UI with defensive checks
   return (
     <div className="trading-history">
       <div className="trading-history-header">
@@ -236,27 +249,38 @@ const TradingHistory: React.FC<TradingHistoryProps> = ({ pair }) => {
 
       <div className="trading-history-content">
         <div className="history-header-row">
-          <span>Price ({pair.quoteAsset})</span>
-          <span>Amount ({pair.baseAsset})</span>
-          <span>Time</span>
+          <span>Price {pair?.quoteAsset ? `(${pair.quoteAsset})` : ""}</span>
+          <span>Amount {pair?.baseAsset ? `(${pair.baseAsset})` : ""}</span>
         </div>
 
         <div className="history-rows">
-          {loading && trades.length === 0 && (
-            <div className="loading-message">Loading recent trades...</div>
+          {(!pair?.baseAddress || !pair?.quoteAddress) && (
+            <div className="loading-message">
+              Waiting for trading pair data...
+            </div>
           )}
+
+          {pair?.baseAddress &&
+            pair?.quoteAddress &&
+            loading &&
+            trades.length === 0 && (
+              <div className="loading-message">Loading recent trades...</div>
+            )}
 
           {error && <div className="error-message">{error}</div>}
 
-          {!loading && !error && trades.length === 0 && (
-            <div className="no-trades-message">No recent trades found.</div>
-          )}
+          {pair?.baseAddress &&
+            pair?.quoteAddress &&
+            !loading &&
+            !error &&
+            trades.length === 0 && (
+              <div className="no-trades-message">No recent trades found.</div>
+            )}
 
           {trades.map((trade) => (
             <div key={trade.id} className={`history-row ${trade.type}`}>
               <div className="price-col">${trade.price.toFixed(6)}</div>
               <div className="amount-col">{trade.amount.toFixed(6)}</div>
-              <div className="time-col">{trade.time}</div>
             </div>
           ))}
         </div>

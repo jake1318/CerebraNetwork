@@ -1,7 +1,7 @@
 // src/pages/Dex/components/Chart.tsx
-// Last Updated: 2025-06-24 03:48:46 UTC by jake1318
+// Last Updated: 2025-06-24 22:24:48 UTC by jake1318
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import ReactApexChart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
 import { getCoinOhlcv, OhlcvPoint } from "../../../services/blockvisionService";
@@ -72,25 +72,107 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [chartType, setChartType] = useState<"line" | "candlestick">("line");
 
+  // Changed: Use chartPanelRef instead of chartContainerRef
+  const chartPanelRef = useRef<HTMLDivElement | null>(null);
+  const [chartHeight, setChartHeight] = useState(300);
+
+  // Changed: Use window resize instead of ResizeObserver for height calculation
+  useEffect(() => {
+    /* helper reads the parent (.chart-panel) once */
+    const update = () => {
+      if (!chartPanelRef.current) return;
+      // header ≈ 50 px + 12 px vertical padding (chart-header has 10)
+      const available = chartPanelRef.current.clientHeight - 62;
+      setChartHeight(Math.max(200, available)); // never below 200
+    };
+
+    update(); // run on mount
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
   // Base chart options that apply to both chart types
   const baseOptions: ApexOptions = {
     chart: {
       background: "#0a0f1e",
       toolbar: { show: false },
       zoom: { enabled: false },
+      height: chartHeight,
+      fontFamily: "inherit",
+      animations: {
+        enabled: false, // Disable animations for better performance
+      },
+      redrawOnWindowResize: true, // Ensure chart redraws when window size changes
     },
     xaxis: {
       type: "datetime",
       labels: {
         style: { colors: "#ccc", fontSize: "12px" },
+        datetimeUTC: false,
+        datetimeFormatter: {
+          year: "yyyy",
+          month: "MMM 'yy",
+          day: "dd MMM",
+          hour: "HH:mm",
+        },
+      },
+      axisBorder: {
+        show: false,
+      },
+      axisTicks: {
+        show: false,
       },
     },
     grid: {
-      borderColor: "rgba(255,255,255,0.2)",
+      borderColor: "rgba(255,255,255,0.1)",
+      strokeDashArray: 3,
       xaxis: { lines: { show: true } },
       yaxis: { lines: { show: true } },
+      padding: { left: 10, right: 10 },
     },
-    tooltip: { theme: "dark", x: { format: "dd MMM HH:mm" } },
+    tooltip: {
+      theme: "dark",
+      x: { format: "dd MMM HH:mm" },
+      fixed: {
+        enabled: true,
+        position: "topRight",
+      },
+    },
+    responsive: [
+      {
+        breakpoint: 1000,
+        options: {
+          chart: {
+            height: 250,
+          },
+          xaxis: {
+            labels: {
+              style: { fontSize: "10px" },
+              rotate: -45,
+              offsetY: 5,
+            },
+          },
+          yaxis: {
+            labels: {
+              style: { fontSize: "10px" },
+            },
+          },
+        },
+      },
+      {
+        breakpoint: 600,
+        options: {
+          chart: {
+            height: 200,
+          },
+          xaxis: {
+            labels: {
+              show: false,
+            },
+          },
+        },
+      },
+    ],
   };
 
   // Line chart specific options
@@ -189,10 +271,16 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
 
       // Convert interval to API format
       let apiInterval: any = "1h";
-      if (type === "1m" || type === "5m" || type === "15m" || type === "30m")
-        apiInterval = type;
-      else if (type === "1H" || type === "4H") apiInterval = type.toLowerCase();
-      else if (type === "1D") apiInterval = "1d";
+      if (tf === "1m" || tf === "5m" || tf === "15m" || tf === "30m")
+        apiInterval = tf;
+      else if (tf === "1h") apiInterval = "1h";
+      else if (tf === "4h") apiInterval = "4h";
+      else if (tf === "1d") apiInterval = "1d";
+      else if (tf === "1Y") apiInterval = "1w";
+
+      console.log(
+        `Fetching OHLCV data: token=${pair.baseAddress}, interval=${apiInterval}, from=${from}`
+      );
 
       const data = await getCoinOhlcv(
         pair.baseAddress,
@@ -200,6 +288,14 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
         from
       );
       console.log("OHLCV data loaded:", data);
+
+      // Make sure we have data before mapping
+      if (!data || !data.length) {
+        console.warn("No OHLCV data received");
+        setLineData([]);
+        setCandlestickData([]);
+        return;
+      }
 
       // Format data for line chart
       const linePoints: ChartPoint[] = data.map((point) => ({
@@ -231,9 +327,10 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
   }, [pair?.baseAddress, tf]);
 
   return (
-    <div className="trading-chart">
+    <div className="trading-chart" ref={chartPanelRef}>
       <div className="chart-header">
-        <h3>{pair?.name || "Chart"}</h3>
+        {/* Changed to only show baseAsset without /USDC */}
+        <h3>{pair?.baseAsset || "Chart"}</h3>
         <div className="chart-controls">
           <div className="timeframe-selector">
             {Object.keys(TIME_FRAMES).map((key) => (

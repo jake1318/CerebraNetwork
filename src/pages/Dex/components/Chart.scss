@@ -1,107 +1,118 @@
 /* src/pages/Dex/components/Chart.scss */
-/* Last Updated: 2025-06-24 03:48:46 UTC by jake1318 */
+/* Last Updated: 2025-06-24 23:13:34 UTC by jake1318 */
 
 .trading-chart {
-  background: #0a0f1e;
-  border-radius: 12px;
-  border: 1px solid;
-  border-image: linear-gradient(
-      45deg,
-      rgba(0, 255, 255, 0.2),
-      rgba(255, 0, 255, 0.2)
-    )
-    1;
   display: flex;
   flex-direction: column;
-  min-height: 400px;
-
-  /* Remove all scrollbars */
-  overflow: hidden;
+  flex: 1 1 auto; /* ← fills all free space of .chart-panel */
+  width: 100%;
+  color: #f0f0f0;
 
   .chart-header {
-    padding: 1rem 1rem 0.6rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 10px 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0; /* Prevent header from shrinking */
 
     h3 {
       margin: 0;
-      font-size: 1.2rem;
-      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      font-size: 22px;
+      background: linear-gradient(90deg, #f0f0f0, #00c2ff);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      white-space: nowrap; /* Prevent wrapping */
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .chart-controls {
       display: flex;
-      gap: 1.2rem;
       align-items: center;
+      gap: 10px;
+      flex-wrap: wrap; /* Allow wrapping on small screens */
 
       .timeframe-selector {
         display: flex;
-        gap: 0.4rem;
+        flex-wrap: wrap; /* Allow wrapping on small screens */
+        gap: 2px;
 
         button {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: rgba(255, 255, 255, 0.7);
-          padding: 0.35rem 0.7rem;
-          border-radius: 4px;
-          font-size: 0.9rem;
+          background: rgba(0, 194, 255, 0.1);
+          color: #9ba6bd;
+          border: 1px solid rgba(0, 194, 255, 0.2);
+          border-radius: 3px;
+          padding: 2px 5px;
+          font-size: 11px;
           cursor: pointer;
-          transition: background 0.2s ease, color 0.2s ease;
+          transition: all 0.2s;
+          min-width: 24px;
 
           &:hover {
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(0, 194, 255, 0.2);
           }
 
           &.active {
-            background: linear-gradient(
-              45deg,
-              rgba(0, 255, 255, 0.3),
-              rgba(255, 0, 255, 0.3)
-            );
-            border-color: rgba(255, 255, 255, 0.2);
-            color: #fff;
-            font-weight: 500;
+            background: rgba(0, 194, 255, 0.3);
+            color: #00c2ff;
+            border-color: #00c2ff;
           }
         }
       }
 
       .chart-type-toggle {
         display: flex;
-        gap: 0.4rem;
+        gap: 5px;
 
         .chart-type-btn {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: rgba(255, 255, 255, 0.7);
-          padding: 0.35rem 0.7rem;
-          border-radius: 4px;
-          font-size: 0.9rem;
+          background: rgba(0, 194, 255, 0.1);
+          color: #9ba6bd;
+          border: 1px solid rgba(0, 194, 255, 0.2);
+          border-radius: 3px;
+          padding: 2px 5px;
+          font-size: 11px;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.2s;
+          min-width: 24px;
 
           &:hover {
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(0, 194, 255, 0.2);
           }
 
           &.active {
-            background: linear-gradient(
-              45deg,
-              rgba(0, 255, 255, 0.3),
-              rgba(255, 0, 255, 0.3)
-            );
-            border-color: rgba(255, 255, 255, 0.2);
-            color: #fff;
+            background: rgba(0, 194, 255, 0.3);
+            color: #00c2ff;
+            border-color: #00c2ff;
           }
+        }
+      }
+    }
 
-          i {
-            font-size: 1rem;
+    @media (max-width: 768px) {
+      padding: 8px 10px;
+
+      h3 {
+        font-size: 18px;
+        max-width: 100px; /* Limit width on small screens */
+      }
+
+      .chart-controls {
+        gap: 5px;
+
+        .timeframe-selector {
+          button {
+            padding: 1px 3px;
+            font-size: 10px;
+            min-width: 20px;
+          }
+        }
+
+        .chart-type-toggle {
+          .chart-type-btn {
+            padding: 1px 3px;
+            font-size: 10px;
+            min-width: 20px;
           }
         }
       }
@@ -109,69 +120,30 @@
   }
 
   .chart-content {
-    flex: 1;
-    position: relative;
+    flex: 1 1 auto; /* grow + shrink inside .trading-chart  */
     display: flex;
-    flex-direction: column;
-    /* Ensure no scrollbars inside chart-content */
-    overflow: hidden;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+    min-height: 200px;
 
-    .chart-area {
-      width: 100%;
-      height: 100%;
-      position: relative;
-      background: #0a0f1e;
-    }
-
-    .chart-loading,
-    .chart-error {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+    .chart-loading {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: rgba(10, 15, 30, 0.85);
-      z-index: 10;
-      padding: 1rem;
-      text-align: center;
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 1rem;
-
-      button {
-        margin-top: 1rem;
-        background: linear-gradient(
-          45deg,
-          rgba(0, 255, 255, 0.3),
-          rgba(255, 0, 255, 0.3)
-        );
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover {
-          background: linear-gradient(
-            45deg,
-            rgba(0, 255, 255, 0.5),
-            rgba(255, 0, 255, 0.5)
-          );
-        }
-      }
+      gap: 20px;
+      width: 100%;
+      height: 100%;
 
       .spinner {
-        border: 3px solid rgba(255, 255, 255, 0.1);
-        border-top: 3px solid rgba(0, 255, 255, 0.7);
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        animation: spin 1s linear infinite;
-        margin-bottom: 1rem;
+        border: 3px solid rgba(0, 194, 255, 0.1);
+        border-top-color: #00c2ff;
+        animation: spin 1s infinite linear;
       }
 
       @keyframes spin {
@@ -182,31 +154,46 @@
           transform: rotate(360deg);
         }
       }
+
+      p {
+        margin: 0;
+        color: #9ba6bd;
+      }
     }
-  }
-}
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .trading-chart {
-    .chart-header {
+    .chart-error {
+      display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 0.8rem;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      width: 100%;
+      height: 100%;
 
-      .chart-controls {
-        width: 100%;
-        justify-content: space-between;
+      p {
+        margin: 0;
+        color: #ff4976;
+      }
 
-        .timeframe-selector {
-          flex-wrap: wrap;
+      button {
+        background: rgba(0, 194, 255, 0.1);
+        color: #00c2ff;
+        border: 1px solid #00c2ff;
+        border-radius: 4px;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: all 0.2s;
 
-          button {
-            font-size: 0.8rem;
-            padding: 0.25rem 0.5rem;
-          }
+        &:hover {
+          background: rgba(0, 194, 255, 0.2);
         }
       }
+    }
+
+    .chart-area {
+      width: 100%;
+      flex: 1 1 auto;
+      height: 100%; /* ← Apex uses this */
     }
   }
 }
