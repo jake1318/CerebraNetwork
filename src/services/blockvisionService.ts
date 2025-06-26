@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-06-24 02:01:15 UTC by jake1318
+// Last Updated: 2025-06-26 20:38:56 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -790,7 +790,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑06‑24
+//  last‑updated: 2025‑06‑24 06:34:16 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1010,6 +1010,197 @@ export const blockvisionService = {
     }
   },
 
+  /**
+   * Get Scallop-specific portfolio data for a given address
+   * @param address Wallet address to get Scallop data for
+   * @returns Processed pool groups for Scallop positions
+   */
+  getScallopPortfolioData: async (address: string): Promise<PoolGroup[]> => {
+    try {
+      console.log(`Fetching Scallop data for: ${address}`);
+
+      // Call the BlockVision API specifically for Scallop
+      const response = await blockvisionApi.get(
+        "/v2/sui/account/defiPortfolio",
+        {
+          params: { address, protocol: "scallop" },
+        }
+      );
+
+      const { code, result } = response.data;
+      console.log(`BlockVision API response code for Scallop: ${code}`);
+
+      if (code === 200 && result) {
+        // Process the raw Scallop data
+        const poolGroups: PoolGroup[] = [];
+
+        if (result.scallop) {
+          // Process deposits
+          if (
+            result.scallop.deposits &&
+            Array.isArray(result.scallop.deposits)
+          ) {
+            const deposits = result.scallop.deposits;
+
+            // Group deposits by token
+            const depositsByToken: Record<string, any[]> = {};
+            for (const deposit of deposits) {
+              const coinType = deposit.coinType;
+              if (!coinType) continue;
+
+              if (!depositsByToken[coinType]) {
+                depositsByToken[coinType] = [];
+              }
+              depositsByToken[coinType].push(deposit);
+            }
+
+            // Create a pool group for each token type
+            for (const [coinType, tokenDeposits] of Object.entries(
+              depositsByToken
+            )) {
+              if (!tokenDeposits.length) continue;
+
+              // Get token info for this deposit
+              const tokenInfo = await blockvisionService.getTokenInfo(coinType);
+
+              // Create positions for each deposit
+              const positions: NormalizedPosition[] = tokenDeposits.map(
+                (deposit, index) => {
+                  // Convert raw amounts to normalized values
+                  const rawAmount = deposit.amount || "0";
+                  const normalizedAmount = normalizeAmount(
+                    rawAmount,
+                    tokenInfo.decimals
+                  );
+                  const valueUsd = normalizedAmount * (tokenInfo.price || 0);
+
+                  return {
+                    id: `scallop-deposit-${coinType}-${index}`,
+                    liquidity: rawAmount,
+                    balanceA: rawAmount,
+                    balanceB: "0",
+                    formattedBalanceA: formatTokenAmount(normalizedAmount),
+                    formattedBalanceB: "0",
+                    valueUsd: valueUsd,
+                    isOutOfRange: false,
+                    positionType: "scallop-deposit",
+                    raw: deposit,
+                  };
+                }
+              );
+
+              // Calculate total value
+              const totalValue = positions.reduce(
+                (sum, pos) => sum + (pos.valueUsd || 0),
+                0
+              );
+
+              // Create the pool group
+              poolGroups.push({
+                poolAddress: `scallop-deposits-${coinType}`,
+                poolName: `${tokenInfo.symbol} Deposits`,
+                protocol: "Scallop",
+                positions: positions,
+                totalLiquidity: 0,
+                totalValueUsd: totalValue,
+                apr: parseFloat(tokenDeposits[0]?.apy || "0"),
+                tokenA: coinType,
+                tokenB: "",
+                tokenASymbol: tokenInfo.symbol,
+                tokenBSymbol: "",
+                tokenALogo: tokenInfo.logo,
+              });
+            }
+          }
+
+          // Process borrows
+          if (result.scallop.borrows && Array.isArray(result.scallop.borrows)) {
+            const borrows = result.scallop.borrows;
+
+            // Group borrows by token
+            const borrowsByToken: Record<string, any[]> = {};
+            for (const borrow of borrows) {
+              const coinType = borrow.coinType;
+              if (!coinType) continue;
+
+              if (!borrowsByToken[coinType]) {
+                borrowsByToken[coinType] = [];
+              }
+              borrowsByToken[coinType].push(borrow);
+            }
+
+            // Create a pool group for each token type
+            for (const [coinType, tokenBorrows] of Object.entries(
+              borrowsByToken
+            )) {
+              if (!tokenBorrows.length) continue;
+
+              // Get token info for this borrow
+              const tokenInfo = await blockvisionService.getTokenInfo(coinType);
+
+              // Create positions for each borrow
+              const positions: NormalizedPosition[] = tokenBorrows.map(
+                (borrow, index) => {
+                  // Convert raw amounts to normalized values
+                  const rawAmount = borrow.amount || "0";
+                  const normalizedAmount = normalizeAmount(
+                    rawAmount,
+                    tokenInfo.decimals
+                  );
+                  const valueUsd = normalizedAmount * (tokenInfo.price || 0);
+
+                  return {
+                    id: `scallop-borrow-${coinType}-${index}`,
+                    liquidity: rawAmount,
+                    balanceA: rawAmount,
+                    balanceB: "0",
+                    formattedBalanceA: formatTokenAmount(normalizedAmount),
+                    formattedBalanceB: "0",
+                    valueUsd: valueUsd,
+                    isOutOfRange: false,
+                    positionType: "scallop-borrow",
+                    raw: borrow,
+                  };
+                }
+              );
+
+              // Calculate total value
+              const totalValue = positions.reduce(
+                (sum, pos) => sum + (pos.valueUsd || 0),
+                0
+              );
+
+              // Create the pool group
+              poolGroups.push({
+                poolAddress: `scallop-borrows-${coinType}`,
+                poolName: `${tokenInfo.symbol} Borrows`,
+                protocol: "Scallop",
+                positions: positions,
+                totalLiquidity: 0,
+                totalValueUsd: totalValue,
+                apr: parseFloat(tokenBorrows[0]?.apy || "0"),
+                tokenA: coinType,
+                tokenB: "",
+                tokenASymbol: tokenInfo.symbol,
+                tokenBSymbol: "",
+                tokenALogo: tokenInfo.logo,
+              });
+            }
+          }
+        }
+
+        return poolGroups;
+      } else {
+        throw new Error(
+          `BlockVision API returned error: ${response.data.message}`
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching Scallop data:", error);
+      return []; // Return empty array on error instead of throwing
+    }
+  },
+
   // Updated method to fetch DeFi portfolio that handles the protocol requirement
   // by fetching from multiple protocols and aggregating the data
   getDefiPortfolio: async (
@@ -1145,7 +1336,7 @@ export const blockvisionService = {
         }
       }
 
-      // ─── patch START ────────────────────────────────────────────────────────�[...]
+      // ─── patch START ──────────────────────────────────────────────────────�[...]
       // Now "enrich" every poolGroup & each position with real USD values
       await Promise.all(
         poolGroups.map(async (pool) => {
@@ -1650,7 +1841,7 @@ export const blockvisionService = {
           }
         }
       }
-      // ─── patch END ─────────────────────────────────────────────────────────[...]
+      // ─── patch END ───────────────────────────────────────────────────────[...]
 
       return poolGroups;
     } catch (error) {

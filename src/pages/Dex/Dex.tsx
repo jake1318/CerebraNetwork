@@ -1,6 +1,5 @@
 // src/pages/Dex/Dex.tsx
-// Last Updated: 2025-06-25 19:07:38 UTC
-// Updated by: jake1318
+// Last Updated: 2025-06-26 06:18:23 UTC by jake1318
 
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -65,6 +64,7 @@ interface TradingPair {
   baseAddress: string;
   quoteAddress: string;
   logo?: string;
+  marketCap?: number; // Added marketCap field
 }
 
 interface TokenMarketData {
@@ -83,7 +83,6 @@ const Dex: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [showPairSelector, setShowPairSelector] = useState(false);
-  const [showDepthChart, setShowDepthChart] = useState(false);
 
   // State for market data from BlockVision API
   const [marketData, setMarketData] = useState<CoinMarketData | null>(null);
@@ -95,6 +94,9 @@ const Dex: React.FC = () => {
 
   // State to trigger refreshing orders
   const [ordersRefreshTrigger, setOrdersRefreshTrigger] = useState(0);
+
+  // Add a lastFetchTimestamp for rate limiting
+  const lastFetchTimestampRef = useRef<Record<string, number>>({});
 
   // Sleep utility for rate limiting
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -150,6 +152,7 @@ const Dex: React.FC = () => {
           change24h: d.priceChangePercentage24H
             ? parseFloat(String(d.priceChangePercentage24H))
             : 0,
+          marketCap: d.marketCap ? parseFloat(String(d.marketCap)) : 0,
         };
       },
       {
@@ -159,6 +162,7 @@ const Dex: React.FC = () => {
         logo: "",
         price: 0,
         change24h: 0,
+        marketCap: 0,
       }
     );
   };
@@ -313,9 +317,24 @@ const Dex: React.FC = () => {
     return results;
   };
 
-  // Function to fetch market data from BlockVision
+  // Function to fetch market data from BlockVision with rate limiting
   const fetchMarketData = async (baseAddress: string) => {
     if (!baseAddress) return;
+
+    // Check if we've fetched this data recently (within the last 10 seconds)
+    const now = Date.now();
+    const lastFetch = lastFetchTimestampRef.current[baseAddress] || 0;
+    const timeSinceLastFetch = now - lastFetch;
+
+    // Only fetch if it's been more than 10 seconds since the last fetch for this address
+    if (timeSinceLastFetch < 10000) {
+      console.log(
+        `Skipping BlockVision API call for ${baseAddress} - last call was ${Math.floor(
+          timeSinceLastFetch / 1000
+        )}s ago`
+      );
+      return;
+    }
 
     setMarketDataLoading(true);
     setMarketDataError(null);
@@ -323,6 +342,10 @@ const Dex: React.FC = () => {
     try {
       // Get detailed market data from BlockVision
       const data = await getCoinMarketDataPro(baseAddress);
+
+      // Update last fetch timestamp
+      lastFetchTimestampRef.current[baseAddress] = now;
+
       console.log("BlockVision market data:", data);
       setMarketData(data);
 
@@ -335,6 +358,12 @@ const Dex: React.FC = () => {
             price: parseFloat(data.priceInUsd),
             change24h: parseFloat(data.market.hour24.priceChange),
             volume24h: data.volume24H,
+            marketCap: parseFloat(data.marketCap || "0"),
+            high24h:
+              parseFloat(data.market.hour24.highPrice || "0") ||
+              prevPair.high24h,
+            low24h:
+              parseFloat(data.market.hour24.lowPrice || "0") || prevPair.low24h,
           };
         });
       }
@@ -385,6 +414,7 @@ const Dex: React.FC = () => {
           baseAddress: addr,
           quoteAddress: USDC_ADDRESS,
           logo: bv.logo,
+          marketCap: bv.marketCap || 0, // Added market cap
         } as TradingPair;
       });
 
@@ -403,13 +433,12 @@ const Dex: React.FC = () => {
     }
   };
 
-  // Auto‑refresh price & change
+  // Auto‑refresh price & change - update to respect the rate limiting
   const refreshSelectedPair = async (pair: TradingPair) => {
-    // Modified to use new BlockVision API
     if (!pair?.baseAddress) return;
 
     try {
-      // Use BlockVision API for market data
+      // Use BlockVision API for market data with rate limiting
       fetchMarketData(pair.baseAddress);
     } catch (e) {
       console.error("Refresh error:", e);
@@ -430,14 +459,34 @@ const Dex: React.FC = () => {
     setOrdersRefreshTrigger((prev) => prev + 1);
   };
 
+  // Format large numbers for display
+  const formatNumber = (num: number) => {
+    if (!num || isNaN(num)) return "$0";
+
+    if (num >= 1_000_000_000) {
+      return `$${(num / 1_000_000_000).toFixed(2)}B`;
+    }
+
+    if (num >= 1_000_000) {
+      return `$${(num / 1_000_000).toFixed(2)}M`;
+    }
+
+    if (num >= 1_000) {
+      return `$${(num / 1_000).toFixed(2)}K`;
+    }
+
+    return `$${num.toFixed(2)}`;
+  };
+
   // useEffect calls must not return a Promise!
   useEffect(() => {
     loadPairs();
   }, []);
 
+  // Modified useEffect to respect rate limiting
   useEffect(() => {
     if (selectedPair) {
-      // Immediately fetch market data when pair changes
+      // Immediately fetch market data when pair changes, but only if we haven't fetched recently
       fetchMarketData(selectedPair.baseAddress);
 
       // Start the refresh interval
@@ -465,138 +514,127 @@ const Dex: React.FC = () => {
           high24h: selectedPair?.high24h || 0,
           low24h: selectedPair?.low24h || 0,
           logo: selectedPair?.logo || "",
+          marketCap: selectedPair?.marketCap || 0,
         }
       : {
           price: parseFloat(marketData.priceInUsd),
           change24h: parseFloat(marketData.market.hour24.priceChange),
           volume24h: marketData.volume24H,
-          high24h: selectedPair?.high24h || 0, // keep original high/low for now
-          low24h: selectedPair?.low24h || 0,
+          high24h:
+            parseFloat(marketData.market.hour24.highPrice || "0") ||
+            selectedPair?.high24h ||
+            0,
+          low24h:
+            parseFloat(marketData.market.hour24.lowPrice || "0") ||
+            selectedPair?.low24h ||
+            0,
           logo: selectedPair?.logo || "",
+          marketCap: parseFloat(marketData.marketCap || "0"),
         };
-
-  // Format volume for display - improved
-  const formatVolume = (volume: number) => {
-    if (!volume || volume === 0) return "$0";
-
-    if (volume >= 1000000) {
-      return `$${(volume / 1000000).toFixed(2)}M`;
-    }
-
-    if (volume >= 1000) {
-      return `$${(volume / 1000).toFixed(2)}K`;
-    }
-
-    return `$${volume.toFixed(2)}`;
-  };
-
-  // Short wallet address formatter
-  const shortenAddress = (address: string | undefined) => {
-    if (!address) return "";
-    return address.length > 10
-      ? `${address.substring(0, 5)}...${address.substring(address.length - 4)}`
-      : address;
-  };
 
   return (
     <div className="dex-container">
       <div className="dex-content">
-        <div className="dex-main">
-          <div className="pair-header">
+        {/* Top section with chart and pair selector */}
+        <div className="top-section">
+          {/* Main chart area */}
+          <div className="dex-main-chart">
+            <div className="pair-header">
+              {selectedPair && (
+                <>
+                  {/* Left side: Pair info */}
+                  <div className="header-left">
+                    <span className="pair-name">
+                      {selectedPair.baseAsset}/USDC
+                    </span>
+                    <span className="pair-price">
+                      ${stats.price.toFixed(stats.price < 1 ? 6 : 4)}
+                    </span>
+                    <span
+                      className={`pair-change ${
+                        stats.change24h >= 0 ? "positive" : "negative"
+                      }`}
+                    >
+                      {stats.change24h >= 0 ? "+" : ""}
+                      {stats.change24h.toFixed(2)}%
+                    </span>
+
+                    {/* Stats directly in the header */}
+                    <div className="header-stats">
+                      <div className="stat-item">
+                        <span className="stat-label">24h High</span>
+                        <span className="stat-value">
+                          ${stats.high24h.toFixed(stats.high24h < 1 ? 6 : 4)}
+                        </span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">24h Low</span>
+                        <span className="stat-value">
+                          ${stats.low24h.toFixed(stats.low24h < 1 ? 6 : 4)}
+                        </span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">24h Volume</span>
+                        <span className="stat-value">
+                          {formatNumber(stats.volume24h)}
+                        </span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Market Cap</span>
+                        <span className="stat-value">
+                          {formatNumber(stats.marketCap)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side: Price Chart label */}
+                  <div className="header-right">
+                    <span className="chart-label">Price Chart</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Mobile stats row - only displayed on smaller screens */}
             {selectedPair && (
-              <>
-                <div className="pair-info">
-                  <span className="pair-name">
-                    {selectedPair.baseAsset}/USDC
-                  </span>
-                  <span className="pair-price">
-                    ${stats.price.toFixed(stats.price < 1 ? 6 : 4)}
-                  </span>
-                  <span
-                    className={`pair-change ${
-                      stats.change24h >= 0 ? "positive" : "negative"
-                    }`}
-                  >
-                    {stats.change24h >= 0 ? "+" : ""}
-                    {stats.change24h.toFixed(2)}%
+              <div className="mobile-stats-row">
+                <div className="stat-item">
+                  <span className="stat-label">24h High</span>
+                  <span className="stat-value">
+                    ${stats.high24h.toFixed(stats.high24h < 1 ? 6 : 4)}
                   </span>
                 </div>
-                <div className="chart-toggle">
-                  <button
-                    className={!showDepthChart ? "active" : ""}
-                    onClick={() => setShowDepthChart(false)}
-                  >
-                    Price Chart
-                  </button>
-                  <button
-                    className={showDepthChart ? "active" : ""}
-                    onClick={() => setShowDepthChart(true)}
-                  >
-                    Depth
-                  </button>
+                <div className="stat-item">
+                  <span className="stat-label">24h Low</span>
+                  <span className="stat-value">
+                    ${stats.low24h.toFixed(stats.low24h < 1 ? 6 : 4)}
+                  </span>
                 </div>
-              </>
+                <div className="stat-item">
+                  <span className="stat-label">24h Volume</span>
+                  <span className="stat-value">
+                    {formatNumber(stats.volume24h)}
+                  </span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Market Cap</span>
+                  <span className="stat-value">
+                    {formatNumber(stats.marketCap)}
+                  </span>
+                </div>
+              </div>
             )}
-          </div>
 
-          <div className="chart-container">
-            {selectedPair && <Chart pair={selectedPair} enhancedData={stats} />}
-          </div>
-
-          <div className="bottom-panels">
-            <div className="order-form-panel">
-              <div className="panel-header">
-                <div className="tab-buttons">
-                  <button
-                    className={`tab-btn ${
-                      orderMode === "limit" ? "active" : ""
-                    }`}
-                    onClick={() => setOrderMode("limit")}
-                  >
-                    Limit
-                  </button>
-                  <button
-                    className={`tab-btn ${
-                      orderMode === "market" ? "active" : ""
-                    }`}
-                    onClick={() => setOrderMode("market")}
-                  >
-                    Market
-                  </button>
-                </div>
-              </div>
-              <div className="panel-content">
-                {selectedPair && (
-                  <OrderForm
-                    pair={selectedPair}
-                    orderType={orderType}
-                    setOrderType={setOrderType}
-                    orderMode={orderMode}
-                    setOrderMode={setOrderMode}
-                    onOrderSuccess={handleOrderSuccess}
-                  />
-                )}
-              </div>
-            </div>
-
-            <div className="orders-panel">
-              <div className="panel-content">
-                <MyOrders
-                  onOrderCancel={() =>
-                    setOrdersRefreshTrigger((prev) => prev + 1)
-                  }
-                  onOrderClaim={() =>
-                    setOrdersRefreshTrigger((prev) => prev + 1)
-                  }
-                  key={`orders-${ordersRefreshTrigger}`}
-                />
-              </div>
+            <div className="chart-container">
+              {selectedPair && (
+                <Chart pair={selectedPair} enhancedData={stats} />
+              )}
             </div>
           </div>
-        </div>
 
-        <div className="dex-sidebar">
-          <div className="sidebar-panel">
+          {/* Pair selector panel */}
+          <div className="pair-selector-panel">
             <div className="panel-header">
               <div className="panel-title">Select Pair</div>
               <button
@@ -615,8 +653,59 @@ const Dex: React.FC = () => {
               />
             </div>
           </div>
+        </div>
 
-          <div className="sidebar-panel">
+        {/* Bottom section with order form, orders, and recent trades */}
+        <div className="bottom-section">
+          {/* Order form panel */}
+          <div className="order-form-panel">
+            <div className="panel-header">
+              <div className="tab-buttons">
+                <button
+                  className={`tab-btn ${orderMode === "limit" ? "active" : ""}`}
+                  onClick={() => setOrderMode("limit")}
+                >
+                  Limit
+                </button>
+                <button
+                  className={`tab-btn ${
+                    orderMode === "market" ? "active" : ""
+                  }`}
+                  onClick={() => setOrderMode("market")}
+                >
+                  Market
+                </button>
+              </div>
+            </div>
+            <div className="panel-content">
+              {selectedPair && (
+                <OrderForm
+                  pair={selectedPair}
+                  orderType={orderType}
+                  setOrderType={setOrderType}
+                  orderMode={orderMode}
+                  setOrderMode={setOrderMode}
+                  onOrderSuccess={handleOrderSuccess}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Order manager panel */}
+          <div className="orders-panel">
+            <div className="panel-content">
+              <MyOrders
+                onOrderCancel={() =>
+                  setOrdersRefreshTrigger((prev) => prev + 1)
+                }
+                onOrderClaim={() => setOrdersRefreshTrigger((prev) => prev + 1)}
+                key={`orders-${ordersRefreshTrigger}`}
+              />
+            </div>
+          </div>
+
+          {/* Recent trades panel */}
+          <div className="recent-trades-panel">
             <div className="panel-header">
               <div className="panel-title">Recent Trades</div>
             </div>
@@ -628,30 +717,6 @@ const Dex: React.FC = () => {
       </div>
 
       {error && <div className="error-message">{error}</div>}
-
-      {/* Wallet connection indicator */}
-      <div className="wallet-status">
-        {connected && account ? (
-          <div className="wallet-connected">
-            <div className="wallet-address">
-              {shortenAddress(account.address)}
-            </div>
-            <button
-              className="disconnect-btn"
-              onClick={() => window.suiWallet?.disconnect()}
-            >
-              Disconnect
-            </button>
-          </div>
-        ) : (
-          <button
-            className="connect-btn"
-            onClick={() => window.suiWallet?.requestPermissions()}
-          >
-            Connect Wallet
-          </button>
-        )}
-      </div>
     </div>
   );
 };

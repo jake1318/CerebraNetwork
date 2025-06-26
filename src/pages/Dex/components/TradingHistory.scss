@@ -1,25 +1,30 @@
-/* src/pages/Dex/components/TradingHistory.scss */
-/* Last Updated: 2025-06-25 06:32:45 UTC by jake1318 */
-
 .trading-history {
-  display: flex;
-  flex-direction: column;
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 
   .history-header {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    padding: 0.5rem;
-    font-size: 0.8rem;
-    color: #888;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: #8a8a8a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
     .col {
-      text-align: right;
-
       &.price {
+        width: 40%;
         text-align: left;
+      }
+
+      &.amount {
+        width: 30%;
+        text-align: right;
+      }
+
+      &.time {
+        width: 30%;
+        text-align: right;
       }
     }
   }
@@ -28,27 +33,35 @@
     flex: 1;
     overflow-y: auto;
 
-    &::-webkit-scrollbar {
-      width: 4px;
+    /* Loading state */
+    .loading {
+      padding: 20px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.6);
+      font-style: italic;
     }
-    &::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.2);
+
+    /* Error state */
+    .error {
+      padding: 20px;
+      text-align: center;
+      color: #ff3b30;
+      font-style: italic;
     }
-    &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 2px;
-    }
-    &::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.3);
+
+    .no-trades {
+      padding: 20px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+      font-style: italic;
     }
 
     .history-item {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      padding: 0.4rem 0.5rem;
-      font-size: 0.85rem;
-      font-family: "Roboto Mono", monospace;
+      display: flex;
+      padding: 6px 16px;
+      font-size: 13px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      font-family: "Orbitron", monospace;
 
       &.buy {
         .price {
@@ -58,31 +71,45 @@
 
       &.sell {
         .price {
-          color: #f44336;
+          color: #ff3b30;
         }
       }
 
       .col {
-        text-align: right;
-
         &.price {
+          width: 40%;
           text-align: left;
         }
 
+        &.amount {
+          width: 30%;
+          text-align: right;
+        }
+
         &.time {
-          color: #888;
-          font-size: 0.75rem;
+          width: 30%;
+          text-align: right;
+          color: #8a8a8a;
         }
       }
     }
 
-    .no-trades {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100px;
-      color: #888;
-      font-style: italic;
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
   }
 }

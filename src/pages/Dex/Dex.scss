@@ -1,15 +1,19 @@
 /* src/pages/Dex/Dex.scss */
-/* Last Updated: 2025-06-25 23:55:05 UTC by jake1318 */
+/* Last Updated: 2025-06-26 06:18:23 UTC by jake1318 */
 
-/* DEX container - use the space already provided by main */
+/* DEX container */
 .dex-container {
-  height: 100%; /* Fill the already-calculated parent height */
+  height: 100vh; /* Full viewport height */
   width: 100%;
-  overflow: hidden; /* or 'auto' if you want scrolling */
+  overflow: auto;
   display: flex;
   flex-direction: column;
   background-color: #05050f;
   color: #ffffff;
+  position: relative;
+  padding-top: var(--navbar-h); /* Add padding equal to navbar height */
+  box-sizing: border-box; /* Ensure padding is included in height calculation */
+  margin-top: 0; /* Remove negative margin */
 
   // Variables
   $accent-color: #00ffff;
@@ -22,200 +26,172 @@
 
   .dex-content {
     display: flex;
-    height: 100%;
+    flex-direction: column;
+    height: 100%; /* Take full height of container */
     width: 100%;
     box-sizing: border-box;
 
-    // Main area - left 75%
-    .dex-main {
-      flex: 3;
+    /* Top section with chart and pair selector */
+    .top-section {
       display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-right: 1px solid $panel-border;
+      height: 45vh; /* 45% of viewport height */
+      max-height: 400px; /* Maximum height */
+      min-height: 280px; /* Minimum height */
+      border-bottom: 1px solid $panel-border;
 
-      .pair-header {
+      /* Main chart area */
+      .dex-main-chart {
+        flex: 3;
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 8px 16px;
-        background-color: $panel-header;
-        border-bottom: 1px solid $panel-border;
-        height: 40px;
-        box-sizing: border-box;
+        flex-direction: column;
+        border-right: 1px solid $panel-border;
 
-        .pair-info {
+        /* Updated pair header for single-line layout */
+        .pair-header {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-
-          .pair-name {
-            font-size: 16px;
-            font-weight: 600;
-            margin-right: 12px;
-          }
-
-          .pair-price {
-            font-family: "Orbitron", monospace;
-            font-size: 15px;
-            margin-right: 8px;
-          }
-
-          .pair-change {
-            font-size: 14px;
-            font-weight: 600;
-            padding: 2px 6px;
-            border-radius: 3px;
-
-            &.positive {
-              color: $positive-color;
-            }
-
-            &.negative {
-              color: $negative-color;
-            }
-          }
-        }
-
-        .chart-toggle {
-          display: flex;
-
-          button {
-            background-color: transparent;
-            color: #8a8a8a;
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            font-size: 12px;
-            padding: 4px 10px;
-            cursor: pointer;
-
-            &:first-child {
-              border-radius: 3px 0 0 3px;
-            }
-
-            &:last-child {
-              border-radius: 0 3px 3px 0;
-            }
-
-            &.active {
-              background-color: rgba(0, 255, 255, 0.1);
-              color: $accent-color;
-              border-color: rgba(0, 255, 255, 0.3);
-            }
-
-            &:hover:not(.active) {
-              background-color: rgba(255, 255, 255, 0.05);
-            }
-          }
-        }
-      }
-
-      .chart-container {
-        flex: 1;
-        background-color: $panel-bg;
-        min-height: 280px;
-        overflow: hidden;
-        position: relative;
-      }
-
-      .bottom-panels {
-        display: flex;
-        height: 300px;
-        border-top: 1px solid $panel-border;
-
-        .order-form-panel,
-        .orders-panel {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
+          padding: 0 16px;
+          background-color: $panel-header;
+          border-bottom: 1px solid $panel-border;
+          height: 50px; /* Increased height to accommodate all content */
+          box-sizing: border-box;
+          flex-shrink: 0;
           overflow: hidden;
 
-          &:first-child {
-            border-right: 1px solid $panel-border;
-          }
-        }
-
-        .panel-header {
-          background-color: $panel-header;
-          padding: 0;
-          height: 36px;
-          border-bottom: 1px solid $panel-border;
-
-          .tab-buttons {
+          /* Left side containing pair info and stats */
+          .header-left {
             display: flex;
-            height: 100%;
+            align-items: center;
+            flex: 1;
+            overflow-x: auto;
+            white-space: nowrap;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
 
-            .tab-btn {
-              background-color: transparent;
-              border: none;
-              color: #8a8a8a;
+            /* Hide scrollbar for Chrome, Safari and Opera */
+            &::-webkit-scrollbar {
+              display: none;
+            }
+
+            /* Pair name/price/change */
+            .pair-name {
+              font-size: 16px;
+              font-weight: 600;
+              margin-right: 12px;
+              white-space: nowrap;
+            }
+
+            .pair-price {
+              font-family: "Orbitron", monospace;
+              font-size: 15px;
+              margin-right: 8px;
+              white-space: nowrap;
+            }
+
+            .pair-change {
               font-size: 14px;
-              padding: 0 16px;
-              height: 100%;
-              cursor: pointer;
-              position: relative;
+              font-weight: 600;
+              padding: 2px 6px;
+              border-radius: 3px;
+              margin-right: 24px; /* Extra space before stats */
+              white-space: nowrap;
 
-              &.active {
-                color: $accent-color;
+              &.positive {
+                color: $positive-color;
+              }
 
-                &::after {
-                  content: "";
-                  position: absolute;
-                  bottom: 0;
-                  left: 0;
-                  width: 100%;
-                  height: 2px;
-                  background-color: $accent-color;
+              &.negative {
+                color: $negative-color;
+              }
+            }
+
+            /* Stats on the same line */
+            .header-stats {
+              display: flex;
+              flex: 1;
+              align-items: center;
+              gap: 20px; /* Space between stat items */
+
+              .stat-item {
+                display: flex;
+                align-items: center;
+                white-space: nowrap;
+
+                .stat-label {
+                  font-size: 12px;
+                  color: rgba(255, 255, 255, 0.6);
+                  margin-right: 6px;
+                }
+
+                .stat-value {
+                  font-family: "Orbitron", monospace;
+                  font-size: 14px;
+                  color: rgba(255, 255, 255, 0.9);
                 }
               }
+            }
+          }
 
-              &:hover:not(.active) {
-                color: #ffffff;
-              }
+          /* Right side with chart type */
+          .header-right {
+            margin-left: 12px;
+            flex-shrink: 0;
+
+            .chart-label {
+              font-size: 14px;
+              color: $accent-color;
+              padding: 4px 10px;
+              border-radius: 4px;
+              background-color: rgba(0, 255, 255, 0.1);
+              border: 1px solid rgba(0, 255, 255, 0.3);
+              white-space: nowrap;
             }
           }
         }
 
-        .panel-content {
-          flex: 1;
-          overflow: auto;
-          background-color: $panel-bg;
+        /* Mobile stats row - hidden on desktop, shown on mobile */
+        .mobile-stats-row {
+          display: none; /* Hidden by default, shown in media query */
+          flex-wrap: wrap;
+          padding: 8px 16px;
+          background-color: rgba(0, 0, 0, 0.2);
+          border-bottom: 1px solid $panel-border;
 
-          &::-webkit-scrollbar {
-            width: 6px;
-          }
+          .stat-item {
+            display: flex;
+            align-items: center;
+            width: 50%;
+            margin-bottom: 8px;
 
-          &::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-          }
+            .stat-label {
+              font-size: 12px;
+              color: rgba(255, 255, 255, 0.6);
+              margin-right: 6px;
+            }
 
-          &::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-          }
-
-          &::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
+            .stat-value {
+              font-family: "Orbitron", monospace;
+              font-size: 14px;
+              color: rgba(255, 255, 255, 0.9);
+            }
           }
         }
+
+        .chart-container {
+          flex: 1;
+          background-color: $panel-bg;
+          position: relative;
+          overflow: hidden;
+        }
       }
-    }
 
-    // Sidebar - right 25%
-    .dex-sidebar {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-
-      .sidebar-panel {
+      /* Pair selector */
+      .pair-selector-panel {
         flex: 1;
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        border-bottom: 1px solid $panel-border;
-
-        &:last-child {
-          border-bottom: none;
-        }
 
         .panel-header {
           display: flex;
@@ -223,8 +199,9 @@
           align-items: center;
           padding: 0 16px;
           background-color: $panel-header;
-          height: 40px;
+          height: 50px; /* Match height with pair-header */
           border-bottom: 1px solid $panel-border;
+          flex-shrink: 0;
 
           .panel-title {
             font-size: 15px;
@@ -284,9 +261,174 @@
             }
           }
 
-          .pair-list {
-            flex: 1;
+          &::-webkit-scrollbar {
+            width: 6px;
           }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+          }
+        }
+      }
+    }
+
+    /* Bottom section with order form, order manager, and recent trades */
+    .bottom-section {
+      display: flex;
+      height: 35vh; /* 35% of viewport height */
+      max-height: 350px; /* Maximum height */
+      min-height: 250px; /* Minimum height */
+
+      /* Order form panel */
+      .order-form-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-right: 1px solid $panel-border;
+
+        .panel-header {
+          background-color: $panel-header;
+          padding: 0;
+          height: 36px;
+          border-bottom: 1px solid $panel-border;
+          flex-shrink: 0;
+
+          .tab-buttons {
+            display: flex;
+            height: 100%;
+
+            .tab-btn {
+              background-color: transparent;
+              border: none;
+              color: #8a8a8a;
+              font-size: 14px;
+              padding: 0 16px;
+              height: 100%;
+              cursor: pointer;
+              position: relative;
+
+              &.active {
+                color: $accent-color;
+
+                &::after {
+                  content: "";
+                  position: absolute;
+                  bottom: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 2px;
+                  background-color: $accent-color;
+                }
+              }
+
+              &:hover:not(.active) {
+                color: #ffffff;
+              }
+            }
+          }
+        }
+
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: $panel-bg;
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+          }
+        }
+      }
+
+      /* Order manager panel */
+      .orders-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-right: 1px solid $panel-border;
+
+        .panel-header {
+          background-color: $panel-header;
+          padding: 0;
+          height: 36px;
+          border-bottom: 1px solid $panel-border;
+          flex-shrink: 0;
+        }
+
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: $panel-bg;
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+          }
+        }
+      }
+
+      /* Recent trades panel */
+      .recent-trades-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+
+        .panel-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0 16px;
+          background-color: $panel-header;
+          height: 36px;
+          border-bottom: 1px solid $panel-border;
+          flex-shrink: 0;
+
+          .panel-title {
+            font-size: 15px;
+            font-weight: 500;
+          }
+        }
+
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: $panel-bg;
 
           &::-webkit-scrollbar {
             width: 6px;
@@ -322,59 +464,103 @@
     font-size: 14px;
     max-width: 80%;
   }
+}
 
-  /* Wallet connection indicator */
-  .wallet-status {
-    position: absolute;
-    top: 8px;
-    right: 16px;
-    z-index: 10;
+/* Custom styling for the PairSelector component */
+.pair-selector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 
-    .wallet-connected {
-      display: flex;
-      align-items: center;
+  .search-box {
+    padding: 10px;
+    border-bottom: 1px solid #1a1a2a;
 
-      .wallet-address {
-        background-color: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
-        padding: 4px 8px;
-        font-size: 13px;
-        margin-right: 8px;
+    .search-input {
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(0, 255, 255, 0.1);
+      color: #ffffff;
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 4px;
+
+      &:focus {
+        outline: none;
+        border-color: rgba(0, 255, 255, 0.5);
       }
 
-      .disconnect-btn {
-        background: rgba(255, 59, 48, 0.1);
-        color: #ff3b30;
-        border: 1px solid rgba(255, 59, 48, 0.3);
-        border-radius: 4px;
-        padding: 4px 8px;
-        font-size: 12px;
-        cursor: pointer;
+      &::placeholder {
+        color: #8a8a8a;
+      }
+    }
+  }
 
-        &:hover {
-          background: rgba(255, 59, 48, 0.2);
+  .pair-list {
+    flex: 1;
+    overflow: auto;
+
+    /* Header styling */
+    .pair-header {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.6);
+      background-color: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid rgba(26, 26, 42, 0.6);
+
+      /* Match the layout of pair items */
+      .header-pair {
+        width: 40%;
+        text-align: left;
+      }
+
+      .header-data {
+        width: 60%;
+        display: flex;
+        justify-content: flex-end;
+
+        .header-price {
+          width: 90px;
+          text-align: right;
+          margin-right: 16px;
+        }
+
+        .header-change {
+          width: 70px;
+          text-align: right;
         }
       }
     }
 
-    .connect-btn {
-      background: rgba(0, 255, 255, 0.1);
-      color: #00ffff;
-      border: 1px solid rgba(0, 255, 255, 0.3);
-      border-radius: 4px;
-      padding: 4px 8px;
-      font-size: 13px;
-      cursor: pointer;
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
 
-      &:hover {
-        background: rgba(0, 255, 255, 0.2);
-      }
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .no-pairs-found {
+      padding: 20px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+      font-style: italic;
     }
   }
 }
 
-/* Custom styling for the PairSelector component */
 .pair-item {
   display: flex;
   align-items: center;
@@ -394,11 +580,20 @@
   .pair-token {
     display: flex;
     align-items: center;
+    width: 40%;
 
     img {
       width: 20px;
       height: 20px;
       border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .token-placeholder {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.1);
       margin-right: 8px;
     }
 
@@ -410,6 +605,9 @@
 
   .pair-data {
     display: flex;
+    align-items: center;
+    width: 60%;
+    justify-content: flex-end;
 
     .price {
       font-family: "Orbitron", monospace;
@@ -473,57 +671,83 @@
   }
 }
 
-/* Responsive adjustments */
+/* Responsive adjustments - UPDATED */
 @media (max-width: 1200px) {
   .dex-container .dex-content {
-    .dex-main {
-      flex: 2;
-    }
-    .dex-sidebar {
-      flex: 1;
-    }
-  }
-}
+    .top-section {
+      .dex-main-chart {
+        flex: 2;
 
-@media (max-width: 992px) {
-  .dex-container {
-    height: auto;
-    overflow: auto;
+        /* Adjust spacing in header for smaller screens */
+        .pair-header {
+          .header-left {
+            .pair-change {
+              margin-right: 16px; /* Less margin before stats */
+            }
 
-    .dex-content {
-      flex-direction: column;
-
-      .dex-main,
-      .dex-sidebar {
-        flex: none;
-        width: 100%;
-        height: auto;
-      }
-
-      .dex-main {
-        .chart-container {
-          height: 400px;
-        }
-
-        .bottom-panels {
-          flex-direction: column;
-          height: auto;
-
-          .order-form-panel,
-          .orders-panel {
-            height: 350px;
-
-            &:first-child {
-              border-right: none;
-              border-bottom: 1px solid #1a1a2a;
+            .header-stats {
+              gap: 12px; /* Less space between stats */
             }
           }
         }
       }
+    }
+  }
+}
 
-      .dex-sidebar {
-        .sidebar-panel {
+/* Mobile layout - show stats under the pair info */
+@media (max-width: 992px) {
+  .dex-container {
+    height: auto;
+
+    .dex-content {
+      .top-section {
+        flex-direction: column;
+        height: auto;
+
+        .dex-main-chart {
+          flex: none;
+          height: 350px;
+          border-right: none;
+          border-bottom: 1px solid #1a1a2a;
+
+          .pair-header {
+            height: auto; /* Auto height to accommodate wrapped content */
+
+            .header-left {
+              .header-stats {
+                display: none; /* Hide stats in header on mobile */
+              }
+            }
+          }
+
+          /* Show mobile stats row on smaller screens */
+          .mobile-stats-row {
+            display: flex;
+          }
+        }
+
+        .pair-selector-panel {
+          flex: none;
           height: 300px;
+        }
+      }
+
+      .bottom-section {
+        flex-direction: column;
+        height: auto;
+
+        .order-form-panel,
+        .orders-panel,
+        .recent-trades-panel {
+          flex: none;
+          height: 250px;
+          border-right: none;
+          border-bottom: 1px solid #1a1a2a;
+
+          &:last-child {
+            border-bottom: none;
+          }
         }
       }
     }
@@ -532,15 +756,68 @@
 
 @media (max-width: 768px) {
   .dex-container {
-    overflow: auto; /* Allow scrolling on smaller screens */
+    .dex-content {
+      .top-section {
+        .dex-main-chart {
+          height: 280px;
 
-    .wallet-status {
-      position: relative;
-      top: auto;
-      right: auto;
-      padding: 8px 16px;
-      display: flex;
-      justify-content: center;
+          .pair-header {
+            .header-left {
+              flex-wrap: wrap;
+
+              .pair-name {
+                margin-right: 8px;
+                font-size: 15px;
+              }
+
+              .pair-price {
+                font-size: 14px;
+              }
+
+              .pair-change {
+                font-size: 13px;
+              }
+            }
+          }
+
+          /* Smaller text on very small screens */
+          .mobile-stats-row {
+            .stat-item {
+              .stat-label {
+                font-size: 11px;
+              }
+
+              .stat-value {
+                font-size: 13px;
+              }
+            }
+          }
+        }
+
+        .pair-selector-panel {
+          height: 250px;
+        }
+      }
+
+      .bottom-section {
+        .order-form-panel,
+        .orders-panel,
+        .recent-trades-panel {
+          height: 220px;
+        }
+      }
     }
+  }
+}
+
+/* Additional style for the Chart component to ensure it fills the container properly */
+.chart-component {
+  width: 100%;
+  height: 100%;
+
+  /* Fix for TradingView charts */
+  > div {
+    width: 100% !important;
+    height: 100% !important;
   }
 }

@@ -1,13 +1,13 @@
 // src/services/cetusService.ts
-// Last Updated: 2025-05-21 02:43:17 UTC by jake1318
+// Last Updated: 2025-06-23 03:43:22 UTC by jake1318
 
+import { CetusClmmSDK } from "@cetusprotocol/sui-clmm-sdk";
 import {
-  initCetusSDK,
-  ClmmPoolUtil,
   TickMath,
+  ClmmPoolUtil,
   Percentage,
   adjustForCoinSlippage,
-} from "@cetusprotocol/cetus-sui-clmm-sdk";
+} from "@cetusprotocol/common-sdk";
 import type { WalletContextState } from "@suiet/wallet-kit";
 import type { PoolInfo } from "./coinGeckoService";
 import BN from "bn.js";
@@ -17,11 +17,11 @@ import { TransactionBlock } from "@mysten/sui.js/transactions";
  * Creates a fresh SDK instance bound to a signer address.
  */
 function getSdkWithWallet(address: string) {
-  const sdk = initCetusSDK({
-    network: "mainnet",
-    wallet: address,
+  const sdk = CetusClmmSDK.createSDK({
+    env: "mainnet",
+    senderAddress: address,
   });
-  sdk.senderAddress = address;
+  sdk.setSenderAddress(address);
   return sdk;
 }
 
@@ -1748,7 +1748,7 @@ export async function collectFees(
 
 /**
  * Collect rewards from a position.
- * Last Updated: 2025-05-21 02:56:09 UTC by jake1318
+ * Last Updated: 2025-06-23 02:44:07 UTC by jake1318
  */
 export async function collectRewards(
   wallet: WalletContextState,
@@ -1858,12 +1858,12 @@ export async function collectRewards(
 
 /**
  * Fetch all positions owned by an address.
- * Last Updated: 2025-05-21 02:56:09 UTC by jake1318
+ * Last Updated: 2025-06-23 02:44:07 UTC by jake1318
  */
 export async function getPositions(
   ownerAddress: string
 ): Promise<Array<{ id: string; poolAddress: string; liquidity: number }>> {
-  const sdk = initCetusSDK({ network: "mainnet" });
+  const sdk = CetusClmmSDK.createSDK({ env: "mainnet" });
   try {
     const raw = await sdk.Position.getPositionList(ownerAddress);
     console.log("Raw positions data:", raw);
@@ -1913,7 +1913,7 @@ export async function getPositions(
 
 /**
  * Fetch pool metadata for a set of pool addresses.
- * Last Updated: 2025-05-21 02:56:09 UTC by jake1318
+ * Last Updated: 2025-06-23 02:44:07 UTC by jake1318
  */
 export async function getPoolsDetailsForPositions(
   addresses: string[]

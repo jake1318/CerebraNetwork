@@ -1,8 +1,7 @@
 // src/pages/Dex/components/PairSelector.tsx
-// Last Updated: 2025-06-25 06:18:30 UTC by jake1318
+// Last Updated: 2025-06-26 03:47:51 UTC by jake1318
 
-import React, { useState, useEffect } from "react";
-import "./PairSelector.scss";
+import React, { useState } from "react";
 
 interface TradingPair {
   id: string;
@@ -11,7 +10,7 @@ interface TradingPair {
   quoteAsset: string;
   price: number;
   change24h: number;
-  volume24h: number;
+  volume24h: number; // Still in data model but won't display
   high24h: number;
   low24h: number;
   baseAddress: string;
@@ -30,102 +29,37 @@ const PairSelector: React.FC<PairSelectorProps> = ({
   selectedPair,
   onSelectPair,
 }) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortMethod, setSortMethod] = useState<"name" | "volume" | "change">(
-    "volume"
-  );
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredPairs = pairs
-    .filter(
-      (pair) =>
-        pair.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pair.baseAsset.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      let comparison = 0;
-
-      if (sortMethod === "name") {
-        comparison = a.baseAsset.localeCompare(b.baseAsset);
-      } else if (sortMethod === "volume") {
-        comparison = a.volume24h - b.volume24h;
-      } else if (sortMethod === "change") {
-        comparison = a.change24h - b.change24h;
-      }
-
-      return sortDirection === "asc" ? comparison : -comparison;
-    });
-
-  const formatVolume = (volume: number) => {
-    if (!volume || volume === 0) return "$0";
-
-    if (volume >= 1000000) {
-      return `$${(volume / 1000000).toFixed(2)}M`;
-    }
-
-    if (volume >= 1000) {
-      return `$${(volume / 1000).toFixed(2)}K`;
-    }
-
-    return `$${volume.toFixed(2)}`;
-  };
-
-  const toggleSort = (method: "name" | "volume" | "change") => {
-    if (sortMethod === method) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortMethod(method);
-      setSortDirection("desc");
-    }
-  };
+  const filteredPairs = pairs.filter((pair) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      pair.baseAsset.toLowerCase().includes(searchLower) ||
+      pair.name.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
-    <div className="pair-selector-container">
-      <div className="pair-search">
+    <div className="pair-selector">
+      <div className="search-box">
         <input
           type="text"
+          className="search-input"
           placeholder="Search pairs..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
-
-      <div className="pair-list-header">
-        <div
-          className={`column name ${sortMethod === "name" ? "sorted" : ""} ${
-            sortMethod === "name" ? sortDirection : ""
-          }`}
-          onClick={() => toggleSort("name")}
-        >
-          Pair
-        </div>
-        <div
-          className={`column price ${sortMethod === "price" ? "sorted" : ""} ${
-            sortMethod === "price" ? sortDirection : ""
-          }`}
-          onClick={() => toggleSort("price")}
-        >
-          Price
-        </div>
-        <div
-          className={`column change ${
-            sortMethod === "change" ? "sorted" : ""
-          } ${sortMethod === "change" ? sortDirection : ""}`}
-          onClick={() => toggleSort("change")}
-        >
-          24h
-        </div>
-        <div
-          className={`column volume ${
-            sortMethod === "volume" ? "sorted" : ""
-          } ${sortMethod === "volume" ? sortDirection : ""}`}
-          onClick={() => toggleSort("volume")}
-        >
-          Volume
-        </div>
-      </div>
-
       <div className="pair-list">
+        {/* Column headers with updated layout */}
+        <div className="pair-header">
+          <div className="header-pair">Pair</div>
+          <div className="header-data">
+            <div className="header-price">Price</div>
+            <div className="header-change">24h</div>
+          </div>
+        </div>
+
         {filteredPairs.map((pair) => (
           <div
             key={pair.id}
@@ -134,33 +68,37 @@ const PairSelector: React.FC<PairSelectorProps> = ({
             }`}
             onClick={() => onSelectPair(pair)}
           >
-            <div className="pair-name">
-              {pair.logo && (
-                <img
-                  src={pair.logo}
-                  alt={pair.baseAsset}
-                  className="pair-logo"
-                />
+            <div className="pair-token">
+              {pair.logo ? (
+                <img src={pair.logo} alt={pair.baseAsset} />
+              ) : (
+                <div className="token-placeholder" />
               )}
-              <span>{pair.baseAsset}</span>
+              <span className="token-name">{pair.baseAsset}</span>
             </div>
-            <div className="pair-price">
-              ${pair.price.toFixed(pair.price < 1 ? 6 : 4)}
+            <div className="pair-data">
+              <span className="price">
+                $
+                {pair.price < 0.01
+                  ? pair.price.toFixed(6)
+                  : pair.price.toFixed(4)}
+              </span>
+              <span
+                className={`change ${
+                  pair.change24h >= 0 ? "positive" : "negative"
+                }`}
+              >
+                {pair.change24h >= 0 ? "+" : ""}
+                {pair.change24h.toFixed(2)}%
+              </span>
             </div>
-            <div
-              className={`pair-change ${
-                pair.change24h >= 0 ? "positive" : "negative"
-              }`}
-            >
-              {pair.change24h >= 0 ? "+" : ""}
-              {pair.change24h.toFixed(2)}%
-            </div>
-            <div className="pair-volume">{formatVolume(pair.volume24h)}</div>
           </div>
         ))}
 
         {filteredPairs.length === 0 && (
-          <div className="no-pairs">No pairs match your search</div>
+          <div className="no-pairs-found">
+            No pairs matching "{searchQuery}"
+          </div>
         )}
       </div>
     </div>

@@ -1,15 +1,20 @@
 // src/services/cetusVaultService.ts
-// Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+// Last Updated: 2025-06-23 03:43:22 UTC by jake1318
 
 import { CetusVaultsSDK } from "@cetusprotocol/vaults-sdk";
-import { initCetusSDK } from "@cetusprotocol/cetus-sui-clmm-sdk";
+import { CetusClmmSDK } from "@cetusprotocol/sui-clmm-sdk";
+import {
+  TickMath,
+  ClmmPoolUtil,
+  Percentage,
+  adjustForCoinSlippage,
+} from "@cetusprotocol/common-sdk";
 import type { WalletContextState } from "@suiet/wallet-kit";
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import BN from "bn.js";
 import { searchPools } from "./coinGeckoService";
 import { getMultipleTokenMetadata, TokenMetadata } from "./birdeyeService";
 import blockvisionService from "./blockvisionService";
-
 // Common vault IDs for our supported vaults
 export const VAULT_IDS = {
   HASUI_SUI:
@@ -144,14 +149,14 @@ function getBaseSdk() {
 function getClmmSdk() {
   try {
     // Try using the new API style
-    return initCetusSDK({ env: "mainnet" });
+    return CetusClmmSDK.createSDK({ env: "mainnet" });
   } catch (e) {
     console.warn(
       "Error creating CLMM SDK with new API, falling back to v1.0 style:",
       e
     );
     // Fallback to v1.0 API style
-    return initCetusSDK("mainnet");
+    return CetusClmmSDK.createSDK({ env: "mainnet" });
   }
 }
 
@@ -743,7 +748,7 @@ function getTokenSymbol(coinType: string | undefined): string {
 
 /**
  * Fetch on-chain vault metadata.
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function getVaultInfo(vaultId: string) {
   const sdk = getBaseSdk();
@@ -773,7 +778,7 @@ export async function getVaultInfo(vaultId: string) {
 
 /**
  * Get detailed info about a vault including its pool, tick range, and TVL.
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function getDetailedVaultInfo(vaultId: string) {
   // Check the cache first
@@ -990,7 +995,7 @@ export async function getDetailedVaultInfo(vaultId: string) {
 
 /**
  * Get all vault LP-token balances for a user, plus their underlying-asset share.
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function getOwnerVaultsBalances(ownerAddress: string) {
   const sdk = getBaseSdk();
@@ -1131,7 +1136,7 @@ export async function getOwnerVaultsBalances(ownerAddress: string) {
 /**
  * Calculate deposit amounts and expected LP tokens for a vault deposit.
  * Version-compatible implementation with SDK v1.1.4
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function calculateVaultDeposit(
   vaultId: string,
@@ -1186,7 +1191,7 @@ export async function calculateVaultDeposit(
 /**
  * Calculate withdrawal amounts for burning LP tokens from a vault.
  * Version-compatible implementation with SDK v1.1.4
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function calculateVaultWithdrawal(
   vaultId: string,
@@ -1241,7 +1246,7 @@ export async function calculateVaultWithdrawal(
 /**
  * Deposit amountA + amountB into a vault, receive vault LP tokens back.
  * Version-compatible implementation with SDK v1.1.4
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function depositToVault(
   wallet: WalletContextState,
@@ -1365,7 +1370,7 @@ export async function depositToVault(
 /**
  * Deposit one asset into a vault, automatically converting to the proper ratio.
  * Version-compatible implementation with SDK v1.1.4
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function depositOneSidedToVault(
   wallet: WalletContextState,
@@ -1523,7 +1528,7 @@ export async function depositOneSidedToVault(
 /**
  * Withdraw by burning vault LP tokens, get underlying assets back.
  * Version-compatible implementation with SDK v1.1.4
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function withdrawFromVault(
   wallet: WalletContextState,
@@ -1638,7 +1643,7 @@ export async function withdrawFromVault(
 /**
  * Withdraw all LP tokens from a vault.
  * Version-compatible implementation with SDK v1.1.4
- * Last Updated: 2025-06-22 23:36:30 UTC by jake1318
+ * Last Updated: 2025-06-23 02:46:40 UTC by jake1318
  */
 export async function withdrawAllFromVault(
   wallet: WalletContextState,
@@ -1688,7 +1693,7 @@ export async function withdrawAllFromVault(
 
 /**
  * Get list of all available vaults.
- * Last Updated: 2025-06-22 23:43:51 UTC by jake1318
+ * Last Updated: 2025-06-23 02:53:45 UTC by jake1318
  */
 export async function getAllAvailableVaults() {
   const sdk = getBaseSdk();
@@ -1761,7 +1766,7 @@ export async function getAllAvailableVaults() {
 /**
  * Clear the cache to force fresh data retrieval.
  * Useful if data becomes stale.
- * Last Updated: 2025-06-22 23:43:51 UTC by jake1318
+ * Last Updated: 2025-06-23 02:53:45 UTC by jake1318
  */
 export function clearCache() {
   vaultCache.clear();
