@@ -1,5 +1,6 @@
 // src/pages/Dex/Dex.tsx
-// Last Updated: 2025-06-24 19:21:30 UTC by jake1318
+// Last Updated: 2025-06-25 19:07:38 UTC
+// Updated by: jake1318
 
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -8,7 +9,7 @@ import Chart from "./components/Chart";
 import OrderForm from "./components/OrderForm";
 import TradingHistory from "./components/TradingHistory";
 import PairSelector from "./components/PairSelector";
-import LimitOrderManager from "./components/LimitOrderManager";
+import MyOrders from "./components/MyOrders";
 
 import {
   blockvisionService,
@@ -73,7 +74,7 @@ interface TokenMarketData {
 }
 
 const Dex: React.FC = () => {
-  const { connected } = useWallet();
+  const { connected, account } = useWallet();
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [selectedPair, setSelectedPair] = useState<TradingPair | null>(null);
   const [orderType, setOrderType] = useState<"buy" | "sell">("buy");
@@ -81,6 +82,8 @@ const Dex: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [showPairSelector, setShowPairSelector] = useState(false);
+  const [showDepthChart, setShowDepthChart] = useState(false);
 
   // State for market data from BlockVision API
   const [marketData, setMarketData] = useState<CoinMarketData | null>(null);
@@ -89,6 +92,9 @@ const Dex: React.FC = () => {
 
   // For tracking progress during data fetch
   const [loadingProgress, setLoadingProgress] = useState(0);
+
+  // State to trigger refreshing orders
+  const [ordersRefreshTrigger, setOrdersRefreshTrigger] = useState(0);
 
   // Sleep utility for rate limiting
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -329,7 +335,6 @@ const Dex: React.FC = () => {
             price: parseFloat(data.priceInUsd),
             change24h: parseFloat(data.market.hour24.priceChange),
             volume24h: data.volume24H,
-            // You might want to update high24h and low24h from OHLCV data
           };
         });
       }
@@ -419,7 +424,13 @@ const Dex: React.FC = () => {
     );
   };
 
-  // 👉 useEffect calls must not return a Promise! 👈
+  // Handle order placement success - refresh orders
+  const handleOrderSuccess = () => {
+    // Trigger a refresh of orders by incrementing the counter
+    setOrdersRefreshTrigger((prev) => prev + 1);
+  };
+
+  // useEffect calls must not return a Promise!
   useEffect(() => {
     loadPairs();
   }, []);
@@ -441,6 +452,7 @@ const Dex: React.FC = () => {
 
   const handleSelectPair = (pair: TradingPair) => {
     setSelectedPair(pair);
+    setShowPairSelector(false);
   };
 
   // Use market data when available, fall back to selectedPair
@@ -478,78 +490,30 @@ const Dex: React.FC = () => {
     return `$${volume.toFixed(2)}`;
   };
 
-  // Format large numbers for display
-  const formatLargeNumber = (value: string | number): string => {
-    const num = typeof value === "string" ? parseFloat(value) : value;
-
-    if (isNaN(num)) return "N/A";
-
-    if (num >= 1_000_000_000) {
-      return `${(num / 1_000_000_000).toFixed(2)}B`;
-    } else if (num >= 1_000_000) {
-      return `${(num / 1_000_000).toFixed(2)}M`;
-    } else if (num >= 1_000) {
-      return `${(num / 1_000).toFixed(2)}K`;
-    } else {
-      return num.toFixed(2);
-    }
+  // Short wallet address formatter
+  const shortenAddress = (address: string | undefined) => {
+    if (!address) return "";
+    return address.length > 10
+      ? `${address.substring(0, 5)}...${address.substring(address.length - 4)}`
+      : address;
   };
 
   return (
-    <div className="dex-page">
-      <div className="glow-1" />
-      <div className="glow-2" />
-      <div className="vertical-scan" />
-
-      <div className="dex-page__container">
-        {/* Header */}
-        <div className="dex-page__header">
-          <h1>DEX Trading</h1>
-          <div className="header-actions">
-            {isLoading && (
-              <span className="loading-indicator">
-                {loadingProgress > 0
-                  ? `Loading... ${loadingProgress}%`
-                  : "Updating…"}
-              </span>
-            )}
-            <button onClick={loadPairs} disabled={isLoading}>
-              ↻ Refresh
-            </button>
-          </div>
-        </div>
-
-        {error && <div className="dex-error">{error}</div>}
-
-        {selectedPair && (
-          <div className="dex-page__grid">
-            {/* Top Stats Bar */}
-            <div className="top-stats">
-              <div className="stats-grid">
-                <div className="ticker-cell">
-                  <span className="ticker-text">{selectedPair.baseAsset}</span>
-                  {stats.logo && (
-                    <img
-                      src={stats.logo}
-                      alt={`${selectedPair.baseAsset} logo`}
-                      className="token-logo"
-                    />
-                  )}
-                </div>
-                <div>
-                  <span className="cell label">PRICE</span>
-                  <span
-                    className={`cell value ${
-                      stats.change24h >= 0 ? "positive" : "negative"
-                    }`}
-                  >
+    <div className="dex-container">
+      <div className="dex-content">
+        <div className="dex-main">
+          <div className="pair-header">
+            {selectedPair && (
+              <>
+                <div className="pair-info">
+                  <span className="pair-name">
+                    {selectedPair.baseAsset}/USDC
+                  </span>
+                  <span className="pair-price">
                     ${stats.price.toFixed(stats.price < 1 ? 6 : 4)}
                   </span>
-                </div>
-                <div>
-                  <span className="cell label">24H CHANGE</span>
                   <span
-                    className={`cell value ${
+                    className={`pair-change ${
                       stats.change24h >= 0 ? "positive" : "negative"
                     }`}
                   >
@@ -557,58 +521,135 @@ const Dex: React.FC = () => {
                     {stats.change24h.toFixed(2)}%
                   </span>
                 </div>
-                <div>
-                  <span className="cell label">24H VOLUME</span>
-                  <span className="cell value">
-                    {formatVolume(stats.volume24h)}
-                  </span>
+                <div className="chart-toggle">
+                  <button
+                    className={!showDepthChart ? "active" : ""}
+                    onClick={() => setShowDepthChart(false)}
+                  >
+                    Price Chart
+                  </button>
+                  <button
+                    className={showDepthChart ? "active" : ""}
+                    onClick={() => setShowDepthChart(true)}
+                  >
+                    Depth
+                  </button>
                 </div>
-                <div>
-                  <span className="cell label">MARKET CAP</span>
-                  <span className="cell value">
-                    ${formatLargeNumber(marketData?.marketCap || "0")}
-                  </span>
+              </>
+            )}
+          </div>
+
+          <div className="chart-container">
+            {selectedPair && <Chart pair={selectedPair} enhancedData={stats} />}
+          </div>
+
+          <div className="bottom-panels">
+            <div className="order-form-panel">
+              <div className="panel-header">
+                <div className="tab-buttons">
+                  <button
+                    className={`tab-btn ${
+                      orderMode === "limit" ? "active" : ""
+                    }`}
+                    onClick={() => setOrderMode("limit")}
+                  >
+                    Limit
+                  </button>
+                  <button
+                    className={`tab-btn ${
+                      orderMode === "market" ? "active" : ""
+                    }`}
+                    onClick={() => setOrderMode("market")}
+                  >
+                    Market
+                  </button>
                 </div>
+              </div>
+              <div className="panel-content">
+                {selectedPair && (
+                  <OrderForm
+                    pair={selectedPair}
+                    orderType={orderType}
+                    setOrderType={setOrderType}
+                    orderMode={orderMode}
+                    setOrderMode={setOrderMode}
+                    onOrderSuccess={handleOrderSuccess}
+                  />
+                )}
               </div>
             </div>
 
-            {/* Trading History - First column, spanning 2 rows */}
-            <div className="trading-history-container">
-              <TradingHistory pair={selectedPair} />
+            <div className="orders-panel">
+              <div className="panel-content">
+                <MyOrders
+                  onOrderCancel={() =>
+                    setOrdersRefreshTrigger((prev) => prev + 1)
+                  }
+                  onOrderClaim={() =>
+                    setOrdersRefreshTrigger((prev) => prev + 1)
+                  }
+                  key={`orders-${ordersRefreshTrigger}`}
+                />
+              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Chart - Second and third columns, first row */}
-            <div className="chart-panel">
-              <Chart pair={selectedPair} />
+        <div className="dex-sidebar">
+          <div className="sidebar-panel">
+            <div className="panel-header">
+              <div className="panel-title">Select Pair</div>
+              <button
+                className="refresh-btn"
+                onClick={loadPairs}
+                disabled={isLoading}
+              >
+                {isLoading ? `${loadingProgress}%` : "↻"}
+              </button>
             </div>
-
-            {/* Pair Selector - Fourth column, first row */}
-            <div className="pair-selector-container">
+            <div className="panel-content">
               <PairSelector
                 pairs={tradingPairs}
                 selectedPair={selectedPair}
                 onSelectPair={handleSelectPair}
               />
             </div>
+          </div>
 
-            {/* Order Form - Second and third columns, second row */}
-            <div className="order-form-container">
-              <OrderForm
-                pair={selectedPair}
-                orderType={orderType}
-                setOrderType={setOrderType}
-                orderMode={orderMode}
-                setOrderMode={setOrderMode}
-              />
+          <div className="sidebar-panel">
+            <div className="panel-header">
+              <div className="panel-title">Recent Trades</div>
             </div>
-
-            {/* Limit Order Manager - Fourth column, second row */}
-            <div className="my-orders-container">
-              <LimitOrderManager
-                selectedPair={`${selectedPair.baseAddress}-${selectedPair.quoteAddress}`}
-              />
+            <div className="panel-content">
+              {selectedPair && <TradingHistory pair={selectedPair} />}
             </div>
           </div>
+        </div>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      {/* Wallet connection indicator */}
+      <div className="wallet-status">
+        {connected && account ? (
+          <div className="wallet-connected">
+            <div className="wallet-address">
+              {shortenAddress(account.address)}
+            </div>
+            <button
+              className="disconnect-btn"
+              onClick={() => window.suiWallet?.disconnect()}
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <button
+            className="connect-btn"
+            onClick={() => window.suiWallet?.requestPermissions()}
+          >
+            Connect Wallet
+          </button>
         )}
       </div>
     </div>

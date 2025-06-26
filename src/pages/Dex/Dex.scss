@@ -1,762 +1,546 @@
 /* src/pages/Dex/Dex.scss */
-/* Last Updated: 2025-06-25 03:06:57 UTC by jake1318 */
+/* Last Updated: 2025-06-25 23:55:05 UTC by jake1318 */
 
-.dex-page {
-  position: relative;
-  min-height: 100vh;
+/* DEX container - use the space already provided by main */
+.dex-container {
+  height: 100%; /* Fill the already-calculated parent height */
   width: 100%;
-  color: #f0f0f0;
-  padding: 0;
-  box-sizing: border-box;
-  background: #0e0e0f;
-  overflow-x: hidden;
+  overflow: hidden; /* or 'auto' if you want scrolling */
+  display: flex;
+  flex-direction: column;
+  background-color: #05050f;
+  color: #ffffff;
 
-  // Theme colors
-  $color-bg: #121212;
-  $color-panel: #1a1a1a;
-  $color-border: #333;
-  $color-text: #e0e0e0;
-  $color-text-muted: #888;
-  $color-accent: #3b82f6;
-  $color-buy: #4caf50;
-  $color-sell: #f44336;
+  // Variables
+  $accent-color: #00ffff;
+  $accent-gradient: linear-gradient(45deg, #00ffff, #0088ff);
+  $positive-color: #4caf50;
+  $negative-color: #ff3b30;
+  $panel-bg: #030308;
+  $panel-header: #050510;
+  $panel-border: #1a1a2a;
 
-  // Breakpoints
-  $break-desktop: 1200px;
-  $break-tablet: 992px;
-  $break-mobile: 768px;
-  $break-small: 480px;
-
-  .glow-1,
-  .glow-2 {
-    position: absolute;
-    width: 300px;
-    height: 300px;
-    border-radius: 50%;
-    filter: blur(100px);
-    z-index: 0;
-    opacity: 0.15;
-    pointer-events: none;
-  }
-
-  .glow-1 {
-    background: #00c2ff;
-    top: 10%;
-    left: 5%;
-  }
-
-  .glow-2 {
-    background: #ff00c8;
-    bottom: 10%;
-    right: 5%;
-  }
-
-  .vertical-scan {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+  .dex-content {
+    display: flex;
     height: 100%;
-    background: linear-gradient(
-      to bottom,
-      transparent,
-      rgba(0, 194, 255, 0.03),
-      transparent
-    );
-    background-size: 100% 10px;
-    animation: scan 8s linear infinite;
-    z-index: 1;
-    pointer-events: none;
-  }
+    width: 100%;
+    box-sizing: border-box;
 
-  @keyframes scan {
-    0% {
-      transform: translateY(-100%);
-    }
-    100% {
-      transform: translateY(100%);
-    }
-  }
-
-  /* Top Bar / Header */
-  .top-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1.5rem;
-    background: #0a0a0a;
-    border-bottom: 1px solid #2a2a2a;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-
-    .pair-selector {
-      display: flex;
-      align-items: center;
-
-      .pair-name {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #fff;
-        margin-right: 0.5rem;
-        background: linear-gradient(90deg, #f0f0f0, #00c2ff);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-      }
-
-      .pair-dropdown-toggle {
-        background: rgba(0, 194, 255, 0.1);
-        color: #00c2ff;
-        border: 1px solid rgba(0, 194, 255, 0.3);
-        border-radius: 4px;
-        padding: 0.25rem 0.5rem;
-        cursor: pointer;
-        font-size: 0.9rem;
-
-        &:hover {
-          background: rgba(0, 194, 255, 0.2);
-        }
-      }
-    }
-
-    .wallet-info {
-      .wallet-connected {
-        display: flex;
-        align-items: center;
-
-        .wallet-address {
-          color: #e0e0e0;
-          margin-right: 0.5rem;
-          font-size: 0.9rem;
-        }
-      }
-
-      .connect-wallet-btn {
-        background: #3b82f6;
-        color: #fff;
-        padding: 0.4rem 0.8rem;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s;
-
-        &:hover {
-          background: #2563eb;
-        }
-      }
-    }
-
-    @media (max-width: $break-mobile) {
-      padding: 0.5rem 1rem;
-
-      .pair-selector .pair-name {
-        font-size: 1rem;
-      }
-    }
-  }
-
-  /* Main Trading Page Grid */
-  .trading-page {
-    display: grid;
-    grid-template-columns: 2fr 1fr; // 2:1 width ratio (chart area vs side panel)
-    grid-template-rows: minmax(380px, 3fr) minmax(220px, 2fr); // top row taller for chart
-    grid-gap: 1rem;
-    padding: 1rem;
-    height: calc(100vh - 60px); // Account for top bar height
-    max-width: 1800px;
-    margin: 0 auto;
-
-    @media (max-width: $break-desktop) {
-      grid-gap: 0.75rem;
-      padding: 0.75rem;
-    }
-
-    @media (max-width: $break-tablet) {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto auto auto auto;
-      height: auto;
-
-      .chart-panel {
-        grid-column: 1 / -1;
-        grid-row: 1 / 2;
-        min-height: 350px;
-      }
-      .orderbook-panel {
-        grid-column: 1 / -1;
-        grid-row: 2 / 3;
-        min-height: 300px;
-      }
-      .trade-panel {
-        grid-column: 1 / -1;
-        grid-row: 3 / 4;
-      }
-      .open-orders-panel {
-        grid-column: 1 / -1;
-        grid-row: 4 / 5;
-      }
-    }
-
-    @media (max-width: $break-mobile) {
-      padding: 0.5rem;
-      grid-gap: 0.5rem;
-    }
-  }
-
-  /* Chart Panel - Top Left */
-  .chart-panel {
-    grid-column: 1 / 2;
-    grid-row: 1 / 2;
-    background: $color-panel;
-    border: 1px solid $color-border;
-    border-radius: 4px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-
-    .chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid $color-border;
-      background: rgba(0, 0, 0, 0.2);
-
-      h2 {
-        margin: 0;
-        font-size: 1.1rem;
-        font-weight: 500;
-        color: $color-text;
-      }
-
-      .pair-stats {
-        font-size: 0.85rem;
-        color: $color-text-muted;
-      }
-
-      .chart-toggle {
-        display: flex;
-        margin-left: auto;
-
-        button {
-          background: rgba(59, 130, 246, 0.1);
-          color: $color-text-muted;
-          border: 1px solid rgba(59, 130, 246, 0.2);
-          padding: 0.25rem 0.5rem;
-          font-size: 0.8rem;
-          cursor: pointer;
-
-          &:first-child {
-            border-radius: 3px 0 0 3px;
-          }
-
-          &:last-child {
-            border-radius: 0 3px 3px 0;
-          }
-
-          &.active {
-            background: rgba(59, 130, 246, 0.3);
-            color: #3b82f6;
-          }
-        }
-      }
-    }
-
-    .chart-content {
-      flex: 1;
-      overflow: hidden;
-      background: $color-panel;
-      display: flex;
-
-      .trading-chart {
-        flex: 1;
-        width: 100%;
-      }
-    }
-
-    @media (max-width: $break-tablet) {
-      min-height: 350px;
-    }
-  }
-
-  /* Orderbook Panel - Top Right */
-  .orderbook-panel {
-    grid-column: 2 / 3;
-    grid-row: 1 / 2;
-    background: $color-panel;
-    border: 1px solid $color-border;
-    border-radius: 4px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-
-    .orderbook-header {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.75rem 1rem;
-      background: rgba(0, 0, 0, 0.2);
-      border-bottom: 1px solid $color-border;
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: $color-text;
-    }
-
-    .orderbook-content {
-      flex: 1;
-      overflow: hidden;
+    // Main area - left 75%
+    .dex-main {
+      flex: 3;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid $panel-border;
 
-      .orderbook-header-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        padding: 0.5rem 1rem;
-        background: rgba(0, 0, 0, 0.2);
-        font-size: 0.8rem;
-        color: $color-text-muted;
-        border-bottom: 1px solid $color-border;
+      .pair-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        background-color: $panel-header;
+        border-bottom: 1px solid $panel-border;
+        height: 40px;
+        box-sizing: border-box;
+
+        .pair-info {
+          display: flex;
+          align-items: center;
+
+          .pair-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-right: 12px;
+          }
+
+          .pair-price {
+            font-family: "Orbitron", monospace;
+            font-size: 15px;
+            margin-right: 8px;
+          }
+
+          .pair-change {
+            font-size: 14px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 3px;
+
+            &.positive {
+              color: $positive-color;
+            }
+
+            &.negative {
+              color: $negative-color;
+            }
+          }
+        }
+
+        .chart-toggle {
+          display: flex;
+
+          button {
+            background-color: transparent;
+            color: #8a8a8a;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            font-size: 12px;
+            padding: 4px 10px;
+            cursor: pointer;
+
+            &:first-child {
+              border-radius: 3px 0 0 3px;
+            }
+
+            &:last-child {
+              border-radius: 0 3px 3px 0;
+            }
+
+            &.active {
+              background-color: rgba(0, 255, 255, 0.1);
+              color: $accent-color;
+              border-color: rgba(0, 255, 255, 0.3);
+            }
+
+            &:hover:not(.active) {
+              background-color: rgba(255, 255, 255, 0.05);
+            }
+          }
+        }
       }
 
-      .orderbook-asks,
-      .orderbook-bids {
-        overflow-y: auto;
+      .chart-container {
         flex: 1;
-
-        &::-webkit-scrollbar {
-          width: 4px;
-        }
-        &::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.2);
-        }
-        &::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.2);
-          border-radius: 2px;
-        }
-        &::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.3);
-        }
-      }
-
-      .order-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        padding: 0.25rem 1rem;
-        font-size: 0.85rem;
-        font-family: "Roboto Mono", monospace;
+        background-color: $panel-bg;
+        min-height: 280px;
+        overflow: hidden;
         position: relative;
-
-        &:hover {
-          background: rgba(255, 255, 255, 0.05);
-        }
-
-        .bar {
-          position: absolute;
-          top: 0;
-          right: 0;
-          height: 100%;
-          z-index: 1;
-          opacity: 0.1;
-        }
-
-        &.bid {
-          .price {
-            color: $color-buy;
-          }
-
-          .bar {
-            background-color: $color-buy;
-          }
-        }
-
-        &.ask {
-          .price {
-            color: $color-sell;
-          }
-
-          .bar {
-            background-color: $color-sell;
-          }
-        }
-
-        > span {
-          position: relative;
-          z-index: 2;
-        }
       }
 
-      .orderbook-spread {
-        padding: 0.5rem 1rem;
-        text-align: center;
-        font-size: 0.85rem;
-        background: rgba(0, 0, 0, 0.2);
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      .bottom-panels {
+        display: flex;
+        height: 300px;
+        border-top: 1px solid $panel-border;
 
-        .spread-value {
-          font-weight: 500;
-          color: #3b82f6;
-        }
-      }
-    }
-  }
+        .order-form-panel,
+        .orders-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
 
-  /* Open Orders Panel - Bottom Left */
-  .open-orders-panel {
-    grid-column: 1 / 2;
-    grid-row: 2 / 3;
-    background: $color-panel;
-    border: 1px solid $color-border;
-    border-radius: 4px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-
-    .orders-tabs {
-      display: flex;
-      background: rgba(0, 0, 0, 0.2);
-      border-bottom: 1px solid $color-border;
-
-      button {
-        padding: 0.75rem 1rem;
-        background: transparent;
-        color: $color-text-muted;
-        border: none;
-        font-size: 0.9rem;
-        cursor: pointer;
-
-        &.active {
-          color: $color-text;
-          border-bottom: 2px solid $color-accent;
+          &:first-child {
+            border-right: 1px solid $panel-border;
+          }
         }
 
-        &:hover:not(.active) {
-          color: $color-text;
+        .panel-header {
+          background-color: $panel-header;
+          padding: 0;
+          height: 36px;
+          border-bottom: 1px solid $panel-border;
+
+          .tab-buttons {
+            display: flex;
+            height: 100%;
+
+            .tab-btn {
+              background-color: transparent;
+              border: none;
+              color: #8a8a8a;
+              font-size: 14px;
+              padding: 0 16px;
+              height: 100%;
+              cursor: pointer;
+              position: relative;
+
+              &.active {
+                color: $accent-color;
+
+                &::after {
+                  content: "";
+                  position: absolute;
+                  bottom: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 2px;
+                  background-color: $accent-color;
+                }
+              }
+
+              &:hover:not(.active) {
+                color: #ffffff;
+              }
+            }
+          }
         }
-      }
-    }
 
-    .orders-content {
-      flex: 1;
-      overflow: auto;
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: $panel-bg;
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.85rem;
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
 
-        th {
-          padding: 0.5rem;
-          text-align: left;
-          font-weight: 500;
-          color: $color-text-muted;
-          background: rgba(0, 0, 0, 0.2);
-          position: sticky;
-          top: 0;
-        }
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
 
-        td {
-          padding: 0.5rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
+          &::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+          }
 
-        .order-buy {
-          color: $color-buy;
-        }
-        .order-sell {
-          color: $color-sell;
-        }
-
-        .action-btn {
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          color: $color-text;
-          border-radius: 3px;
-          padding: 0.2rem 0.4rem;
-          cursor: pointer;
-          font-size: 0.8rem;
-
-          &:hover {
+          &::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.2);
           }
-
-          &.cancel {
-            color: $color-sell;
-            border-color: rgba(244, 67, 54, 0.3);
-
-            &:hover {
-              background: rgba(244, 67, 54, 0.1);
-            }
-          }
-        }
-      }
-
-      .no-orders {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        min-height: 150px;
-        color: $color-text-muted;
-        font-size: 0.9rem;
-      }
-
-      &::-webkit-scrollbar {
-        width: 4px;
-      }
-      &::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.2);
-      }
-      &::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
-      }
-      &::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.3);
-      }
-    }
-  }
-
-  /* Order Form Panel - Bottom Right */
-  .trade-panel {
-    grid-column: 2 / 3;
-    grid-row: 2 / 3;
-    background: $color-panel;
-    border: 1px solid $color-border;
-    border-radius: 4px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-
-    .order-form-header {
-      padding: 0.75rem 1rem;
-      background: rgba(0, 0, 0, 0.2);
-      border-bottom: 1px solid $color-border;
-
-      .order-type-tabs {
-        display: flex;
-        gap: 0.5rem;
-
-        button {
-          background: transparent;
-          color: $color-text-muted;
-          border: none;
-          padding: 0.25rem 0.5rem;
-          font-size: 0.9rem;
-          cursor: pointer;
-          position: relative;
-
-          &.active {
-            color: $color-text;
-
-            &::after {
-              content: "";
-              position: absolute;
-              bottom: -4px;
-              left: 0;
-              width: 100%;
-              height: 2px;
-              background: $color-accent;
-            }
-          }
-
-          &:hover:not(.active) {
-            color: $color-text;
-          }
         }
       }
     }
 
-    .order-form-content {
+    // Sidebar - right 25%
+    .dex-sidebar {
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 1rem;
-      gap: 1rem;
+      overflow: hidden;
 
-      .price-input,
-      .amount-input {
-        display: flex;
-        flex-direction: column;
-
-        label {
-          font-size: 0.85rem;
-          color: $color-text-muted;
-          margin-bottom: 0.25rem;
-        }
-
-        .input-wrapper {
-          position: relative;
-
-          input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            color: $color-text;
-            border: 1px solid $color-border;
-            padding: 0.5rem;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            box-sizing: border-box;
-
-            &:focus {
-              outline: none;
-              border-color: $color-accent;
-            }
-          }
-
-          .asset-symbol {
-            position: absolute;
-            right: 0.5rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: $color-text-muted;
-            font-size: 0.85rem;
-          }
-        }
-      }
-
-      .balance {
-        font-size: 0.8rem;
-        color: $color-text-muted;
-        text-align: right;
-        margin-top: 0.25rem;
-      }
-
-      .total-display {
-        font-size: 0.9rem;
-        color: $color-text;
-        padding: 0.5rem;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 4px;
-        margin-top: 0.5rem;
-        display: flex;
-        justify-content: space-between;
-      }
-
-      .order-size-buttons {
-        display: flex;
-        gap: 0.25rem;
-        margin: 0.5rem 0;
-
-        button {
-          flex: 1;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid $color-border;
-          color: $color-text-muted;
-          padding: 0.25rem 0;
-          font-size: 0.8rem;
-          cursor: pointer;
-
-          &:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: $color-text;
-          }
-
-          &:first-child {
-            border-radius: 3px 0 0 3px;
-          }
-
-          &:last-child {
-            border-radius: 0 3px 3px 0;
-          }
-        }
-      }
-
-      .order-actions {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: auto;
-
-        .buy-btn,
-        .sell-btn {
-          flex: 1;
-          padding: 0.75rem;
-          border: none;
-          color: #fff;
-          border-radius: 4px;
-          cursor: pointer;
-          font-weight: 500;
-          font-size: 0.95rem;
-
-          &:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-          }
-        }
-
-        .buy-btn {
-          background: $color-buy;
-
-          &:hover:not(:disabled) {
-            background: lighten($color-buy, 5%);
-          }
-        }
-
-        .sell-btn {
-          background: $color-sell;
-
-          &:hover:not(:disabled) {
-            background: lighten($color-sell, 5%);
-          }
-        }
-      }
-    }
-  }
-
-  /* Mobile Tab Navigation for Small Screens */
-  .mobile-tabs {
-    display: none;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: #0a0a0a;
-    border-top: 1px solid #2a2a2a;
-    z-index: 100;
-
-    .tabs-container {
-      display: flex;
-      justify-content: space-around;
-
-      button {
+      .sidebar-panel {
         flex: 1;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        padding: 0.75rem 0;
-        background: transparent;
-        border: none;
-        color: $color-text-muted;
-        font-size: 0.8rem;
+        overflow: hidden;
+        border-bottom: 1px solid $panel-border;
 
-        i {
-          font-size: 1.2rem;
-          margin-bottom: 0.25rem;
+        &:last-child {
+          border-bottom: none;
         }
 
-        &.active {
-          color: $color-accent;
+        .panel-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0 16px;
+          background-color: $panel-header;
+          height: 40px;
+          border-bottom: 1px solid $panel-border;
+
+          .panel-title {
+            font-size: 15px;
+            font-weight: 500;
+          }
+
+          .refresh-btn {
+            background: transparent;
+            color: #8a8a8a;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            &:hover {
+              color: $accent-color;
+            }
+
+            &:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+            }
+          }
         }
-      }
-    }
 
-    @media (max-width: $break-mobile) {
-      display: block;
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: $panel-bg;
 
-      & ~ .trading-page {
-        padding-bottom: 4rem;
-        height: calc(100vh - 60px - 4rem);
+          .search-box {
+            padding: 10px;
+            border-bottom: 1px solid $panel-border;
+
+            .search-input {
+              width: 100%;
+              background-color: rgba(0, 0, 0, 0.2);
+              border: 1px solid rgba(0, 255, 255, 0.1);
+              color: #ffffff;
+              padding: 6px 10px;
+              font-size: 13px;
+              border-radius: 4px;
+
+              &:focus {
+                outline: none;
+                border-color: rgba(0, 255, 255, 0.5);
+              }
+
+              &::placeholder {
+                color: #8a8a8a;
+              }
+            }
+          }
+
+          .pair-list {
+            flex: 1;
+          }
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+          }
+        }
       }
     }
   }
 
-  @media (max-width: $break-mobile) {
-    .trading-page > * {
-      display: none;
+  .error-message {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(255, 59, 48, 0.1);
+    border: 1px solid rgba(255, 59, 48, 0.3);
+    color: $negative-color;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    max-width: 80%;
+  }
+
+  /* Wallet connection indicator */
+  .wallet-status {
+    position: absolute;
+    top: 8px;
+    right: 16px;
+    z-index: 10;
+
+    .wallet-connected {
+      display: flex;
+      align-items: center;
+
+      .wallet-address {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 13px;
+        margin-right: 8px;
+      }
+
+      .disconnect-btn {
+        background: rgba(255, 59, 48, 0.1);
+        color: #ff3b30;
+        border: 1px solid rgba(255, 59, 48, 0.3);
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 12px;
+        cursor: pointer;
+
+        &:hover {
+          background: rgba(255, 59, 48, 0.2);
+        }
+      }
     }
 
-    .trading-page > .active-panel {
+    .connect-btn {
+      background: rgba(0, 255, 255, 0.1);
+      color: #00ffff;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 13px;
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(0, 255, 255, 0.2);
+      }
+    }
+  }
+}
+
+/* Custom styling for the PairSelector component */
+.pair-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #1a1a2a;
+  cursor: pointer;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+  }
+
+  &.selected {
+    background-color: rgba(0, 255, 255, 0.05);
+  }
+
+  .pair-token {
+    display: flex;
+    align-items: center;
+
+    img {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .token-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+  }
+
+  .pair-data {
+    display: flex;
+
+    .price {
+      font-family: "Orbitron", monospace;
+      font-size: 13px;
+      width: 90px;
+      text-align: right;
+      margin-right: 16px;
+    }
+
+    .change {
+      font-size: 13px;
+      width: 70px;
+      text-align: right;
+      font-weight: 600;
+
+      &.positive {
+        color: #4caf50;
+      }
+
+      &.negative {
+        color: #ff3b30;
+      }
+    }
+  }
+}
+
+/* Custom styling for Trading History component */
+.trade-list {
+  width: 100%;
+
+  .trade-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-family: "Orbitron", monospace;
+
+    .price {
+      width: 100px;
+
+      &.buy {
+        color: #4caf50;
+      }
+
+      &.sell {
+        color: #ff3b30;
+      }
+    }
+
+    .amount {
+      width: 80px;
+      text-align: right;
+    }
+
+    .time {
+      width: 80px;
+      text-align: right;
+      color: #8a8a8a;
+    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .dex-container .dex-content {
+    .dex-main {
+      flex: 2;
+    }
+    .dex-sidebar {
+      flex: 1;
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .dex-container {
+    height: auto;
+    overflow: auto;
+
+    .dex-content {
+      flex-direction: column;
+
+      .dex-main,
+      .dex-sidebar {
+        flex: none;
+        width: 100%;
+        height: auto;
+      }
+
+      .dex-main {
+        .chart-container {
+          height: 400px;
+        }
+
+        .bottom-panels {
+          flex-direction: column;
+          height: auto;
+
+          .order-form-panel,
+          .orders-panel {
+            height: 350px;
+
+            &:first-child {
+              border-right: none;
+              border-bottom: 1px solid #1a1a2a;
+            }
+          }
+        }
+      }
+
+      .dex-sidebar {
+        .sidebar-panel {
+          height: 300px;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .dex-container {
+    overflow: auto; /* Allow scrolling on smaller screens */
+
+    .wallet-status {
+      position: relative;
+      top: auto;
+      right: auto;
+      padding: 8px 16px;
       display: flex;
+      justify-content: center;
     }
   }
 }

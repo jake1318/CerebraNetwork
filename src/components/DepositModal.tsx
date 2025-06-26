@@ -1,5 +1,5 @@
 // src/components/DepositModal.tsx
-// Last Updated: 2025-05-23 22:24:29 UTC by jake1318
+// Last Updated: 2025-06-23 03:43:22 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -10,7 +10,13 @@ import blockvisionService, {
 } from "../services/blockvisionService";
 import { birdeyeService } from "../services/birdeyeService";
 import { BN } from "bn.js";
-import { initCetusSDK } from "@cetusprotocol/cetus-sui-clmm-sdk";
+import { CetusClmmSDK } from "@cetusprotocol/sui-clmm-sdk";
+import {
+  TickMath,
+  ClmmPoolUtil,
+  Percentage,
+  adjustForCoinSlippage,
+} from "@cetusprotocol/common-sdk";
 import { getPoolDetails as getBluefinPool } from "../services/bluefinService";
 import TransactionNotification from "./TransactionNotification";
 import "../styles/components/DepositModal.scss";
@@ -139,9 +145,9 @@ const DepositModal: React.FC<DepositModalProps> = ({
         account?.address || "none"
       );
       // Initialize SDK with network and optional wallet address
-      const sdkInstance = initCetusSDK({
-        network: "mainnet",
-        wallet: account?.address || undefined,
+      const sdkInstance = CetusClmmSDK.createSDK({
+        env: "mainnet",
+        senderAddress: account?.address,
       });
 
       console.log("SDK initialized successfully");
@@ -159,7 +165,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
   useEffect(() => {
     if (sdk && account?.address) {
       console.log("Setting sender address:", account.address);
-      sdk.senderAddress = account.address;
+      sdk.setSenderAddress(account.address);
     }
   }, [account?.address, sdk]);
 

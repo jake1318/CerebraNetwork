@@ -1,286 +1,156 @@
 /* src/pages/Dex/components/PairSelector.scss */
+/* Last Updated: 2025-06-25 06:18:30 UTC by jake1318 */
 
-.pair-selector {
-  background: rgba(5, 15, 30, 0.95); /* Made background more opaque */
-  border-radius: 16px;
-  height: 100%;
+.pair-selector-container {
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid;
-  border-image: linear-gradient(
-      45deg,
-      rgba(0, 255, 255, 0.2),
-      rgba(255, 0, 255, 0.2)
-    )
-    1;
-  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
-    0 8px 32px rgba(255, 0, 255, 0.1);
-  overflow: hidden;
-  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #1a1a1a;
 
-  /* Add solid background to search bar */
-  .search-bar {
-    padding: 0.8rem 1rem;
-    position: relative;
-    flex: 0 0 auto;
-    z-index: 2;
-    background: rgba(5, 15, 30, 0.95); /* Match parent background */
-    border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+  .pair-search {
+    padding: 0.5rem;
+    border-bottom: 1px solid #333;
 
     input {
       width: 100%;
-      padding: 0.6rem 0.8rem;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.3);
-      color: #fff;
+      padding: 0.5rem;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
       font-size: 0.9rem;
-
-      &::placeholder {
-        color: rgba(255, 255, 255, 0.4);
-      }
 
       &:focus {
         outline: none;
-        border-color: rgba(0, 255, 255, 0.5);
-        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        border-color: #3b82f6;
+      }
+
+      &::placeholder {
+        color: #666;
       }
     }
   }
 
-  .filter-bar {
-    display: flex;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-    padding: 0 0.5rem;
-    flex: 0 0 auto;
-    z-index: 2;
-    background: rgba(5, 15, 30, 0.95); /* Match parent background */
+  .pair-list-header {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1fr 1.5fr;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    color: #888;
+    border-bottom: 1px solid #333;
+    background-color: rgba(0, 0, 0, 0.2);
 
-    button {
-      flex: 1;
-      background: none;
-      border: none;
-      padding: 0.6rem;
-      color: rgba(255, 255, 255, 0.6);
+    .column {
       cursor: pointer;
-      font-size: 0.9rem;
+      user-select: none;
       position: relative;
 
-      &.active {
-        color: #00ffff;
-        font-weight: 500;
+      &:hover {
+        color: #e0e0e0;
+      }
+
+      &.sorted {
+        color: #3b82f6;
 
         &::after {
           content: "";
           position: absolute;
-          bottom: 0;
-          left: 15%;
-          width: 70%;
-          height: 2px;
-          background: linear-gradient(
-            90deg,
-            rgba(0, 255, 255, 0.3),
-            rgba(255, 0, 255, 0.7)
-          );
+          right: 0.25rem;
+          top: 50%;
+          transform: translateY(-50%);
+          border-left: 4px solid transparent;
+          border-right: 4px solid transparent;
+        }
+
+        &.asc::after {
+          border-bottom: 4px solid #3b82f6;
+        }
+
+        &.desc::after {
+          border-top: 4px solid #3b82f6;
         }
       }
     }
-  }
-
-  /* Important - this is the scrollable container */
-  .pair-list-container {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    background: rgba(5, 15, 30, 0.7);
   }
 
   .pair-list {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow-y: scroll;
-    overflow-x: hidden;
-    padding-right: 2px;
-    /* Add box shadow at the top to enhance separation */
-    box-shadow: inset 0 10px 10px -10px rgba(0, 0, 0, 0.5);
+    flex: 1;
+    overflow-y: auto;
 
-    /* Explicitly define scrollbar styles for webkit browsers */
     &::-webkit-scrollbar {
-      width: 10px;
-      background-color: rgba(5, 15, 30, 0.8);
+      width: 4px;
     }
-
-    &::-webkit-scrollbar-thumb {
-      background: linear-gradient(
-        to bottom,
-        rgba(0, 255, 255, 0.6),
-        rgba(255, 0, 255, 0.6)
-      );
-      border-radius: 10px;
-    }
-
     &::-webkit-scrollbar-track {
-      background-color: rgba(0, 0, 0, 0.2);
-      border-radius: 10px;
-      margin: 2px;
+      background: rgba(0, 0, 0, 0.2);
     }
-
-    /* Firefox scrollbar styles */
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 255, 255, 0.6) rgba(5, 15, 30, 0.8);
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
 
     .pair-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.75rem 1rem;
-      border-left: 3px solid transparent;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      display: grid;
+      grid-template-columns: 2fr 1.5fr 1fr 1.5fr;
+      padding: 0.5rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      flex-shrink: 0;
-      min-height: 48px;
+      font-size: 0.9rem;
+      cursor: pointer;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background-color: rgba(255, 255, 255, 0.05);
       }
 
-      &.active {
-        background: rgba(0, 255, 255, 0.05);
-        border-left: 3px solid rgba(0, 255, 255, 0.7);
+      &.selected {
+        background-color: rgba(59, 130, 246, 0.1);
+        border-left: 2px solid #3b82f6;
       }
 
-      .pair-info {
+      .pair-name {
         display: flex;
         align-items: center;
-        gap: 8px;
-        flex: 1;
 
-        .star {
-          color: rgba(255, 255, 255, 0.3);
-          cursor: pointer;
-          transition: all 0.3s;
-          font-size: 0.9rem;
-
-          &.favorite {
-            color: rgba(0, 255, 255, 0.9);
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
-          }
+        .pair-logo {
+          width: 18px;
+          height: 18px;
+          margin-right: 0.5rem;
+          border-radius: 50%;
+          background-color: #333;
         }
-
-        .pair-symbol {
-          color: #fff;
-          font-weight: 500;
-          font-size: 0.9rem;
-        }
-      }
-
-      .pair-stats {
-        display: flex;
-        gap: 1rem;
-        align-items: center;
-
-        .pair-price {
-          color: #fff;
-          font-family: "Courier New", monospace;
-          font-size: 0.9rem;
-          min-width: 80px;
-          text-align: right;
-        }
-
-        .pair-change {
-          min-width: 60px;
-          text-align: right;
-          font-size: 0.85rem;
-          font-weight: 500;
-
-          &.positive {
-            color: #00ff88;
-            text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
-          }
-
-          &.negative {
-            color: #ff4d6d;
-            text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
-          }
-
-          &.neutral {
-            color: rgba(255, 255, 255, 0.7);
-          }
-        }
-      }
-    }
-
-    .loading-indicator {
-      padding: 1rem;
-      text-align: center;
-      color: rgba(0, 255, 255, 0.7);
-      font-size: 0.9rem;
-      background: rgba(0, 0, 0, 0.2);
-      margin: 0.5rem;
-      border-radius: 4px;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    .no-results {
-      padding: 2rem 1rem;
-      text-align: center;
-      color: rgba(255, 255, 255, 0.4);
-      font-style: italic;
-    }
-  }
-}
-
-@keyframes pulse {
-  0% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.6;
-  }
-}
-
-@media (max-width: 768px) {
-  .pair-selector {
-    .search-bar {
-      padding: 0.6rem 0.8rem;
-
-      input {
-        padding: 0.5rem 0.7rem;
-        font-size: 0.85rem;
-      }
-    }
-
-    .filter-bar {
-      padding: 0;
-
-      button {
-        padding: 0.5rem;
-        font-size: 0.85rem;
-      }
-    }
-
-    .pair-list .pair-item {
-      padding: 0.5rem 0.8rem;
-
-      .pair-symbol {
-        font-size: 0.85rem;
       }
 
       .pair-price {
-        font-size: 0.8rem;
+        font-family: "Roboto Mono", monospace;
       }
 
       .pair-change {
-        font-size: 0.75rem;
+        font-weight: 500;
+
+        &.positive {
+          color: #4caf50;
+        }
+
+        &.negative {
+          color: #f44336;
+        }
       }
+
+      .pair-volume {
+        color: #888;
+        text-align: right;
+      }
+    }
+
+    .no-pairs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100px;
+      color: #888;
+      font-style: italic;
     }
   }
 }

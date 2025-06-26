@@ -1,5 +1,5 @@
-// src/pages/LendingPage.tsx
-// Last Updated: 2025-06-21 23:42:31 UTC by jake1318
+// src/pages/Lending/LendingPage.tsx
+// Last Updated: 2025-06-23 06:09:06 UTC by jake1318
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import scallopService from "../../scallop/ScallopService";
@@ -110,6 +110,16 @@ const EXCLUDED_MARKETS = [
 // Default placeholder for all coin images
 const DEFAULT_COIN_IMAGE = "/icons/default-coin.svg";
 
+// ---- local logo overrides ----------------------------------------------
+/**
+ * Keys can be token *symbol* (lower‑case) **or** full coinType.
+ * Values are paths relative to /public (a leading "/" is required in Vite).
+ */
+const LOCAL_LOGOS: Record<string, string> = {
+  hasui: "/haSui.webp", // <── your local image
+  // add other manual overrides here if you ever need them
+};
+
 const LendingPage: React.FC = () => {
   // Extract all wallet properties for usage
   const wallet = useWallet();
@@ -127,8 +137,10 @@ const LendingPage: React.FC = () => {
     "lending" | "borrowing" | "obligations"
   >("lending");
 
-  // Add token logo state
-  const [tokenLogos, setTokenLogos] = useState<Record<string, string>>({});
+  // Add token logo state with LOCAL_LOGOS initialization
+  const [tokenLogos, setTokenLogos] = useState<Record<string, string>>({
+    ...LOCAL_LOGOS,
+  });
 
   // Add market summary state
   const [marketSummary, setMarketSummary] = useState<MarketSummary>({
@@ -221,14 +233,25 @@ const LendingPage: React.FC = () => {
   const initialLoadComplete = useRef(false);
   const fetchInProgress = useRef(false);
 
+  // Helper function to get the logo source with proper fallbacks
+  const getLogoSrc = (coinType: string, symbol: string) =>
+    tokenLogos[coinType] ??
+    tokenLogos[symbol.toLowerCase()] ?? // fallback by symbol
+    LOCAL_LOGOS[symbol.toLowerCase()] ?? // safety‑net
+    DEFAULT_COIN_IMAGE;
+
   // Function to fetch token logos
   const fetchTokenLogos = async (assetsToFetch: AssetInfo[]) => {
     try {
       console.log("Fetching token logos for market assets");
       const logoPromises = assetsToFetch.map(async (asset) => {
         try {
-          // If we already have this asset's logo, skip fetching it again
-          if (tokenLogos[asset.coinType]) return null;
+          // skip if we already have a local or fetched logo
+          if (
+            tokenLogos[asset.coinType] ||
+            LOCAL_LOGOS[asset.symbol.toLowerCase()]
+          )
+            return null;
 
           const metadata = await getTokenMetadata(asset.coinType);
           if (
@@ -1556,21 +1579,15 @@ const LendingPage: React.FC = () => {
           <div className="summary-item">
             <span className="summary-label">Highest Supply APY:</span>
             <span className="summary-value highlight">
-              {/* Add token logo for highest APY token */}
-              {tokenLogos[
-                assets.find(
-                  (a) => a.symbol === marketSummary.highestSupplyAPY.symbol
-                )?.coinType
-              ] && (
+              {/* Add token logo for highest APY token - Updated to use getLogoSrc helper */}
+              {marketSummary.highestSupplyAPY.symbol !== "--" && (
                 <img
-                  src={
-                    tokenLogos[
-                      assets.find(
-                        (a) =>
-                          a.symbol === marketSummary.highestSupplyAPY.symbol
-                      )?.coinType
-                    ]
-                  }
+                  src={getLogoSrc(
+                    assets.find(
+                      (a) => a.symbol === marketSummary.highestSupplyAPY.symbol
+                    )?.coinType || "",
+                    marketSummary.highestSupplyAPY.symbol
+                  )}
                   alt={marketSummary.highestSupplyAPY.symbol}
                   className="mini-token-logo"
                   onError={(e) => {
@@ -1914,23 +1931,15 @@ const LendingPage: React.FC = () => {
                 key={`collateral-${asset.symbol}`}
               >
                 <div className="position-icon">
-                  {/* Use token logo if available */}
-                  {tokenLogos[asset.coinType] ? (
-                    <img
-                      src={tokenLogos[asset.coinType]}
-                      alt={asset.symbol}
-                      className="coin-icon"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={DEFAULT_COIN_IMAGE}
-                      alt={asset.symbol}
-                      className="coin-icon"
-                    />
-                  )}
+                  {/* Use getLogoSrc helper for token logo */}
+                  <img
+                    src={getLogoSrc(asset.coinType, asset.symbol)}
+                    alt={asset.symbol}
+                    className="coin-icon"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
+                    }}
+                  />
                 </div>
                 <div className="position-details">
                   <h4>{asset.symbol}</h4>
@@ -2012,23 +2021,15 @@ const LendingPage: React.FC = () => {
                 key={`supply-${asset.symbol}`}
               >
                 <div className="position-icon">
-                  {/* Use token logo if available */}
-                  {tokenLogos[asset.coinType] ? (
-                    <img
-                      src={tokenLogos[asset.coinType]}
-                      alt={asset.symbol}
-                      className="coin-icon"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={DEFAULT_COIN_IMAGE}
-                      alt={asset.symbol}
-                      className="coin-icon"
-                    />
-                  )}
+                  {/* Use getLogoSrc helper for token logo */}
+                  <img
+                    src={getLogoSrc(asset.coinType, asset.symbol)}
+                    alt={asset.symbol}
+                    className="coin-icon"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
+                    }}
+                  />
                 </div>
                 <div className="position-details">
                   <h4>{asset.symbol}</h4>
@@ -2121,23 +2122,15 @@ const LendingPage: React.FC = () => {
                 key={`borrow-${asset.symbol}`}
               >
                 <div className="position-icon">
-                  {/* Use token logo if available */}
-                  {tokenLogos[asset.coinType] ? (
-                    <img
-                      src={tokenLogos[asset.coinType]}
-                      alt={asset.symbol}
-                      className="coin-icon"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={DEFAULT_COIN_IMAGE}
-                      alt={asset.symbol}
-                      className="coin-icon"
-                    />
-                  )}
+                  {/* Use getLogoSrc helper for token logo */}
+                  <img
+                    src={getLogoSrc(asset.coinType, asset.symbol)}
+                    alt={asset.symbol}
+                    className="coin-icon"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
+                    }}
+                  />
                 </div>
                 <div className="position-details">
                   <h4>{asset.symbol}</h4>
@@ -2289,24 +2282,20 @@ const LendingPage: React.FC = () => {
                   }) => (
                     <tr key={symbol}>
                       <td className="asset-cell">
-                        {/* Add token logo before symbol */}
-                        {tokenLogos[coinType] ? (
-                          <div className="asset-with-logo">
-                            <img
-                              src={tokenLogos[coinType]}
-                              alt={symbol}
-                              className="token-logo"
-                              onError={(e) => {
-                                // Fallback if logo fails to load
-                                (e.target as HTMLImageElement).src =
-                                  DEFAULT_COIN_IMAGE;
-                              }}
-                            />
-                            <span className="asset-text">{symbol}</span>
-                          </div>
-                        ) : (
+                        {/* Use getLogoSrc helper for token logo */}
+                        <div className="asset-with-logo">
+                          <img
+                            src={getLogoSrc(coinType, symbol)}
+                            alt={symbol}
+                            className="token-logo"
+                            onError={(e) => {
+                              // Fallback if logo fails to load
+                              (e.target as HTMLImageElement).src =
+                                DEFAULT_COIN_IMAGE;
+                            }}
+                          />
                           <span className="asset-text">{symbol}</span>
-                        )}
+                        </div>
                       </td>
                       <td>${price.toFixed(4)}</td>
                       <td>
@@ -2574,7 +2563,7 @@ const LendingPage: React.FC = () => {
 
       {/* Last updated timestamp */}
       <div className="last-updated">
-        Last updated: 2025-06-21 23:50:15 UTC by jake1318
+        Last updated: 2025-06-23 06:19:12 UTC by jake1318
       </div>
     </div>
   );

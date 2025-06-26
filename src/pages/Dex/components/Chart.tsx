@@ -1,10 +1,10 @@
 // src/pages/Dex/components/Chart.tsx
-// Last Updated: 2025-06-24 22:24:48 UTC by jake1318
+// Last Updated: 2025-06-25 07:16:02 UTC by jake1318
 
 import React, { useEffect, useState, useRef } from "react";
 import ReactApexChart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
-import { getCoinOhlcv, OhlcvPoint } from "../../../services/blockvisionService";
+import { getCoinOhlcv } from "../../../services/blockvisionService";
 import "./Chart.scss";
 
 interface TradingPair {
@@ -38,15 +38,10 @@ interface EnhancedMarketData {
   volume24h: number;
   high24h: number;
   low24h: number;
-  marketCap: string;
-  fdvUsd: string;
-  circulating: string;
-  totalSupply: string;
-  isLoading: boolean;
-  hasError: boolean;
+  logo?: string;
 }
 
-const TIME_FRAMES: Record<string, string> = {
+const TIME_FRAMES = {
   "1m": "1m",
   "5m": "5m",
   "15m": "15m",
@@ -67,54 +62,60 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
   const [candlestickData, setCandlestickData] = useState<CandlestickPoint[]>(
     []
   );
-  const [tf, setTf] = useState<string>("15m");
-  const [err, setErr] = useState<string | null>(null);
+  const [timeFrame, setTimeFrame] = useState<string>("15m");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [chartType, setChartType] = useState<"line" | "candlestick">("line");
+  const [chartType, setChartType] = useState<"line" | "candlestick">(
+    "candlestick"
+  );
+  const chartRef = useRef<HTMLDivElement>(null);
 
-  // Changed: Use chartPanelRef instead of chartContainerRef
-  const chartPanelRef = useRef<HTMLDivElement | null>(null);
-  const [chartHeight, setChartHeight] = useState(300);
-
-  // Changed: Use window resize instead of ResizeObserver for height calculation
-  useEffect(() => {
-    /* helper reads the parent (.chart-panel) once */
-    const update = () => {
-      if (!chartPanelRef.current) return;
-      // header ≈ 50 px + 12 px vertical padding (chart-header has 10)
-      const available = chartPanelRef.current.clientHeight - 62;
-      setChartHeight(Math.max(200, available)); // never below 200
-    };
-
-    update(); // run on mount
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  // Base chart options that apply to both chart types
+  // Base chart options
   const baseOptions: ApexOptions = {
     chart: {
-      background: "#0a0f1e",
-      toolbar: { show: false },
-      zoom: { enabled: false },
-      height: chartHeight,
-      fontFamily: "inherit",
-      animations: {
-        enabled: false, // Disable animations for better performance
+      type: chartType,
+      background: "transparent",
+      toolbar: {
+        show: false,
       },
-      redrawOnWindowResize: true, // Ensure chart redraws when window size changes
+      animations: {
+        enabled: false,
+      },
+      fontFamily: "'Inter', 'Roboto', sans-serif",
+    },
+    grid: {
+      borderColor: "rgba(70, 70, 80, 0.15)",
+      strokeDashArray: 3,
+      xaxis: {
+        lines: {
+          show: true,
+        },
+      },
+      yaxis: {
+        lines: {
+          show: true,
+        },
+      },
+    },
+    tooltip: {
+      enabled: true,
+      theme: "dark",
+      style: {
+        fontSize: "12px",
+        fontFamily: "'Inter', 'Roboto', sans-serif",
+      },
+      x: {
+        format: "HH:mm dd MMM",
+      },
     },
     xaxis: {
       type: "datetime",
       labels: {
-        style: { colors: "#ccc", fontSize: "12px" },
-        datetimeUTC: false,
-        datetimeFormatter: {
-          year: "yyyy",
-          month: "MMM 'yy",
-          day: "dd MMM",
-          hour: "HH:mm",
+        style: {
+          colors: "#9CA3AF",
+          fontSize: "11px",
         },
+        datetimeUTC: false,
       },
       axisBorder: {
         show: false,
@@ -123,48 +124,21 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
         show: false,
       },
     },
-    grid: {
-      borderColor: "rgba(255,255,255,0.1)",
-      strokeDashArray: 3,
-      xaxis: { lines: { show: true } },
-      yaxis: { lines: { show: true } },
-      padding: { left: 10, right: 10 },
-    },
-    tooltip: {
-      theme: "dark",
-      x: { format: "dd MMM HH:mm" },
-      fixed: {
-        enabled: true,
-        position: "topRight",
+    yaxis: {
+      labels: {
+        style: {
+          colors: "#9CA3AF",
+          fontSize: "11px",
+        },
+        formatter: (value) => {
+          return value.toFixed(value >= 1 ? 2 : 6);
+        },
       },
     },
     responsive: [
       {
-        breakpoint: 1000,
+        breakpoint: 576,
         options: {
-          chart: {
-            height: 250,
-          },
-          xaxis: {
-            labels: {
-              style: { fontSize: "10px" },
-              rotate: -45,
-              offsetY: 5,
-            },
-          },
-          yaxis: {
-            labels: {
-              style: { fontSize: "10px" },
-            },
-          },
-        },
-      },
-      {
-        breakpoint: 600,
-        options: {
-          chart: {
-            height: 200,
-          },
           xaxis: {
             labels: {
               show: false,
@@ -182,13 +156,20 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
       ...baseOptions.chart,
       type: "line",
     },
-    yaxis: {
-      labels: {
-        style: { colors: "#ccc", fontSize: "12px" },
-        formatter: (v) => v.toFixed(4),
+    stroke: {
+      curve: "smooth",
+      width: 2,
+    },
+    colors: ["#00c2ff"],
+    fill: {
+      type: "gradient",
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.15,
+        opacityTo: 0.05,
+        stops: [0, 100],
       },
     },
-    stroke: { curve: "smooth", width: 2, colors: ["#00c2ff"] },
   };
 
   // Candlestick chart specific options
@@ -198,17 +179,11 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
       ...baseOptions.chart,
       type: "candlestick",
     },
-    yaxis: {
-      labels: {
-        style: { colors: "#ccc", fontSize: "12px" },
-        formatter: (v) => v.toFixed(4),
-      },
-    },
     plotOptions: {
       candlestick: {
         colors: {
-          upward: "#4bffb5",
-          downward: "#ff4976",
+          upward: "#4caf50",
+          downward: "#ff3b30",
         },
         wick: {
           useFillColor: true,
@@ -217,182 +192,173 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
     },
   };
 
-  const lineSeries = [{ name: "Price", data: lineData }];
-  const candlestickSeries = [{ name: "Price", data: candlestickData }];
-
-  const getIntervalAndRange = (t: string) => {
-    const now = Math.floor(Date.now() / 1000);
-    let type = t;
-    let from = now - 6 * 3600;
-    switch (t) {
+  // Function to transform API interval to chart interval
+  const getApiInterval = (chartInterval: string) => {
+    switch (chartInterval) {
       case "1m":
-        from = now - 3600;
-        break;
+        return "1m";
       case "5m":
-        from = now - 3 * 3600;
-        break;
+        return "5m";
       case "15m":
-        from = now - 6 * 3600;
-        break;
+        return "15m";
       case "30m":
-        from = now - 12 * 3600;
-        break;
+        return "30m";
       case "1h":
-        type = "1H";
-        from = now - 24 * 3600;
-        break;
+        return "1h";
       case "4h":
-        type = "4H";
-        from = now - 7 * 24 * 3600;
-        break;
+        return "4h";
       case "1d":
-        type = "1D";
-        from = now - 30 * 24 * 3600;
-        break;
+        return "1d";
       case "1Y":
-        type = "1D";
-        from = now - 365 * 24 * 3600;
-        break;
+        return "1w";
       default:
-        type = "15m";
+        return "15m";
     }
-    return { type, from };
   };
 
-  // Function to fetch OHLCV data for candlestick chart
-  const fetchOhlcvData = async () => {
+  // Function to determine time range based on interval
+  const getTimeRange = (interval: string) => {
+    const now = Math.floor(Date.now() / 1000);
+
+    switch (interval) {
+      case "1m":
+        return now - 60 * 60; // 1 hour
+      case "5m":
+        return now - 60 * 60 * 6; // 6 hours
+      case "15m":
+        return now - 60 * 60 * 12; // 12 hours
+      case "30m":
+        return now - 60 * 60 * 24; // 24 hours
+      case "1h":
+        return now - 60 * 60 * 24 * 3; // 3 days
+      case "4h":
+        return now - 60 * 60 * 24 * 7; // 7 days
+      case "1d":
+        return now - 60 * 60 * 24 * 30; // 30 days
+      case "1Y":
+        return now - 60 * 60 * 24 * 365; // 365 days
+      default:
+        return now - 60 * 60 * 12; // 12 hours
+    }
+  };
+
+  // Fetch chart data
+  const fetchChartData = async () => {
     if (!pair?.baseAddress) return;
 
     setLoading(true);
-    setErr(null);
+    setError(null);
 
     try {
-      const { type, from } = getIntervalAndRange(tf);
-
-      // Convert interval to API format
-      let apiInterval: any = "1h";
-      if (tf === "1m" || tf === "5m" || tf === "15m" || tf === "30m")
-        apiInterval = tf;
-      else if (tf === "1h") apiInterval = "1h";
-      else if (tf === "4h") apiInterval = "4h";
-      else if (tf === "1d") apiInterval = "1d";
-      else if (tf === "1Y") apiInterval = "1w";
-
-      console.log(
-        `Fetching OHLCV data: token=${pair.baseAddress}, interval=${apiInterval}, from=${from}`
-      );
+      const apiInterval = getApiInterval(timeFrame);
+      const fromTime = getTimeRange(timeFrame);
 
       const data = await getCoinOhlcv(
         pair.baseAddress,
         apiInterval as any,
-        from
+        fromTime
       );
-      console.log("OHLCV data loaded:", data);
 
-      // Make sure we have data before mapping
-      if (!data || !data.length) {
-        console.warn("No OHLCV data received");
+      if (!data || data.length === 0) {
+        setError("No chart data available");
         setLineData([]);
         setCandlestickData([]);
         return;
       }
 
       // Format data for line chart
-      const linePoints: ChartPoint[] = data.map((point) => ({
-        x: point.timestamp * 1000, // convert to milliseconds
+      const linePoints = data.map((point) => ({
+        x: point.timestamp * 1000,
         y: point.close,
       }));
 
       // Format data for candlestick chart
-      const candlePoints: CandlestickPoint[] = data.map((point) => ({
-        x: point.timestamp * 1000, // convert to milliseconds
+      const candlePoints = data.map((point) => ({
+        x: point.timestamp * 1000,
         y: [point.open, point.high, point.low, point.close],
       }));
 
       setLineData(linePoints);
       setCandlestickData(candlePoints);
-    } catch (error) {
-      console.error("Error fetching OHLCV data:", error);
-      setErr("Failed to load chart data");
+    } catch (err) {
+      console.error("Failed to fetch chart data:", err);
+      setError("Failed to load chart data");
     } finally {
       setLoading(false);
     }
   };
 
-  // Effect to fetch OHLCV data when pair or timeframe changes
+  // Fetch data when pair or timeframe changes
   useEffect(() => {
     if (pair?.baseAddress) {
-      fetchOhlcvData();
+      fetchChartData();
     }
-  }, [pair?.baseAddress, tf]);
+  }, [pair?.baseAddress, timeFrame]);
 
   return (
-    <div className="trading-chart" ref={chartPanelRef}>
-      <div className="chart-header">
-        {/* Changed to only show baseAsset without /USDC */}
-        <h3>{pair?.baseAsset || "Chart"}</h3>
-        <div className="chart-controls">
-          <div className="timeframe-selector">
-            {Object.keys(TIME_FRAMES).map((key) => (
-              <button
-                key={key}
-                className={tf === key ? "active" : ""}
-                onClick={() => setTf(key)}
-              >
-                {key}
-              </button>
-            ))}
-          </div>
+    <div className="chart-wrapper" ref={chartRef}>
+      <div className="chart-controls">
+        <div className="timeframe-buttons">
+          {Object.keys(TIME_FRAMES).map((tf) => (
+            <button
+              key={tf}
+              className={`timeframe-btn ${tf === timeFrame ? "active" : ""}`}
+              onClick={() => setTimeFrame(tf)}
+            >
+              {tf}
+            </button>
+          ))}
+        </div>
 
-          <div className="chart-type-toggle">
-            <button
-              className={`chart-type-btn ${
-                chartType === "line" ? "active" : ""
-              }`}
-              onClick={() => setChartType("line")}
-              title="Line Chart"
-            >
-              <i className="fas fa-chart-line"></i>
-            </button>
-            <button
-              className={`chart-type-btn ${
-                chartType === "candlestick" ? "active" : ""
-              }`}
-              onClick={() => setChartType("candlestick")}
-              title="Candlestick Chart"
-            >
-              <i className="fas fa-chart-bar"></i>
-            </button>
-          </div>
+        <div className="chart-type-buttons">
+          <button
+            className={`chart-type-btn ${chartType === "line" ? "active" : ""}`}
+            onClick={() => setChartType("line")}
+          >
+            Line
+          </button>
+          <button
+            className={`chart-type-btn ${
+              chartType === "candlestick" ? "active" : ""
+            }`}
+            onClick={() => setChartType("candlestick")}
+          >
+            Candles
+          </button>
         </div>
       </div>
 
-      <div className="chart-content">
-        {loading ? (
-          <div className="chart-loading">
-            <div className="spinner"></div>
-            <p>Loading chart data...</p>
-          </div>
-        ) : err ? (
-          <div className="chart-error">
-            <p>{err}</p>
-            <button onClick={fetchOhlcvData}>Retry</button>
-          </div>
-        ) : (
-          <div className="chart-area">
-            <ReactApexChart
-              options={
-                chartType === "line"
-                  ? lineChartOptions
-                  : candlestickChartOptions
-              }
-              series={chartType === "line" ? lineSeries : candlestickSeries}
-              type={chartType}
-              height="100%"
-              width="100%"
-            />
+      <div className="chart-area">
+        {loading && (
+          <div className="chart-overlay">
+            <div className="loading-indicator">Loading...</div>
           </div>
         )}
+
+        {error && (
+          <div className="chart-overlay">
+            <div className="error-message">
+              {error}
+              <button onClick={fetchChartData} className="retry-btn">
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        <ReactApexChart
+          options={
+            chartType === "line" ? lineChartOptions : candlestickChartOptions
+          }
+          series={
+            chartType === "line"
+              ? [{ name: "Price", data: lineData }]
+              : [{ name: "Price", data: candlestickData }]
+          }
+          type={chartType}
+          height="100%"
+          width="100%"
+        />
       </div>
     </div>
   );

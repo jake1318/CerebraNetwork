@@ -1,5 +1,5 @@
 // src/pages/Positions.tsx
-// Last Updated: 2025-05-22 18:00:04 UTC by jake1318
+// Last Updated: 2025-06-23 07:18:27 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -10,7 +10,7 @@ import {
   TickMath,
   ClmmPoolUtil,
   adjustForCoinSlippage,
-} from "@cetusprotocol/cetus-sui-clmm-sdk";
+} from "@cetusprotocol/common-sdk";
 
 import * as cetusService from "../../services/cetusService";
 import * as birdeyeService from "../../services/birdeyeService";
@@ -23,6 +23,7 @@ import ProtocolBadge from "../../pages/PoolsPage/ProtocolBadge";
 import blockvisionService, {
   NormalizedPosition,
   PoolGroup,
+  getScallopPortfolioData,
 } from "../../services/blockvisionService";
 
 import WithdrawModal from "../../components/WithdrawModal";
@@ -77,6 +78,9 @@ const TOKEN_ADDRESSES: Record<string, string> = {
   WAL: "0x1e8b532cca6569cab9f9b9ebc73f8c13885012ade714729aa3b450e0339ac766::coin::COIN",
   HASUI:
     "0x680eb4a8e1074d7e15186c40dcf8d3b749f1ddba4c60478c367fc9c24a5a5a29::hasui::HASUI",
+  // Add Scallop tokens
+  SSUI: "0xaafc4f740de0dd0dde642a31148fb94517087052f19afb0f7bed1dc41a50c77b::scallop_sui::SCALLOP_SUI",
+  SSCA: "0x5ca17430c1d046fae9edeaa8fd76c7b4193a00d764a0ecfa9418d733ad27bc1e::scallop_sca::SCALLOP_SCA",
 };
 
 // Hardcoded token logos for fallbacks
@@ -93,6 +97,11 @@ const HARDCODED_LOGOS: Record<string, string> = {
   BLUB: "https://coin-images.coingecko.com/coins/images/39356/small/Frame_38.png",
   CHIRP:
     "https://coin-images.coingecko.com/coins/images/52894/small/Chirp_Icon_Round.png",
+  // Add Scallop token logos
+  SSUI: "https://raw.githubusercontent.com/scallop-io/sui-scallop-branding-assets/main/token-icons/scallop-sui.svg",
+  SSCA: "https://raw.githubusercontent.com/scallop-io/sui-scallop-branding-assets/main/token-icons/scallop-sca.svg",
+  SCALLOP:
+    "https://raw.githubusercontent.com/scallop-io/sui-scallop-branding-assets/main/logo/scallop_logo_light.svg",
 };
 
 // Token metadata cache to prevent repeated API calls
@@ -111,6 +120,19 @@ function isVaultPool(poolGroup: PoolGroup): boolean {
   );
 }
 
+// Helper function to determine if a pool group is a scallop position
+function isScallopPosition(position: NormalizedPosition): boolean {
+  return position.positionType?.startsWith("scallop-") || false;
+}
+
+// Helper function to determine if a pool group is a scallop pool
+function isScallopPool(poolGroup: PoolGroup): boolean {
+  return (
+    poolGroup.protocol === "Scallop" ||
+    poolGroup.poolAddress.startsWith("scallop-")
+  );
+}
+
 // Normalize protocol name for badge display
 const normalizeProtocolName = (protocol: string): string => {
   // Convert protocol to appropriate className format
@@ -122,6 +144,7 @@ const normalizeProtocolName = (protocol: string): string => {
     flowx: "flowx",
     "turbos finance": "turbos",
     "kriya-dex": "kriya",
+    scallop: "scallop",
   };
 
   if (specialCases[normalized]) {
@@ -138,6 +161,8 @@ const TOKEN_ALIASES: Record<string, string> = {
   $USDC: "USDC",
   WUSDC: "USDC",
   "HA-SUI": "HASUI",
+  sSUI: "SSUI",
+  sSCA: "SSCA",
 };
 
 // Clean symbol name for consistent lookup
@@ -322,6 +347,10 @@ function EnhancedTokenIcon({
     tokenClass = "wal-token";
   } else if (normalizedSymbol === "HASUI") {
     tokenClass = "hasui-token";
+  } else if (normalizedSymbol === "USDC" || normalizedSymbol === "WUSDC") {
+    tokenClass = "usdc-token";
+  } else if (normalizedSymbol === "SSUI" || normalizedSymbol === "SSCA") {
+    tokenClass = "scallop-token";
   }
 
   return (
@@ -372,7 +401,8 @@ function PoolPair({
   const safeTokenBSymbol = tokenBSymbol || "?";
 
   // For SuiLend or other protocols with single token, display only token A
-  const isSingleTokenProtocol = protocol === "SuiLend" || !tokenBSymbol;
+  const isSingleTokenProtocol =
+    protocol === "SuiLend" || protocol === "Scallop" || !tokenBSymbol;
 
   return (
     <div className="pool-pair">
@@ -405,9 +435,204 @@ function PoolPair({
           </span>
         )}
 
+        {/* Add Scallop badge for Scallop positions */}
+        {protocol === "Scallop" && (
+          <span className="position-type-badge scallop-badge">
+            {poolName?.includes("Supply")
+              ? "Supply"
+              : poolName?.includes("Collateral")
+              ? "Collateral"
+              : "Borrow"}
+          </span>
+        )}
+
         {/* Add vault badge if this is a vault */}
         {isVault && (
           <span className="position-type-badge vault-badge">Vault</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Scallop Summary Component
+function ScallopSummary({ scallopData }: { scallopData: any }) {
+  if (!scallopData) return null;
+
+  const {
+    totalSupplyValue = 0,
+    totalDebtValue = 0,
+    totalCollateralValue = 0,
+    lendings = [],
+    borrowings = [],
+    pendingRewards = {},
+  } = scallopData;
+
+  // Format pending rewards if they exist
+  const hasRewards =
+    pendingRewards &&
+    pendingRewards.borrowIncentives &&
+    pendingRewards.borrowIncentives.length > 0;
+
+  return (
+    <div className="scallop-summary-container">
+      <div className="scallop-header">
+        <div className="protocol-icon">
+          <EnhancedTokenIcon symbol="SCALLOP" size="md" />
+        </div>
+        <h3>Scallop Protocol Positions</h3>
+      </div>
+
+      <div className="scallop-stats">
+        <div className="stat-item">
+          <span className="stat-label">Total Supply:</span>
+          <span className="stat-value">${formatDollars(totalSupplyValue)}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Total Collateral:</span>
+          <span className="stat-value">
+            ${formatDollars(totalCollateralValue)}
+          </span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Total Borrow:</span>
+          <span className="stat-value">${formatDollars(totalDebtValue)}</span>
+        </div>
+      </div>
+
+      {hasRewards && (
+        <div className="scallop-rewards">
+          <h4>Pending Rewards</h4>
+          <div className="rewards-list">
+            {pendingRewards.borrowIncentives.map(
+              (reward: any, index: number) => (
+                <div className="reward-item" key={`reward-${index}`}>
+                  <EnhancedTokenIcon symbol={reward.symbol} size="sm" />
+                  <span className="reward-amount">
+                    {formatLargeNumber(reward.pendingRewardInCoin)}
+                  </span>
+                  <span className="reward-value">
+                    ${formatDollars(reward.pendingRewardInUsd)}
+                  </span>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="scallop-positions">
+        {lendings.length > 0 && (
+          <div className="position-section">
+            <h4>Supply Positions</h4>
+            <div className="positions-list">
+              {lendings.map((lending: any, index: number) => (
+                <div className="position-item" key={`lending-${index}`}>
+                  <div className="position-token">
+                    <EnhancedTokenIcon
+                      symbol={lending.symbol}
+                      address={lending.coinType}
+                      size="sm"
+                    />
+                    <span>{lending.symbol}</span>
+                  </div>
+                  <div className="position-details">
+                    <div className="position-amount">
+                      {formatLargeNumber(lending.suppliedCoin)}
+                    </div>
+                    <div className="position-value">
+                      ${formatDollars(lending.suppliedValue)}
+                    </div>
+                    <div className="position-apy">
+                      {(lending.supplyApy * 100).toFixed(2)}% APY
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {borrowings.length > 0 && (
+          <div className="position-section">
+            <h4>Borrows & Collateral</h4>
+            {borrowings.map((obligation: any, idx: number) => (
+              <div className="obligation-item" key={`obligation-${idx}`}>
+                <div className="obligation-header">
+                  <span className="obligation-id">Obligation {idx + 1}</span>
+                  <span
+                    className="risk-level"
+                    style={{
+                      color:
+                        obligation.riskLevel < 0.3
+                          ? "#4CAF50"
+                          : obligation.riskLevel < 0.6
+                          ? "#FFC107"
+                          : "#FF5722",
+                    }}
+                  >
+                    Risk: {(obligation.riskLevel * 100).toFixed(0)}%
+                  </span>
+                </div>
+
+                {obligation.collaterals &&
+                  obligation.collaterals.length > 0 && (
+                    <div className="collateral-list">
+                      <h5>Collateral</h5>
+                      {obligation.collaterals.map(
+                        (collateral: any, cIdx: number) => (
+                          <div
+                            className="collateral-item"
+                            key={`collateral-${cIdx}`}
+                          >
+                            <EnhancedTokenIcon
+                              symbol={collateral.symbol}
+                              address={collateral.coinType}
+                              size="sm"
+                            />
+                            <span>
+                              {formatLargeNumber(collateral.depositedCoin)}{" "}
+                              {collateral.symbol}
+                            </span>
+                            <span className="item-value">
+                              ${formatDollars(collateral.depositedValueInUsd)}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                {obligation.borrowedPools &&
+                  obligation.borrowedPools.length > 0 && (
+                    <div className="borrowed-list">
+                      <h5>Borrows</h5>
+                      {obligation.borrowedPools.map(
+                        (borrow: any, bIdx: number) => (
+                          <div className="borrow-item" key={`borrow-${bIdx}`}>
+                            <EnhancedTokenIcon
+                              symbol={borrow.symbol}
+                              address={borrow.coinType}
+                              size="sm"
+                            />
+                            <span>
+                              {formatLargeNumber(borrow.borrowedCoin)}{" "}
+                              {borrow.symbol}
+                            </span>
+                            <span className="item-value">
+                              ${formatDollars(borrow.borrowedValueInUsd)}
+                            </span>
+                            <span className="borrow-rate">
+                              {(borrow.borrowApy * 100).toFixed(2)}% APY
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -422,9 +647,11 @@ function Positions() {
   const [poolPositions, setPoolPositions] = useState<PoolGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [positionType, setPositionType] = useState<"all" | "lp" | "vault">(
-    "all"
-  );
+  const [positionType, setPositionType] = useState<
+    "all" | "lp" | "vault" | "scallop"
+  >("all");
+  const [scallopData, setScallopData] = useState<any>(null);
+  const [loadingScallop, setLoadingScallop] = useState(false);
 
   const [withdrawModal, setWithdrawModal] = useState<WithdrawModalState>({
     isOpen: false,
@@ -516,6 +743,48 @@ function Positions() {
     []
   );
 
+  // Fetch Scallop positions
+  const fetchScallopData = useCallback(async () => {
+    if (!connected || !account?.address) return;
+
+    setLoadingScallop(true);
+    try {
+      console.log("Fetching Scallop data for:", account.address);
+      const data = await getScallopPortfolioData(account.address);
+      console.log("Scallop data received:", data);
+      setScallopData(data);
+
+      // Fetch token logos for Scallop positions
+      if (data) {
+        const tokens = [
+          ...(data.lendings || []).map((l: any) => ({
+            coinType: l.coinType,
+            symbol: l.symbol,
+          })),
+          ...(data.borrowings || []).flatMap((b: any) =>
+            [...(b.collaterals || []), ...(b.borrowedPools || [])].map(
+              (item: any) => ({ coinType: item.coinType, symbol: item.symbol })
+            )
+          ),
+          // Also add rewards tokens if they exist
+          ...(data.pendingRewards?.borrowIncentives || []).map((r: any) => ({
+            coinType: r.coinType,
+            symbol: r.symbol,
+          })),
+        ];
+
+        if (tokens.length > 0) {
+          const addresses = tokens.map((t) => t.coinType).filter(Boolean);
+          await fetchTokenMetadata(addresses);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching Scallop data:", err);
+    } finally {
+      setLoadingScallop(false);
+    }
+  }, [connected, account, fetchTokenMetadata]);
+
   // Updated loadPositions function to handle the new structure
   const loadPositions = useCallback(async () => {
     if (connected && account?.address) {
@@ -584,14 +853,24 @@ function Positions() {
     loadPositions();
   }, [loadPositions]);
 
+  // Load Scallop data when wallet connects
+  useEffect(() => {
+    fetchScallopData();
+  }, [fetchScallopData]);
+
   // Filter pool positions based on the positionType state
   const filteredPoolPositions = useMemo(() => {
     if (positionType === "all") {
       return poolPositions;
     } else if (positionType === "vault") {
       return poolPositions.filter((pool) => isVaultPool(pool));
+    } else if (positionType === "scallop") {
+      // Just return empty array since we'll display Scallop data separately
+      return [];
     } else {
-      return poolPositions.filter((pool) => !isVaultPool(pool));
+      return poolPositions.filter(
+        (pool) => !isVaultPool(pool) && pool.protocol !== "Scallop"
+      );
     }
   }, [poolPositions, positionType]);
 
@@ -1005,12 +1284,19 @@ function Positions() {
 
   // Helper to determine if a protocol uses single tokens
   const isSingleTokenProtocol = (protocol: string): boolean => {
-    return protocol === "SuiLend";
+    return protocol === "SuiLend" || protocol === "Scallop";
   };
 
   // Calculate counts for tabs
   const vaultCount = poolPositions.filter((pool) => isVaultPool(pool)).length;
-  const lpCount = poolPositions.filter((pool) => !isVaultPool(pool)).length;
+  const lpCount = poolPositions.filter(
+    (pool) => !isVaultPool(pool) && pool.protocol !== "Scallop"
+  ).length;
+  const hasScallopPositions =
+    scallopData &&
+    ((scallopData.lendings && scallopData.lendings.length > 0) ||
+      (scallopData.borrowings && scallopData.borrowings.length > 0));
+  const scallopCount = hasScallopPositions ? 1 : 0;
 
   // Helper function to find token metadata for a given token
   const getTokenMetadataByAddress = (address?: string) => {
@@ -1081,12 +1367,12 @@ function Positions() {
               Connect Wallet
             </button>
           </div>
-        ) : loading ? (
+        ) : loading && !scallopData ? (
           <div className="loading-state">
             <div className="spinner"></div>
             <div className="loading-text">Loading positions...</div>
           </div>
-        ) : poolPositions.length === 0 ? (
+        ) : poolPositions.length === 0 && !hasScallopPositions ? (
           <div className="empty-state">
             <div className="empty-icon">💧</div>
             <h3>No Positions Found</h3>
@@ -1118,7 +1404,7 @@ function Positions() {
                 }`}
                 onClick={() => setPositionType("all")}
               >
-                All Positions ({poolPositions.length})
+                All Positions ({poolPositions.length + scallopCount})
               </button>
               <button
                 className={`position-type-tab ${
@@ -1136,344 +1422,189 @@ function Positions() {
               >
                 Vaults ({vaultCount})
               </button>
+              {hasScallopPositions && (
+                <button
+                  className={`position-type-tab ${
+                    positionType === "scallop" ? "active" : ""
+                  }`}
+                  onClick={() => setPositionType("scallop")}
+                >
+                  Scallop ({scallopCount})
+                </button>
+              )}
             </div>
 
-            {/* Display positions in a table format similar to pools */}
-            <div className="positions-table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Pool</th>
-                    <th>DEX</th>
-                    <th className="align-right">Your Liquidity</th>
-                    <th className="align-right">Value (USD)</th>
-                    <th className="align-right">APR</th>
-                    <th className="align-center">Status</th>
-                    <th className="actions-column">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPoolPositions
-                    // Add this filter to exclude any wallet positions
-                    .filter(
-                      (poolPosition) =>
-                        poolPosition.protocol.toLowerCase() !== "wallet"
-                    )
-                    .map((poolPosition) => (
-                      <React.Fragment key={poolPosition.poolAddress}>
-                        <tr
-                          className={`position-row ${
-                            isVaultPool(poolPosition) ? "vault-row" : "lp-row"
-                          }`}
-                          onClick={() =>
-                            toggleDetails(poolPosition.poolAddress)
-                          }
-                        >
-                          <td className="pool-cell">
-                            <PoolPair
-                              tokenALogo={poolPosition.tokenALogo}
-                              tokenBLogo={poolPosition.tokenBLogo}
-                              tokenASymbol={poolPosition.tokenASymbol}
-                              tokenBSymbol={poolPosition.tokenBSymbol}
-                              tokenAAddress={poolPosition.tokenA}
-                              tokenBAddress={poolPosition.tokenB}
-                              protocol={poolPosition.protocol}
-                              poolName={poolPosition.poolName}
-                              isVault={isVaultPool(poolPosition)}
-                              tokenAMetadata={
-                                getTokenMetadataByAddress(
-                                  poolPosition.tokenA
-                                ) ||
-                                getTokenMetadataBySymbol(
-                                  poolPosition.tokenASymbol
-                                )
-                              }
-                              tokenBMetadata={
-                                getTokenMetadataByAddress(
-                                  poolPosition.tokenB
-                                ) ||
-                                getTokenMetadataBySymbol(
-                                  poolPosition.tokenBSymbol
-                                )
-                              }
-                            />
-                          </td>
-                          <td>
-                            {/* Replace the hardcoded dex-badge with the ProtocolBadge component */}
-                            <ProtocolBadge
-                              protocol={poolPosition.protocol}
-                              protocolClass={normalizeProtocolName(
-                                poolPosition.protocol
-                              )}
-                              isVault={isVaultPool(poolPosition)}
-                            />
-                          </td>
-                          <td className="align-right liquidity-cell">
-                            {formatLargeNumber(poolPosition.totalLiquidity)}
-                          </td>
-                          <td className="align-right">
-                            {formatDollars(poolPosition.totalValueUsd)}
-                          </td>
-                          <td className="align-right">
-                            <span
-                              className={`apr-value ${getAprClass(
-                                poolPosition.apr
-                              )}`}
-                            >
-                              {poolPosition.apr.toFixed(2)}%
-                            </span>
-                          </td>
-                          <td className="align-center">
-                            {isVaultPool(poolPosition) ? (
-                              <span className="status-badge vault">Vault</span>
-                            ) : poolPosition.positions.some(
-                                (pos) => pos.isOutOfRange
-                              ) ? (
-                              <span className="status-badge warning">
-                                Partially Out of Range
-                              </span>
-                            ) : (
-                              <span className="status-badge success">
-                                {poolPosition.protocol === "SuiLend"
-                                  ? poolPosition.poolName.includes("Deposit")
-                                    ? "Deposit"
-                                    : "Borrow"
-                                  : "In Range"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="actions-cell">
-                            <div className="action-buttons">
-                              <button
-                                className="btn btn--secondary btn--sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleDetails(poolPosition.poolAddress);
-                                }}
-                              >
-                                {showDetails[poolPosition.poolAddress]
-                                  ? "Hide"
-                                  : "Details"}
-                              </button>
-                              <button
-                                className="btn btn--primary btn--sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleWithdraw(
-                                    poolPosition.poolAddress,
-                                    poolPosition.positions.map((p) => p.id),
-                                    poolPosition.totalLiquidity,
-                                    poolPosition.totalValueUsd
-                                  );
-                                }}
-                                disabled={
-                                  withdrawingPool === poolPosition.poolAddress
-                                }
-                              >
-                                {withdrawingPool ===
-                                poolPosition.poolAddress ? (
-                                  <span className="loading-text">
-                                    <span className="dot-loader"></span>
-                                    Withdrawing
-                                  </span>
-                                ) : isVaultPool(poolPosition) ? (
-                                  "Withdraw from Vault"
-                                ) : poolPosition.protocol === "SuiLend" &&
-                                  poolPosition.poolName?.includes("Deposit") ? (
-                                  "Withdraw"
-                                ) : poolPosition.protocol === "SuiLend" ? (
-                                  "Repay"
-                                ) : (
-                                  "Withdraw"
-                                )}
-                              </button>
-                              {poolPosition.positions.some(
-                                (pos) =>
-                                  pos.rewards &&
-                                  pos.rewards.some(
-                                    (r) => parseFloat(r.formatted || "0") > 0
+            {/* Scallop summary if showing scallop tab */}
+            {positionType === "scallop" && hasScallopPositions && (
+              <ScallopSummary scallopData={scallopData} />
+            )}
+
+            {/* Show regular positions if NOT on scallop tab or if 'all' tab */}
+            {(positionType !== "scallop" || positionType === "all") && (
+              <div className="positions-table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Pool</th>
+                      <th>DEX</th>
+                      <th className="align-right">Your Liquidity</th>
+                      <th className="align-right">Value (USD)</th>
+                      <th className="align-right">APR</th>
+                      <th className="align-center">Status</th>
+                      <th className="actions-column">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPoolPositions
+                      // Add this filter to exclude any wallet positions
+                      .filter(
+                        (poolPosition) =>
+                          poolPosition.protocol.toLowerCase() !== "wallet"
+                      )
+                      .map((poolPosition) => (
+                        <React.Fragment key={poolPosition.poolAddress}>
+                          <tr
+                            className={`position-row ${
+                              isVaultPool(poolPosition) ? "vault-row" : "lp-row"
+                            } ${
+                              isScallopPool(poolPosition) ? "scallop-row" : ""
+                            }`}
+                            onClick={() =>
+                              toggleDetails(poolPosition.poolAddress)
+                            }
+                          >
+                            <td className="pool-cell">
+                              <PoolPair
+                                tokenALogo={poolPosition.tokenALogo}
+                                tokenBLogo={poolPosition.tokenBLogo}
+                                tokenASymbol={poolPosition.tokenASymbol}
+                                tokenBSymbol={poolPosition.tokenBSymbol}
+                                tokenAAddress={poolPosition.tokenA}
+                                tokenBAddress={poolPosition.tokenB}
+                                protocol={poolPosition.protocol}
+                                poolName={poolPosition.poolName}
+                                isVault={isVaultPool(poolPosition)}
+                                tokenAMetadata={
+                                  getTokenMetadataByAddress(
+                                    poolPosition.tokenA
+                                  ) ||
+                                  getTokenMetadataBySymbol(
+                                    poolPosition.tokenASymbol
                                   )
-                              ) && (
+                                }
+                                tokenBMetadata={
+                                  getTokenMetadataByAddress(
+                                    poolPosition.tokenB
+                                  ) ||
+                                  getTokenMetadataBySymbol(
+                                    poolPosition.tokenBSymbol
+                                  )
+                                }
+                              />
+                            </td>
+                            <td>
+                              {/* Replace the hardcoded dex-badge with the ProtocolBadge component */}
+                              <ProtocolBadge
+                                protocol={poolPosition.protocol}
+                                protocolClass={normalizeProtocolName(
+                                  poolPosition.protocol
+                                )}
+                                isVault={isVaultPool(poolPosition)}
+                              />
+                            </td>
+                            <td className="align-right liquidity-cell">
+                              {formatLargeNumber(poolPosition.totalLiquidity)}
+                            </td>
+                            <td className="align-right">
+                              {formatDollars(poolPosition.totalValueUsd)}
+                            </td>
+                            <td className="align-right">
+                              <span
+                                className={`apr-value ${getAprClass(
+                                  poolPosition.apr
+                                )}`}
+                              >
+                                {poolPosition.apr.toFixed(2)}%
+                              </span>
+                            </td>
+                            <td className="align-center">
+                              {isVaultPool(poolPosition) ? (
+                                <span className="status-badge vault">
+                                  Vault
+                                </span>
+                              ) : isScallopPool(poolPosition) ? (
+                                <span className="status-badge scallop">
+                                  {poolPosition.poolName.includes("Supply")
+                                    ? "Supply"
+                                    : poolPosition.poolName.includes(
+                                        "Collateral"
+                                      )
+                                    ? "Collateral"
+                                    : "Borrow"}
+                                </span>
+                              ) : poolPosition.positions.some(
+                                  (pos) => pos.isOutOfRange
+                                ) ? (
+                                <span className="status-badge warning">
+                                  Partially Out of Range
+                                </span>
+                              ) : (
+                                <span className="status-badge success">
+                                  {poolPosition.protocol === "SuiLend"
+                                    ? poolPosition.poolName.includes("Deposit")
+                                      ? "Deposit"
+                                      : "Borrow"
+                                    : "In Range"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="actions-cell">
+                              <div className="action-buttons">
                                 <button
-                                  className="btn btn--accent btn--sm"
+                                  className="btn btn--secondary btn--sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleClaim(
+                                    toggleDetails(poolPosition.poolAddress);
+                                  }}
+                                >
+                                  {showDetails[poolPosition.poolAddress]
+                                    ? "Hide"
+                                    : "Details"}
+                                </button>
+                                <button
+                                  className="btn btn--primary btn--sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleWithdraw(
                                       poolPosition.poolAddress,
-                                      poolPosition.positions.map((p) => p.id)
+                                      poolPosition.positions.map((p) => p.id),
+                                      poolPosition.totalLiquidity,
+                                      poolPosition.totalValueUsd
                                     );
                                   }}
                                   disabled={
-                                    claimingPool === poolPosition.poolAddress
+                                    withdrawingPool === poolPosition.poolAddress
                                   }
                                 >
-                                  {claimingPool === poolPosition.poolAddress ? (
+                                  {withdrawingPool ===
+                                  poolPosition.poolAddress ? (
                                     <span className="loading-text">
                                       <span className="dot-loader"></span>
-                                      Claiming
+                                      Withdrawing
                                     </span>
+                                  ) : isVaultPool(poolPosition) ? (
+                                    "Withdraw from Vault"
+                                  ) : poolPosition.protocol === "SuiLend" &&
+                                    poolPosition.poolName?.includes(
+                                      "Deposit"
+                                    ) ? (
+                                    "Withdraw"
+                                  ) : poolPosition.protocol === "SuiLend" ? (
+                                    "Repay"
                                   ) : (
-                                    "Claim"
+                                    "Withdraw"
                                   )}
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {showDetails[poolPosition.poolAddress] && (
-                          <tr className="details-row">
-                            <td colSpan={7}>
-                              <div className="position-details-container">
-                                <div className="details-header">
-                                  <h4>
-                                    {isVaultPool(poolPosition)
-                                      ? "Vault Details"
-                                      : "Position Details"}
-                                  </h4>
-                                </div>
-                                <div className="positions-detail-table">
-                                  <table>
-                                    <thead>
-                                      <tr>
-                                        <th>Position ID</th>
-                                        <th>
-                                          {poolPosition.tokenASymbol ||
-                                            "Token A"}{" "}
-                                          Amount
-                                        </th>
-                                        {!isSingleTokenProtocol(
-                                          poolPosition.protocol
-                                        ) &&
-                                          !isVaultPool(poolPosition) && (
-                                            <th>
-                                              {poolPosition.tokenBSymbol ||
-                                                "Token B"}{" "}
-                                              Amount
-                                            </th>
-                                          )}
-                                        <th>Value (USD)</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {poolPosition.positions.map(
-                                        (position) => (
-                                          <tr
-                                            key={position.id}
-                                            data-protocol={
-                                              position.positionType ||
-                                              poolPosition.protocol.toLowerCase()
-                                            }
-                                          >
-                                            <td className="monospace">
-                                              {position.id.substring(0, 8)}...
-                                              {position.id.substring(
-                                                position.id.length - 4
-                                              )}
-                                            </td>
-                                            <td>
-                                              {/* Show formatted balance if available */}
-                                              {(position as ExtendedPosition)
-                                                .formattedAmountA ||
-                                                position.formattedBalanceA ||
-                                                formatLargeNumber(
-                                                  parseInt(
-                                                    position.balanceA || "0"
-                                                  )
-                                                )}
-                                            </td>
-                                            {!isSingleTokenProtocol(
-                                              poolPosition.protocol
-                                            ) &&
-                                              !isVaultPosition(position) && (
-                                                <td>
-                                                  {/* Show formatted balance if available */}
-                                                  {(
-                                                    position as ExtendedPosition
-                                                  ).formattedAmountB ||
-                                                    position.formattedBalanceB ||
-                                                    formatLargeNumber(
-                                                      parseInt(
-                                                        position.balanceB || "0"
-                                                      )
-                                                    )}
-                                                </td>
-                                              )}
-                                            <td>
-                                              {formatDollars(position.valueUsd)}
-                                            </td>
-                                            <td>
-                                              {isVaultPosition(position) ? (
-                                                <span className="status-badge vault">
-                                                  Vault
-                                                </span>
-                                              ) : position.isOutOfRange ? (
-                                                <span className="status-badge warning">
-                                                  Out of Range
-                                                </span>
-                                              ) : (
-                                                <span className="status-badge success">
-                                                  {poolPosition.protocol ===
-                                                  "SuiLend"
-                                                    ? position.positionType ===
-                                                      "suilend-deposit"
-                                                      ? "Deposit"
-                                                      : "Borrow"
-                                                    : "In Range"}
-                                                </span>
-                                              )}
-                                            </td>
-                                            <td>
-                                              <div className="action-buttons">
-                                                {!isVaultPosition(position) &&
-                                                  poolPosition.protocol !==
-                                                    "SuiLend" && (
-                                                    <button
-                                                      className="btn btn--secondary btn--sm"
-                                                      onClick={() =>
-                                                        handleCollectFees(
-                                                          poolPosition.poolAddress,
-                                                          position.id
-                                                        )
-                                                      }
-                                                    >
-                                                      Collect Fees
-                                                    </button>
-                                                  )}
-                                                <button
-                                                  className="btn btn--primary btn--sm"
-                                                  onClick={() =>
-                                                    handleClosePosition(
-                                                      poolPosition.poolAddress,
-                                                      position.id
-                                                    )
-                                                  }
-                                                  disabled={
-                                                    withdrawingPool ===
-                                                    poolPosition.poolAddress
-                                                  }
-                                                >
-                                                  {isVaultPosition(position)
-                                                    ? "Withdraw from Vault"
-                                                    : poolPosition.protocol ===
-                                                      "SuiLend"
-                                                    ? position.positionType ===
-                                                      "suilend-deposit"
-                                                      ? "Withdraw"
-                                                      : "Repay"
-                                                    : "Close"}
-                                                </button>
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        )
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
-
-                                {/* Unclaimed rewards section */}
                                 {poolPosition.positions.some(
                                   (pos) =>
                                     pos.rewards &&
@@ -1481,107 +1612,330 @@ function Positions() {
                                       (r) => parseFloat(r.formatted || "0") > 0
                                     )
                                 ) && (
-                                  <div className="rewards-section">
-                                    <h4>Unclaimed Rewards</h4>
-                                    <div className="rewards-list">
-                                      {Object.values(
-                                        poolPosition.positions
-                                          .flatMap((pos) => pos.rewards || [])
-                                          .reduce((acc, reward) => {
-                                            if (!reward) return acc;
-                                            const key =
-                                              reward.tokenSymbol || "Unknown";
-                                            if (!acc[key]) {
-                                              acc[key] = { ...reward };
-                                            } else {
-                                              // Sum up rewards of the same token
-                                              const currentAmount = BigInt(
-                                                acc[key].amount || "0"
-                                              );
-                                              const newAmount = BigInt(
-                                                reward.amount || "0"
-                                              );
-                                              acc[key].amount = (
-                                                currentAmount + newAmount
-                                              ).toString();
-                                              acc[key].formatted = (
-                                                parseInt(
-                                                  acc[key].amount || "0"
-                                                ) /
-                                                Math.pow(
-                                                  10,
-                                                  reward.decimals || 0
-                                                )
-                                              ).toFixed(reward.decimals || 0);
-                                              acc[key].valueUsd =
-                                                (acc[key].valueUsd || 0) +
-                                                (reward.valueUsd || 0);
-                                            }
-                                            return acc;
-                                          }, {} as Record<string, NonNullable<NormalizedPosition["rewards"]>[number]>)
-                                      )
-                                        .filter(
-                                          (reward) =>
-                                            reward &&
-                                            parseFloat(
-                                              reward.formatted || "0"
-                                            ) > 0
-                                        )
-                                        .map((reward) => (
-                                          <div
-                                            key={reward.tokenSymbol}
-                                            className="reward-item"
-                                          >
-                                            <span className="reward-token">
-                                              {reward.tokenSymbol || "Unknown"}:
-                                            </span>
-                                            <span className="reward-amount">
-                                              {parseFloat(
-                                                reward.formatted || "0"
-                                              ).toFixed(6)}
-                                            </span>
-                                            <span className="reward-value">
-                                              ≈ $
-                                              {(reward.valueUsd || 0).toFixed(
-                                                2
-                                              )}
-                                            </span>
-                                          </div>
-                                        ))}
-                                    </div>
-                                    <div className="rewards-actions">
-                                      <button
-                                        className="btn btn--accent btn--sm"
-                                        onClick={() =>
-                                          handleClaim(
-                                            poolPosition.poolAddress,
-                                            poolPosition.positions.map(
-                                              (p) => p.id
-                                            )
-                                          )
-                                        }
-                                        disabled={
-                                          claimingPool ===
-                                          poolPosition.poolAddress
-                                        }
-                                      >
-                                        {claimingPool ===
-                                        poolPosition.poolAddress
-                                          ? "Claiming..."
-                                          : "Claim All Rewards"}
-                                      </button>
-                                    </div>
-                                  </div>
+                                  <button
+                                    className="btn btn--accent btn--sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleClaim(
+                                        poolPosition.poolAddress,
+                                        poolPosition.positions.map((p) => p.id)
+                                      );
+                                    }}
+                                    disabled={
+                                      claimingPool === poolPosition.poolAddress
+                                    }
+                                  >
+                                    {claimingPool ===
+                                    poolPosition.poolAddress ? (
+                                      <span className="loading-text">
+                                        <span className="dot-loader"></span>
+                                        Claiming
+                                      </span>
+                                    ) : (
+                                      "Claim"
+                                    )}
+                                  </button>
                                 )}
                               </div>
                             </td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+                          {showDetails[poolPosition.poolAddress] && (
+                            <tr className="details-row">
+                              <td colSpan={7}>
+                                <div className="position-details-container">
+                                  <div className="details-header">
+                                    <h4>
+                                      {isVaultPool(poolPosition)
+                                        ? "Vault Details"
+                                        : "Position Details"}
+                                    </h4>
+                                  </div>
+                                  <div className="positions-detail-table">
+                                    <table>
+                                      <thead>
+                                        <tr>
+                                          <th>Position ID</th>
+                                          <th>
+                                            {poolPosition.tokenASymbol ||
+                                              "Token A"}{" "}
+                                            Amount
+                                          </th>
+                                          {!isSingleTokenProtocol(
+                                            poolPosition.protocol
+                                          ) &&
+                                            !isVaultPool(poolPosition) && (
+                                              <th>
+                                                {poolPosition.tokenBSymbol ||
+                                                  "Token B"}{" "}
+                                                Amount
+                                              </th>
+                                            )}
+                                          <th>Value (USD)</th>
+                                          <th>Status</th>
+                                          <th>Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {poolPosition.positions.map(
+                                          (position) => (
+                                            <tr
+                                              key={position.id}
+                                              data-protocol={
+                                                position.positionType ||
+                                                poolPosition.protocol.toLowerCase()
+                                              }
+                                            >
+                                              <td className="monospace">
+                                                {position.id.substring(0, 8)}...
+                                                {position.id.substring(
+                                                  position.id.length - 4
+                                                )}
+                                              </td>
+                                              <td>
+                                                {/* Show formatted balance if available */}
+                                                {(position as ExtendedPosition)
+                                                  .formattedAmountA ||
+                                                  position.formattedBalanceA ||
+                                                  formatLargeNumber(
+                                                    parseInt(
+                                                      position.balanceA || "0"
+                                                    )
+                                                  )}
+                                              </td>
+                                              {!isSingleTokenProtocol(
+                                                poolPosition.protocol
+                                              ) &&
+                                                !isVaultPosition(position) && (
+                                                  <td>
+                                                    {/* Show formatted balance if available */}
+                                                    {(
+                                                      position as ExtendedPosition
+                                                    ).formattedAmountB ||
+                                                      position.formattedBalanceB ||
+                                                      formatLargeNumber(
+                                                        parseInt(
+                                                          position.balanceB ||
+                                                            "0"
+                                                        )
+                                                      )}
+                                                  </td>
+                                                )}
+                                              <td>
+                                                {formatDollars(
+                                                  position.valueUsd
+                                                )}
+                                              </td>
+                                              <td>
+                                                {isVaultPosition(position) ? (
+                                                  <span className="status-badge vault">
+                                                    Vault
+                                                  </span>
+                                                ) : isScallopPosition(
+                                                    position
+                                                  ) ? (
+                                                  <span className="status-badge scallop">
+                                                    {position.positionType?.includes(
+                                                      "supply"
+                                                    )
+                                                      ? "Supply"
+                                                      : position.positionType?.includes(
+                                                          "collateral"
+                                                        )
+                                                      ? "Collateral"
+                                                      : "Borrow"}
+                                                  </span>
+                                                ) : position.isOutOfRange ? (
+                                                  <span className="status-badge warning">
+                                                    Out of Range
+                                                  </span>
+                                                ) : (
+                                                  <span className="status-badge success">
+                                                    {poolPosition.protocol ===
+                                                    "SuiLend"
+                                                      ? position.positionType ===
+                                                        "suilend-deposit"
+                                                        ? "Deposit"
+                                                        : "Borrow"
+                                                      : "In Range"}
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td>
+                                                <div className="action-buttons">
+                                                  {!isVaultPosition(position) &&
+                                                    !isScallopPosition(
+                                                      position
+                                                    ) &&
+                                                    poolPosition.protocol !==
+                                                      "SuiLend" && (
+                                                      <button
+                                                        className="btn btn--secondary btn--sm"
+                                                        onClick={() =>
+                                                          handleCollectFees(
+                                                            poolPosition.poolAddress,
+                                                            position.id
+                                                          )
+                                                        }
+                                                      >
+                                                        Collect Fees
+                                                      </button>
+                                                    )}
+                                                  <button
+                                                    className="btn btn--primary btn--sm"
+                                                    onClick={() =>
+                                                      handleClosePosition(
+                                                        poolPosition.poolAddress,
+                                                        position.id
+                                                      )
+                                                    }
+                                                    disabled={
+                                                      withdrawingPool ===
+                                                      poolPosition.poolAddress
+                                                    }
+                                                  >
+                                                    {isVaultPosition(position)
+                                                      ? "Withdraw from Vault"
+                                                      : isScallopPosition(
+                                                          position
+                                                        )
+                                                      ? position.positionType?.includes(
+                                                          "supply"
+                                                        ) ||
+                                                        position.positionType?.includes(
+                                                          "collateral"
+                                                        )
+                                                        ? "Withdraw"
+                                                        : "Repay"
+                                                      : poolPosition.protocol ===
+                                                        "SuiLend"
+                                                      ? position.positionType ===
+                                                        "suilend-deposit"
+                                                        ? "Withdraw"
+                                                        : "Repay"
+                                                      : "Close"}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          )
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Unclaimed rewards section */}
+                                  {poolPosition.positions.some(
+                                    (pos) =>
+                                      pos.rewards &&
+                                      pos.rewards.some(
+                                        (r) =>
+                                          parseFloat(r.formatted || "0") > 0
+                                      )
+                                  ) && (
+                                    <div className="rewards-section">
+                                      <h4>Unclaimed Rewards</h4>
+                                      <div className="rewards-list">
+                                        {Object.values(
+                                          poolPosition.positions
+                                            .flatMap((pos) => pos.rewards || [])
+                                            .reduce((acc, reward) => {
+                                              if (!reward) return acc;
+                                              const key =
+                                                reward.tokenSymbol || "Unknown";
+                                              if (!acc[key]) {
+                                                acc[key] = { ...reward };
+                                              } else {
+                                                // Sum up rewards of the same token
+                                                const currentAmount = BigInt(
+                                                  acc[key].amount || "0"
+                                                );
+                                                const newAmount = BigInt(
+                                                  reward.amount || "0"
+                                                );
+                                                acc[key].amount = (
+                                                  currentAmount + newAmount
+                                                ).toString();
+                                                acc[key].formatted = (
+                                                  parseInt(
+                                                    acc[key].amount || "0"
+                                                  ) /
+                                                  Math.pow(
+                                                    10,
+                                                    reward.decimals || 0
+                                                  )
+                                                ).toFixed(reward.decimals || 0);
+                                                acc[key].valueUsd =
+                                                  (acc[key].valueUsd || 0) +
+                                                  (reward.valueUsd || 0);
+                                              }
+                                              return acc;
+                                            }, {} as Record<string, NonNullable<NormalizedPosition["rewards"]>[number]>)
+                                        )
+                                          .filter(
+                                            (reward) =>
+                                              reward &&
+                                              parseFloat(
+                                                reward.formatted || "0"
+                                              ) > 0
+                                          )
+                                          .map((reward) => (
+                                            <div
+                                              key={reward.tokenSymbol}
+                                              className="reward-item"
+                                            >
+                                              <span className="reward-token">
+                                                {reward.tokenSymbol ||
+                                                  "Unknown"}
+                                                :
+                                              </span>
+                                              <span className="reward-amount">
+                                                {parseFloat(
+                                                  reward.formatted || "0"
+                                                ).toFixed(6)}
+                                              </span>
+                                              <span className="reward-value">
+                                                ≈ $
+                                                {(reward.valueUsd || 0).toFixed(
+                                                  2
+                                                )}
+                                              </span>
+                                            </div>
+                                          ))}
+                                      </div>
+                                      <div className="rewards-actions">
+                                        <button
+                                          className="btn btn--accent btn--sm"
+                                          onClick={() =>
+                                            handleClaim(
+                                              poolPosition.poolAddress,
+                                              poolPosition.positions.map(
+                                                (p) => p.id
+                                              )
+                                            )
+                                          }
+                                          disabled={
+                                            claimingPool ===
+                                            poolPosition.poolAddress
+                                          }
+                                        >
+                                          {claimingPool ===
+                                          poolPosition.poolAddress
+                                            ? "Claiming..."
+                                            : "Claim All Rewards"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
 
@@ -1623,6 +1977,11 @@ function Positions() {
         .position-type-badge.vault-badge {
           background-color: rgba(92, 67, 232, 0.1);
           color: #5c43e8;
+        }
+
+        .position-type-badge.scallop-badge {
+          background-color: rgba(235, 102, 98, 0.1);
+          color: #eb6662;
         }
 
         /* Position type tabs */
@@ -1670,6 +2029,16 @@ function Positions() {
         .status-badge.vault {
           background-color: rgba(92, 67, 232, 0.1);
           color: #5c43e8;
+        }
+
+        /* Scallop styling */
+        .scallop-row {
+          background-color: rgba(235, 102, 98, 0.05);
+        }
+
+        .status-badge.scallop {
+          background-color: rgba(235, 102, 98, 0.1);
+          color: #eb6662;
         }
 
         /* Token styling */
@@ -1758,6 +2127,210 @@ function Positions() {
         .hasui-token {
           background: linear-gradient(135deg, #ffd966, #ff6b6b);
           box-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
+        }
+
+        .scallop-token {
+          background: linear-gradient(135deg, #eb6662, #ff9c97);
+          box-shadow: 0 0 10px rgba(235, 102, 98, 0.7);
+        }
+
+        /* Scallop Summary Styles */
+        .scallop-summary-container {
+          background: rgba(20, 30, 48, 0.6);
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          padding: 20px;
+          margin-bottom: 24px;
+        }
+
+        .scallop-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
+        .protocol-icon {
+          margin-right: 12px;
+        }
+
+        .scallop-stats {
+          display: flex;
+          gap: 20px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+
+        .stat-item {
+          display: flex;
+          flex-direction: column;
+          min-width: 150px;
+        }
+
+        .stat-label {
+          font-size: 14px;
+          color: #a0a7b8;
+          margin-bottom: 4px;
+        }
+
+        .stat-value {
+          font-size: 18px;
+          font-weight: 500;
+        }
+
+        .scallop-rewards {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 16px;
+        }
+
+        .scallop-rewards h4 {
+          margin-bottom: 8px;
+          color: #eb6662;
+        }
+
+        .rewards-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .reward-item {
+          display: flex;
+          align-items: center;
+          background: rgba(0, 0, 0, 0.2);
+          padding: 8px;
+          border-radius: 6px;
+        }
+
+        .reward-item .token-icon {
+          margin-right: 8px;
+        }
+
+        .reward-amount {
+          font-weight: 500;
+          margin-right: 8px;
+        }
+
+        .reward-value {
+          color: #a0a7b8;
+          font-size: 12px;
+        }
+
+        .scallop-positions {
+          margin-top: 16px;
+        }
+
+        .position-section h4 {
+          padding-bottom: 8px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          margin-bottom: 12px;
+        }
+
+        .positions-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 12px;
+        }
+
+        .position-item {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          padding: 12px;
+          display: flex;
+          align-items: center;
+        }
+
+        .position-token {
+          display: flex;
+          align-items: center;
+          margin-right: 12px;
+          min-width: 80px;
+        }
+
+        .position-token .token-icon {
+          margin-right: 8px;
+        }
+
+        .position-details {
+          flex: 1;
+        }
+
+        .position-amount {
+          font-weight: 500;
+        }
+
+        .position-value {
+          color: #a0a7b8;
+          font-size: 12px;
+        }
+
+        .position-apy {
+          color: #00c48c;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .obligation-item {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 16px;
+        }
+
+        .obligation-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .obligation-id {
+          font-weight: 500;
+        }
+
+        .risk-level {
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          background: rgba(0, 0, 0, 0.2);
+        }
+
+        .collateral-list h5,
+        .borrowed-list h5 {
+          margin-bottom: 8px;
+          font-size: 14px;
+          color: #a0a7b8;
+        }
+
+        .collateral-item,
+        .borrow-item {
+          display: flex;
+          align-items: center;
+          margin-bottom: 8px;
+          padding: 8px;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+        }
+
+        .collateral-item .token-icon,
+        .borrow-item .token-icon {
+          margin-right: 8px;
+        }
+
+        .item-value {
+          margin-left: auto;
+          font-weight: 500;
+        }
+
+        .borrow-rate {
+          margin-left: 10px;
+          color: #ff5252;
+          font-size: 12px;
+        }
+
+        .borrowed-list {
+          margin-top: 16px;
         }
       `}</style>
     </div>

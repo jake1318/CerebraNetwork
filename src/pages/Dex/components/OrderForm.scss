@@ -1,304 +1,304 @@
 /* src/pages/Dex/components/OrderForm.scss */
-/* Last Updated: 2025-06-24 19:37:13 UTC by jake1318 */
+/* Last Updated: 2025-06-25 19:49:13 */
+/* Author: jake1318 */
 
-.order-form {
+.dex-order-form {
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  width: 100%;
-  max-height: 100%;
-  overflow-y: auto; /* Allow scrolling if content is too tall */
-  -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS */
-  padding-right: 5px; /* Add space for scrollbar */
+  color: #e0e0e0;
+  padding: 8px;
 
-  /* Buy/Sell Tabs */
-  .order-tabs {
+  // Variables
+  $buy-color: #4caf50;
+  $buy-hover: #43a047;
+  $buy-bg: rgba(76, 175, 80, 0.1);
+  $buy-border: rgba(76, 175, 80, 0.3);
+
+  $sell-color: #ff3b30;
+  $sell-hover: #e53935;
+  $sell-bg: rgba(255, 59, 48, 0.1);
+  $sell-border: rgba(255, 59, 48, 0.3);
+
+  $accent-color: #00c2ff;
+  $accent-bg: rgba(0, 194, 255, 0.1);
+  $accent-border: rgba(0, 194, 255, 0.3);
+
+  $border-color: #2a2f3a;
+  $input-bg: rgba(0, 0, 0, 0.2);
+  $text-muted: #8a8a8a;
+
+  // Buy/Sell tabs at the top
+  .order-form-tabs {
     display: flex;
-    border-radius: 6px;
-    overflow: hidden;
-    margin-bottom: 5px;
-    flex-shrink: 0; /* Prevent this from shrinking */
+    margin-bottom: 12px;
 
-    button {
+    .tab {
       flex: 1;
-      background: rgba(10, 15, 30, 0.4);
-      color: #f0f0f0;
-      border: none;
-      padding: 10px;
-      font-size: 16px;
-      font-weight: 600;
+      padding: 8px 0;
+      border: 1px solid $border-color;
+      background: transparent;
+      color: $text-muted;
+      font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s;
-      text-transform: uppercase;
+      transition: all 0.2s ease;
+
+      &:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      &:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+
+      &.buy.active {
+        background-color: $buy-bg;
+        color: $buy-color;
+        border-color: $buy-border;
+      }
+
+      &.sell.active {
+        background-color: $sell-bg;
+        color: $sell-color;
+        border-color: $sell-border;
+      }
+
+      &:hover:not(.active) {
+        color: #e0e0e0;
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+    }
+  }
+
+  // Limit/Market mode selector
+  .order-form-mode-selector {
+    display: flex;
+    margin-bottom: 16px;
+
+    .mode-btn {
+      flex: 1;
+      padding: 6px 0;
+      background: transparent;
+      border: 1px solid $border-color;
+      color: $text-muted;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      &:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+
+      &.active {
+        background-color: $accent-bg;
+        color: $accent-color;
+        border-color: $accent-border;
+      }
+
+      &:hover:not(.active) {
+        color: #e0e0e0;
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+    }
+  }
+
+  // Form content
+  .order-form-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+
+      label {
+        font-size: 13px;
+        color: $text-muted;
+        margin-bottom: 6px;
+      }
+
+      .input-container {
+        position: relative;
+
+        input {
+          width: 100%;
+          padding: 8px 10px;
+          background-color: $input-bg;
+          border: 1px solid $border-color;
+          border-radius: 4px;
+          color: #e0e0e0;
+          font-size: 14px;
+          font-family: "Roboto Mono", monospace;
+
+          &:focus {
+            outline: none;
+            border-color: $accent-border;
+          }
+
+          &:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+
+          // Remove spinner buttons in number inputs
+          &::-webkit-outer-spin-button,
+          &::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+
+          // Firefox
+          &[type="number"] {
+            -moz-appearance: textfield;
+          }
+        }
+      }
+
+      .balance-info {
+        font-size: 12px;
+        color: $text-muted;
+        margin-top: 6px;
+        text-align: right;
+      }
+
+      .percentage-buttons {
+        display: flex;
+        margin-top: 8px;
+        gap: 4px;
+
+        .pct-btn {
+          flex: 1;
+          padding: 4px 0;
+          background-color: rgba(255, 255, 255, 0.05);
+          border: 1px solid $border-color;
+          color: $text-muted;
+          font-size: 12px;
+          cursor: pointer;
+          border-radius: 2px;
+
+          &:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+
+      .total-value {
+        background-color: $input-bg;
+        padding: 8px 10px;
+        border: 1px solid $border-color;
+        border-radius: 4px;
+        font-family: "Roboto Mono", monospace;
+        font-size: 14px;
+      }
+    }
+
+    .market-notice {
+      background-color: $accent-bg;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid $accent-border;
+      text-align: center;
+      font-size: 14px;
+      color: $accent-color;
+    }
+
+    .order-status {
+      padding: 10px;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 13px;
+      margin: 8px 0;
+
+      &.success {
+        background-color: rgba(76, 175, 80, 0.1);
+        border: 1px solid rgba(76, 175, 80, 0.3);
+        color: $buy-color;
+      }
+
+      &.error {
+        background-color: rgba(255, 59, 48, 0.1);
+        border: 1px solid rgba(255, 59, 48, 0.3);
+        color: $sell-color;
+      }
+    }
+
+    .submit-order-btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      margin-top: 8px;
 
       &.buy {
-        color: #4bffb5;
+        background-color: $buy-color;
+        color: white;
 
-        &.active {
-          background: rgba(75, 255, 181, 0.2);
+        &:hover:not(:disabled) {
+          background-color: $buy-hover;
         }
       }
 
       &.sell {
-        color: #ff4976;
+        background-color: $sell-color;
+        color: white;
 
-        &.active {
-          background: rgba(255, 73, 118, 0.2);
+        &:hover:not(:disabled) {
+          background-color: $sell-hover;
         }
       }
-    }
 
-    @media (max-width: 768px) {
-      button {
-        padding: 8px;
-        font-size: 14px;
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
       }
     }
   }
+}
 
-  /* Limit/Market Tabs */
-  .order-mode-tabs {
-    display: flex;
-    border-radius: 6px;
-    overflow: hidden;
-    margin-bottom: 8px;
-    flex-shrink: 0; /* Prevent this from shrinking */
+// Responsive adjustments
+@media (max-width: 576px) {
+  .dex-order-form {
+    padding: 6px;
 
-    button {
-      flex: 1;
-      background: rgba(10, 15, 30, 0.4);
-      color: #9ba6bd;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 8px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-transform: uppercase;
-
-      &.active {
-        background: rgba(0, 194, 255, 0.2);
-        color: #00c2ff;
-        border-color: #00c2ff;
-      }
+    .order-form-tabs .tab,
+    .order-form-mode-selector .mode-btn {
+      font-size: 12px;
     }
 
-    @media (max-width: 768px) {
-      button {
-        padding: 6px;
+    .order-form-content .form-group {
+      label {
         font-size: 12px;
       }
-    }
-  }
 
-  /* Price and Amount Fields */
-  .form-field {
-    position: relative;
-    width: 100%;
-    flex-shrink: 0; /* Prevent fields from shrinking */
-
-    label {
-      display: block;
-      margin-bottom: 5px;
-      color: #9ba6bd;
-      text-transform: uppercase;
-      font-size: 12px;
-    }
-
-    input {
-      width: 100%;
-      background: rgba(10, 15, 30, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #f0f0f0;
-      padding: 10px;
-      font-size: 16px;
-      border-radius: 6px;
-
-      &:focus {
-        outline: none;
-        border-color: #00c2ff;
-      }
-    }
-
-    @media (max-width: 768px) {
-      label {
-        font-size: 11px;
+      .input-container input {
+        font-size: 13px;
+        padding: 7px 8px;
       }
 
-      input {
-        padding: 8px;
-        font-size: 14px;
-      }
-    }
-  }
-
-  /* Available Balance */
-  .available-balance {
-    text-align: right;
-    color: #9ba6bd;
-    font-size: 12px;
-    margin-top: 3px;
-    margin-bottom: 3px;
-    flex-shrink: 0; /* Prevent this from shrinking */
-  }
-
-  /* Amount Percentage Buttons */
-  .amount-percentages {
-    display: flex;
-    gap: 6px;
-    margin-top: 8px;
-    flex-shrink: 0; /* Prevent this from shrinking */
-
-    button {
-      flex: 1;
-      background: rgba(10, 15, 30, 0.4);
-      color: #9ba6bd;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 6px;
-      font-size: 13px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-
-      &:hover {
-        background: rgba(0, 194, 255, 0.1);
-        color: #00c2ff;
-        border-color: rgba(0, 194, 255, 0.3);
-      }
-    }
-
-    @media (max-width: 768px) {
-      gap: 4px;
-      margin-top: 6px;
-
-      button {
-        padding: 4px 2px;
+      .percentage-buttons .pct-btn {
         font-size: 11px;
       }
     }
-  }
 
-  /* Total Section */
-  .total-section {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 8px;
-    flex-shrink: 0; /* Prevent this from shrinking */
-
-    .total-label {
-      color: #9ba6bd;
-      text-transform: uppercase;
-      font-size: 12px;
-    }
-
-    .total-amount {
-      font-size: 16px;
-      font-weight: 600;
-      color: #f0f0f0;
-    }
-
-    @media (max-width: 768px) {
-      margin-top: 6px;
-
-      .total-label {
-        font-size: 11px;
-      }
-
-      .total-amount {
-        font-size: 14px;
-      }
-    }
-  }
-
-  /* Submit Button */
-  .submit-button {
-    margin-top: 10px; /* Add spacing above button */
-    background: linear-gradient(
-      90deg,
-      rgba(0, 194, 255, 0.2),
-      rgba(0, 194, 255, 0.4)
-    );
-    color: #f0f0f0;
-    border: 1px solid #00c2ff;
-    border-radius: 6px;
-    padding: 10px;
-    font-size: 16px;
-    font-weight: 600;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-    flex-shrink: 0; /* Prevent this from shrinking */
-
-    &:hover {
-      background: linear-gradient(
-        90deg,
-        rgba(0, 194, 255, 0.3),
-        rgba(0, 194, 255, 0.5)
-      );
-    }
-
-    &.buy {
-      background: linear-gradient(
-        90deg,
-        rgba(75, 255, 181, 0.2),
-        rgba(75, 255, 181, 0.4)
-      );
-      border-color: #4bffb5;
-
-      &:hover {
-        background: linear-gradient(
-          90deg,
-          rgba(75, 255, 181, 0.3),
-          rgba(75, 255, 181, 0.5)
-        );
-      }
-    }
-
-    &.sell {
-      background: linear-gradient(
-        90deg,
-        rgba(255, 73, 118, 0.2),
-        rgba(255, 73, 118, 0.4)
-      );
-      border-color: #ff4976;
-
-      &:hover {
-        background: linear-gradient(
-          90deg,
-          rgba(255, 73, 118, 0.3),
-          rgba(255, 73, 118, 0.5)
-        );
-      }
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    @media (max-width: 768px) {
-      padding: 8px;
+    .submit-order-btn {
       font-size: 14px;
+      padding: 8px;
     }
-  }
-
-  /* Scrollbar styling */
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 194, 255, 0.3);
-    border-radius: 10px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 194, 255, 0.5);
   }
 }

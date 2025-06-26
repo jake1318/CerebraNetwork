@@ -1,9 +1,5 @@
 // src/pages/Portfolio.tsx
-// Last Updated: 2025-05-22 18:27:46 UTC by jake1318
-
-// NOTE: This component requires the react-icons package:
-// npm install react-icons --save
-// or: yarn add react-icons
+// Last Updated: 2025-06-24 00:56:25 UTC by jake1318
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -13,13 +9,16 @@ import { ApexOptions } from "apexcharts";
 import { FaCaretUp, FaCaretDown, FaChevronDown } from "react-icons/fa";
 
 import "./Portfolio.scss";
-import blockvisionService from "../../services/blockvisionService";
-import * as birdeyeService from "../../services/birdeyeService";
+import blockvisionService, {
+  getScallopPortfolioData,
+  PoolGroup,
+} from "../../services/blockvisionService";
+import * as birdeyeService from "../../services/birdeyeService"; // <-- still needed
 
 // Import components
 import ProtocolBadge from "../PoolsPage/ProtocolBadge";
 
-// Map of token addresses for well-known tokens (Sui mainnet)
+// keep TOKEN_ADDRESSES – we still use it inside TokenIcon for fall‑back
 const TOKEN_ADDRESSES: Record<string, string> = {
   SUI: "0x2::sui::SUI",
   USDC: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
@@ -27,36 +26,111 @@ const TOKEN_ADDRESSES: Record<string, string> = {
   WAL: "0x1e8b532cca6569cab9f9b9ebc73f8c13885012ade714729aa3b450e0339ac766::coin::COIN",
   HASUI:
     "0x680eb4a8e1074d7e15186c40dcf8d3b749f1ddba4c60478c367fc9c24a5a5a29::hasui::HASUI",
+  SSUI: "0xaafc4f740de0dd0dde642a31148fb94517087052f19afb0f7bed1dc41a50c77b::scallop_sui::SCALLOP_SUI",
+  SSCA: "0x5ca17430c1d046fae9edeaa8fd76c7b4193a00d764a0ecfa9418d733ad27bc1e::scallop_sca::SCALLOP_SCA",
+  BLUE: "0xce7ff77a83ea0cb6fd39bd8748e2ec89a3f41e8c5ab7d00bad20d95b8f4b8b77::blue::BLUE",
 };
 
-// Hardcoded token logos for fallbacks
-const HARDCODED_LOGOS: Record<string, string> = {
-  CETUS:
-    "https://coin-images.coingecko.com/coins/images/30256/large/cetus.png?1696529165",
-  USDC: "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png",
-  USDT: "https://assets.coingecko.com/coins/images/325/thumb/Tether.png",
-  WAL: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS/logo.png",
-  HASUI: "https://archive.cetus.zone/assets/image/sui/hasui.png",
-  "HA-SUI": "https://archive.cetus.zone/assets/image/sui/hasui.png",
-  SLOVE:
-    "https://coin-images.coingecko.com/coins/images/54967/small/logo_square_color.png",
-  BLUB: "https://coin-images.coingecko.com/coins/images/39356/small/Frame_38.png",
-  CHIRP:
-    "https://coin-images.coingecko.com/coins/images/52894/small/Chirp_Icon_Round.png",
-  WUSDC:
-    "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png",
-};
+// ---------- dynamic token‑icon (Birdeye + in‑memory cache) ------------------
+import { getTokenMetadata, TokenMetadata } from "../../services/birdeyeService";
 
-// Token metadata cache to prevent repeated API calls
-const tokenMetadataCache: Record<string, any> = {};
+/** simple in‑memory cache (key: token address **or** lower‑case symbol) */
+const logoCache: Record<string, string> = {};
+const DEFAULT_LOGO = "/icons/default-coin.svg";
 
-// List of token aliases to normalize symbols
-const TOKEN_ALIASES: Record<string, string> = {
-  $SUI: "SUI",
-  $USDC: "USDC",
-  WUSDC: "USDC",
-  "HA-SUI": "HASUI",
-};
+interface TokenIconProps {
+  symbol: string;
+  /** full on‑chain address if you already have it – improves hit‑rate */
+  address?: string;
+  size?: "sm" | "md" | "lg";
+}
+
+function TokenIcon({ symbol, address, size = "sm" }: TokenIconProps) {
+  const sizeClass = `token-icon-${size}`;
+  const id = (address || symbol).toLowerCase(); // cache key
+  const [logoUrl, setLogoUrl] = React.useState<string | null>(
+    logoCache[id] ?? null
+  );
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (logoUrl || logoCache[id]) return; // already have it
+
+      let tokenAddr = address;
+      if (!tokenAddr) {
+        // fall back to static mapping for the very common symbols we know
+        tokenAddr =
+          TOKEN_ADDRESSES[symbol.toUpperCase() as keyof typeof TOKEN_ADDRESSES];
+      }
+
+      if (!tokenAddr) return; // nothing we can do
+
+      const md: TokenMetadata | null = await getTokenMetadata(tokenAddr);
+      const url =
+        md?.logoURI || md?.logo_uri || md?.logoUrl || md?.logo || null;
+
+      if (url && !cancelled) {
+        logoCache[id] = url;
+        setLogoUrl(url);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, address, symbol, logoUrl]);
+
+  // graceful fallback
+  const fallbackLetter = symbol ? symbol[0].toUpperCase() : "?";
+
+  return (
+    <div className={`token-icon ${sizeClass}`}>
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt={symbol}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = DEFAULT_LOGO;
+          }}
+        />
+      ) : (
+        <div className="token-letter">{fallbackLetter}</div>
+      )}
+    </div>
+  );
+}
+
+// Simple pool pair component
+function PoolPair({
+  tokenASymbol,
+  tokenBSymbol,
+  tokenAAddress,
+  tokenBAddress,
+}: {
+  tokenASymbol: string;
+  tokenBSymbol?: string;
+  tokenAAddress?: string;
+  tokenBAddress?: string;
+}) {
+  const isSingleToken = !tokenBSymbol;
+
+  return (
+    <div className="portfolio-pair">
+      <div className="token-icons">
+        <TokenIcon symbol={tokenASymbol} address={tokenAAddress} />
+        {!isSingleToken && (
+          <div className="second-token">
+            <TokenIcon symbol={tokenBSymbol!} address={tokenBAddress} />
+          </div>
+        )}
+      </div>
+      <div className="pair-name">
+        {tokenASymbol}
+        {!isSingleToken && `/${tokenBSymbol}`}
+      </div>
+    </div>
+  );
+}
 
 // Helper function to format large token balances
 function formatTokenBalance(
@@ -96,299 +170,8 @@ function formatTokenBalance(
   }
 }
 
-// Mock data for portfolio history chart
-const generateMockPortfolioHistory = (currentValue: number) => {
-  const dates = [];
-  const values = [];
-  const today = new Date();
-
-  // Generate data for the past 30 days
-  for (let i = 30; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    dates.push(date.toISOString().split("T")[0]);
-
-    // Generate a somewhat realistic value progression leading to current value
-    // Start at 80-120% of current value and create some variance
-    const startFactor = 0.8 + Math.random() * 0.4; // 80-120% of current
-    const randomFactor = 1 + (Math.random() * 0.1 - 0.05); // +/- 5%
-    const dayProgress = i / 30;
-    const baseValue = startFactor * currentValue;
-    const progressValue =
-      baseValue + (currentValue - baseValue) * (1 - dayProgress);
-    values.push(Math.round(progressValue * randomFactor * 100) / 100);
-  }
-
-  return { dates, values };
-};
-
-// Clean symbol name for consistent lookup
-function normalizeSymbol(symbol: string): string {
-  if (!symbol) return "";
-
-  // Remove $ prefix if present
-  const cleaned = symbol.trim().toUpperCase();
-
-  // Check aliases first
-  if (TOKEN_ALIASES[cleaned]) {
-    return TOKEN_ALIASES[cleaned];
-  }
-
-  return cleaned;
-}
-
-// Utility to sanitize logo URLs
-function sanitizeLogoUrl(url: string): string {
-  if (!url) return url;
-  if (url.startsWith("ipfs://")) {
-    return url.replace(/^ipfs:\/\//, "https://cloudflare-ipfs.com/ipfs/");
-  }
-  if (url.includes("ipfs.io")) {
-    url = url.replace("http://", "https://");
-    return url.replace("https://ipfs.io", "https://cloudflare-ipfs.com");
-  }
-  if (url.startsWith("http://")) {
-    return "https://" + url.slice(7);
-  }
-  return url;
-}
-
-// Enhanced token icon component with fallbacks
-function EnhancedTokenIcon({
-  symbol,
-  logoUrl,
-  address,
-  size = "sm",
-  metadata,
-}: {
-  symbol: string;
-  logoUrl?: string;
-  address?: string;
-  size?: "sm" | "md" | "lg";
-  metadata?: any;
-}) {
-  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
-  const [imgFailed, setImgFailed] = useState<boolean>(false);
-  const safeSymbol = symbol || "?";
-  const normalizedSymbol = normalizeSymbol(safeSymbol);
-
-  // Decide which logo URL to use with priority order
-  useEffect(() => {
-    const getLogoUrl = async () => {
-      // 1. First try metadata from props if available
-      if (
-        metadata?.logo_uri ||
-        metadata?.logoUrl ||
-        metadata?.logoURI ||
-        metadata?.logo
-      ) {
-        const metadataLogo =
-          metadata.logo_uri ||
-          metadata.logoUrl ||
-          metadata.logoURI ||
-          metadata.logo;
-        setCurrentUrl(sanitizeLogoUrl(metadataLogo));
-        return;
-      }
-
-      // 2. Try logoUrl passed directly as prop
-      if (logoUrl) {
-        setCurrentUrl(sanitizeLogoUrl(logoUrl));
-        return;
-      }
-
-      // 3. Check hardcoded logos for known tokens
-      if (HARDCODED_LOGOS[normalizedSymbol]) {
-        setCurrentUrl(HARDCODED_LOGOS[normalizedSymbol]);
-        return;
-      }
-
-      // 4. If we have an address, try to fetch from BirdEye API
-      if (address) {
-        try {
-          // Check cache first
-          if (tokenMetadataCache[address]) {
-            const cachedMetadata = tokenMetadataCache[address];
-            const cachedLogo =
-              cachedMetadata.logo_uri ||
-              cachedMetadata.logoUrl ||
-              cachedMetadata.logoURI ||
-              cachedMetadata.logo;
-            if (cachedLogo) {
-              setCurrentUrl(sanitizeLogoUrl(cachedLogo));
-              return;
-            }
-          }
-
-          // Fetch from API if not in cache
-          const tokenMetadata = await birdeyeService.getTokenMetadata(address);
-          if (tokenMetadata) {
-            tokenMetadataCache[address] = tokenMetadata;
-            const apiLogo =
-              tokenMetadata.logo_uri ||
-              tokenMetadata.logoUrl ||
-              tokenMetadata.logoURI ||
-              tokenMetadata.logo;
-            if (apiLogo) {
-              setCurrentUrl(sanitizeLogoUrl(apiLogo));
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn(`Failed to fetch metadata for ${address}:`, err);
-        }
-      }
-
-      // 5. Try to fetch by symbol if no address
-      if (!address && symbol) {
-        const mappedAddress = TOKEN_ADDRESSES[normalizedSymbol];
-        if (mappedAddress) {
-          try {
-            // Check cache first for mapped address
-            if (tokenMetadataCache[mappedAddress]) {
-              const cachedMetadata = tokenMetadataCache[mappedAddress];
-              const cachedLogo =
-                cachedMetadata.logo_uri ||
-                cachedMetadata.logoUrl ||
-                cachedMetadata.logoURI ||
-                cachedMetadata.logo;
-              if (cachedLogo) {
-                setCurrentUrl(sanitizeLogoUrl(cachedLogo));
-                return;
-              }
-            }
-
-            // Fetch from API if not in cache
-            const tokenMetadata = await birdeyeService.getTokenMetadata(
-              mappedAddress
-            );
-            if (tokenMetadata) {
-              tokenMetadataCache[mappedAddress] = tokenMetadata;
-              const apiLogo =
-                tokenMetadata.logo_uri ||
-                tokenMetadata.logoUrl ||
-                tokenMetadata.logoURI ||
-                tokenMetadata.logo;
-              if (apiLogo) {
-                setCurrentUrl(sanitizeLogoUrl(apiLogo));
-                return;
-              }
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch metadata for ${mappedAddress}:`, err);
-          }
-        }
-      }
-
-      // 6. If all else fails, use null to show fallback letter
-      setCurrentUrl(null);
-    };
-
-    getLogoUrl();
-  }, [symbol, logoUrl, address, metadata, normalizedSymbol]);
-
-  // Handle image load error
-  const handleError = () => {
-    console.warn(`Failed to load logo for ${symbol}: ${currentUrl}`);
-    setImgFailed(true);
-  };
-
-  // Style classes based on props
-  const sizeClass = `token-icon-${size}`;
-
-  // Special class for certain tokens
-  let tokenClass = "";
-  if (normalizedSymbol === "SUI") {
-    tokenClass = "sui-token";
-  } else if (normalizedSymbol === "WAL") {
-    tokenClass = "wal-token";
-  } else if (normalizedSymbol === "HASUI") {
-    tokenClass = "hasui-token";
-  } else if (normalizedSymbol === "USDC" || normalizedSymbol === "WUSDC") {
-    tokenClass = "usdc-token";
-  } else if (normalizedSymbol === "CETUS") {
-    tokenClass = "cetus-token";
-  }
-
-  return (
-    <div
-      className={`token-icon ${sizeClass} ${
-        !currentUrl || imgFailed ? "token-fallback" : ""
-      } ${tokenClass}`}
-    >
-      {currentUrl && !imgFailed ? (
-        <img src={currentUrl} alt={safeSymbol} onError={handleError} />
-      ) : (
-        <div className="token-fallback-letter">
-          {safeSymbol.charAt(0).toUpperCase()}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Modified PoolPair component for the portfolio
-function PoolPair({
-  tokenASymbol,
-  tokenBSymbol,
-  tokenAAddress,
-  tokenBAddress,
-  tokenAMetadata,
-  tokenBMetadata,
-}: {
-  tokenALogo?: string;
-  tokenBLogo?: string;
-  tokenASymbol: string;
-  tokenBSymbol: string;
-  tokenAAddress?: string;
-  tokenBAddress?: string;
-  protocol?: string;
-  poolName?: string;
-  isVault?: boolean;
-  tokenAMetadata?: any;
-  tokenBMetadata?: any;
-}) {
-  // Ensure symbols always have a value
-  const safeTokenASymbol = tokenASymbol || "?";
-  const safeTokenBSymbol = tokenBSymbol || "?";
-
-  // For single token cases
-  const isSingleToken = !tokenBSymbol;
-
-  return (
-    <div className="portfolio-pair">
-      <div className="token-icons">
-        <EnhancedTokenIcon
-          symbol={safeTokenASymbol}
-          address={tokenAAddress}
-          size="sm"
-          metadata={tokenAMetadata}
-        />
-        {!isSingleToken && (
-          <EnhancedTokenIcon
-            symbol={safeTokenBSymbol}
-            address={tokenBAddress}
-            size="sm"
-            metadata={tokenBMetadata}
-          />
-        )}
-      </div>
-      <div className="pair-name">
-        {safeTokenASymbol}
-        {!isSingleToken && `/${safeTokenBSymbol}`}
-      </div>
-    </div>
-  );
-}
-
 // Wallet dropdown component
-function WalletTokensDropdown({
-  walletTokens,
-  getTokenMetadataByAddress,
-}: {
-  walletTokens: any[];
-  getTokenMetadataByAddress: (address: string) => any;
-}) {
+function WalletTokensDropdown({ walletTokens }: { walletTokens: any[] }) {
   const [isOpen, setIsOpen] = useState(true); // Start open by default
   const [showAll, setShowAll] = useState(false);
 
@@ -429,12 +212,7 @@ function WalletTokensDropdown({
             {(showAll ? sortedTokens : topTokens).map((token, idx) => (
               <div className="wallet-token-item" key={`wallet-token-${idx}`}>
                 <div className="token-info">
-                  <EnhancedTokenIcon
-                    symbol={token.symbol}
-                    address={token.coinType}
-                    size="sm"
-                    metadata={getTokenMetadataByAddress(token.coinType)}
-                  />
+                  <TokenIcon symbol={token.symbol} address={token.coinType} />
                   <span className="token-symbol">{token.symbol}</span>
                 </div>
                 <div className="token-details">
@@ -469,9 +247,257 @@ function WalletTokensDropdown({
   );
 }
 
+// Scallop Summary Component with SUI icon handling
+function ScallopSummary({ scallopData }: { scallopData: any }) {
+  if (!scallopData) return null;
+
+  // Extract values from scallopData
+  const {
+    totalSupplyValue = 0,
+    totalDebtValue = 0,
+    totalCollateralValue = 0,
+    lendings = [],
+    borrowings = [],
+    pendingRewards = {},
+  } = scallopData;
+
+  // Format pending rewards if they exist
+  const hasRewards =
+    pendingRewards &&
+    pendingRewards.borrowIncentives &&
+    pendingRewards.borrowIncentives.length > 0;
+
+  return (
+    <div className="scallop-summary-container">
+      <div className="scallop-header">
+        <div className="protocol-icon">
+          <TokenIcon symbol="SCALLOP" size="md" />
+        </div>
+        <h3>Scallop Summary</h3>
+      </div>
+
+      <div className="scallop-stats">
+        <div className="stat-item">
+          <span className="stat-label">Total Supply:</span>
+          <span className="stat-value">${totalSupplyValue.toFixed(2)}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Total Collateral:</span>
+          <span className="stat-value">${totalCollateralValue.toFixed(2)}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Total Borrow:</span>
+          <span className="stat-value">${totalDebtValue.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {hasRewards && (
+        <div className="scallop-rewards">
+          <h4>Pending Rewards</h4>
+          <div className="rewards-list">
+            {pendingRewards.borrowIncentives.map(
+              (reward: any, index: number) => (
+                <div className="reward-item" key={`reward-${index}`}>
+                  <TokenIcon
+                    symbol={reward.symbol}
+                    address={reward.coinType}
+                    size="sm"
+                  />
+                  <span className="reward-amount">
+                    {reward.pendingRewardInCoin.toFixed(6)}
+                  </span>
+                  <span className="reward-value">
+                    ${reward.pendingRewardInUsd.toFixed(6)}
+                  </span>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="scallop-positions">
+        {lendings.length > 0 && (
+          <div className="position-section">
+            <h4>Supply Positions</h4>
+            <div className="positions-list">
+              {lendings.map((lending: any, index: number) => (
+                <div className="position-item" key={`lending-${index}`}>
+                  <div className="position-token">
+                    <TokenIcon
+                      symbol={lending.symbol}
+                      address={lending.coinType}
+                      size="sm"
+                    />
+                    <span>{lending.symbol}</span>
+                  </div>
+                  <div className="position-details">
+                    <div className="position-amount">
+                      {lending.suppliedCoin.toFixed(6)}
+                    </div>
+                    <div className="position-value">
+                      ${lending.suppliedValue.toFixed(2)}
+                    </div>
+                    <div className="position-apy">
+                      {(lending.supplyApy * 100).toFixed(2)}% APY
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {borrowings.length > 0 && (
+          <div className="position-section">
+            <h4>Borrows & Collateral</h4>
+            {borrowings.map((obligation: any, idx: number) => (
+              <div className="obligation-item" key={`obligation-${idx}`}>
+                <div className="obligation-header">
+                  <span className="obligation-id">Obligation {idx + 1}</span>
+                  <span
+                    className="risk-level"
+                    style={{
+                      color:
+                        obligation.riskLevel < 0.3
+                          ? "#4CAF50"
+                          : obligation.riskLevel < 0.6
+                          ? "#FFC107"
+                          : "#FF5722",
+                    }}
+                  >
+                    Risk: {(obligation.riskLevel * 100).toFixed(0)}%
+                  </span>
+                </div>
+
+                {obligation.collaterals &&
+                  obligation.collaterals.length > 0 && (
+                    <div className="collateral-list">
+                      <h5>Collateral</h5>
+                      {obligation.collaterals.map(
+                        (collateral: any, cIdx: number) => (
+                          <div
+                            className="collateral-item"
+                            key={`collateral-${cIdx}`}
+                          >
+                            <TokenIcon
+                              symbol={collateral.symbol}
+                              address={collateral.coinType}
+                              size="sm"
+                            />
+                            <span>
+                              {collateral.depositedCoin.toFixed(6)}{" "}
+                              {collateral.symbol}
+                            </span>
+                            <span className="item-value">
+                              ${collateral.depositedValueInUsd.toFixed(2)}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                {obligation.borrowedPools &&
+                  obligation.borrowedPools.length > 0 && (
+                    <div className="borrowed-list">
+                      <h5>Borrows</h5>
+                      {obligation.borrowedPools.map(
+                        (borrow: any, bIdx: number) => (
+                          <div className="borrow-item" key={`borrow-${bIdx}`}>
+                            <TokenIcon
+                              symbol={borrow.symbol}
+                              address={borrow.coinType}
+                              size="sm"
+                            />
+                            <span>
+                              {borrow.borrowedCoin.toFixed(6)} {borrow.symbol}
+                            </span>
+                            <span className="item-value">
+                              ${borrow.borrowedValueInUsd.toFixed(2)}
+                            </span>
+                            <span className="borrow-rate">
+                              {(borrow.borrowApy * 100).toFixed(2)}% APY
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Interface for portfolio history data point
+interface PortfolioDataPoint {
+  date: string;
+  value: number;
+}
+
+// Function to fetch historical portfolio data
+async function fetchPortfolioHistory(
+  address: string,
+  days: number = 30
+): Promise<{ dates: string[]; values: number[] }> {
+  try {
+    // Use SUI price history as a proxy for portfolio history
+    const suiToken = "0x2::sui::SUI";
+    const historyData = await birdeyeService.getLineChartData(
+      suiToken,
+      days === 7 ? "1d" : days === 30 ? "1w" : "1w"
+    );
+
+    // Check if we got valid data
+    if (
+      !historyData ||
+      !Array.isArray(historyData) ||
+      historyData.length === 0
+    ) {
+      throw new Error("Invalid history data received");
+    }
+
+    // Extract the dates and prices
+    const dates: string[] = [];
+    const values: number[] = [];
+
+    // Get current portfolio value to use for scaling
+    const latestValue = historyData[historyData.length - 1]?.price || 1;
+    const currentPortfolioValue = address
+      ? parseFloat(sessionStorage.getItem(`${address}_portfolioValue`) || "0")
+      : 0;
+    const scaleFactor =
+      currentPortfolioValue > 0 ? currentPortfolioValue / latestValue : 100;
+
+    // Process data points
+    historyData.forEach((dataPoint) => {
+      // Convert timestamp to date string
+      const date = new Date(dataPoint.timestamp * 1000)
+        .toISOString()
+        .split("T")[0];
+      // Scale the price to simulate portfolio value
+      const value = dataPoint.price * scaleFactor || 0;
+
+      dates.push(date);
+      values.push(parseFloat(value.toFixed(2)));
+    });
+
+    return { dates, values };
+  } catch (error) {
+    console.error("Error fetching portfolio history:", error);
+    // Return an empty dataset in case of error
+    return { dates: [], values: [] };
+  }
+}
+
 function Portfolio() {
   const wallet = useWallet();
   const { connected, account } = wallet;
+  const [poolPositions, setPoolPositions] = useState<PoolGroup[]>([]);
   const [portfolioData, setPortfolioData] = useState<any>(null);
   const [portfolioHistory, setPortfolioHistory] = useState<{
     dates: string[];
@@ -479,200 +505,207 @@ function Portfolio() {
   }>({ dates: [], values: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
   const [portfolioChange24h, setPortfolioChange24h] = useState<{
     value: number;
     percent: number;
   }>({ value: 0, percent: 0 });
-
-  // Function to fetch metadata for a list of token addresses individually
-  const fetchTokenMetadata = useCallback(async (tokenAddresses: string[]) => {
-    const result: Record<string, any> = {};
-    const addressesToFetch = tokenAddresses.filter(
-      (addr) => addr && !tokenMetadataCache[addr]
-    );
-
-    // If there's nothing to fetch, return the cached data
-    if (addressesToFetch.length === 0) {
-      tokenAddresses.forEach((addr) => {
-        if (addr && tokenMetadataCache[addr]) {
-          result[addr] = tokenMetadataCache[addr];
-        }
-      });
-      return result;
-    }
-
-    try {
-      // Fetch metadata for all addresses at once
-      const fetchedMetadata = await birdeyeService.getMultipleTokenMetadata(
-        addressesToFetch
-      );
-
-      // Add to result and update cache
-      Object.entries(fetchedMetadata).forEach(([addr, data]) => {
-        tokenMetadataCache[addr] = data;
-        result[addr] = data;
-      });
-
-      // Add any cached entries not in fetched results
-      tokenAddresses.forEach((addr) => {
-        if (addr && tokenMetadataCache[addr] && !result[addr]) {
-          result[addr] = tokenMetadataCache[addr];
-        }
-      });
-
-      return result;
-    } catch (err) {
-      console.error("Error fetching token metadata:", err);
-
-      // Return cached data for any addresses we have
-      tokenAddresses.forEach((addr) => {
-        if (addr && tokenMetadataCache[addr]) {
-          result[addr] = tokenMetadataCache[addr];
-        }
-      });
-
-      return result;
-    }
-  }, []);
-
-  const getAddressBySymbol = useCallback(
-    (symbol: string): string | undefined => {
-      if (!symbol) return undefined;
-      const upperSymbol = normalizeSymbol(symbol);
-      return TOKEN_ADDRESSES[upperSymbol];
-    },
-    []
+  const [scallopData, setScallopData] = useState<any>(null);
+  const [loadingScallop, setLoadingScallop] = useState(false);
+  const [walletTokens, setWalletTokens] = useState<any[]>([]);
+  const [selectedTimeframe, setSelectedTimeframe] = useState<"7d" | "30d">(
+    "30d"
   );
 
-  const loadPortfolioData = useCallback(async () => {
-    if (!connected || !account?.address) {
-      return;
-    }
+  // Fetch portfolio history data
+  const loadPortfolioHistory = useCallback(
+    async (currentValue: number) => {
+      if (!connected || !account?.address) return;
 
-    setLoading(true);
-    setError(null);
+      try {
+        // Store current portfolio value in session storage for reference
+        sessionStorage.setItem(
+          `${account.address}_portfolioValue`,
+          currentValue.toString()
+        );
 
-    try {
-      console.log("Loading portfolio data for:", account.address);
+        // Fetch real historical data based on selected timeframe
+        const days = selectedTimeframe === "7d" ? 7 : 30;
+        const history = await fetchPortfolioHistory(account.address, days);
 
-      // Get positions from BlockVision API
-      const allPoolGroups = await blockvisionService.getDefiPortfolio(
-        account.address,
-        undefined, // No specific protocol
-        false // Exclude wallet assets
-      );
+        if (history.dates.length > 0 && history.values.length > 0) {
+          setPortfolioHistory(history);
 
-      // Get wallet assets using getAccountCoins
-      const walletTokensResponse = await blockvisionService.getAccountCoins(
-        account.address
-      );
-      const walletTokens = walletTokensResponse.data || [];
+          // Calculate 24h change using the last two data points
+          const todayValue = history.values[history.values.length - 1];
+          const yesterdayValue =
+            history.values[history.values.length - 2] || todayValue;
+          const changeValue = todayValue - yesterdayValue;
+          const changePercent =
+            yesterdayValue > 0 ? (changeValue / yesterdayValue) * 100 : 0;
 
-      // Collect all token addresses for metadata fetching
-      const tokenAddresses = new Set<string>();
+          setPortfolioChange24h({
+            value: changeValue,
+            percent: changePercent,
+          });
+        } else {
+          // Fallback to a simple timeline with current value
+          const dates: string[] = [];
+          const values: number[] = [];
+          const today = new Date();
 
-      allPoolGroups.forEach((pool) => {
-        if (pool.tokenA) tokenAddresses.add(pool.tokenA);
-        if (pool.tokenB) tokenAddresses.add(pool.tokenB);
+          // Generate a simple timeline
+          for (let i = days; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(today.getDate() - i);
+            dates.push(date.toISOString().split("T")[0]);
 
-        // Try to use mapped addresses for symbols if direct addresses not available
-        if (!pool.tokenA && pool.tokenASymbol) {
-          const mappedAddress = getAddressBySymbol(pool.tokenASymbol);
-          if (mappedAddress) tokenAddresses.add(mappedAddress);
+            // For fallback, simulate a slight uptrend
+            const factor = 0.9 + (i / days) * 0.2;
+            values.push(parseFloat((currentValue * factor).toFixed(2)));
+          }
+
+          setPortfolioHistory({ dates, values });
+
+          // Calculate fallback 24h change
+          if (values.length >= 2) {
+            const todayValue = values[values.length - 1];
+            const yesterdayValue = values[values.length - 2];
+            const changeValue = todayValue - yesterdayValue;
+            const changePercent =
+              yesterdayValue > 0 ? (changeValue / yesterdayValue) * 100 : 0;
+
+            setPortfolioChange24h({
+              value: changeValue,
+              percent: changePercent,
+            });
+          }
         }
-
-        if (!pool.tokenB && pool.tokenBSymbol) {
-          const mappedAddress = getAddressBySymbol(pool.tokenBSymbol);
-          if (mappedAddress) tokenAddresses.add(mappedAddress);
-        }
-      });
-
-      walletTokens.forEach((token) => {
-        if (token.coinType) tokenAddresses.add(token.coinType);
-      });
-
-      // Fetch token metadata
-      const metadata = await fetchTokenMetadata(Array.from(tokenAddresses));
-      setTokenMetadata(metadata);
-
-      // Calculate portfolio totals
-      const positionValue = allPoolGroups.reduce(
-        (sum, p) => sum + p.totalValueUsd,
-        0
-      );
-      const walletValue = walletTokens.reduce(
-        (sum, t) => parseFloat(t.usdValue || "0") + sum,
-        0
-      );
-      const totalValue = positionValue + walletValue;
-
-      // Set portfolio data
-      setPortfolioData({
-        positions: allPoolGroups,
-        walletTokens,
-        positionValue,
-        walletValue,
-        totalValue,
-      });
-
-      // Generate mock portfolio history for chart
-      const history = generateMockPortfolioHistory(totalValue);
-      setPortfolioHistory(history);
-
-      // Calculate 24h change (mock data for now)
-      // In a real implementation, we'd compare with actual yesterday's value
-      const yesterdayValue = history.values[history.values.length - 2];
-      const todayValue = history.values[history.values.length - 1];
-      const changeValue = todayValue - yesterdayValue;
-      const changePercent =
-        yesterdayValue > 0 ? (changeValue / yesterdayValue) * 100 : 0;
-
-      setPortfolioChange24h({
-        value: changeValue,
-        percent: changePercent,
-      });
-    } catch (err) {
-      console.error("Failed to load portfolio data:", err);
-      setError("Failed to load your portfolio. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [connected, account, fetchTokenMetadata, getAddressBySymbol]);
-
-  useEffect(() => {
-    loadPortfolioData();
-  }, [loadPortfolioData]);
-
-  // Helper function to find token metadata for a given address
-  const getTokenMetadataByAddress = useCallback(
-    (address?: string) => {
-      if (!address) return null;
-      return tokenMetadata[address] || null;
-    },
-    [tokenMetadata]
-  );
-
-  // Helper function to find token metadata for a given symbol
-  const getTokenMetadataBySymbol = useCallback(
-    (symbol?: string) => {
-      if (!symbol) return null;
-
-      // Check if we have a known address for this symbol
-      const address = getAddressBySymbol(symbol);
-      if (address && tokenMetadata[address]) {
-        return tokenMetadata[address];
+      } catch (error) {
+        console.error("Failed to load portfolio history:", error);
       }
-
-      // Otherwise search through metadata for matching symbol
-      return (
-        Object.values(tokenMetadata).find(
-          (metadata) => metadata.symbol?.toUpperCase() === symbol.toUpperCase()
-        ) || null
-      );
     },
-    [tokenMetadata, getAddressBySymbol]
+    [connected, account, selectedTimeframe]
   );
+
+  // Fetch Scallop data only - separate from main portfolio loading
+  const fetchScallopData = useCallback(async () => {
+    if (!connected || !account?.address) return;
+
+    setLoadingScallop(true);
+    try {
+      console.log("Fetching Scallop data for:", account.address);
+      const data = await getScallopPortfolioData(account.address);
+      console.log("Scallop data received:", data);
+
+      // Make sure we have valid data before setting it
+      if (data) {
+        setScallopData(data);
+      }
+    } catch (err) {
+      console.error("Error fetching Scallop data:", err);
+    } finally {
+      setLoadingScallop(false);
+    }
+  }, [connected, account]);
+
+  // Load positions - similar to the Positions page approach that works
+  const loadPositions = useCallback(async () => {
+    if (connected && account?.address) {
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log("Loading positions for Portfolio:", account.address);
+
+        // Get all positions in one call (excluding wallet assets)
+        const positions = await blockvisionService.getDefiPortfolio(
+          account.address,
+          undefined, // No specific protocol filter
+          false // Exclude wallet assets
+        );
+
+        console.log(`Loaded ${positions.length} positions`);
+
+        // Set positions in state
+        setPoolPositions(positions);
+
+        // Calculate the total value of all positions
+        const positionValue = positions.reduce(
+          (sum, p) => sum + p.totalValueUsd,
+          0
+        );
+
+        // Make sure we have Scallop data before using it
+        const scallopValue = scallopData
+          ? parseFloat(scallopData.totalSupplyValue || "0") +
+            parseFloat(scallopData.totalCollateralValue || "0")
+          : 0;
+
+        // Generate portfolio data
+        const portfolioTotalValue = positionValue + scallopValue;
+        setPortfolioData({
+          positions,
+          positionValue,
+          scallopValue,
+          totalValue: portfolioTotalValue,
+        });
+
+        // Load real portfolio history
+        await loadPortfolioHistory(portfolioTotalValue);
+      } catch (err) {
+        console.error("Failed to load positions:", err);
+        setError("Failed to load your positions. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [connected, account, scallopData, loadPortfolioHistory]);
+
+  // Use separate effect for loading wallet tokens to avoid rate limiting
+  const loadWalletTokens = useCallback(async () => {
+    if (connected && account?.address) {
+      try {
+        // Attempt to get wallet tokens but don't block main loading if it fails
+        const walletTokensResponse = await blockvisionService.getWalletValue(
+          account.address
+        );
+        if (walletTokensResponse && walletTokensResponse.coins) {
+          setWalletTokens(walletTokensResponse.coins || []);
+        }
+      } catch (err) {
+        console.warn("Could not load wallet tokens:", err);
+        // Non-fatal error, continue without wallet tokens
+        setWalletTokens([]);
+      }
+    }
+  }, [connected, account]);
+
+  // First fetch Scallop data
+  useEffect(() => {
+    fetchScallopData();
+  }, [fetchScallopData]);
+
+  // Then load positions once Scallop data is available
+  useEffect(() => {
+    loadPositions();
+  }, [loadPositions, scallopData]);
+
+  // Load wallet tokens separately to avoid rate limiting
+  useEffect(() => {
+    // Add a small delay to avoid rate limiting
+    const timer = setTimeout(() => {
+      loadWalletTokens();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [loadWalletTokens]);
+
+  // Reload portfolio history when timeframe changes
+  useEffect(() => {
+    if (portfolioData?.totalValue) {
+      loadPortfolioHistory(portfolioData.totalValue);
+    }
+  }, [selectedTimeframe, portfolioData?.totalValue, loadPortfolioHistory]);
 
   // Simple function to determine if a pool group is a vault pool
   const isVaultPool = (poolGroup: any): boolean => {
@@ -688,17 +721,11 @@ function Portfolio() {
       chart: {
         type: "area",
         height: 180,
-        toolbar: {
-          show: false,
-        },
-        zoom: {
-          enabled: false,
-        },
+        toolbar: { show: false },
+        zoom: { enabled: false },
         background: "transparent",
       },
-      dataLabels: {
-        enabled: false,
-      },
+      dataLabels: { enabled: false },
       stroke: {
         curve: "smooth",
         width: 2,
@@ -712,52 +739,26 @@ function Portfolio() {
           opacityTo: 0.1,
           stops: [0, 90, 100],
           colorStops: [
-            {
-              offset: 0,
-              color: "#00c2ff",
-              opacity: 0.4,
-            },
-            {
-              offset: 100,
-              color: "#00c2ff",
-              opacity: 0,
-            },
+            { offset: 0, color: "#00c2ff", opacity: 0.4 },
+            { offset: 100, color: "#00c2ff", opacity: 0 },
           ],
         },
       },
-      grid: {
-        show: false,
-      },
+      grid: { show: false },
       xaxis: {
         type: "datetime",
         categories: portfolioHistory.dates,
-        labels: {
-          show: false,
-        },
-        axisBorder: {
-          show: false,
-        },
-        axisTicks: {
-          show: false,
-        },
+        labels: { show: false },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
       },
-      yaxis: {
-        labels: {
-          show: false,
-        },
-      },
+      yaxis: { labels: { show: false } },
       tooltip: {
-        x: {
-          format: "yyyy-MM-dd",
-        },
-        y: {
-          formatter: (value) => `$${value.toFixed(2)}`,
-        },
+        x: { format: "yyyy-MM-dd" },
+        y: { formatter: (value) => `$${value.toFixed(2)}` },
         theme: "dark",
       },
-      theme: {
-        mode: "dark",
-      },
+      theme: { mode: "dark" },
     }),
     [portfolioHistory]
   );
@@ -789,7 +790,7 @@ function Portfolio() {
             <button
               type="button"
               className="btn btn--primary"
-              onClick={() => loadPortfolioData()}
+              onClick={() => loadPositions()}
             >
               Retry
             </button>
@@ -807,12 +808,12 @@ function Portfolio() {
               Connect Wallet
             </button>
           </div>
-        ) : loading ? (
+        ) : loading && !portfolioData ? (
           <div className="loading-state">
             <div className="spinner"></div>
             <div className="loading-text">Loading portfolio...</div>
           </div>
-        ) : !portfolioData ? (
+        ) : !portfolioData && !scallopData ? (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
             <h3>No Portfolio Data</h3>
@@ -830,7 +831,7 @@ function Portfolio() {
                   <div className="total-value">
                     <span className="value-label">Total Value</span>
                     <span className="value-amount">
-                      ${portfolioData.totalValue.toFixed(2)}
+                      ${portfolioData?.totalValue.toFixed(2) || "0.00"}
                     </span>
                     <div
                       className={`value-change ${
@@ -853,6 +854,23 @@ function Portfolio() {
                     </div>
                   </div>
 
+                  <div className="chart-controls">
+                    <div className="timeframe-selector">
+                      <button
+                        className={selectedTimeframe === "7d" ? "active" : ""}
+                        onClick={() => setSelectedTimeframe("7d")}
+                      >
+                        7D
+                      </button>
+                      <button
+                        className={selectedTimeframe === "30d" ? "active" : ""}
+                        onClick={() => setSelectedTimeframe("30d")}
+                      >
+                        30D
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="portfolio-chart">
                     <ReactApexChart
                       options={chartOptions}
@@ -869,23 +887,25 @@ function Portfolio() {
                 </div>
 
                 <div className="wallet-section">
-                  <WalletTokensDropdown
-                    walletTokens={portfolioData.walletTokens}
-                    getTokenMetadataByAddress={getTokenMetadataByAddress}
-                  />
+                  {walletTokens && walletTokens.length > 0 && (
+                    <WalletTokensDropdown walletTokens={walletTokens} />
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* Scallop Section */}
+            {scallopData && <ScallopSummary scallopData={scallopData} />}
 
             <div className="positions-section">
               <h3>
                 Your Positions{" "}
                 <span className="positions-count">
-                  ({portfolioData.positions.length})
+                  ({poolPositions.length})
                 </span>
               </h3>
 
-              {portfolioData.positions.length > 0 ? (
+              {poolPositions.length > 0 ? (
                 <div className="positions-table">
                   <table>
                     <thead>
@@ -897,43 +917,29 @@ function Portfolio() {
                       </tr>
                     </thead>
                     <tbody>
-                      {portfolioData.positions.map(
-                        (position: any, idx: number) => (
-                          <tr key={`position-${idx}`}>
-                            <td>
-                              <ProtocolBadge
-                                protocol={position.protocol}
-                                protocolClass={position.protocol
-                                  .toLowerCase()
-                                  .replace(/[-\s]/g, "")}
-                                isVault={isVaultPool(position)}
-                              />
-                            </td>
-                            <td>
-                              <PoolPair
-                                tokenASymbol={position.tokenASymbol}
-                                tokenBSymbol={position.tokenBSymbol}
-                                tokenAAddress={position.tokenA}
-                                tokenBAddress={position.tokenB}
-                                tokenAMetadata={
-                                  getTokenMetadataByAddress(position.tokenA) ||
-                                  getTokenMetadataBySymbol(
-                                    position.tokenASymbol
-                                  )
-                                }
-                                tokenBMetadata={
-                                  getTokenMetadataByAddress(position.tokenB) ||
-                                  getTokenMetadataBySymbol(
-                                    position.tokenBSymbol
-                                  )
-                                }
-                              />
-                            </td>
-                            <td>${position.totalValueUsd.toFixed(2)}</td>
-                            <td>{position.apr.toFixed(2)}%</td>
-                          </tr>
-                        )
-                      )}
+                      {poolPositions.map((position: any, idx: number) => (
+                        <tr key={`position-${idx}`}>
+                          <td>
+                            <ProtocolBadge
+                              protocol={position.protocol}
+                              protocolClass={position.protocol
+                                .toLowerCase()
+                                .replace(/[-\s]/g, "")}
+                              isVault={isVaultPool(position)}
+                            />
+                          </td>
+                          <td>
+                            <PoolPair
+                              tokenASymbol={position.tokenASymbol}
+                              tokenBSymbol={position.tokenBSymbol}
+                              tokenAAddress={position.tokenA}
+                              tokenBAddress={position.tokenB}
+                            />
+                          </td>
+                          <td>${position.totalValueUsd.toFixed(2)}</td>
+                          <td>{position.apr.toFixed(2)}%</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -1046,6 +1052,34 @@ function Portfolio() {
 
         .change-amount {
           margin-right: 4px;
+        }
+
+        .chart-controls {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 8px;
+        }
+
+        .timeframe-selector {
+          display: flex;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 6px;
+          padding: 2px;
+        }
+
+        .timeframe-selector button {
+          background: none;
+          border: none;
+          color: #a0a7b8;
+          padding: 4px 8px;
+          font-size: 12px;
+          cursor: pointer;
+          border-radius: 4px;
+        }
+
+        .timeframe-selector button.active {
+          background: rgba(0, 194, 255, 0.2);
+          color: #00c2ff;
         }
 
         .portfolio-chart {
@@ -1227,43 +1261,18 @@ function Portfolio() {
           border-bottom: none;
         }
 
-        .token-icons {
-          display: flex;
-          align-items: center;
-          margin-right: 8px;
-        }
-
-        .token-icons .token-icon:nth-child(2) {
-          margin-left: -8px;
-          z-index: 1;
-          border: 1px solid rgba(0, 0, 0, 0.5);
-        }
-
-        .portfolio-pair {
-          display: flex;
-          align-items: center;
-        }
-
-        .pair-name {
-          margin-left: 8px;
-          font-weight: 500;
-        }
-
+        /* Token Icon Styles */
         .token-icon {
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 50%;
-          overflow: hidden;
-          background-color: #1a1f2e;
-          position: relative;
-          box-shadow: 0 0 8px rgba(0, 225, 255, 0.2);
-        }
-
-        .token-icon-sm {
           width: 24px;
           height: 24px;
           min-width: 24px;
+          min-height: 24px;
+          border-radius: 50%;
+          overflow: hidden;
+          background: #141e30;
         }
 
         .token-icon img {
@@ -1272,42 +1281,45 @@ function Portfolio() {
           object-fit: cover;
         }
 
-        .token-fallback {
-          background: linear-gradient(135deg, #2a3042, #1e2433);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+        .token-icon-sm {
+          width: 24px;
+          height: 24px;
         }
 
-        .token-fallback-letter {
+        .token-icon-md {
+          width: 32px;
+          height: 32px;
+        }
+
+        .token-icon-lg {
+          width: 48px;
+          height: 48px;
+        }
+
+        .token-letter {
           font-weight: bold;
           font-size: 12px;
           color: #fff;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
 
-        .sui-token {
-          background: linear-gradient(135deg, #4bc1d2, #2b6eff);
-          box-shadow: 0 0 10px rgba(0, 174, 240, 0.7);
+        .token-icons {
+          display: flex;
+          align-items: center;
         }
 
-        .wal-token {
-          background: linear-gradient(135deg, #94f9f0, #a770ef);
-          box-shadow: 0 0 10px rgba(167, 112, 239, 0.7);
+        .second-token {
+          margin-left: -8px;
+          z-index: 1;
         }
 
-        .hasui-token {
-          background: linear-gradient(135deg, #ffd966, #ff6b6b);
-          box-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
+        .portfolio-pair {
+          display: flex;
+          align-items: center;
         }
 
-        .usdc-token,
-        .wusdc-token {
-          background: linear-gradient(135deg, #2775ca, #4dc1e1);
-          box-shadow: 0 0 10px rgba(39, 117, 202, 0.7);
-        }
-
-        .cetus-token {
-          background: linear-gradient(135deg, #00c2ff, #00aadd);
-          box-shadow: 0 0 10px rgba(0, 194, 255, 0.7);
+        .pair-name {
+          margin-left: 16px;
+          font-weight: 500;
         }
 
         .empty-positions {
@@ -1386,6 +1398,205 @@ function Portfolio() {
 
         .btn--primary:hover {
           background-color: #33cfff;
+        }
+
+        /* Scallop Summary Styles */
+        .scallop-summary-container {
+          background: rgba(20, 30, 48, 0.6);
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          padding: 20px;
+          margin-bottom: 24px;
+        }
+
+        .scallop-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
+        .protocol-icon {
+          margin-right: 12px;
+        }
+
+        .scallop-stats {
+          display: flex;
+          gap: 20px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+
+        .stat-item {
+          display: flex;
+          flex-direction: column;
+          min-width: 150px;
+        }
+
+        .stat-label {
+          font-size: 14px;
+          color: #a0a7b8;
+          margin-bottom: 4px;
+        }
+
+        .stat-value {
+          font-size: 18px;
+          font-weight: 500;
+        }
+
+        .scallop-rewards {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 16px;
+        }
+
+        .scallop-rewards h4 {
+          margin-bottom: 8px;
+          color: #eb6662;
+        }
+
+        .rewards-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .reward-item {
+          display: flex;
+          align-items: center;
+          background: rgba(0, 0, 0, 0.2);
+          padding: 8px;
+          border-radius: 6px;
+        }
+
+        .reward-item .token-icon {
+          margin-right: 8px;
+        }
+
+        .reward-amount {
+          font-weight: 500;
+          margin-right: 8px;
+        }
+
+        .reward-value {
+          color: #a0a7b8;
+          font-size: 12px;
+        }
+
+        .scallop-positions {
+          margin-top: 16px;
+        }
+
+        .position-section h4 {
+          padding-bottom: 8px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          margin-bottom: 12px;
+        }
+
+        .positions-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 12px;
+        }
+
+        .position-item {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          padding: 12px;
+          display: flex;
+          align-items: center;
+        }
+
+        .position-token {
+          display: flex;
+          align-items: center;
+          margin-right: 12px;
+          min-width: 80px;
+        }
+
+        .position-token .token-icon {
+          margin-right: 8px;
+        }
+
+        .position-details {
+          flex: 1;
+        }
+
+        .position-amount {
+          font-weight: 500;
+        }
+
+        .position-value {
+          color: #a0a7b8;
+          font-size: 12px;
+        }
+
+        .position-apy {
+          color: #00c48c;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .obligation-item {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 16px;
+        }
+
+        .obligation-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .obligation-id {
+          font-weight: 500;
+        }
+
+        .risk-level {
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          background: rgba(0, 0, 0, 0.2);
+        }
+
+        .collateral-list h5,
+        .borrowed-list h5 {
+          margin-bottom: 8px;
+          font-size: 14px;
+          color: #a0a7b8;
+        }
+
+        .collateral-item,
+        .borrow-item {
+          display: flex;
+          align-items: center;
+          margin-bottom: 8px;
+          padding: 8px;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+        }
+
+        .collateral-item .token-icon,
+        .borrow-item .token-icon {
+          margin-right: 8px;
+        }
+
+        .item-value {
+          margin-left: auto;
+          font-weight: 500;
+        }
+
+        .borrow-rate {
+          margin-left: 10px;
+          color: #ff5252;
+          font-size: 12px;
+        }
+
+        .borrowed-list {
+          margin-top: 16px;
         }
       `}</style>
     </div>

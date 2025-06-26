@@ -1,23 +1,29 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+// src/pages/Dex/components/PairSelector.tsx
+// Last Updated: 2025-06-25 06:18:30 UTC by jake1318
+
+import React, { useState, useEffect } from "react";
 import "./PairSelector.scss";
 
-export interface TradingPair {
+interface TradingPair {
   id: string;
   name: string;
   baseAsset: string;
   quoteAsset: string;
   price: number;
   change24h: number;
+  volume24h: number;
+  high24h: number;
+  low24h: number;
+  baseAddress: string;
+  quoteAddress: string;
+  logo?: string;
 }
 
 interface PairSelectorProps {
   pairs: TradingPair[];
-  selectedPair: TradingPair;
+  selectedPair: TradingPair | null;
   onSelectPair: (pair: TradingPair) => void;
 }
-
-const INITIAL_DISPLAY_COUNT = 9;
-const LOAD_MORE_COUNT = 5;
 
 const PairSelector: React.FC<PairSelectorProps> = ({
   pairs,
@@ -25,76 +31,57 @@ const PairSelector: React.FC<PairSelectorProps> = ({
   onSelectPair,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [showFavorites, setShowFavorites] = useState(false);
-  const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
-  const [isLoading, setIsLoading] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [sortMethod, setSortMethod] = useState<"name" | "volume" | "change">(
+    "volume"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    const saved = localStorage.getItem("favoritePairs");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const filteredPairs = pairs
+    .filter(
+      (pair) =>
+        pair.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pair.baseAsset.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      let comparison = 0;
 
-  useEffect(() => {
-    localStorage.setItem("favoritePairs", JSON.stringify(favorites));
-  }, [favorites]);
+      if (sortMethod === "name") {
+        comparison = a.baseAsset.localeCompare(b.baseAsset);
+      } else if (sortMethod === "volume") {
+        comparison = a.volume24h - b.volume24h;
+      } else if (sortMethod === "change") {
+        comparison = a.change24h - b.change24h;
+      }
 
-  const toggleFavorite = (symbol: string) => {
-    setFavorites((prev) =>
-      prev.includes(symbol)
-        ? prev.filter((s) => s !== symbol)
-        : [...prev, symbol]
-    );
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+  const formatVolume = (volume: number) => {
+    if (!volume || volume === 0) return "$0";
+
+    if (volume >= 1000000) {
+      return `$${(volume / 1000000).toFixed(2)}M`;
+    }
+
+    if (volume >= 1000) {
+      return `$${(volume / 1000).toFixed(2)}K`;
+    }
+
+    return `$${volume.toFixed(2)}`;
   };
 
-  const filtered = pairs.filter((p) => {
-    if (
-      searchTerm &&
-      !p.baseAsset.toLowerCase().includes(searchTerm.toLowerCase())
-    ) {
-      return false;
+  const toggleSort = (method: "name" | "volume" | "change") => {
+    if (sortMethod === method) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortMethod(method);
+      setSortDirection("desc");
     }
-    if (showFavorites && !favorites.includes(p.name)) {
-      return false;
-    }
-    return true;
-  });
-
-  const handleScroll = useCallback(() => {
-    if (!listRef.current || isLoading) return;
-    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-    if (
-      scrollTop + clientHeight >= scrollHeight - 50 &&
-      displayCount < filtered.length
-    ) {
-      setIsLoading(true);
-      setTimeout(() => {
-        setDisplayCount((prev) =>
-          Math.min(prev + LOAD_MORE_COUNT, filtered.length)
-        );
-        setIsLoading(false);
-      }, 300);
-    }
-  }, [filtered.length, isLoading, displayCount]);
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (el) {
-      el.addEventListener("scroll", handleScroll);
-      return () => el.removeEventListener("scroll", handleScroll);
-    }
-  }, [handleScroll]);
-
-  useEffect(() => {
-    setDisplayCount(INITIAL_DISPLAY_COUNT);
-  }, [searchTerm, showFavorites]);
-
-  const displayedPairs = filtered.slice(0, displayCount);
-  const hasMoreToLoad = displayCount < filtered.length;
+  };
 
   return (
-    <div className="pair-selector">
-      <div className="search-bar">
+    <div className="pair-selector-container">
+      <div className="pair-search">
         <input
           type="text"
           placeholder="Search pairs..."
@@ -103,71 +90,78 @@ const PairSelector: React.FC<PairSelectorProps> = ({
         />
       </div>
 
-      <div className="filter-bar">
-        <button
-          className={!showFavorites ? "active" : ""}
-          onClick={() => setShowFavorites(false)}
+      <div className="pair-list-header">
+        <div
+          className={`column name ${sortMethod === "name" ? "sorted" : ""} ${
+            sortMethod === "name" ? sortDirection : ""
+          }`}
+          onClick={() => toggleSort("name")}
         >
-          All
-        </button>
-        <button
-          className={showFavorites ? "active" : ""}
-          onClick={() => setShowFavorites(true)}
+          Pair
+        </div>
+        <div
+          className={`column price ${sortMethod === "price" ? "sorted" : ""} ${
+            sortMethod === "price" ? sortDirection : ""
+          }`}
+          onClick={() => toggleSort("price")}
         >
-          Favorites
-        </button>
+          Price
+        </div>
+        <div
+          className={`column change ${
+            sortMethod === "change" ? "sorted" : ""
+          } ${sortMethod === "change" ? sortDirection : ""}`}
+          onClick={() => toggleSort("change")}
+        >
+          24h
+        </div>
+        <div
+          className={`column volume ${
+            sortMethod === "volume" ? "sorted" : ""
+          } ${sortMethod === "volume" ? sortDirection : ""}`}
+          onClick={() => toggleSort("volume")}
+        >
+          Volume
+        </div>
       </div>
 
-      <div className="pair-list-container">
-        <div className="pair-list" ref={listRef}>
-          {displayedPairs.map((p) => {
-            const symbol = p.name;
-            const isActive = selectedPair.id === p.id;
-            const positive = p.change24h > 0;
-            const changeClass = positive
-              ? "positive"
-              : p.change24h < 0
-              ? "negative"
-              : "neutral";
+      <div className="pair-list">
+        {filteredPairs.map((pair) => (
+          <div
+            key={pair.id}
+            className={`pair-item ${
+              selectedPair?.id === pair.id ? "selected" : ""
+            }`}
+            onClick={() => onSelectPair(pair)}
+          >
+            <div className="pair-name">
+              {pair.logo && (
+                <img
+                  src={pair.logo}
+                  alt={pair.baseAsset}
+                  className="pair-logo"
+                />
+              )}
+              <span>{pair.baseAsset}</span>
+            </div>
+            <div className="pair-price">
+              ${pair.price.toFixed(pair.price < 1 ? 6 : 4)}
+            </div>
+            <div
+              className={`pair-change ${
+                pair.change24h >= 0 ? "positive" : "negative"
+              }`}
+            >
+              {pair.change24h >= 0 ? "+" : ""}
+              {pair.change24h.toFixed(2)}%
+            </div>
+            <div className="pair-volume">{formatVolume(pair.volume24h)}</div>
+          </div>
+        ))}
 
-            return (
-              <div
-                key={p.id}
-                className={`pair-item ${isActive ? "active" : ""}`}
-                onClick={() => onSelectPair(p)}
-              >
-                <div className="pair-info">
-                  <span
-                    className={`star ${
-                      favorites.includes(symbol) ? "favorite" : ""
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(symbol);
-                    }}
-                  >
-                    {favorites.includes(symbol) ? "★" : "☆"}
-                  </span>
-                  <span className="pair-symbol">{p.baseAsset}</span>
-                </div>
-                <div className="pair-stats">
-                  <span className="pair-price">{p.price.toFixed(4)}</span>
-                  <span className={`pair-change ${changeClass}`}>
-                    {positive ? "+" : ""}
-                    {p.change24h.toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-
-          {isLoading && hasMoreToLoad && (
-            <div className="loading-indicator">Loading more…</div>
-          )}
-          {!displayedPairs.length && !isLoading && (
-            <div className="no-results">No pairs found</div>
-          )}
-        </div>
+        {filteredPairs.length === 0 && (
+          <div className="no-pairs">No pairs match your search</div>
+        )}
       </div>
     </div>
   );

@@ -1,16 +1,16 @@
 // src/components/WithdrawModal.tsx
-// Last Updated: 2025-05-08 07:01:15 UTC by jake1318
+// Last Updated: 2025-06-23 03:43:22 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import { BN } from "bn.js";
+import { CetusClmmSDK } from "@cetusprotocol/sui-clmm-sdk";
 import {
-  ClmmPoolUtil,
   TickMath,
+  ClmmPoolUtil,
   Percentage,
   adjustForCoinSlippage,
-  initCetusSDK,
-} from "@cetusprotocol/cetus-sui-clmm-sdk";
+} from "@cetusprotocol/common-sdk";
 import { formatDollars } from "../utils/formatters";
 import "../styles/components/WithdrawModal.scss";
 
@@ -58,9 +58,9 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
         "Initializing Cetus SDK with address:",
         account?.address || "none"
       );
-      const sdkInstance = initCetusSDK({
-        network: "mainnet",
-        wallet: account?.address || undefined,
+      const sdkInstance = CetusClmmSDK.createSDK({
+        env: "mainnet",
+        senderAddress: account?.address,
       });
 
       console.log("SDK initialized successfully");
@@ -75,7 +75,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
   useEffect(() => {
     if (sdk && account?.address) {
       console.log("Setting sender address:", account.address);
-      sdk.senderAddress = account.address;
+      sdk.setSenderAddress(account.address);
     }
   }, [account?.address, sdk]);
 
