@@ -1,143 +1,70 @@
 // src/services/cetusVaultsProcessor.ts
-// Last Updated: 2025-06-22 23:21:25 UTC by jake1318
+// Last Updated: 2025-06-27 00:29:11 UTC by jake1318
 
-import { getAllAvailableVaults } from "./cetusVaultService";
+import { getCoinInfo } from "./cetusService";
+import { getVaultCoinInfo } from "./cetusVaultService";
 
-// Interface for vault data returned from BlockVision API
-export interface BlockVisionVaultData {
-  id: string;
-  name: string;
-  apy: string;
-  coinA: {
-    symbol: string;
-    name: string;
-    decimals: number;
-    iconUrl?: string;
-  };
-  coinB: {
-    symbol: string;
-    name: string;
-    decimals: number;
-    iconUrl?: string;
-  };
-  coinAAmount: string;
-  coinBAmount: string;
-  coinTypeA: string;
-  coinTypeB: string;
-}
+// Process and merge pools with vaults data for UI
+export function processPoolsWithVaults(pools, allVaults) {
+  // Create a lookup by pool ID for vaults
+  const vaultMap = new Map();
+  allVaults.forEach((v) => vaultMap.set(v.clmm_pool_id, v));
 
-// Interface for processed vault data with additional details
-export interface EnrichedVaultData {
-  id: string;
-  name: string;
-  apy: number;
-  tvl?: number;
-  tokenASymbol: string;
-  tokenBSymbol: string;
-  tokenAAmount: string;
-  tokenBAmount: string;
-  tokenAType: string;
-  tokenBType: string;
-  tokenALogo?: string;
-  tokenBLogo?: string;
-  tokenADecimals: number;
-  tokenBDecimals: number;
-  userValueUsd?: number;
-  userHasPosition: boolean;
-}
+  return pools.map((pool) => {
+    const vault = vaultMap.get(pool.poolAddress);
 
-// Cache for vault APY data
-const vaultApyCache = new Map<string, number>();
+    // Merge vault data if exists for this pool
+    if (vault) {
+      // Ensure symbols present
+      const symbolA = pool.symbolA || vault.symbolA || "";
+      const symbolB = pool.symbolB || vault.symbolB || "";
 
-/**
- * Process vault data from BlockVision API
- * Updated to maintain compatibility with Cetus Vaults SDK v1.1.4
- */
-export async function processCetusVaults(
-  vaultsData: BlockVisionVaultData[]
-): Promise<EnrichedVaultData[]> {
-  console.log(`Processing ${vaultsData.length} Cetus vaults from BlockVision`);
+      // Compute APR if needed
+      const vaultApr = vault.apr_percent || vault.apy_percent || null;
 
-  const result: EnrichedVaultData[] = [];
-
-  // Store APYs in cache for later use
-  vaultsData.forEach((vault) => {
-    const apyValue = parseFloat(vault.apy);
-    if (!isNaN(apyValue)) {
-      vaultApyCache.set(vault.id, apyValue);
-      console.log(`Cached APY for vault ${vault.id}: ${apyValue}%`);
+      return {
+        ...pool,
+        symbolA,
+        symbolB,
+        hasVault: true,
+        vaultId: vault.vault_id,
+        vaultApy: vaultApr,
+        vaultLowerTick: vault.tick_lower_index,
+        vaultUpperTick: vault.tick_upper_index,
+      };
+    } else {
+      return {
+        ...pool,
+        hasVault: false,
+      };
     }
   });
+}
 
-  // Process each vault
-  for (const vault of vaultsData) {
-    // Convert APY string to number
-    const apy = parseFloat(vault.apy);
+// Process user's vault positions
+export function processUserVaultPositions(vaultPositions, allVaults) {
+  return vaultPositions.map((vp) => {
+    const vaultConfig = allVaults.find((v) => v.vault_id === vp.vault_id);
 
-    const enrichedVault: EnrichedVaultData = {
-      id: vault.id,
-      name: vault.name,
-      apy: isNaN(apy) ? 0 : apy,
-      tokenASymbol: vault.coinA?.symbol || "Unknown",
-      tokenBSymbol: vault.coinB?.symbol || "Unknown",
-      tokenAAmount: vault.coinAAmount || "0",
-      tokenBAmount: vault.coinBAmount || "0",
-      tokenAType: vault.coinTypeA,
-      tokenBType: vault.coinTypeB,
-      tokenALogo: vault.coinA?.iconUrl,
-      tokenBLogo: vault.coinB?.iconUrl,
-      tokenADecimals: vault.coinA?.decimals || 9,
-      tokenBDecimals: vault.coinB?.decimals || 9,
-      userHasPosition: true, // This data comes from user positions, so they have a position
+    const symbolA = vp.symbolA || vaultConfig?.symbolA || "";
+    const symbolB = vp.symbolB || vaultConfig?.symbolB || "";
+
+    // Calculate user's share percentage
+    let sharePercent = 0;
+    if (
+      vaultConfig &&
+      vaultConfig.liquidity &&
+      Number(vaultConfig.liquidity) > 0
+    ) {
+      sharePercent =
+        (Number(vp.lp_token_balance) / Number(vaultConfig.liquidity)) * 100;
+    }
+
+    return {
+      ...vp,
+      symbolA,
+      symbolB,
+      sharePercent: sharePercent.toFixed(2) + "%",
     };
-
-    result.push(enrichedVault);
-  }
-
-  return result;
-}
-
-/**
- * Get the APY for a specific vault ID from cache
- */
-export function getVaultApy(vaultId: string): number | undefined {
-  return vaultApyCache.get(vaultId);
-}
-
-/**
- * Update our vault service data with APYs from BlockVision
- * Updated to maintain compatibility with Cetus Vaults SDK v1.1.4
- */
-export async function updateVaultApysFromBlockVision(
-  blockVisionVaults: BlockVisionVaultData[]
-): Promise<void> {
-  // Store APYs in cache for later use by the vault service
-  try {
-    blockVisionVaults.forEach((vault) => {
-      const apyValue = parseFloat(vault.apy);
-      if (!isNaN(apyValue)) {
-        vaultApyCache.set(vault.id, apyValue);
-        console.log(
-          `Storing BlockVision APY for vault ${vault.id}: ${apyValue}%`
-        );
-      }
-    });
-  } catch (error) {
-    console.error("Error updating vault APYs from BlockVision:", error);
-  }
-}
-
-/**
- * Clear the vault APY cache
- */
-export function clearVaultApyCache(): void {
-  vaultApyCache.clear();
-  console.log("Vault APY cache cleared");
-}
-
-/**
- * Get cached APY values for all vaults
- */
-export function getVaultApyCache(): Map<string, number> {
-  return vaultApyCache;
+  });
 }

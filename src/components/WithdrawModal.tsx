@@ -1,5 +1,5 @@
 // src/components/WithdrawModal.tsx
-// Last Updated: 2025-06-23 03:43:22 UTC by jake1318
+// Last Updated: 2025-06-29 20:30:33 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -12,6 +12,7 @@ import {
   adjustForCoinSlippage,
 } from "@cetusprotocol/common-sdk";
 import { formatDollars } from "../utils/formatters";
+import { withdraw as sdkWithdraw } from "../services/cetusService";
 import "../styles/components/WithdrawModal.scss";
 
 interface WithdrawModalProps {
@@ -38,7 +39,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
   onConfirm,
   onClose,
 }) => {
-  const { account } = useWallet();
+  const wallet = useWallet();
   const [withdrawPercent, setWithdrawPercent] = useState<number>(100); // Default to 100% (full withdrawal)
   const [slippage, setSlippage] = useState<string>("0.5");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -50,17 +51,23 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
     txDigest?: string;
     pairName?: string;
   } | null>(null);
+  const [txDigests, setTxDigests] = useState<string[]>([]);
+
+  // Compute pair name once
+  const pairNameMemo = useMemo(() => {
+    return "USDC/SUI"; // Replace with actual dynamic pair name if available
+  }, []);
 
   // Initialize SDK once and cache it
   const sdk = useMemo(() => {
     try {
       console.log(
         "Initializing Cetus SDK with address:",
-        account?.address || "none"
+        wallet.account?.address || "none"
       );
       const sdkInstance = CetusClmmSDK.createSDK({
         env: "mainnet",
-        senderAddress: account?.address,
+        senderAddress: wallet.account?.address,
       });
 
       console.log("SDK initialized successfully");
@@ -69,15 +76,15 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
       console.error("Failed to initialize Cetus SDK:", error);
       return null;
     }
-  }, [account?.address]);
+  }, [wallet.account?.address]);
 
   // Update sender address when wallet changes
   useEffect(() => {
-    if (sdk && account?.address) {
-      console.log("Setting sender address:", account.address);
-      sdk.setSenderAddress(account.address);
+    if (sdk && wallet.account?.address) {
+      console.log("Setting sender address:", wallet.account.address);
+      sdk.setSenderAddress(wallet.account.address);
     }
-  }, [account?.address, sdk]);
+  }, [wallet.account?.address, sdk]);
 
   // Handle percentage select buttons
   const handlePercentSelect = (percent: number) => {
@@ -100,8 +107,10 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Pass withdrawal options to parent component
-      const result = await onConfirm({
+      // Use the new unified withdraw helper function
+      const result = await sdkWithdraw(wallet, {
+        poolId: poolAddress,
+        positionIds,
         withdrawPercent,
         collectFees,
         closePosition,
@@ -110,19 +119,18 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
 
       console.log("Transaction result:", result);
 
-      if (result?.success) {
-        // Log the transaction digest for debugging
-        console.log("Transaction digest:", result.digest);
-
+      if (result.success) {
         // Set success notification
         setTxNotification({
           message: closePosition
-            ? "Successfully closed position(s)!"
-            : `Successfully withdrew ${withdrawPercent}% of liquidity!`,
+            ? "Position successfully closed"
+            : `Withdrew ${withdrawPercent}% liquidity`,
           isSuccess: true,
-          txDigest: result.digest,
-          pairName: "USDC/SUI", // Hardcoded for now, should ideally be passed from parent
+          txDigest: result.digests.length === 1 ? result.digests[0] : undefined,
+          pairName: pairNameMemo,
         });
+        // For multiple txs we still show success but list links below
+        setTxDigests(result.digests);
       } else {
         throw new Error("Transaction failed");
       }
@@ -141,6 +149,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
 
   const handleModalClose = () => {
     setTxNotification(null);
+    setTxDigests([]);
     onClose();
   };
 
@@ -174,7 +183,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
           </button>
         </div>
 
-        {txNotification?.txDigest ? (
+        {txNotification?.isSuccess ? (
           <div className="success-confirmation">
             {/* Success Check Icon - Matching the deposit modal */}
             <div className="success-check-icon">
@@ -209,27 +218,48 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
 
             <p className="success-message">
               {closePosition
-                ? `Closed position for ${txNotification.pairName || "USDC/SUI"}`
-                : `Withdrew ${withdrawPercent}% from ${
-                    txNotification.pairName || "USDC/SUI"
-                  }`}
+                ? `Closed position${
+                    positionIds.length > 1 ? "s" : ""
+                  } for ${pairNameMemo}`
+                : `Withdrew ${withdrawPercent}% from ${pairNameMemo}`}
             </p>
 
             {/* Transaction ID - Matching the deposit modal */}
-            <p className="transaction-id">
-              Transaction ID: {txNotification.txDigest}
-            </p>
+            {txNotification.txDigest && (
+              <p className="transaction-id">
+                Transaction ID: {txNotification.txDigest}
+              </p>
+            )}
+
+            {/* Multiple transaction digests */}
+            {txDigests.length > 1 && (
+              <ul className="tx-list">
+                {txDigests.map((d) => (
+                  <li key={d}>
+                    <a
+                      href={`https://suivision.xyz/txblock/${d}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {d.slice(0, 10)}…{d.slice(-6)}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             {/* Action Buttons - Matching the deposit modal */}
             <div className="success-actions">
-              <a
-                href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="view-tx-link"
-              >
-                View on SuiVision
-              </a>
+              {txNotification.txDigest && (
+                <a
+                  href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="view-tx-link"
+                >
+                  View on SuiVision
+                </a>
+              )}
 
               <button className="done-button" onClick={handleModalClose}>
                 Done
@@ -242,7 +272,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
             <div className="position-info">
               <div className="position-header">
                 <div className="token-pair">
-                  <span className="token-name">USDC/SUI</span>
+                  <span className="token-name">{pairNameMemo}</span>
                   <span className="range-badge in-range">Pool Position</span>
                 </div>
                 <div className="position-value">
@@ -394,7 +424,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
                   <span className="item-label">Action:</span>
                   <span className="item-value">
                     {withdrawPercent === 100 && closePosition
-                      ? "Close Position (Single Transaction)"
+                      ? "Close Position" + (positionIds.length > 1 ? "s" : "")
                       : `Withdraw ${withdrawPercent}% Liquidity`}
                   </span>
                 </div>
@@ -408,6 +438,14 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
                   <span className="item-label">Slippage Tolerance:</span>
                   <span className="item-value">{slippage}%</span>
                 </div>
+                {positionIds.length > 1 && (
+                  <div className="transaction-item">
+                    <span className="item-label">Positions:</span>
+                    <span className="item-value">
+                      {positionIds.length} selected
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -444,7 +482,9 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
                   />
                 </svg>
                 <span>
-                  Closing a position will permanently remove this position.
+                  Closing {positionIds.length > 1 ? "positions" : "a position"}{" "}
+                  will permanently remove{" "}
+                  {positionIds.length > 1 ? "them" : "it"}.
                 </span>
               </div>
             )}
@@ -453,13 +493,15 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
             {isSubmitting && (
               <div className="processing-notification">
                 <div className="spinner"></div>
-                <span>Processing transaction...</span>
+                <span>
+                  Processing transaction{positionIds.length > 1 ? "s" : ""}...
+                </span>
               </div>
             )}
           </div>
         )}
 
-        {!txNotification?.txDigest && !isSubmitting && (
+        {!txNotification?.isSuccess && !isSubmitting && (
           <div className="modal-footer">
             <button
               type="button"
@@ -475,7 +517,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
               disabled={isSubmitting}
             >
               {closePosition && withdrawPercent === 100
-                ? "Close Position"
+                ? "Close Position" + (positionIds.length > 1 ? "s" : "")
                 : "Withdraw"}
             </button>
           </div>

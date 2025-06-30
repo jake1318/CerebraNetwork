@@ -1,8 +1,7 @@
 // src/components/DepositModal.tsx
-// Last Updated: 2025-06-23 03:43:22 UTC by jake1318
+// Last Updated: 2025-06-27 06:24:18 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
-import { useWallet } from "@suiet/wallet-kit";
 import { PoolInfo } from "../services/coinGeckoService";
 import { formatDollars } from "../utils/formatters";
 import blockvisionService, {
@@ -19,6 +18,10 @@ import {
 } from "@cetusprotocol/common-sdk";
 import { getPoolDetails as getBluefinPool } from "../services/bluefinService";
 import TransactionNotification from "./TransactionNotification";
+import {
+  calculateVaultDeposit,
+  depositToVault,
+} from "../services/cetusVaultService";
 import "../styles/components/DepositModal.scss";
 
 interface DepositModalProps {
@@ -32,8 +35,10 @@ interface DepositModalProps {
     tickUpper: number,
     deltaLiquidity: string
   ) => Promise<{ success: boolean; digest: string }>;
-  pool: PoolInfo;
+  pool?: PoolInfo;
+  vault?: any;
   walletConnected: boolean;
+  wallet: any; // Use the wallet passed as prop
 }
 
 // Constants for tick range in Sui CLMM implementation
@@ -50,16 +55,19 @@ const DepositModal: React.FC<DepositModalProps> = ({
   onClose,
   onDeposit,
   pool,
+  vault,
   walletConnected,
+  wallet, // Use this wallet prop instead of useWallet()
 }) => {
-  const { account } = useWallet();
+  // Get account from wallet prop instead of calling useWallet() again
+  const account = wallet?.account;
+
   const [amountA, setAmountA] = useState<string>("");
   const [amountB, setAmountB] = useState<string>("");
   const [slippage, setSlippage] = useState<string>("0.5");
-  const [balances, setBalances] = useState<Record<string, AccountCoin | null>>({
-    [pool.tokenA]: null,
-    [pool.tokenB]: null,
-  });
+  const [balances, setBalances] = useState<Record<string, AccountCoin | null>>(
+    pool ? { [pool.tokenA]: null, [pool.tokenB]: null } : {}
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [txNotification, setTxNotification] = useState<{
@@ -67,6 +75,15 @@ const DepositModal: React.FC<DepositModalProps> = ({
     isSuccess: boolean;
     txDigest?: string;
   } | null>(null);
+
+  // Vault-specific states
+  const [useOneSide, setUseOneSide] = useState<boolean>(false);
+  const [activeToken, setActiveToken] = useState<"A" | "B">("A");
+  const [estimations, setEstimations] = useState<{
+    coinA?: string;
+    coinB?: string;
+    lpAmount?: string;
+  }>({});
 
   // Which token side is fixed
   const [fixedToken, setFixedToken] = useState<"A" | "B" | null>(null);
@@ -104,21 +121,62 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
   // Token decimals
   const tokenADecimals = useMemo(() => {
+    if (!pool) return vault?.decimalsA || 9;
     if (pool.tokenA.toUpperCase() === "USDC") return 6;
     return pool.tokenAMetadata?.decimals || 9;
-  }, [pool.tokenA, pool.tokenAMetadata]);
+  }, [pool?.tokenA, pool?.tokenAMetadata, vault?.decimalsA]);
+
   const tokenBDecimals = useMemo(() => {
+    if (!pool) return vault?.decimalsB || 9;
     if (pool.tokenB.toUpperCase() === "SUI") return 9;
     return pool.tokenBMetadata?.decimals || 9;
-  }, [pool.tokenB, pool.tokenBMetadata]);
+  }, [pool?.tokenB, pool?.tokenBMetadata, vault?.decimalsB]);
+
+  // Get display symbols
+  const symbolA = pool ? pool.tokenA : vault?.symbolA || "";
+  const symbolB = pool ? pool.tokenB : vault?.symbolB || "";
 
   // Check if this is a SUI pair which we know works correctly
-  const isSuiPair = useMemo(
-    () =>
+  const isSuiPair = useMemo(() => {
+    if (vault) {
+      return (
+        (vault.symbolA || "").toUpperCase().includes("SUI") ||
+        (vault.symbolB || "").toUpperCase().includes("SUI")
+      );
+    }
+    if (!pool) return false;
+    return (
       pool.tokenA.toUpperCase().includes("SUI") ||
-      pool.tokenB.toUpperCase().includes("SUI"),
-    [pool.tokenA, pool.tokenB]
-  );
+      pool.tokenB.toUpperCase().includes("SUI")
+    );
+  }, [pool?.tokenA, pool?.tokenB, vault?.symbolA, vault?.symbolB]);
+
+  // Handle amount changes for vault inputs
+  const handleAmountChange = (token: "A" | "B", value: string) => {
+    const v = value.replace(/[^0-9.]/g, "");
+    if ((v.match(/\./g) || []).length > 1) return;
+
+    if (token === "A") {
+      setAmountA(v);
+      setActiveToken("A");
+      if (useOneSide) setAmountB("");
+    } else {
+      setAmountB(v);
+      setActiveToken("B");
+      if (useOneSide) setAmountA("");
+    }
+  };
+
+  // Reset the form when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAmountA("");
+      setAmountB("");
+      setUseOneSide(false);
+      setEstimations({});
+      setTxNotification(null);
+    }
+  }, [isOpen]);
 
   // Check if this is a Turbos pool - if so, redirect to specialized modal
   useEffect(() => {
@@ -134,7 +192,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
   // Initialize SDK once and cache it
   const sdk = useMemo(() => {
-    if (pool.dex.toLowerCase() === "turbos") {
+    if (pool && pool.dex.toLowerCase() === "turbos") {
       // Skip SDK initialization for Turbos pools
       return null;
     }
@@ -159,7 +217,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
       );
       return null;
     }
-  }, [account?.address, pool.dex]);
+  }, [account?.address, pool?.dex]);
 
   // Update sender address when wallet changes
   useEffect(() => {
@@ -169,30 +227,88 @@ const DepositModal: React.FC<DepositModalProps> = ({
     }
   }, [account?.address, sdk]);
 
+  // Calculate vault deposits on input changes
+  useEffect(() => {
+    if (vault && (parseFloat(amountA) > 0 || parseFloat(amountB) > 0)) {
+      // If one-sided deposit, only one of amountA or amountB is used
+      const inputAmt =
+        activeToken === "A"
+          ? parseFloat(amountA) || 0
+          : parseFloat(amountB) || 0;
+      if (inputAmt <= 0) return;
+
+      const useCoinA = activeToken === "A";
+
+      calculateVaultDeposit(
+        vault.vault_id || vault.id,
+        inputAmt,
+        useCoinA,
+        useOneSide
+      )
+        .then((result) => {
+          const coinANeeded =
+            result.coin_a_amount ?? result.required_coin_a_amount;
+          const coinBNeeded =
+            result.coin_b_amount ?? result.required_coin_b_amount;
+          const lpOut = result.estimated_lp_amount;
+
+          setEstimations({
+            coinA: coinANeeded
+              ? (Number(coinANeeded) / 10 ** tokenADecimals).toFixed(6)
+              : undefined,
+            coinB: coinBNeeded
+              ? (Number(coinBNeeded) / 10 ** tokenBDecimals).toFixed(6)
+              : undefined,
+            lpAmount: lpOut ? (Number(lpOut) / 10 ** 9).toFixed(6) : undefined,
+          });
+        })
+        .catch((err) => {
+          console.error("Failed to calculate vault deposit", err);
+          setTxNotification({
+            message:
+              "Failed to calculate deposit estimate. Please check your input amounts.",
+            isSuccess: false,
+          });
+          setEstimations({});
+        });
+    }
+  }, [
+    amountA,
+    amountB,
+    useOneSide,
+    activeToken,
+    vault,
+    tokenADecimals,
+    tokenBDecimals,
+  ]);
+
   // Fetch balances & pool data when opened
   useEffect(() => {
     if (isOpen && account?.address) {
       fetchWalletBalances();
 
-      // For non-SUI pools on Cetus, fetch external prices first when enabled
-      if (
-        USE_BIRDEYE_FOR_CETUS &&
-        pool.dex.toLowerCase() === "cetus" &&
-        !isSuiPair
-      ) {
-        console.log("Non-SUI pair detected, prioritizing Birdeye pricing");
-        fetchTokenPrices().then((externalPriceSuccess) => {
-          // Only fetch pool data if external prices failed
-          if (!externalPriceSuccess) {
-            fetchPoolData();
-          }
-        });
-      } else {
-        // For SUI pairs or when flag is disabled, use original flow
-        fetchPoolData();
+      // Only need to fetch pool data when dealing with a pool, not a vault
+      if (pool) {
+        // For non-SUI pools on Cetus, fetch external prices first when enabled
+        if (
+          USE_BIRDEYE_FOR_CETUS &&
+          pool.dex.toLowerCase() === "cetus" &&
+          !isSuiPair
+        ) {
+          console.log("Non-SUI pair detected, prioritizing Birdeye pricing");
+          fetchTokenPrices().then((externalPriceSuccess) => {
+            // Only fetch pool data if external prices failed
+            if (!externalPriceSuccess) {
+              fetchPoolData();
+            }
+          });
+        } else {
+          // For SUI pairs or when flag is disabled, use original flow
+          fetchPoolData();
+        }
       }
     }
-  }, [isOpen, account?.address, isSuiPair]);
+  }, [isOpen, account?.address, isSuiPair, pool]);
 
   // Convert display amount → base units BN
   const toBaseUnits = (amount: string, decimals: number): BN => {
@@ -267,15 +383,13 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
     // Check if this is a WAL/USDC pool to apply special handling
     const isWalUsdc =
-      (pool.tokenA.toUpperCase() === "WAL" &&
-        pool.tokenB.toUpperCase() === "USDC") ||
-      (pool.tokenA.toUpperCase() === "USDC" &&
-        pool.tokenB.toUpperCase() === "WAL");
+      (symbolA.toUpperCase() === "WAL" && symbolB.toUpperCase() === "USDC") ||
+      (symbolA.toUpperCase() === "USDC" && symbolB.toUpperCase() === "WAL");
 
     if (isWalUsdc) {
       // For WAL/USDC specifically, we know the price should be around 1.5-2 USDC per WAL
       // Check if WAL is token A or token B to get direction correct
-      if (pool.tokenA.toUpperCase() === "WAL") {
+      if (symbolA.toUpperCase() === "WAL") {
         // WAL is token A, so price is USDC per WAL
         // Apply correction - divide by special factor for WAL/USDC
         const correctedPrice = price / 1000;
@@ -311,6 +425,8 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
   // Enhanced fetchTokenPrices to be the primary price source for Cetus pools
   const fetchTokenPrices = async (): Promise<boolean> => {
+    if (!pool) return false;
+
     try {
       // If no token addresses, can't fetch prices
       if (!pool.tokenAAddress && !pool.tokenAMetadata?.address) {
@@ -371,7 +487,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
   // Separate function to fetch just the pool metadata, not price
   const fetchPoolMetadata = async () => {
     try {
-      if (!pool.address || !sdk) return;
+      if (!pool || !pool.address || !sdk) return;
 
       console.log(`Fetching pool metadata for address: ${pool.address}`);
       const pd = await sdk.Pool.getPool(pool.address);
@@ -395,7 +511,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
   // Modified fetchPoolData to be the fallback when external prices aren't available
   const fetchPoolData = async () => {
-    if (!pool.address) return;
+    if (!pool || !pool.address) return;
     setLoading(true);
     setSdkError(null);
 
@@ -479,7 +595,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
   // Fetch balances
   const fetchWalletBalances = async () => {
-    if (!account?.address) return;
+    if (!account?.address || !pool) return;
     setLoading(true);
     try {
       const { data: coins } = await blockvisionService.getAccountCoins(
@@ -598,6 +714,16 @@ const DepositModal: React.FC<DepositModalProps> = ({
     const v = e.target.value.replace(/[^0-9.]/g, "");
     if ((v.match(/\./g) || []).length > 1) return;
     setAmountA(v);
+
+    if (vault) {
+      setActiveToken("A");
+      if (useOneSide) {
+        setAmountB("");
+      }
+      return;
+    }
+
+    // Pool handling
     setFixedToken("A");
 
     // Auto-compute token B amount if price is available
@@ -605,9 +731,9 @@ const DepositModal: React.FC<DepositModalProps> = ({
       // Normal pools: price = tokenB per tokenA
       setAmountB((Number(v) * currentPrice).toFixed(6));
       console.log(
-        `Normal calculation: ${v} ${pool.tokenA} → ${
+        `Normal calculation: ${v} ${symbolA} → ${
           Number(v) * currentPrice
-        } ${pool.tokenB}`
+        } ${symbolB}`
       );
     } else {
       setAmountB("");
@@ -618,6 +744,16 @@ const DepositModal: React.FC<DepositModalProps> = ({
     const v = e.target.value.replace(/[^0-9.]/g, "");
     if ((v.match(/\./g) || []).length > 1) return;
     setAmountB(v);
+
+    if (vault) {
+      setActiveToken("B");
+      if (useOneSide) {
+        setAmountA("");
+      }
+      return;
+    }
+
+    // Pool handling
     setFixedToken("B");
 
     // Auto-compute token A amount if price is available
@@ -625,9 +761,9 @@ const DepositModal: React.FC<DepositModalProps> = ({
       // Normal pools
       setAmountA((Number(v) / currentPrice).toFixed(6));
       console.log(
-        `Normal calculation: ${v} ${pool.tokenB} → ${
+        `Normal calculation: ${v} ${symbolB} → ${
           Number(v) / currentPrice
-        } ${pool.tokenA}`
+        } ${symbolA}`
       );
     } else {
       setAmountA("");
@@ -635,6 +771,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
   };
 
   const handleMaxAClick = () => {
+    if (!pool) return;
     const b = balances[pool.tokenA];
     if (!b) return;
     const max = (parseInt(b.balance) / 10 ** b.decimals).toString();
@@ -648,6 +785,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
   };
 
   const handleMaxBClick = () => {
+    if (!pool) return;
     const b = balances[pool.tokenB];
     if (!b) return;
     const max = (parseInt(b.balance) / 10 ** b.decimals).toString();
@@ -657,6 +795,18 @@ const DepositModal: React.FC<DepositModalProps> = ({
     // Auto-compute token A amount
     if (currentPrice > 0) {
       setAmountA((Number(max) / currentPrice).toFixed(6));
+    }
+  };
+
+  // Handle one-sided toggle for vaults
+  const handleToggleOneSide = (checked: boolean) => {
+    setUseOneSide(checked);
+
+    // Clear the secondary token field when toggling modes
+    if (checked) {
+      // If toggling on one-sided, keep the active token field and empty the other
+      if (activeToken === "A") setAmountB("");
+      else setAmountA("");
     }
   };
 
@@ -864,6 +1014,67 @@ const DepositModal: React.FC<DepositModalProps> = ({
   // Submit handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if wallet is connected
+    if (!wallet || !wallet.account) {
+      setTxNotification({
+        message: "Wallet not connected",
+        isSuccess: false,
+      });
+      return;
+    }
+
+    // Vault deposit
+    if (vault) {
+      setIsSubmitting(true);
+      setTxNotification({
+        message: "Processing vault deposit…",
+        isSuccess: true,
+      });
+
+      try {
+        const amtA = parseFloat(amountA) || 0;
+        const amtB = parseFloat(amountB) || 0;
+
+        if (amtA <= 0 && amtB <= 0) {
+          throw new Error("Please enter a valid amount");
+        }
+
+        // Pass the wallet to the depositToVault function
+        const txnBlock = await depositToVault(
+          wallet, // Pass the wallet instance from props
+          vault.vault_id || vault.id,
+          amtA,
+          amtB
+        );
+
+        setTxNotification({
+          message: `Successfully deposited to ${symbolA}-${symbolB} vault`,
+          isSuccess: true,
+          txDigest: txnBlock.digest,
+        });
+
+        setAmountA("");
+        setAmountB("");
+        setTimeout(() => {
+          onClose();
+        }, 3000);
+      } catch (err: any) {
+        console.error("Vault deposit failed", err);
+        setTxNotification({
+          message: `Failed to deposit to vault: ${
+            err.message || "Unknown error"
+          }`,
+          isSuccess: false,
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Pool deposit
+    if (!pool) return;
     if (!amountA || !amountB) return;
 
     // Final validation to ensure we have valid tick values
@@ -986,24 +1197,299 @@ const DepositModal: React.FC<DepositModalProps> = ({
   };
 
   const formatBalance = (tk: string): string => {
+    if (!pool) return "...";
     const b = balances[tk];
     if (!b) return "...";
     const v = parseInt(b.balance) / 10 ** b.decimals;
     return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
   };
 
-  const isSubmitDisabled =
-    !amountA ||
-    !amountB ||
-    !walletConnected ||
-    isSubmitting ||
-    isNaN(tickLower) ||
-    isNaN(tickUpper) ||
-    tickUpper <= tickLower ||
-    (tickSpacing > 0 && tickUpper - tickLower < tickSpacing);
+  const isSubmitDisabled = vault
+    ? (!amountA && !amountB) || !walletConnected || isSubmitting
+    : !amountA ||
+      !amountB ||
+      !walletConnected ||
+      isSubmitting ||
+      isNaN(tickLower) ||
+      isNaN(tickUpper) ||
+      tickUpper <= tickLower ||
+      (tickSpacing > 0 && tickUpper - tickLower < tickSpacing);
 
   if (!isOpen) return null;
 
+  // Render vault deposit modal
+  if (vault) {
+    return (
+      <div className="modal-overlay">
+        <div className="deposit-modal">
+          <div className="modal-header">
+            <h3>
+              Deposit into Vault {symbolA}-{symbolB}
+            </h3>
+            <button
+              className="close-button"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path
+                  d="M18 6L6 18M6 6L18 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {txNotification?.txDigest ? (
+            <div className="success-confirmation">
+              <div className="success-check-icon">
+                <svg
+                  width="80"
+                  height="80"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="11"
+                    stroke="#2EC37C"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M7 12L10 15L17 8"
+                    stroke="#2EC37C"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <h2 className="success-title">Vault Deposit Successful!</h2>
+              <p className="success-message">
+                Added to {symbolA}-{symbolB} Vault
+              </p>
+              <p className="transaction-id">
+                Transaction ID: {txNotification.txDigest}
+              </p>
+
+              <div className="success-actions">
+                <a
+                  href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="view-tx-link"
+                >
+                  View on SuiVision
+                </a>
+                <button className="done-button" onClick={onClose}>
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="modal-body">
+                {/* One-sided toggle for vaults */}
+                <div className="toggle-one-side">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={useOneSide}
+                      onChange={(e) => handleToggleOneSide(e.target.checked)}
+                    />
+                    One-sided deposit
+                  </label>
+                  <div className="info-text">
+                    {useOneSide
+                      ? "Deposit only one token. The vault will handle conversion internally."
+                      : "Balanced deposit using both tokens."}
+                  </div>
+                </div>
+
+                {/* Amount inputs */}
+                <div className="input-group">
+                  <label>{symbolA}</label>
+                  <input
+                    type="number"
+                    value={amountA}
+                    min="0"
+                    step="0.000001"
+                    placeholder="0.0"
+                    disabled={useOneSide && activeToken !== "A"}
+                    onChange={(e) => handleAmountChange("A", e.target.value)}
+                  />
+                  {useOneSide && activeToken === "A" && (
+                    <span className="badge">Single token mode</span>
+                  )}
+                </div>
+
+                <div className="input-group">
+                  <label>{symbolB}</label>
+                  <input
+                    type="number"
+                    value={amountB}
+                    min="0"
+                    step="0.000001"
+                    placeholder="0.0"
+                    disabled={useOneSide && activeToken !== "B"}
+                    onChange={(e) => handleAmountChange("B", e.target.value)}
+                  />
+                  {useOneSide && activeToken === "B" && (
+                    <span className="badge">Single token mode</span>
+                  )}
+                </div>
+
+                {Object.keys(estimations).length > 0 && (
+                  <div className="estimates">
+                    <h4>Estimated Details:</h4>
+                    {useOneSide ? (
+                      <p>
+                        Deposit:{" "}
+                        {estimations.coinA
+                          ? `${estimations.coinA} ${symbolA}`
+                          : ""}
+                        {estimations.coinB
+                          ? ` + ${estimations.coinB} ${symbolB}`
+                          : ""}
+                        <br />
+                        LP to receive: ~{estimations.lpAmount || "-"}
+                      </p>
+                    ) : (
+                      <p>
+                        LP tokens to receive: ~{estimations.lpAmount || "-"}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Summary for Vault */}
+                {vault.apy && (
+                  <div className="summary-panel">
+                    <div className="summary-item">
+                      <span className="item-label">Vault APY:</span>
+                      <span className="item-value highlight">
+                        {typeof vault.apy === "number"
+                          ? vault.apy.toFixed(2)
+                          : vault.apy}
+                        %
+                      </span>
+                    </div>
+                    {vault.tvl && (
+                      <div className="summary-item">
+                        <span className="item-label">Vault TVL:</span>
+                        <span className="item-value">
+                          ${formatDollars(vault.tvl)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Wallet Warning */}
+                {!walletConnected && (
+                  <div className="wallet-warning">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                      <line x1="12" y1="9" x2="12" y2="13"></line>
+                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <span>Connect your wallet to deposit</span>
+                  </div>
+                )}
+
+                {/* Transaction Notification */}
+                {txNotification && !txNotification.txDigest && (
+                  <div
+                    className={`transaction-notification ${
+                      txNotification.isSuccess ? "success" : "error"
+                    }`}
+                  >
+                    {txNotification.isSuccess ? (
+                      <div className="spinner"></div>
+                    ) : (
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                        <line
+                          x1="15"
+                          y1="9"
+                          x2="9"
+                          y2="15"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                        <line
+                          x1="9"
+                          y1="9"
+                          x2="15"
+                          y2="15"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                      </svg>
+                    )}
+                    <span>{txNotification.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn--primary"
+                  onClick={handleSubmit}
+                  disabled={isSubmitDisabled}
+                >
+                  {isSubmitting ? (
+                    <span className="loading-text">
+                      <span className="spinner-small"></span>
+                      Processing...
+                    </span>
+                  ) : (
+                    "Deposit to Vault"
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Render pool deposit modal
   return (
     <div className="modal-overlay">
       <div className="deposit-modal">
@@ -1050,7 +1536,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
             <h2 className="success-title">Deposit Successful!</h2>
 
             <p className="success-message">
-              Added liquidity to {pool.tokenA}/{pool.tokenB}
+              Added liquidity to {symbolA}/{symbolB}
             </p>
 
             <p className="transaction-id">
@@ -1249,6 +1735,14 @@ const DepositModal: React.FC<DepositModalProps> = ({
               <div className="slippage-setting">
                 <label>Slippage Tolerance:</label>
                 <div className="slippage-options">
+                  <button
+                    type="button"
+                    className={slippage === "0.1" ? "selected" : ""}
+                    onClick={() => setSlippage("0.1")}
+                    disabled={isSubmitting}
+                  >
+                    0.1%
+                  </button>
                   <button
                     type="button"
                     className={slippage === "0.1" ? "selected" : ""}

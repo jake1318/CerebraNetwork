@@ -1,12 +1,12 @@
-// src/pages/Pools.tsx
-// Last Updated: 2025-05-28 23:19:55 UTC by jake1318
+// src/pages/PoolsPage/Pools.tsx
+// Last Updated: 2025-06-27 07:25:45 UTC by jake1318
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@suiet/wallet-kit";
 import DepositModal from "../../components/DepositModal";
 import TurbosDepositModal from "../../components/TurbosDepositModal";
-import KriyaDepositModal from "../../components/KriyaDepositModal"; // Import the new Kriya modal
+import KriyaDepositModal from "../../components/KriyaDepositModal";
 import TransactionNotification from "../../components/TransactionNotification";
 import EnhancedTokenIcon from "../../components/EnhancedTokenIcon";
 import ProtocolBadge from "./ProtocolBadge";
@@ -16,9 +16,15 @@ import * as coinGeckoService from "../../services/coinGeckoService";
 import * as cetusService from "../../services/cetusService";
 import * as bluefinService from "../../services/bluefinService";
 import * as turbosService from "../../services/turbosService";
-import * as kriyadexService from "../../services/kriyadexService"; // Import the new Kriya service
+import * as kriyadexService from "../../services/kriyadexService";
 import * as birdeyeService from "../../services/birdeyeService";
-import * as blockvisionService from "../../services/blockvisionService";
+// Fix 1: Use default import for blockvisionService instead of namespace import
+import blockvisionService from "../../services/blockvisionService";
+import { processPoolsWithVaults } from "../../services/cetusVaultsProcessor";
+import {
+  getAllVaults,
+  setVaultsSender,
+} from "../../services/cetusVaultService";
 import "../../styles/pages/Pools.scss";
 import "./protocolBadges.scss";
 
@@ -82,7 +88,7 @@ const Pools: React.FC = () => {
   // State for deposit modals - separate state for each modal type
   const [isDepositModalOpen, setIsDepositModalOpen] = useState<boolean>(false);
   const [isTurbosModalOpen, setIsTurbosModalOpen] = useState<boolean>(false);
-  const [isKriyaModalOpen, setIsKriyaModalOpen] = useState<boolean>(false); // New state for Kriya modal
+  const [isKriyaModalOpen, setIsKriyaModalOpen] = useState<boolean>(false);
   const [selectedPool, setSelectedPool] = useState<PoolInfo | null>(null);
 
   const [notification, setNotification] = useState<{
@@ -112,10 +118,23 @@ const Pools: React.FC = () => {
     "turbos",
     "kriya-dex",
     "kriya",
-  ]; // Added Kriya
+  ];
 
   // Set maximum number of pools to show in results
   const MAX_POOLS_TO_DISPLAY = 20;
+
+  // Setup SDK sender address when wallet connects
+  useEffect(() => {
+    if (connected && account?.address) {
+      // Set the wallet's address in the Cetus SDK
+      cetusService.setCetusSender(account.address);
+
+      // Set the wallet's address in the Vaults SDK
+      setVaultsSender(account.address);
+
+      console.log(`Set SDK sender address to ${account.address}`);
+    }
+  }, [connected, account]);
 
   // Handle navigation to other pages
   const navigateToPage = (tab: TabType) => {
@@ -176,11 +195,24 @@ const Pools: React.FC = () => {
         setTokenMetadata(meta);
       }
 
-      // 5. Save to state and sort by APR by default
-      setOriginalPools(mergedPools);
-      setPools(mergedPools);
+      // 5. Get all vaults to merge with pools
+      let allVaults = [];
+      try {
+        allVaults = await getAllVaults();
+        console.log(`Retrieved ${allVaults.length} vaults from Cetus`);
+      } catch (vaultsError) {
+        console.error("Failed to fetch vaults:", vaultsError);
+      }
 
-      const sortedPools = [...mergedPools].sort((a, b) => b.apr - a.apr);
+      // 6. Process pools with vaults data
+      const poolsWithVaults = processPoolsWithVaults(mergedPools, allVaults);
+      console.log(`Processed ${poolsWithVaults.length} pools with vault data`);
+
+      // 7. Save to state and sort by APR by default
+      setOriginalPools(poolsWithVaults);
+      setPools(poolsWithVaults);
+
+      const sortedPools = [...poolsWithVaults].sort((a, b) => b.apr - a.apr);
       setFilteredPools(sortedPools.slice(0, MAX_POOLS_TO_DISPLAY));
     } catch (error) {
       console.error("Failed to fetch pools:", error);
@@ -257,8 +289,23 @@ const Pools: React.FC = () => {
           setTokenMetadata((prev) => ({ ...prev, ...meta }));
         }
 
-        setPools(dexPools);
-        setFilteredPools(dexPools.slice(0, MAX_POOLS_TO_DISPLAY));
+        // Get all vaults to merge with pools
+        let allVaults = [];
+        try {
+          allVaults = await getAllVaults();
+          console.log(`Retrieved ${allVaults.length} vaults for DEX filter`);
+        } catch (vaultsError) {
+          console.error("Failed to fetch vaults for DEX filter:", vaultsError);
+        }
+
+        // Process pools with vaults data
+        const poolsWithVaults = processPoolsWithVaults(dexPools, allVaults);
+        console.log(
+          `Processed ${poolsWithVaults.length} pools with vault data for DEX filter`
+        );
+
+        setPools(poolsWithVaults);
+        setFilteredPools(poolsWithVaults.slice(0, MAX_POOLS_TO_DISPLAY));
       } catch (error) {
         console.error(`Failed to fetch pools for DEX ${dex}:`, error);
         // Fallback to cached
@@ -367,9 +414,29 @@ const Pools: React.FC = () => {
           }
         }
 
+        // Get all vaults to merge with search results
+        let allVaults = [];
+        try {
+          allVaults = await getAllVaults();
+          console.log(
+            `Retrieved ${allVaults.length} vaults for search results`
+          );
+        } catch (vaultsError) {
+          console.error("Failed to fetch vaults for search:", vaultsError);
+        }
+
+        // Process pools with vaults data
+        const poolsWithVaults = processPoolsWithVaults(
+          searchResults,
+          allVaults
+        );
+        console.log(
+          `Processed ${poolsWithVaults.length} search results with vault data`
+        );
+
         // Enrich logos
         const addrs = new Set<string>();
-        searchResults.forEach((p) => {
+        poolsWithVaults.forEach((p) => {
           if (p.tokenAAddress) addrs.add(p.tokenAAddress);
           if (p.tokenBAddress) addrs.add(p.tokenBAddress);
         });
@@ -380,7 +447,7 @@ const Pools: React.FC = () => {
           setTokenMetadata((prev) => ({ ...prev, ...meta }));
         }
 
-        let result = searchResults;
+        let result = poolsWithVaults;
         if (selectedDex) {
           result = result.filter(
             (p) => p.dex.toLowerCase() === selectedDex.toLowerCase()
@@ -487,13 +554,7 @@ const Pools: React.FC = () => {
         else setFilteredPools(originalPools.slice(0, MAX_POOLS_TO_DISPLAY));
       }
     },
-    [
-      originalPools,
-      fetchPoolsByDex,
-      search,
-      performSearch,
-      MAX_POOLS_TO_DISPLAY,
-    ]
+    [originalPools, fetchPoolsByDex, search, performSearch]
   );
 
   /**
@@ -521,93 +582,54 @@ const Pools: React.FC = () => {
   };
 
   /**
-   * Fetch token balances for the deposit modals
+   * Fetch token balances for the deposit modals (using BlockVision API only)
    */
   const fetchTokenBalances = async (pool: PoolInfo) => {
-    if (!account?.address) return;
+    if (!account?.address) {
+      setTokenABalance("0");
+      setTokenBBalance("0");
+      return;
+    }
 
     try {
-      // First try to get balances from blockvisionService
-      if (pool.tokenAAddress && pool.tokenBAddress) {
-        try {
-          console.log("Fetching token balances from BlockVision API");
-          const coinsResponse = await blockvisionService.getAccountCoins(
-            account.address
-          );
+      console.log("Fetching token balances from BlockVision API");
+      // Fix 1: Now using the correctly imported blockvisionService
+      const { data: coins } = await blockvisionService.getAccountCoins(
+        account.address
+      );
 
-          if (coinsResponse && coinsResponse.data) {
-            const coins = coinsResponse.data;
+      // Find balances for token A and token B
+      // Fix 2: Added null check for coinType to prevent "toLowerCase is not a function" error
+      const coinA = coins.find(
+        (c) =>
+          c.coinType &&
+          pool.tokenAAddress &&
+          c.coinType.toLowerCase() === pool.tokenAAddress.toLowerCase()
+      );
+      const coinB = coins.find(
+        (c) =>
+          c.coinType &&
+          pool.tokenBAddress &&
+          c.coinType.toLowerCase() === pool.tokenBAddress.toLowerCase()
+      );
 
-            // Find tokens in the coins list
-            const tokenACoin = coins.find(
-              (coin) =>
-                coin.coinType?.toLowerCase() ===
-                pool.tokenAAddress?.toLowerCase()
-            );
-
-            const tokenBCoin = coins.find(
-              (coin) =>
-                coin.coinType?.toLowerCase() ===
-                pool.tokenBAddress?.toLowerCase()
-            );
-
-            if (tokenACoin) {
-              const decimals = tokenACoin.decimals || 9;
-              const normalizedBalance = tokenACoin.balance / 10 ** decimals;
-              setTokenABalance(normalizedBalance.toString());
-              console.log(
-                `Found ${pool.tokenA} balance:`,
-                normalizedBalance.toString()
-              );
-            }
-
-            if (tokenBCoin) {
-              const decimals = tokenBCoin.decimals || 9;
-              const normalizedBalance = tokenBCoin.balance / 10 ** decimals;
-              setTokenBBalance(normalizedBalance.toString());
-              console.log(
-                `Found ${pool.tokenB} balance:`,
-                normalizedBalance.toString()
-              );
-            }
-
-            // If we found at least one token, return early
-            if (tokenACoin || tokenBCoin) return;
-          }
-        } catch (error) {
-          console.log(
-            "Error fetching from BlockVision, falling back to BirdEye:",
-            error
-          );
-        }
+      if (coinA) {
+        const balA = Number(coinA.balance) / Math.pow(10, coinA.decimals);
+        setTokenABalance(balA.toString());
+        console.log(`Balance for ${pool.tokenA}:`, balA);
+      } else {
+        setTokenABalance("0");
       }
 
-      // Fallback to BirdEye if BlockVision didn't work
-      if (birdeyeService.getTokenBalance) {
-        try {
-          const tokenABalance = await birdeyeService.getTokenBalance(
-            account.address,
-            pool.tokenAAddress || pool.tokenA
-          );
-          const tokenBBalance = await birdeyeService.getTokenBalance(
-            account.address,
-            pool.tokenBAddress || pool.tokenB
-          );
-
-          setTokenABalance(tokenABalance);
-          setTokenBBalance(tokenBBalance);
-        } catch (error) {
-          console.error("Error fetching balances from BirdEye:", error);
-          setTokenABalance("0");
-          setTokenBBalance("0");
-        }
+      if (coinB) {
+        const balB = Number(coinB.balance) / Math.pow(10, coinB.decimals);
+        setTokenBBalance(balB.toString());
+        console.log(`Balance for ${pool.tokenB}:`, balB);
       } else {
-        console.error("birdeyeService.getTokenBalance is not a function");
-        setTokenABalance("0");
         setTokenBBalance("0");
       }
-    } catch (error) {
-      console.error("Failed to fetch token balances:", error);
+    } catch (err) {
+      console.error("Error fetching token balances from BlockVision:", err);
       setTokenABalance("0");
       setTokenBBalance("0");
     }
@@ -952,33 +974,20 @@ const Pools: React.FC = () => {
     const address = isTokenA ? pool.tokenAAddress : pool.tokenBAddress;
     const symbol = isTokenA ? pool.tokenA : pool.tokenB;
 
-    // For debugging, log what we have
-    console.debug(
-      `Getting logo for ${symbol} (${isTokenA ? "token A" : "token B"})${
-        address ? ` address ${address}` : ""
-      }`
-    );
-
     // First try BirdEye metadata
     if (address && tokenMetadata[address]) {
       const metadata = tokenMetadata[address];
-
-      console.debug(`Found BirdEye metadata for ${symbol}`, metadata);
 
       // Check all possible logo fields
       if (metadata.logo_uri) return metadata.logo_uri;
       if (metadata.logoUrl) return metadata.logoUrl;
       if (metadata.logoURI) return metadata.logoURI;
       if (metadata.logo) return metadata.logo;
-    } else if (address) {
-      console.debug(`No BirdEye metadata found for ${symbol} (${address})`);
     }
 
     // Then try pool metadata
     const poolMetadata = isTokenA ? pool.tokenAMetadata : pool.tokenBMetadata;
     if (poolMetadata) {
-      console.debug(`Found pool metadata for ${symbol}`, poolMetadata);
-
       // Check all possible logo fields
       const logo =
         poolMetadata.logo_uri ||
@@ -989,8 +998,6 @@ const Pools: React.FC = () => {
       if (logo) return logo;
     }
 
-    // No logo found in metadata
-    console.debug(`No logo URL found for ${symbol}`);
     return undefined;
   };
 
@@ -1142,27 +1149,27 @@ const Pools: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredPools.map((pool) => {
-                    const isStubPool = !hasCompleteData(pool);
+                  filteredPools.map((item) => {
+                    const isStubPool = !hasCompleteData(item);
                     return (
                       <tr
-                        key={pool.address}
+                        key={item.poolAddress || item.address}
                         className={isStubPool ? "stub-pool" : ""}
                       >
                         <td className="pool-cell">
                           <div className="pool-item">
                             <div className="token-icons">
                               <EnhancedTokenIcon
-                                symbol={pool.tokenA}
-                                logoUrl={getTokenLogoUrl(pool, true)}
-                                address={pool.tokenAAddress}
+                                symbol={item.tokenA}
+                                logoUrl={getTokenLogoUrl(item, true)}
+                                address={item.tokenAAddress}
                                 size="md"
                                 className="token-a"
                               />
                               <EnhancedTokenIcon
-                                symbol={pool.tokenB}
-                                logoUrl={getTokenLogoUrl(pool, false)}
-                                address={pool.tokenBAddress}
+                                symbol={item.tokenB}
+                                logoUrl={getTokenLogoUrl(item, false)}
+                                address={item.tokenBAddress}
                                 size="md"
                                 className="token-b"
                               />
@@ -1174,69 +1181,79 @@ const Pools: React.FC = () => {
                                     Coming Soon
                                   </span>
                                 )}
-                                {pool.tokenA} / {pool.tokenB}
+                                {item.tokenA} / {item.tokenB}
                               </div>
-                              {pool.name?.match(/(\d+(\.\d+)?)%/) && (
+                              {item.name?.match(/(\d+(\.\d+)?)%/) && (
                                 <div className="fee-tier">
-                                  {pool.name.match(/(\d+(\.\d+)?)%/)![0]}
+                                  {item.name.match(/(\d+(\.\d+)?)%/)![0]}
                                 </div>
                               )}
-                              {pool.fee &&
-                                !pool.name?.match(/(\d+(\.\d+)?)%/) && (
+                              {item.fee &&
+                                !item.name?.match(/(\d+(\.\d+)?)%/) && (
                                   <div className="fee-tier">
-                                    {(pool.fee * 100).toFixed(2)}%
+                                    {(item.fee * 100).toFixed(2)}%
                                   </div>
                                 )}
+                              {item.hasVault && (
+                                <div className="vault-badge">Auto-Vault</div>
+                              )}
                             </div>
                           </div>
                         </td>
 
                         <td>
                           <ProtocolBadge
-                            protocol={getDexDisplayName(pool.dex)}
-                            protocolClass={normalizeProtocolName(pool.dex)}
+                            protocol={getDexDisplayName(item.dex)}
+                            protocolClass={normalizeProtocolName(item.dex)}
                           />
                         </td>
 
                         <td className="align-right">
-                          ${formatNumber(pool.liquidityUSD)}
+                          ${formatNumber(item.liquidityUSD)}
                         </td>
                         <td className="align-right">
-                          ${formatNumber(pool.volumeUSD)}
+                          ${formatNumber(item.volumeUSD)}
                         </td>
                         <td className="align-right">
-                          ${formatNumber(pool.feesUSD)}
+                          ${formatNumber(item.feesUSD)}
                         </td>
 
                         <td className="align-right">
                           <span
-                            className={`apr-value ${getAprClass(pool.apr)}`}
+                            className={`apr-value ${getAprClass(item.apr)}`}
                           >
-                            {formatNumber(pool.apr)}%
+                            {formatNumber(item.apr)}%
                           </span>
+                          {item.hasVault && item.vaultApy && (
+                            <div className="vault-apy">
+                              Vault: {formatNumber(item.vaultApy)}%
+                            </div>
+                          )}
                         </td>
 
                         <td className="actions-cell">
                           <button
                             className={`btn ${
-                              isDexSupported(pool.dex) && !isStubPool
+                              isDexSupported(item.dex) && !isStubPool
                                 ? "btn--primary"
                                 : "btn--secondary"
                             }`}
                             onClick={() =>
-                              isDexSupported(pool.dex) && !isStubPool
-                                ? handleOpenDepositModal(pool)
+                              isDexSupported(item.dex) && !isStubPool
+                                ? handleOpenDepositModal(item)
                                 : undefined
                             }
                             disabled={
-                              !isDexSupported(pool.dex) ||
+                              !isDexSupported(item.dex) ||
                               !connected ||
                               isStubPool
                             }
                           >
                             {isStubPool
                               ? "Coming Soon"
-                              : isDexSupported(pool.dex)
+                              : item.hasVault
+                              ? "Deposit to Vault"
+                              : isDexSupported(item.dex)
                               ? "Deposit"
                               : "Coming Soon"}
                           </button>
@@ -1294,6 +1311,7 @@ const Pools: React.FC = () => {
               onDeposit={handleDeposit}
               pool={selectedPool}
               walletConnected={connected}
+              wallet={wallet}
             />
           )}
 

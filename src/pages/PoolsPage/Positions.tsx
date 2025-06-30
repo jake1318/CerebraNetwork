@@ -1,5 +1,5 @@
 // src/pages/Positions.tsx
-// Last Updated: 2025-06-23 07:18:27 UTC by jake1318
+// Last Updated: 2025-06-29 20:43:12 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -120,7 +120,7 @@ function isVaultPool(poolGroup: PoolGroup): boolean {
   );
 }
 
-// Helper function to determine if a pool group is a scallop position
+// Helper function to determine if a position is a scallop position
 function isScallopPosition(position: NormalizedPosition): boolean {
   return position.positionType?.startsWith("scallop-") || false;
 }
@@ -675,6 +675,8 @@ function Positions() {
   // Transaction notification state
   const [notification, setNotification] =
     useState<TransactionNotificationState | null>(null);
+  // Transaction digests for multiple transactions
+  const [txDigests, setTxDigests] = useState<string[]>([]);
 
   // Function to fetch metadata for a list of token addresses individually
   const fetchTokenMetadata = useCallback(async (tokenAddresses: string[]) => {
@@ -1034,129 +1036,7 @@ function Positions() {
   };
 
   /**
-   * Handle removing liquidity using Cetus service
-   */
-  const handleRemoveLiquidity = async (
-    poolAddress: string,
-    positionId: string,
-    percentage: number = 100
-  ) => {
-    if (!wallet.connected) {
-      console.error("Wallet not connected");
-      return;
-    }
-
-    try {
-      console.log(
-        `Removing ${percentage}% liquidity from position: ${positionId} in pool: ${poolAddress}`
-      );
-
-      // Get pool info for display
-      const poolInfo = poolPositions.find((p) => p.poolAddress === poolAddress);
-      const pairName = poolInfo
-        ? `${poolInfo.tokenASymbol}${
-            poolInfo.tokenBSymbol ? "/" + poolInfo.tokenBSymbol : ""
-          }`
-        : "";
-
-      // Call service function to remove liquidity
-      const result = await cetusService.removeLiquidity(
-        wallet,
-        poolAddress,
-        positionId,
-        percentage
-      );
-
-      console.log("Remove liquidity transaction completed:", result);
-
-      setNotification({
-        visible: true,
-        message: `Successfully removed ${percentage}% of liquidity!`,
-        txDigest: result.digest,
-        isSuccess: true,
-        asModal: true, // Show as modal
-        poolInfo: pairName,
-      });
-
-      // Refresh position data
-      await loadPositions();
-    } catch (err) {
-      console.error("Remove liquidity failed:", err);
-      setNotification({
-        visible: true,
-        message: `Failed to remove liquidity: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`,
-        isSuccess: false,
-        asModal: false, // Show errors as inline notifications
-      });
-    }
-  };
-
-  /**
-   * Handle closing position using Cetus service
-   */
-  const handleClosePosition = async (
-    poolAddress: string,
-    positionId: string
-  ) => {
-    if (!wallet.connected) {
-      console.error("Wallet not connected");
-      return;
-    }
-
-    setWithdrawingPool(poolAddress);
-
-    try {
-      console.log(`Closing position: ${positionId} in pool: ${poolAddress}`);
-
-      // Get pool info for display
-      const poolInfo = poolPositions.find((p) => p.poolAddress === poolAddress);
-      const pairName = poolInfo
-        ? `${poolInfo.tokenASymbol}${
-            poolInfo.tokenBSymbol ? "/" + poolInfo.tokenBSymbol : ""
-          }`
-        : "";
-
-      // Call service function to close position
-      const result = await cetusService.closePosition(
-        wallet,
-        poolAddress,
-        positionId
-      );
-
-      console.log("Close position transaction completed:", result);
-
-      setNotification({
-        visible: true,
-        message: "Close Successful!",
-        txDigest: result.digest,
-        isSuccess: true,
-        asModal: true, // Show as modal
-        poolInfo: `Closed position for ${pairName}`,
-      });
-
-      // Refresh position data
-      await loadPositions();
-    } catch (err) {
-      console.error("Close position failed:", err);
-      setNotification({
-        visible: true,
-        message: `Failed to close position: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`,
-        isSuccess: false,
-        asModal: false, // Show errors as inline notifications
-      });
-    } finally {
-      setWithdrawingPool(null);
-      // Close modal if open
-      setWithdrawModal((prev) => ({ ...prev, isOpen: false }));
-    }
-  };
-
-  /**
-   * Handle withdrawal with options from the modal
+   * Handle withdrawing liquidity using the new unified withdraw function
    */
   const handleWithdrawConfirm = async (options: {
     withdrawPercent: number;
@@ -1174,54 +1054,6 @@ function Positions() {
 
     try {
       setWithdrawingPool(poolAddress);
-      let txDigest: string | undefined;
-
-      // For multiple positions, handle each position
-      for (const positionId of positionIds) {
-        let result;
-
-        if (withdrawPercent === 100 && closePosition) {
-          // Close position (includes withdrawing all liquidity and collecting fees)
-          result = await cetusService.closePosition(
-            wallet,
-            poolAddress,
-            positionId
-          );
-          console.log(`Position ${positionId} closed, result:`, result);
-          txDigest = result.digest; // Capture the transaction digest
-        } else {
-          // Partial withdrawal
-          if (collectFees) {
-            // First collect fees if requested
-            const feesResult = await cetusService.collectFees(
-              wallet,
-              poolAddress,
-              positionId
-            );
-            console.log(
-              `Fees collected for position ${positionId}, result:`,
-              feesResult
-            );
-          }
-
-          // Then remove liquidity
-          result = await cetusService.removeLiquidity(
-            wallet,
-            poolAddress,
-            positionId,
-            withdrawPercent,
-            slippage
-          );
-          console.log(
-            `Removed ${withdrawPercent}% from position ${positionId}, result:`,
-            result
-          );
-          txDigest = result.digest; // Capture the transaction digest
-        }
-      }
-
-      // Log the transaction digest for debugging
-      console.log("Transaction completed with digest:", txDigest);
 
       // Get pool info for display
       const poolInfo = poolPositions.find((p) => p.poolAddress === poolAddress);
@@ -1231,26 +1063,45 @@ function Positions() {
           }`
         : "";
 
-      // Show notification with transaction digest
-      setNotification({
-        visible: true,
-        message: closePosition ? "Close Successful!" : "Withdraw Successful!",
-        txDigest, // Include the transaction digest
-        isSuccess: true,
-        asModal: true, // Show as modal
-        poolInfo: closePosition
-          ? `Closed position for ${pairName}`
-          : `Withdrew ${withdrawPercent}% from ${pairName}`,
+      // Use the new unified withdraw function from cetusService
+      const result = await cetusService.withdraw(wallet, {
+        poolId: poolAddress,
+        positionIds: positionIds,
+        withdrawPercent,
+        collectFees,
+        closePosition,
+        slippage,
       });
 
-      // Close the modal
-      setWithdrawModal((prev) => ({ ...prev, isOpen: false }));
+      console.log("Withdrawal completed:", result);
 
-      // Refresh positions
-      await loadPositions();
+      if (result.success) {
+        // Show notification with transaction digests
+        setNotification({
+          visible: true,
+          message: closePosition ? "Close Successful!" : "Withdraw Successful!",
+          txDigest: result.digests.length === 1 ? result.digests[0] : undefined,
+          isSuccess: true,
+          asModal: true, // Show as modal
+          poolInfo: closePosition
+            ? `Closed position for ${pairName}`
+            : `Withdrew ${withdrawPercent}% from ${pairName}`,
+        });
 
-      // Return success with digest for the WithdrawModal
-      return { success: true, digest: txDigest };
+        // Store all digests for multiple transactions
+        setTxDigests(result.digests);
+
+        // Close the modal
+        setWithdrawModal((prev) => ({ ...prev, isOpen: false }));
+
+        // Refresh positions
+        await loadPositions();
+
+        // Return success with digest for the WithdrawModal
+        return { success: true, digest: result.digests[0] };
+      } else {
+        throw new Error("Withdrawal failed");
+      }
     } catch (err) {
       console.error("Withdraw failed:", err);
       setNotification({
@@ -1273,7 +1124,10 @@ function Positions() {
     setWithdrawingPool(null);
   };
 
-  const handleNotificationClose = () => setNotification(null);
+  const handleNotificationClose = () => {
+    setNotification(null);
+    setTxDigests([]);
+  };
 
   // Helper function to get APR color class
   const getAprClass = (apr: number): string => {
@@ -1783,9 +1637,14 @@ function Positions() {
                                                   <button
                                                     className="btn btn--primary btn--sm"
                                                     onClick={() =>
-                                                      handleClosePosition(
+                                                      handleWithdraw(
                                                         poolPosition.poolAddress,
-                                                        position.id
+                                                        [position.id],
+                                                        parseInt(
+                                                          position.balanceA ||
+                                                            "0"
+                                                        ),
+                                                        position.valueUsd
                                                       )
                                                     }
                                                     disabled={
@@ -1838,6 +1697,38 @@ function Positions() {
                                         {Object.values(
                                           poolPosition.positions
                                             .flatMap((pos) => pos.rewards || [])
+                                            .reduce((acc, reward) => {
+                                              if (!reward) return acc;
+                                              const key =
+                                                reward.tokenSymbol || "Unknown";
+                                              if (!acc[key]) {
+                                                acc[key] = { ...reward };
+                                              } else {
+                                                // Sum up rewards of the same token
+                                                const currentAmount = BigInt(
+                                                  acc[key].amount || "0"
+                                                );
+                                                const newAmount = BigInt(
+                                                  reward.amount || "0"
+                                                );
+                                                acc[key].amount = (
+                                                  currentAmount + newAmount
+                                                ).toString();
+                                                acc[key].formatted = (
+                                                  parseInt(
+                                                    acc[key].amount || "0"
+                                                  ) /
+                                                  Math.pow(
+                                                    10,
+                                                    reward.decimals || 0
+                                                  )
+                                                ).toFixed(reward.decimals || 0);
+                                                acc[key].valueUsd =
+                                                  (acc[key].valueUsd || 0) +
+                                                  (reward.valueUsd || 0);
+                                              }
+                                              return acc;
+                                            }, {} as Record<string, NonNullable<NormalizedPosition["rewards"]>[number]>)
                                             .reduce((acc, reward) => {
                                               if (!reward) return acc;
                                               const key =
@@ -1958,8 +1849,8 @@ function Positions() {
             txDigest={notification.txDigest}
             isSuccess={notification.isSuccess}
             onClose={handleNotificationClose}
-            asModal={notification.asModal} // Pass the asModal prop
-            poolName={notification.poolInfo} // Pass the pool info
+            asModal={notification.asModal}
+            poolName={notification.poolInfo}
           />
         )}
       </div>
@@ -2331,6 +2222,32 @@ function Positions() {
 
         .borrowed-list {
           margin-top: 16px;
+        }
+
+        /* Transaction digests list styling */
+        .tx-list {
+          margin: 10px 0;
+          padding: 0;
+          list-style: none;
+        }
+
+        .tx-list li {
+          margin-bottom: 8px;
+        }
+
+        .tx-list a {
+          color: #5c43e8;
+          text-decoration: none;
+          background: rgba(92, 67, 232, 0.1);
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-family: monospace;
+          transition: all 0.2s ease;
+        }
+
+        .tx-list a:hover {
+          background: rgba(92, 67, 232, 0.2);
+          text-decoration: underline;
         }
       `}</style>
     </div>

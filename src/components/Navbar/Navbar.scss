@@ -1,9 +1,17 @@
+/* src/components/Navbar/Navbar.scss */
+/* Last Updated: 2025-06-26 03:06:40 UTC by jake1318 */
+
+:root {
+  --navbar-h: 70px; /* Define navbar height globally */
+}
+
 .navbar {
-  position: fixed;
+  position: fixed; /* Changed from commented position to fixed */
   top: 0;
   left: 0;
   width: 100%;
   z-index: 1000;
+  height: var(--navbar-h); /* Set exact height based on global variable */
   transition: all 0.3s ease;
   background: rgba(5, 15, 30, 0.7);
   backdrop-filter: blur(10px);
@@ -27,7 +35,8 @@
     justify-content: space-between;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 1rem 2rem;
+    height: 100%; /* Make container take full height of navbar */
+    padding: 0 2rem; /* Changed from 1rem 2rem to 0 2rem to maintain height */
   }
 
   &__logo {
@@ -441,11 +450,10 @@
 
   @media (max-width: 768px) {
     &__container {
-      padding: 1rem;
+      padding: 0 1rem;
     }
   }
 }
-/* Add these styles to your existing Navbar.scss file */
 
 /* Dropdown styling */
 .dropdown {
