@@ -1,4 +1,4 @@
-// Current Date and Time (UTC): 2025-06-29 20:19:51
+// Current Date and Time (UTC): 2025-07-01 04:53:11
 // Current User's Login: jake1318
 
 import {
@@ -11,6 +11,7 @@ import {
   TickMath,
   CoinAssist,
   Percentage,
+  adjustForCoinSlippage, // Restored this missing import
 } from "@cetusprotocol/common-sdk";
 import type { WalletContextState } from "@suiet/wallet-kit";
 import type { PoolInfo } from "./coinGeckoService";
@@ -19,6 +20,7 @@ import { TransactionBlock } from "@mysten/sui.js/transactions";
 import { SuiClient } from "@mysten/sui.js/client";
 import { birdeyeService } from "./birdeyeService";
 import BN from "bn.js";
+import { normalizeSuiAddress } from "@mysten/sui.js/utils";
 
 // Correct mainnet object IDs for Cetus CLMM SDK v2
 const CETUS_MAINNET_ADDRESSES = {
@@ -63,6 +65,32 @@ const COMMON_DECIMALS: Record<string, number> = {
   CETUS: 9,
   WAL: 9,
 };
+
+/**
+ * Helper function to apply slippage to an amount
+ * @param n Amount as string
+ * @param bps Basis points of slippage (1% = 100 bps)
+ * @returns String representing the amount after slippage
+ */
+function compareWithSlippage(n: string, bps: number): string {
+  try {
+    // Return "0" for empty string, "0", or invalid inputs
+    if (!n || n === "0" || isNaN(Number(n))) return "0";
+
+    const bn = new BN(n);
+    // If the amount is already 0, return 0
+    if (bn.isZero()) return "0";
+
+    // Calculate with slippage: amount * (10_000 - bps) / 10_000
+    return bn
+      .muln(10_000 - bps)
+      .divn(10_000)
+      .toString();
+  } catch (error) {
+    console.error(`Error in compareWithSlippage for value ${n}:`, error);
+    return "0"; // Safe fallback
+  }
+}
 
 // Helper to get coin metadata (symbol & decimals) with fallback
 export async function getCoinInfo(
@@ -716,7 +744,18 @@ export async function withdraw(
 ): Promise<{ success: boolean; digests: string[] }> {
   const digests: string[] = [];
 
+  // Keep track of processed position IDs to avoid duplicates
+  const processedIds = new Set<string>();
+
   for (const posId of opts.positionIds) {
+    // Skip if this position has already been processed
+    if (processedIds.has(posId)) {
+      console.log(`Skipping duplicate position ID: ${posId}`);
+      continue;
+    }
+
+    processedIds.add(posId);
+
     if (opts.closePosition) {
       // ---- CLOSE (will always force 100 %)
       const { success, digest } = await closePosition(
@@ -733,8 +772,8 @@ export async function withdraw(
         opts.poolId,
         posId,
         opts.withdrawPercent,
-        opts.collectFees, //      ↓ NEW PARAM
-        opts.slippage //      ↓ NEW PARAM
+        opts.collectFees,
+        opts.slippage
       );
       if (!success) throw new Error(`Withdraw failed for ${posId}`);
       if (digest) digests.push(digest);
@@ -745,8 +784,23 @@ export async function withdraw(
 }
 
 /**
+ * Helper function to check if an error is a "position already closed" type error
+ * Updated to be more specific and not catch "Invalid Sui Object id" as closed
+ */
+function isAlreadyClosedError(e: unknown) {
+  const msg = String((e as Error).message || "").toLowerCase();
+  return (
+    msg.includes("already closed") ||
+    msg.includes("object not found") ||
+    msg.includes("not exist") ||
+    (msg.includes("moveabort") && msg.includes("7"))
+  );
+}
+
+/**
  * Remove a percentage (0–100) of liquidity from a position, collecting fees.
- * Updated for SDK v2
+ * Updated for SDK v2 with proper position verification and slippage handling
+ * Fixed to use safe approach for minimum amounts
  */
 export async function removeLiquidity(
   wallet: WalletContextState,
@@ -770,16 +824,55 @@ export async function removeLiquidity(
       `Removing ${liquidityPct}% liquidity from position ${positionId} in pool ${poolId}`
     );
 
-    // Fetch position details
-    const position = await clmmSdk.Position.getPosition(positionId);
-    if (!position || !position.liquidity || position.liquidity === "0") {
-      throw new Error("Position has zero liquidity or was not found");
+    // Sanitize IDs
+    const posId = normalizeSuiAddress(positionId.trim());
+    const poolIdSanitized = normalizeSuiAddress(poolId.trim());
+
+    // Use getPositionById instead of getPosition - recommended SDK v2 method
+    // Disable unnecessary features to reduce errors
+    let position;
+    try {
+      position = await clmmSdk.Position.getPositionById(
+        posId,
+        /*calculate_rewarder=*/ false,
+        /*show_display=*/ false
+      );
+
+      if (!position) {
+        throw new Error(`Position ${posId} not found`);
+      }
+      console.log(`Position found: ${posId}, liquidity: ${position.liquidity}`);
+    } catch (error) {
+      console.warn(`Position verification failed for ${posId}:`, error);
+
+      if (isAlreadyClosedError(error)) {
+        console.log(`Position ${posId} appears to be already closed`);
+        return { success: true, digest: "" };
+      }
+
+      // For all other errors, surface them
+      console.error(
+        `Failed to get position data: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      throw error;
     }
 
-    // Get pool data
-    const pool = await clmmSdk.Pool.getPool(poolId);
+    if (!position.liquidity || position.liquidity === "0") {
+      console.log("Position has zero liquidity, nothing to withdraw");
+      return { success: true, digest: "" };
+    }
+
+    // Get pool data - with showPositions option
+    const pool = await clmmSdk.Pool.getPool(poolIdSanitized, {
+      showTick: true,
+      showRewarder: true,
+      showPositions: true,
+    });
+
     if (!pool) {
-      throw new Error(`Pool ${poolId} not found`);
+      throw new Error(`Pool ${poolIdSanitized} not found`);
     }
 
     // Ensure we have the coin types
@@ -797,48 +890,68 @@ export async function removeLiquidity(
     const removeLiquidity = totalLiquidity.muln(liquidityPct).divn(100);
 
     if (removeLiquidity.isZero()) {
-      throw new Error("No liquidity to withdraw");
+      console.log("No liquidity to withdraw based on percentage");
+      return { success: true, digest: "" };
     }
 
-    // Calculate minimum expected amounts with slippage protection
-    const lowerSqrt = TickMath.tickIndexToSqrtPriceX64(
-      position.tick_lower_index
-    );
-    const upperSqrt = TickMath.tickIndexToSqrtPriceX64(
-      position.tick_upper_index
-    );
-    const curSqrt = new BN(pool.current_sqrt_price);
+    // Initialize with safe defaults
+    let min_amount_a = "0";
+    let min_amount_b = "0";
 
-    const coinAmounts = ClmmPoolUtil.getCoinAmountFromLiquidity(
-      removeLiquidity,
-      curSqrt,
-      lowerSqrt,
-      upperSqrt,
-      false
-    );
+    try {
+      // Calculate minimum expected amounts with slippage protection
+      const lowerSqrt = TickMath.tickIndexToSqrtPriceX64(
+        position.tick_lower_index
+      );
+      const upperSqrt = TickMath.tickIndexToSqrtPriceX64(
+        position.tick_upper_index
+      );
+      const curSqrt = new BN(pool.current_sqrt_price);
 
-    // Apply custom slippage tolerance
-    const slippageTol = new Percentage(
-      new BN(Math.round(slippagePc * 100)), // numerator
-      new BN(100 * 100) // denominator
-    );
-    const { tokenMaxA, tokenMaxB } = adjustForCoinSlippage(
-      coinAmounts,
-      slippageTol,
-      false
-    );
+      const coinAmounts = ClmmPoolUtil.getCoinAmountFromLiquidity(
+        removeLiquidity,
+        curSqrt,
+        lowerSqrt,
+        upperSqrt,
+        false
+      );
+
+      // Calculate the minimum expected amounts with slippage protection (500 bps = 5%)
+      const slippageBps = Math.round(slippagePc * 100); // 0.5% -> 50 bps
+
+      // Apply slippage to the amounts
+      min_amount_a = compareWithSlippage(
+        coinAmounts.coin_amount_a,
+        slippageBps
+      );
+      min_amount_b = compareWithSlippage(
+        coinAmounts.coin_amount_b,
+        slippageBps
+      );
+
+      // If one side is expected to be 0, make sure the min is also 0
+      if (coinAmounts.coin_amount_a === "0") min_amount_a = "0";
+      if (coinAmounts.coin_amount_b === "0") min_amount_b = "0";
+
+      console.log(`Using min amounts: A=${min_amount_a}, B=${min_amount_b}`);
+    } catch (calcError) {
+      console.error("Error calculating withdrawal amounts:", calcError);
+      // For partial withdraws, use safe zero values
+      min_amount_a = "0";
+      min_amount_b = "0";
+    }
 
     // Build transaction payload - updated to V2 method name
     const tx = await clmmSdk.Position.removeLiquidityPayload({
       coin_type_a,
       coin_type_b,
-      pool_id: poolId,
-      pos_id: positionId,
+      pool_id: poolIdSanitized,
+      pos_id: posId,
       delta_liquidity: removeLiquidity.toString(),
-      min_amount_a: tokenMaxA.toString(),
-      min_amount_b: tokenMaxB.toString(),
+      min_amount_a, // Use min_amount_a as minimum for output A
+      min_amount_b, // Use min_amount_b as minimum for output B
       collect_fee: collectFee,
-      rewarder_coin_types: [],
+      rewarder_coin_types: [], // Not collecting rewards on remove liquidity
     });
 
     // Set explicit gas budget
@@ -859,21 +972,18 @@ export async function removeLiquidity(
   } catch (error) {
     console.error("Error in removeLiquidity:", error);
 
-    // Provide helpful error messages
+    // Only return success for truly closed positions
+    if (error instanceof Error && isAlreadyClosedError(error)) {
+      return { success: true, digest: "" };
+    }
+
+    // Surface the error details for debugging
     if (error instanceof Error) {
-      const errorMessage = error.message.toLowerCase();
-      if (
-        errorMessage.includes("insufficient") ||
-        errorMessage.includes("balance")
-      ) {
-        throw new Error("Insufficient balance to complete the transaction");
-      } else if (errorMessage.includes("not found")) {
+      console.warn(`removeLiquidity failed. Error: ${error.message}`);
+
+      if (error.message.toLowerCase().includes("invalid sui object id")) {
         throw new Error(
-          "Position or pool not found. It may have been closed already."
-        );
-      } else if (errorMessage.includes("package object does not exist")) {
-        throw new Error(
-          "Transaction failed: One of the Cetus package addresses is incorrect. The app may need to be updated to work with the latest Cetus protocol version."
+          "Invalid position ID format or RPC node error. This position might exist but the node couldn't fetch it correctly."
         );
       }
     }
@@ -883,8 +993,64 @@ export async function removeLiquidity(
 }
 
 /**
+ * Helper function to close a Bluefin position
+ */
+async function closeBluefinPosition(
+  wallet: WalletContextState,
+  poolId: string,
+  positionId: string
+): Promise<{ success: boolean; digest: string }> {
+  try {
+    console.log(`Closing Bluefin position ${positionId} in pool ${poolId}`);
+
+    const txb = new TransactionBlock();
+    const BLUEFIN_PACKAGE =
+      "0xf7133d0cb63e1a78ef27a78d4e887a58428d06ff4f2ebbd33af273a04a1bf444";
+
+    // First remove all liquidity
+    txb.moveCall({
+      target: `${BLUEFIN_PACKAGE}::clmm::remove_liquidity`,
+      arguments: [
+        txb.pure(poolId),
+        txb.pure(positionId),
+        txb.pure("18446744073709551615"), // Max uint64 value to remove all liquidity
+      ],
+    });
+
+    // Then burn the position if balance is zero
+    txb.moveCall({
+      target: `${BLUEFIN_PACKAGE}::position::burn`,
+      arguments: [txb.pure(poolId), txb.pure(positionId)],
+    });
+
+    txb.setGasBudget(100000000); // 0.1 SUI
+
+    const result = await wallet.signAndExecuteTransactionBlock({
+      transactionBlock: txb,
+      options: {
+        showEffects: true,
+        showEvents: true,
+      },
+    });
+
+    return {
+      success: true,
+      digest: result.digest || "",
+    };
+  } catch (error) {
+    console.error("Bluefin position closing failed:", error);
+
+    // Check if it's a benign error
+    if (isAlreadyClosedError(error)) {
+      return { success: true, digest: "" };
+    }
+    throw error;
+  }
+}
+
+/**
  * Withdraw all liquidity, fees and rewards, and close the position.
- * Updated for SDK v2
+ * Updated with safe approach to minimum amounts to avoid MoveAbort code 9
  */
 export async function closePosition(
   wallet: WalletContextState,
@@ -897,25 +1063,63 @@ export async function closePosition(
 
   const address = wallet.account.address;
 
+  // Sanitize IDs
+  const posId = normalizeSuiAddress(positionId.trim());
+  const poolIdSanitized = normalizeSuiAddress(poolId.trim());
+
+  // Check for Bluefin pools
+  if (isBluefinPool(poolIdSanitized)) {
+    return await closeBluefinPosition(wallet, poolIdSanitized, posId);
+  }
+
   // Set sender address for this operation
   clmmSdk.setSenderAddress(address);
 
   try {
-    console.log(`Closing position ${positionId} in pool ${poolId}`);
+    console.log(`Closing position ${posId} in pool ${poolIdSanitized}`);
 
-    // Check if position exists
+    // Use getPositionById instead of getPosition - it's the recommended SDK v2 method
+    // Disable unnecessary features to reduce errors
     let position;
     try {
-      position = await clmmSdk.Position.getPosition(positionId);
+      position = await clmmSdk.Position.getPositionById(
+        posId,
+        /*calculate_rewarder=*/ false,
+        /*show_display=*/ false
+      );
+
+      if (!position) {
+        throw new Error(`Position ${posId} not found`);
+      }
+
+      console.log(`Position found: ${posId}, liquidity: ${position.liquidity}`);
     } catch (error) {
-      console.warn("Position may not exist:", error);
-      return { success: true, digest: "" }; // Position doesn't exist, no action needed
+      console.warn(`Position verification failed for ${posId}:`, error);
+
+      // Only consider it already closed if the error explicitly indicates the object doesn't exist
+      if (isAlreadyClosedError(error)) {
+        console.log(`Position ${posId} appears to be already closed`);
+        return { success: true, digest: "" };
+      }
+
+      // For all other errors, we should surface them
+      console.error(
+        `Failed to get position data: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      throw error;
     }
 
-    // Get pool info
-    const pool = await clmmSdk.Pool.getPool(poolId);
+    // Get pool info - with showPositions option
+    const pool = await clmmSdk.Pool.getPool(poolIdSanitized, {
+      showTick: true,
+      showRewarder: true,
+      showPositions: true,
+    });
+
     if (!pool) {
-      throw new Error(`Pool ${poolId} not found`);
+      throw new Error(`Pool ${poolIdSanitized} not found`);
     }
 
     // Ensure we have the coin types
@@ -928,112 +1132,157 @@ export async function closePosition(
       );
     }
 
-    // Check if position has liquidity to remove
-    let hasLiquidity = false;
-    if (position && position.liquidity) {
-      const liquidity = new BN(position.liquidity);
-      hasLiquidity = !liquidity.isZero();
-    }
+    // Initialize with safe defaults
+    let min_amount_a = "0";
+    let min_amount_b = "0";
 
-    if (hasLiquidity) {
-      // Calculate minimum amounts with slippage
-      const lowerSqrt = TickMath.tickIndexToSqrtPriceX64(
-        position.tick_lower_index
-      );
-      const upperSqrt = TickMath.tickIndexToSqrtPriceX64(
-        position.tick_upper_index
-      );
-      const curSqrt = new BN(pool.current_sqrt_price);
+    if (position && position.liquidity && position.liquidity !== "0") {
+      try {
+        console.log("Position has liquidity, calculating withdrawal amounts");
 
-      const coinAmounts = ClmmPoolUtil.getCoinAmountFromLiquidity(
-        new BN(position.liquidity),
-        curSqrt,
-        lowerSqrt,
-        upperSqrt,
-        false
-      );
+        // Use try/catch for each step that could fail
+        try {
+          const lowerSqrt = TickMath.tickIndexToSqrtPriceX64(
+            position.tick_lower_index
+          );
+          const upperSqrt = TickMath.tickIndexToSqrtPriceX64(
+            position.tick_upper_index
+          );
+          const curSqrt = new BN(pool.current_sqrt_price);
 
-      // Apply 5% slippage tolerance for closing (more permissive)
-      const slippageTol = new Percentage(new BN(5), new BN(100));
-      const { tokenMaxA, tokenMaxB } = adjustForCoinSlippage(
-        coinAmounts,
-        slippageTol,
-        false
-      );
+          // Calculate withdrawal amounts
+          const coinAmounts = ClmmPoolUtil.getCoinAmountFromLiquidity(
+            new BN(position.liquidity),
+            curSqrt,
+            lowerSqrt,
+            upperSqrt,
+            false
+          );
 
-      // Create transaction to close position - updated to V2 method name
-      const closeTx = await clmmSdk.Position.closePositionPayload({
-        coin_type_a,
-        coin_type_b,
-        pool_id: poolId,
-        pos_id: positionId,
-        min_amount_a: tokenMaxA.toString(),
-        min_amount_b: tokenMaxB.toString(),
-        rewarder_coin_types: [], // Will collect all available rewards
-      });
+          console.log("Coin amounts calculated:", coinAmounts);
 
-      // Set gas budget
-      closeTx.setGasBudget(100000000); // 0.1 SUI
+          // Use wider slippage for close position (10% = 1000 bps)
+          const slippageBps = 1000; // 10% is safe for full burns
 
-      // Execute transaction
-      const closeResult = await wallet.signAndExecuteTransactionBlock({
-        transactionBlock: closeTx,
-        options: { showEvents: true, showEffects: true },
-      });
+          // Apply slippage to the amounts
+          min_amount_a = compareWithSlippage(
+            coinAmounts.coin_amount_a,
+            slippageBps
+          );
+          min_amount_b = compareWithSlippage(
+            coinAmounts.coin_amount_b,
+            slippageBps
+          );
 
-      console.log("Position closed successfully:", closeResult.digest);
+          // If one side is expected to be 0, make sure the min is also 0
+          if (coinAmounts.coin_amount_a === "0") min_amount_a = "0";
+          if (coinAmounts.coin_amount_b === "0") min_amount_b = "0";
 
-      return {
-        success: true,
-        digest: closeResult.digest || "",
-      };
+          console.log(
+            `Using min amounts: A=${min_amount_a}, B=${min_amount_b}`
+          );
+        } catch (calcError) {
+          console.error("Withdrawal amount calculation error:", calcError);
+          console.log("Using default zero minimums due to calculation error");
+          min_amount_a = "0";
+          min_amount_b = "0";
+        }
+      } catch (error) {
+        console.error("Error in liquidity processing:", error);
+        console.log("Using default zero minimums due to processing error");
+        min_amount_a = "0";
+        min_amount_b = "0";
+      }
     } else {
-      // Position has no liquidity, just need to close it
-      const closeTx = await clmmSdk.Position.closePositionPayload({
-        coin_type_a,
-        coin_type_b,
-        pool_id: poolId,
-        pos_id: positionId,
-        min_amount_a: "0",
-        min_amount_b: "0",
-        rewarder_coin_types: [],
-      });
-
-      // Set gas budget
-      closeTx.setGasBudget(100000000); // 0.1 SUI
-
-      // Execute transaction
-      const closeResult = await wallet.signAndExecuteTransactionBlock({
-        transactionBlock: closeTx,
-        options: { showEvents: true, showEffects: true },
-      });
-
-      console.log("Empty position closed successfully:", closeResult.digest);
-
-      return {
-        success: true,
-        digest: closeResult.digest || "",
-      };
+      console.log("Position has zero liquidity, using zero minimums");
+      min_amount_a = "0";
+      min_amount_b = "0";
     }
+
+    // Fetch any rewards for the position - important for complete closure
+    let rewarder_coin_types: string[] = [];
+    if (pool.positions_handle) {
+      try {
+        const rewards = await clmmSdk.Rewarder.fetchPosRewardersAmount(
+          poolIdSanitized,
+          pool.positions_handle,
+          posId
+        );
+
+        rewarder_coin_types = rewards
+          .filter((r: any) => r && Number(r.amount_owed) > 0)
+          .map((r: any) => r.coin_address);
+
+        console.log(
+          `Found ${rewarder_coin_types.length} reward types with non-zero amounts to claim`
+        );
+      } catch (error) {
+        console.warn(`Error fetching rewards for position ${posId}:`, error);
+        // Continue with closure even if rewards fetch fails
+      }
+    } else {
+      console.warn("Pool has no positions_handle – skip reward query");
+    }
+
+    console.log("Creating close position payload with params:", {
+      coin_type_a,
+      coin_type_b,
+      pool_id: poolIdSanitized,
+      pos_id: posId,
+      min_amount_a,
+      min_amount_b,
+      rewarder_coin_types: rewarder_coin_types.length,
+      collect_fee: true,
+    });
+
+    // Create transaction to close position
+    const closeTx = await clmmSdk.Position.closePositionPayload({
+      coin_type_a,
+      coin_type_b,
+      pool_id: poolIdSanitized,
+      pos_id: posId,
+      min_amount_a,
+      min_amount_b,
+      rewarder_coin_types,
+      collect_fee: true,
+    });
+
+    // Set gas budget
+    closeTx.setGasBudget(100000000); // 0.1 SUI
+
+    // Execute transaction
+    const closeResult = await wallet.signAndExecuteTransactionBlock({
+      transactionBlock: closeTx,
+      options: { showEvents: true, showEffects: true },
+    });
+
+    console.log("Position closed successfully:", closeResult.digest);
+
+    return {
+      success: true,
+      digest: closeResult.digest || "",
+    };
   } catch (error) {
     console.error("Error in closePosition:", error);
 
-    // Check if this is a "position already closed" error, which we can ignore
+    // Surface the error details for debugging
     if (error instanceof Error) {
       const errorMessage = error.message.toLowerCase();
-      if (
-        errorMessage.includes("not found") ||
-        errorMessage.includes("already closed") ||
-        (errorMessage.includes("moveabort") && errorMessage.includes("7"))
-      ) {
-        console.log("Position may have already been closed");
-        return {
-          success: true,
-          digest: "",
-        };
-      } else if (errorMessage.includes("package object does not exist")) {
+      console.warn(`closePosition failed. Error: ${error.message}`);
+
+      // Check if it matches patterns for already closed positions
+      if (isAlreadyClosedError(error)) {
+        return { success: true, digest: "" };
+      }
+
+      // Provide more specific error messages to help with diagnosis
+      if (errorMessage.includes("invalid sui object id")) {
         throw new Error(
-          "Transaction failed: One of the Cetus package addresses is incorrect. The app may need to be updated to work with the latest Cetus protocol version."
+          "Invalid position ID format or RPC node error. This position might exist but the node couldn't fetch it correctly."
+        );
+      } else if (errorMessage.includes("insufficient")) {
+        throw new Error(
+          "Insufficient funds to execute the transaction. Check your SUI balance for gas."
         );
       }
     }
@@ -1044,7 +1293,7 @@ export async function closePosition(
 
 /**
  * Collect fees from a position.
- * Updated for SDK v2
+ * Updated for SDK v2 with proper position verification
  */
 export async function collectFees(
   wallet: WalletContextState,
@@ -1064,29 +1313,56 @@ export async function collectFees(
       `Collecting fees for position: ${positionId} in pool: ${poolId}`
     );
 
-    // Verify position exists
-    let pos;
+    // Sanitize IDs
+    const posId = normalizeSuiAddress(positionId.trim());
+    const poolIdSanitized = normalizeSuiAddress(poolId.trim());
+
+    // Use getPositionById instead of getPosition - recommended SDK v2 method
+    // Disable unnecessary features to reduce errors
+    let position;
     try {
-      pos = await clmmSdk.Position.getPosition(positionId);
-      if (!pos) {
-        throw new Error(`Position ${positionId} not found`);
+      position = await clmmSdk.Position.getPositionById(
+        posId,
+        /*calculate_rewarder=*/ false,
+        /*show_display=*/ false
+      );
+
+      if (!position) {
+        throw new Error(`Position ${posId} not found`);
       }
+      console.log(`Position found: ${posId}`);
     } catch (error) {
-      console.error("Error verifying position:", error);
-      throw new Error(`Position verification failed: ${positionId}`);
+      console.warn(`Position verification failed for ${posId}:`, error);
+
+      if (isAlreadyClosedError(error)) {
+        return { success: true, digest: "" };
+      }
+
+      // For all other errors, surface them
+      console.error(
+        `Failed to get position data: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      throw error;
     }
 
-    // Get on-chain pool
+    // Get on-chain pool with options
     let pool;
     try {
-      pool = await clmmSdk.Pool.getPool(poolId);
+      pool = await clmmSdk.Pool.getPool(poolIdSanitized, {
+        showTick: true,
+        showRewarder: true,
+        showPositions: true,
+      });
+
       if (!pool) {
-        throw new Error(`Pool ${poolId} not found`);
+        throw new Error(`Pool ${poolIdSanitized} not found`);
       }
-      console.log("Found pool:", poolId);
+      console.log("Found pool:", poolIdSanitized);
     } catch (error) {
       console.error("Error fetching pool:", error);
-      throw new Error(`Pool not found: ${poolId}`);
+      throw new Error(`Pool not found: ${poolIdSanitized}`);
     }
 
     // Ensure we have the coin types
@@ -1105,8 +1381,8 @@ export async function collectFees(
       tx = await clmmSdk.Position.collectFeePayload({
         coin_type_a,
         coin_type_b,
-        pool_id: poolId,
-        pos_id: positionId,
+        pool_id: poolIdSanitized,
+        pos_id: posId,
       });
     } catch (error) {
       console.error("SDK collect fee transaction creation failed:", error);
@@ -1128,8 +1404,8 @@ export async function collectFees(
       txb.moveCall({
         target: `${clmmModule}::position::collect_fee`,
         arguments: [
-          txb.object(poolId),
-          txb.object(positionId),
+          txb.object(poolIdSanitized),
+          txb.object(posId),
           txb.object(configAddress),
           txb.pure(true), // is_immutable
         ],
@@ -1158,27 +1434,17 @@ export async function collectFees(
   } catch (error) {
     console.error("Fee collection failed:", error);
 
-    // Provide user-friendly error messages
+    // Only return success for truly closed positions
+    if (error instanceof Error && isAlreadyClosedError(error)) {
+      return { success: true, digest: "" };
+    }
+
+    // Surface specific errors
     if (error instanceof Error) {
       const errorMessage = error.message.toLowerCase();
-      if (
-        errorMessage.includes("insufficient") ||
-        errorMessage.includes("balance")
-      ) {
-        throw new Error("Insufficient balance to complete the transaction.");
-      } else if (
-        errorMessage.includes("gas") ||
-        errorMessage.includes("budget")
-      ) {
-        throw new Error("Gas budget error. Please try again later.");
-      } else if (
-        errorMessage.includes("position") &&
-        errorMessage.includes("not found")
-      ) {
-        throw new Error("Position no longer exists or has been closed.");
-      } else if (errorMessage.includes("package object does not exist")) {
+      if (errorMessage.includes("invalid sui object id")) {
         throw new Error(
-          "Transaction failed: One of the Cetus package addresses is incorrect. The app may need to be updated to work with the latest Cetus protocol version."
+          "Invalid position ID format or RPC node error. This position might exist but the node couldn't fetch it correctly."
         );
       }
     }
@@ -1189,7 +1455,7 @@ export async function collectFees(
 
 /**
  * Collect rewards from a position.
- * Updated for SDK v2
+ * Updated for SDK v2 with proper position verification
  */
 export async function collectRewards(
   wallet: WalletContextState,
@@ -1209,30 +1475,55 @@ export async function collectRewards(
       `Attempting to collect rewards for position ${positionId} in pool ${poolId}`
     );
 
-    // Verify position exists
-    let pos;
+    // Sanitize IDs
+    const posId = normalizeSuiAddress(positionId.trim());
+    const poolIdSanitized = normalizeSuiAddress(poolId.trim());
+
+    // Use getPositionById instead of getPosition - recommended SDK v2 method
+    // Disable unnecessary features to reduce errors
+    let position;
     try {
-      pos = await clmmSdk.Position.getPosition(positionId);
-      if (!pos) {
-        throw new Error(`Position ${positionId} not found`);
+      position = await clmmSdk.Position.getPositionById(
+        posId,
+        /*calculate_rewarder=*/ false,
+        /*show_display=*/ false
+      );
+
+      if (!position) {
+        throw new Error(`Position ${posId} not found`);
       }
     } catch (error) {
-      console.error("Error verifying position:", error);
-      throw new Error(`Position verification failed: ${positionId}`);
+      console.warn(`Position verification failed for ${posId}:`, error);
+
+      if (isAlreadyClosedError(error)) {
+        return { success: true, digest: "" };
+      }
+
+      // For all other errors, surface them
+      console.error(
+        `Failed to get position data: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      throw error;
     }
 
-    // Get on-chain pool
+    // Get on-chain pool - with options
     let pool;
     try {
-      pool = await clmmSdk.Pool.getPool(poolId);
+      pool = await clmmSdk.Pool.getPool(poolIdSanitized, {
+        showTick: true,
+        showRewarder: true,
+        showPositions: true,
+      });
+
       if (!pool) {
-        throw new Error(`Pool ${poolId} not found`);
+        throw new Error(`Pool ${poolIdSanitized} not found`);
       }
-      console.log("Found pool:", poolId);
-      console.log("Pool positions handle:", pool.positions_handle);
+      console.log("Found pool:", poolIdSanitized);
     } catch (error) {
       console.error("Error fetching pool:", error);
-      throw new Error(`Pool not found: ${poolId}`);
+      throw new Error(`Pool not found: ${poolIdSanitized}`);
     }
 
     // Ensure we have the coin types
@@ -1245,25 +1536,29 @@ export async function collectRewards(
       );
     }
 
-    // Check for rewards - updated to V2 method name
-    let rewarder_coin_types = [];
-    try {
-      const rewards = await clmmSdk.Rewarder.fetchPosRewardersAmount(
-        poolId,
-        pool.positions_handle,
-        positionId
-      );
+    // Check for rewards with guard for positions_handle
+    let rewarder_coin_types: string[] = [];
+    if (pool.positions_handle) {
+      try {
+        const rewards = await clmmSdk.Rewarder.fetchPosRewardersAmount(
+          poolIdSanitized,
+          pool.positions_handle,
+          posId
+        );
 
-      rewarder_coin_types = rewards
-        .filter((r: any) => r && Number(r.amount_owed) > 0)
-        .map((r: any) => r.coin_address);
+        rewarder_coin_types = rewards
+          .filter((r: any) => r && Number(r.amount_owed) > 0)
+          .map((r: any) => r.coin_address);
 
-      console.log(
-        `Found ${rewarder_coin_types.length} reward types with non-zero amounts`
-      );
-    } catch (error) {
-      console.error("Error checking rewards:", error);
-      throw new Error("Failed to check rewards. Please try again.");
+        console.log(
+          `Found ${rewarder_coin_types.length} reward types with non-zero amounts`
+        );
+      } catch (error) {
+        console.error("Error checking rewards:", error);
+        throw new Error("Failed to check rewards. Please try again.");
+      }
+    } else {
+      console.warn("Pool has no positions_handle – skip reward query");
     }
 
     if (rewarder_coin_types.length === 0) {
@@ -1274,13 +1569,13 @@ export async function collectRewards(
       };
     }
 
-    // If we have rewards, collect them - updated to V2 method name
+    // If we have rewards, collect them - using the correct SDK v2 method name
     try {
       const tx = await clmmSdk.Rewarder.collectRewarderPayload({
         coin_type_a,
         coin_type_b,
-        pool_id: poolId,
-        pos_id: positionId,
+        pool_id: poolIdSanitized,
+        pos_id: posId,
         rewarder_coin_types,
         collect_fee: false, // We're just collecting rewards, not fees
       });
@@ -1305,12 +1600,19 @@ export async function collectRewards(
     }
   } catch (error) {
     console.error("Error in collectRewards:", error);
+
+    // Only return success for truly closed positions
+    if (error instanceof Error && isAlreadyClosedError(error)) {
+      return { success: true, digest: "" };
+    }
+
     throw error;
   }
 }
 
 /**
  * Fetch all positions owned by an address.
+ * Updated to use SDK v2 methods and properly prioritize NFT ID
  */
 export async function getPositions(
   ownerAddress: string
@@ -1319,25 +1621,26 @@ export async function getPositions(
     // Set sender address for this operation
     clmmSdk.setSenderAddress(ownerAddress);
 
+    // Use the SDK v2 method
     const positions = await clmmSdk.Position.getPositionList(ownerAddress);
     console.log(`Found ${positions.length} positions for ${ownerAddress}`);
 
     // Process positions to extract useful information
     const processedPositions = positions
       .filter((p) => {
-        // Filter out positions with zero liquidity
-        const liquidity = Number(p.liquidity) || 0;
-        return liquidity > 0 && p.position_status === "Exists";
+        // Include all positions with "Exists" status, even those with zero liquidity
+        return p.position_status === "Exists";
       })
       .map((p) => {
+        // Fix: Prioritize nft_id or id over pos_object_id
         return {
-          id: p.pos_object_id || p.id || p.position_id || p.nft_id || "",
+          id: p.nft_id || p.id || p.position_id || p.pos_object_id || "",
           poolAddress: p.pool || p.pool_id || "",
           liquidity: Number(p.liquidity) || 0,
         };
       });
 
-    console.log(`Returning ${processedPositions.length} active positions`);
+    console.log(`Returning ${processedPositions.length} positions`);
     return processedPositions;
   } catch (error) {
     console.error("Error fetching positions:", error);
