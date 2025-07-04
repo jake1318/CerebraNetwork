@@ -1,5 +1,5 @@
 // src/components/WithdrawModal.tsx
-// Last Updated: 2025-06-29 20:30:33 UTC by jake1318
+// Last Updated: 2025-06-30 00:43:16 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -26,7 +26,7 @@ interface WithdrawModalProps {
     collectFees: boolean;
     closePosition: boolean;
     slippage: number;
-  }) => Promise<{ success: boolean; digest?: string }>;
+  }) => Promise<{ success: boolean; digests: string[] }>;
   onClose: () => void;
 }
 
