@@ -1,5 +1,5 @@
-// src/pages/Positions.tsx
-// Last Updated: 2025-06-29 20:43:12 UTC by jake1318
+// src/pages/PoolsPage/Positions.tsx
+// Last Updated: 2025-06-30 17:31:39 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -1049,7 +1049,7 @@ function Positions() {
 
     if (!positionIds.length) {
       console.error("No position IDs provided for withdrawal");
-      return { success: false };
+      return { success: false, digests: [] };
     }
 
     try {
@@ -1097,8 +1097,8 @@ function Positions() {
         // Refresh positions
         await loadPositions();
 
-        // Return success with digest for the WithdrawModal
-        return { success: true, digest: result.digests[0] };
+        // Return success with digests for the WithdrawModal
+        return { success: true, digests: result.digests };
       } else {
         throw new Error("Withdrawal failed");
       }
@@ -1113,7 +1113,7 @@ function Positions() {
         asModal: false, // Show errors as inline notifications
       });
 
-      return { success: false };
+      return { success: false, digests: [] };
     } finally {
       setWithdrawingPool(null);
     }
@@ -1682,7 +1682,7 @@ function Positions() {
                                     </table>
                                   </div>
 
-                                  {/* Unclaimed rewards section */}
+                                  {/* Unclaimed rewards section - FIXED IMPLEMENTATION */}
                                   {poolPosition.positions.some(
                                     (pos) =>
                                       pos.rewards &&
@@ -1695,40 +1695,8 @@ function Positions() {
                                       <h4>Unclaimed Rewards</h4>
                                       <div className="rewards-list">
                                         {Object.values(
-                                          poolPosition.positions
+                                          (poolPosition.positions ?? [])
                                             .flatMap((pos) => pos.rewards || [])
-                                            .reduce((acc, reward) => {
-                                              if (!reward) return acc;
-                                              const key =
-                                                reward.tokenSymbol || "Unknown";
-                                              if (!acc[key]) {
-                                                acc[key] = { ...reward };
-                                              } else {
-                                                // Sum up rewards of the same token
-                                                const currentAmount = BigInt(
-                                                  acc[key].amount || "0"
-                                                );
-                                                const newAmount = BigInt(
-                                                  reward.amount || "0"
-                                                );
-                                                acc[key].amount = (
-                                                  currentAmount + newAmount
-                                                ).toString();
-                                                acc[key].formatted = (
-                                                  parseInt(
-                                                    acc[key].amount || "0"
-                                                  ) /
-                                                  Math.pow(
-                                                    10,
-                                                    reward.decimals || 0
-                                                  )
-                                                ).toFixed(reward.decimals || 0);
-                                                acc[key].valueUsd =
-                                                  (acc[key].valueUsd || 0) +
-                                                  (reward.valueUsd || 0);
-                                              }
-                                              return acc;
-                                            }, {} as Record<string, NonNullable<NormalizedPosition["rewards"]>[number]>)
                                             .reduce((acc, reward) => {
                                               if (!reward) return acc;
                                               const key =
