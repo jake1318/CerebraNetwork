@@ -1,0 +1,112 @@
+.user-orders {
+  background: rgba(5, 15, 30, 0.7);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  border-radius: 16px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+
+  .no-orders {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 2rem;
+    font-style: italic;
+  }
+
+  .orders-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th,
+    td {
+      padding: 0.8rem;
+      text-align: left;
+    }
+
+    th {
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 500;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    tr {
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+
+      &.buy-order td:first-child {
+        color: #4caf50;
+      }
+
+      &.sell-order td:first-child {
+        color: #ff5b5b;
+      }
+    }
+
+    td {
+      color: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  .cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    border: none;
+    border-radius: 4px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 91, 91, 0.2);
+      color: #ff5b5b;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .loading-spinner-small {
+    width: 30px;
+    height: 30px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top: 2px solid #00ffff;
+    border-right: 2px solid #ff00ff;
+    animation: spin 1s ease-in-out infinite;
+    margin: 2rem auto;
+  }
+
+  .error-message-small {
+    color: #ff5b5b;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 768px) {
+    overflow-x: auto;
+
+    .orders-table {
+      min-width: 600px;
+    }
+  }
+}
