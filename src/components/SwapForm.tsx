@@ -14,6 +14,14 @@ import BigNumber from "bignumber.js";
 /* local components */
 import TokenSelector from "./TokenSelector/TokenSelector";
 
+/* ───────────────────────────────────────────────────────────────────┐
+ | Partner commission for every swap (30 bps = 0.30 %)               |
+ └──────────────────────────────────────────────────────────────────*/
+const COMMISSION = {
+  partner: "0xc4a6782bda928c118a336a581aaa24f3a0418fdeebe1b7a053b9bf5890fd691e",
+  commissionBps: 30,
+};
+
 /* hooks / services / styles */
 import { useWalletContext } from "../contexts/WalletContext";
 import { Token, fetchTokens } from "../services/tokenService";
@@ -186,7 +194,7 @@ export default function SwapForm() {
               accountAddress: wallet.account.address,
               slippage,
               suiPrice: suiPrice ?? undefined,
-              commission: { partner: wallet.account.address, commissionBps: 0 },
+              commission: COMMISSION,
             });
             setEstimatedFee(feeUsd);
           } catch (e) {
@@ -228,7 +236,7 @@ export default function SwapForm() {
         quoteResponse: qr!,
         accountAddress: wallet.account!.address,
         slippage,
-        commission: { partner: wallet.account!.address, commissionBps: 0 },
+        commission: COMMISSION,
       });
       const res = await wallet.signAndExecuteTransactionBlock({
         transactionBlock: tx,

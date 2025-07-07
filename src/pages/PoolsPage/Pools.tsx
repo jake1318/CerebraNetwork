@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Pools.tsx
-// Last Updated: 2025-06-27 07:25:45 UTC by jake1318
+// Last Updated: 2025-07-06 19:35:31 UTC by jake1318
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -579,6 +579,14 @@ const Pools: React.FC = () => {
       pool.dex.toLowerCase() === "kriya" ||
       pool.dex.toLowerCase() === "kriya-dex"
     );
+  };
+
+  /**
+   * Check if a pool has a real vault (not just hasVault flag)
+   */
+  const hasActiveVault = (pool: PoolInfo): boolean => {
+    // Check if the pool has both hasVault flag AND a valid vaultApy value
+    return !!(pool.hasVault && pool.vaultApy && pool.vaultApy > 0);
   };
 
   /**
@@ -1194,7 +1202,8 @@ const Pools: React.FC = () => {
                                     {(item.fee * 100).toFixed(2)}%
                                   </div>
                                 )}
-                              {item.hasVault && (
+                              {/* FIX: Only show Auto-Vault badge if there's an actual vault with APY */}
+                              {hasActiveVault(item) && (
                                 <div className="vault-badge">Auto-Vault</div>
                               )}
                             </div>
@@ -1224,7 +1233,8 @@ const Pools: React.FC = () => {
                           >
                             {formatNumber(item.apr)}%
                           </span>
-                          {item.hasVault && item.vaultApy && (
+                          {/* FIX: Only show vault APY if there's an actual vault with APY */}
+                          {hasActiveVault(item) && (
                             <div className="vault-apy">
                               Vault: {formatNumber(item.vaultApy)}%
                             </div>
@@ -1249,9 +1259,10 @@ const Pools: React.FC = () => {
                               isStubPool
                             }
                           >
+                            {/* FIX: Only show "Deposit to Vault" for pools with actual vaults */}
                             {isStubPool
                               ? "Coming Soon"
-                              : item.hasVault
+                              : hasActiveVault(item)
                               ? "Deposit to Vault"
                               : isDexSupported(item.dex)
                               ? "Deposit"

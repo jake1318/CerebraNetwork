@@ -1,13 +1,24 @@
 /* src/pages/Dex/components/OrderForm.scss */
-/* Last Updated: 2025-06-25 19:49:13 */
-/* Author: jake1318 */
+/* Last Updated: 2025-07-07 00:50:29 UTC by jake1318 */
 
 .dex-order-form {
   width: 100%;
   display: flex;
   flex-direction: column;
   color: #e0e0e0;
-  padding: 8px;
+  padding: 12px;
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  animation: fadeIn 0.5s ease-out;
 
   // Variables
   $buy-color: #4caf50;
@@ -20,11 +31,11 @@
   $sell-bg: rgba(255, 59, 48, 0.1);
   $sell-border: rgba(255, 59, 48, 0.3);
 
-  $accent-color: #00c2ff;
-  $accent-bg: rgba(0, 194, 255, 0.1);
-  $accent-border: rgba(0, 194, 255, 0.3);
+  $accent-color: #00ffff;
+  $accent-bg: rgba(0, 255, 255, 0.1);
+  $accent-border: rgba(0, 255, 255, 0.3);
 
-  $border-color: #2a2f3a;
+  $border-color: rgba(255, 255, 255, 0.1);
   $input-bg: rgba(0, 0, 0, 0.2);
   $text-muted: #8a8a8a;
 
@@ -45,28 +56,31 @@
       transition: all 0.2s ease;
 
       &:first-child {
-        border-radius: 4px 0 0 4px;
+        border-radius: 8px 0 0 8px;
       }
 
       &:last-child {
-        border-radius: 0 4px 4px 0;
+        border-radius: 0 8px 8px 0;
       }
 
       &.buy.active {
         background-color: $buy-bg;
         color: $buy-color;
         border-color: $buy-border;
+        text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
       }
 
       &.sell.active {
         background-color: $sell-bg;
         color: $sell-color;
         border-color: $sell-border;
+        text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
       }
 
       &:hover:not(.active) {
         color: #e0e0e0;
         background-color: rgba(255, 255, 255, 0.05);
+        transform: translateY(-1px);
       }
     }
   }
@@ -87,22 +101,29 @@
       transition: all 0.15s ease;
 
       &:first-child {
-        border-radius: 4px 0 0 4px;
+        border-radius: 8px 0 0 8px;
       }
 
       &:last-child {
-        border-radius: 0 4px 4px 0;
+        border-radius: 0 8px 8px 0;
       }
 
       &.active {
-        background-color: $accent-bg;
-        color: $accent-color;
-        border-color: $accent-border;
+        background: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(255, 0, 255, 0.2)
+        );
+        color: #ffffff;
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.1),
+          0 0 15px rgba(255, 0, 255, 0.1);
       }
 
       &:hover:not(.active) {
         color: #e0e0e0;
         background-color: rgba(255, 255, 255, 0.05);
+        transform: translateY(-1px);
       }
     }
   }
@@ -111,7 +132,7 @@
   .order-form-content {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 
     .form-group {
       display: flex;
@@ -128,17 +149,26 @@
 
         input {
           width: 100%;
-          padding: 8px 10px;
+          padding: 10px 12px;
           background-color: $input-bg;
           border: 1px solid $border-color;
-          border-radius: 4px;
+          border-radius: 8px;
           color: #e0e0e0;
           font-size: 14px;
-          font-family: "Roboto Mono", monospace;
+          font-family: "Orbitron", monospace;
+          transition: all 0.3s ease;
 
           &:focus {
             outline: none;
-            border-color: $accent-border;
+            border: 1px solid;
+            border-image: linear-gradient(
+                45deg,
+                rgba(0, 255, 255, 0.5),
+                rgba(255, 0, 255, 0.5)
+              )
+              1;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
+              0 0 10px rgba(255, 0, 255, 0.2);
           }
 
           &:disabled {
@@ -180,11 +210,13 @@
           color: $text-muted;
           font-size: 12px;
           cursor: pointer;
-          border-radius: 2px;
+          border-radius: 4px;
+          transition: all 0.3s ease;
 
           &:hover:not(:disabled) {
             background-color: rgba(255, 255, 255, 0.1);
             color: #e0e0e0;
+            transform: translateY(-1px);
           }
 
           &:disabled {
@@ -196,27 +228,39 @@
 
       .total-value {
         background-color: $input-bg;
-        padding: 8px 10px;
+        padding: 10px 12px;
         border: 1px solid $border-color;
-        border-radius: 4px;
-        font-family: "Roboto Mono", monospace;
+        border-radius: 8px;
+        font-family: "Orbitron", monospace;
         font-size: 14px;
       }
     }
 
     .market-notice {
-      background-color: $accent-bg;
+      background: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.1),
+        rgba(255, 0, 255, 0.1)
+      );
       padding: 12px;
-      border-radius: 4px;
-      border: 1px solid $accent-border;
+      border-radius: 8px;
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.3),
+          rgba(255, 0, 255, 0.3)
+        )
+        1;
       text-align: center;
       font-size: 14px;
-      color: $accent-color;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.1),
+        0 0 15px rgba(255, 0, 255, 0.1);
     }
 
     .order-status {
       padding: 10px;
-      border-radius: 4px;
+      border-radius: 8px;
       text-align: center;
       font-size: 13px;
       margin: 8px 0;
@@ -225,41 +269,70 @@
         background-color: rgba(76, 175, 80, 0.1);
         border: 1px solid rgba(76, 175, 80, 0.3);
         color: $buy-color;
+        text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.2);
       }
 
       &.error {
         background-color: rgba(255, 59, 48, 0.1);
         border: 1px solid rgba(255, 59, 48, 0.3);
         color: $sell-color;
+        text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+        box-shadow: 0 0 15px rgba(255, 59, 48, 0.2);
       }
     }
 
     .submit-order-btn {
       width: 100%;
-      padding: 10px;
-      border: none;
-      border-radius: 4px;
+      padding: 12px;
+      border-radius: 8px;
       font-size: 15px;
       font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.2s ease;
+      transition: all 0.3s ease;
       margin-top: 8px;
 
       &.buy {
-        background-color: $buy-color;
+        background: linear-gradient(
+          45deg,
+          rgba(76, 175, 80, 0.8),
+          rgba(76, 175, 80, 0.6)
+        );
         color: white;
+        border: none;
+        box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
 
         &:hover:not(:disabled) {
-          background-color: $buy-hover;
+          background: linear-gradient(
+            45deg,
+            rgba(76, 175, 80, 0.9),
+            rgba(76, 175, 80, 0.7)
+          );
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
         }
       }
 
       &.sell {
-        background-color: $sell-color;
+        background: linear-gradient(
+          45deg,
+          rgba(255, 59, 48, 0.8),
+          rgba(255, 59, 48, 0.6)
+        );
         color: white;
+        border: none;
+        box-shadow: 0 0 20px rgba(255, 59, 48, 0.3);
+        text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
 
         &:hover:not(:disabled) {
-          background-color: $sell-hover;
+          background: linear-gradient(
+            45deg,
+            rgba(255, 59, 48, 0.9),
+            rgba(255, 59, 48, 0.7)
+          );
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(255, 59, 48, 0.4);
         }
       }
 
@@ -271,10 +344,22 @@
   }
 }
 
+// Animation keyframes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 // Responsive adjustments
 @media (max-width: 576px) {
   .dex-order-form {
-    padding: 6px;
+    padding: 8px;
 
     .order-form-tabs .tab,
     .order-form-mode-selector .mode-btn {
@@ -288,7 +373,7 @@
 
       .input-container input {
         font-size: 13px;
-        padding: 7px 8px;
+        padding: 8px 10px;
       }
 
       .percentage-buttons .pct-btn {
@@ -298,7 +383,7 @@
 
     .submit-order-btn {
       font-size: 14px;
-      padding: 8px;
+      padding: 10px;
     }
   }
 }

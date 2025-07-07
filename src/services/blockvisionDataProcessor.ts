@@ -1,34 +1,55 @@
-// src/services/blockvisionDataProcessor.ts 
-// Last Updated: 2025-05-05 22:24:09 UTC by jake1318
+// src/services/blockvisionDataProcessor.ts
+// Last Updated: 2025-07-04 22:59:59 UTC by jake1318
 
-import { RawProtocolData, PoolGroup, NormalizedPosition, RewardInfo } from './blockvisionService';
-import { normalizeAmount } from './blockvisionService';
+import {
+  RawProtocolData,
+  PoolGroup,
+  NormalizedPosition,
+  RewardInfo,
+} from "./blockvisionService";
+import { normalizeAmount } from "./blockvisionService";
 
 // Token cache to avoid repeated lookups (shared with blockvisionService via imports)
-const tokenCache: Record<string, { symbol: string, decimals: number, price?: number, logo?: string }> = {};
+const tokenCache: Record<
+  string,
+  { symbol: string; decimals: number; price?: number; logo?: string }
+> = {};
+
+export function processCetusData(raw: any) {
+  const cetusPositions = raw?.cetus?.positions ?? [];
+  const cetusVaults = raw?.cetus?.vaults ?? [];
+
+  if (!cetusPositions.length && !cetusVaults.length) {
+    console.warn("No Cetus positions or vaults in BlockVision payload");
+    return [];
+  }
+
+  // Rest of processCetusData implementation...
+  return []; // Return processed data
+}
 
 /**
  * Extract token symbol from coinType (e.g. "0x123::coin::USDC" -> "USDC")
  */
 const getSymbolFromType = (coinType: string): string => {
   if (!coinType) return "Unknown";
-  
+
   // Check cache first
   if (tokenCache[coinType]?.symbol) {
     return tokenCache[coinType].symbol;
   }
-  
+
   // Extract from type string
   const parts = coinType.split("::");
   const symbol = parts[parts.length - 1] || coinType.substring(0, 8);
-  
+
   // Cache for future use
   if (!tokenCache[coinType]) {
     tokenCache[coinType] = { symbol, decimals: 9 }; // Default decimals
   } else {
     tokenCache[coinType].symbol = symbol;
   }
-  
+
   return symbol;
 };
 
@@ -37,31 +58,35 @@ const getSymbolFromType = (coinType: string): string => {
  */
 const formatTokenAmount = (value: number): string => {
   if (value === 0) return "0";
-  
+
   if (Math.abs(value) >= 1) {
     // For values >= 1, show 2-4 decimal places
     return value.toLocaleString(undefined, {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 4
+      maximumFractionDigits: 4,
     });
   } else if (Math.abs(value) >= 0.01) {
     // For small values, show more precision
     return value.toLocaleString(undefined, {
       minimumFractionDigits: 4,
-      maximumFractionDigits: 6
+      maximumFractionDigits: 6,
     });
   } else if (Math.abs(value) > 0) {
     // For very small values, avoid showing 0
     return value > 0 ? "<0.01" : ">-0.01";
   }
-  
+
   return "0";
 };
 
 /**
  * Generate unique ID for a position
  */
-const generateUniqueId = (protocol: string, category: string, index: number): string => {
+const generateUniqueId = (
+  protocol: string,
+  category: string,
+  index: number
+): string => {
   return `${protocol}-${category}-${index}-${Date.now()}`;
 };
 
@@ -70,7 +95,7 @@ const generateUniqueId = (protocol: string, category: string, index: number): st
  */
 const extractFeesUsd = (protocolData: any, protocol: string): number => {
   let result = 0;
-  
+
   try {
     switch (protocol.toLowerCase()) {
       case "cetus":
@@ -78,34 +103,44 @@ const extractFeesUsd = (protocolData: any, protocol: string): number => {
         if (protocolData.feeOwedA && protocolData.feeOwedB) {
           // Try to get direct USD values if available
           if (protocolData.feeOwedAUsd && protocolData.feeOwedBUsd) {
-            result = Number(protocolData.feeOwedAUsd) + Number(protocolData.feeOwedBUsd);
+            result =
+              Number(protocolData.feeOwedAUsd) +
+              Number(protocolData.feeOwedBUsd);
           }
-          
+
           // Otherwise calculate based on token A/B prices if available
           else if (protocolData.coinTypeAPrice && protocolData.coinTypeBPrice) {
-            const feeA = typeof protocolData.feeOwedA === 'string' && /^[0-9a-f]+$/i.test(protocolData.feeOwedA) 
-              ? parseInt(protocolData.feeOwedA, 16) 
-              : Number(protocolData.feeOwedA || 0);
-              
-            const feeB = typeof protocolData.feeOwedB === 'string' && /^[0-9a-f]+$/i.test(protocolData.feeOwedB)
-              ? parseInt(protocolData.feeOwedB, 16)
-              : Number(protocolData.feeOwedB || 0);
-              
+            const feeA =
+              typeof protocolData.feeOwedA === "string" &&
+              /^[0-9a-f]+$/i.test(protocolData.feeOwedA)
+                ? parseInt(protocolData.feeOwedA, 16)
+                : Number(protocolData.feeOwedA || 0);
+
+            const feeB =
+              typeof protocolData.feeOwedB === "string" &&
+              /^[0-9a-f]+$/i.test(protocolData.feeOwedB)
+                ? parseInt(protocolData.feeOwedB, 16)
+                : Number(protocolData.feeOwedB || 0);
+
             const decimalsA = protocolData.coinTypeADecimals || 9;
             const decimalsB = protocolData.coinTypeBDecimals || 9;
-            
-            result = (feeA / Math.pow(10, decimalsA)) * Number(protocolData.coinTypeAPrice) +
-                    (feeB / Math.pow(10, decimalsB)) * Number(protocolData.coinTypeBPrice);
+
+            result =
+              (feeA / Math.pow(10, decimalsA)) *
+                Number(protocolData.coinTypeAPrice) +
+              (feeB / Math.pow(10, decimalsB)) *
+                Number(protocolData.coinTypeBPrice);
           }
         }
         break;
-        
+
       case "turbos":
         // Turbos usually has unclaimedFee fields with USD prices
-        result = Number(protocolData.unclaimedFeeAUsdPrice || 0) + 
-               Number(protocolData.unclaimedFeeBUsdPrice || 0);
+        result =
+          Number(protocolData.unclaimedFeeAUsdPrice || 0) +
+          Number(protocolData.unclaimedFeeBUsdPrice || 0);
         break;
-      
+
       default:
         result = Number(protocolData.feesUsd || 0);
         break;
@@ -114,13 +149,15 @@ const extractFeesUsd = (protocolData: any, protocol: string): number => {
     console.error("Error extracting fees:", err);
     result = 0;
   }
-  
+
   console.log(`Extracted fees for ${protocol}: $${result}`);
   return result;
 };
 
 // Process the raw portfolio data into normalized pool groups
-async function processDefiPortfolioData(rawData: RawProtocolData): Promise<PoolGroup[]> {
+function processDefiPortfolioData(
+  rawData: RawProtocolData
+): Promise<PoolGroup[]> {
   // Store all pools here
   const poolGroups: Record<string, PoolGroup> = {};
 
@@ -130,74 +167,81 @@ async function processDefiPortfolioData(rawData: RawProtocolData): Promise<PoolG
 
     switch (protocol.toLowerCase()) {
       case "cetus":
-        await processCetusPositions(data, poolGroups);
+        processCetusPositions(data, poolGroups);
         break;
 
       case "turbos":
-        await processTurbosPositions(data, poolGroups);
+        processTurbosPositions(data, poolGroups);
         break;
 
       case "flowx":
-        await processFlowXPositions(data, poolGroups);
+        processFlowXPositions(data, poolGroups);
         break;
 
       case "suilend":
-        await processSuiLendPositions(data, poolGroups);
+        processSuiLendPositions(data, poolGroups);
         break;
 
       case "kriya":
-        await processKriyaPositions(data, poolGroups);
+        processKriyaPositions(data, poolGroups);
         break;
 
       case "navi":
-        await processNaviPositions(data, poolGroups);
+        processNaviPositions(data, poolGroups);
         break;
-        
+
       case "suistake":
-        await processSuistakePositions(data, poolGroups);
+        processSuistakePositions(data, poolGroups);
         break;
 
       // Add more protocols as needed
 
       default:
         // Handle unknown protocols
-        await processGenericProtocolPositions(protocol, data, poolGroups);
+        processGenericProtocolPositions(protocol, data, poolGroups);
         break;
     }
   }
 
   // Return as array, sort by total value descending
-  return Object.values(poolGroups).sort(
-    (a, b) => b.totalValueUsd - a.totalValueUsd
+  return Promise.resolve(
+    Object.values(poolGroups).sort((a, b) => b.totalValueUsd - a.totalValueUsd)
   );
 }
 
 // Process Suistake positions
-async function processSuistakePositions(
+function processSuistakePositions(
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   // Exit if no data
-  if (!data || !data.stakes || !Array.isArray(data.stakes) || data.stakes.length === 0) {
+  if (
+    !data ||
+    !data.stakes ||
+    !Array.isArray(data.stakes) ||
+    data.stakes.length === 0
+  ) {
     console.log("No Suistake data to process");
     return;
   }
-  
+
   console.log(`Processing ${data.stakes.length} Suistake positions`);
-  
+
   for (const stake of data.stakes) {
     // Generate a unique identifier for this staking position
     const timestamp = Date.now();
     const poolId = `suistake-${timestamp}`;
-    
+
     // Extract important data from the stake object
     const stakeAmount = stake.stakeAmount || "0";
     const stakeUSDValue = parseFloat(stake.stakeUSDValue || "0");
     const estimatedRewardAmount = stake.estimatedRewardAmount || "0";
-    const estimatedRewardUSDValue = parseFloat(stake.estimatedRewardUSDValue || "0");
+    const estimatedRewardUSDValue = parseFloat(
+      stake.estimatedRewardUSDValue || "0"
+    );
     const apy = stake.apy || "0";
     const validatorName = stake.validatorName || "Unknown Validator";
-    
+
     // Create normalized position - we'll update the token values in the enrichment phase
     const position: NormalizedPosition = {
       id: `Suistake-position-${Math.floor(Math.random() * 10000)}-${timestamp}`,
@@ -209,19 +253,21 @@ async function processSuistakePositions(
       valueUsd: stakeUSDValue, // Use the USD value from the API
       isOutOfRange: false,
       positionType: "suistake",
-      raw: stake // Keep the raw data for later use
+      raw: stake, // Keep the raw data for later use
     };
-    
+
     // Add rewards if available
     if (estimatedRewardAmount !== "0" || estimatedRewardUSDValue > 0) {
-      position.rewards = [{
-        tokenSymbol: "SUI",
-        tokenAddress: "0x2::sui::SUI",
-        amount: estimatedRewardAmount,
-        valueUsd: estimatedRewardUSDValue
-      }];
+      position.rewards = [
+        {
+          tokenSymbol: "SUI",
+          tokenAddress: "0x2::sui::SUI",
+          amount: estimatedRewardAmount,
+          valueUsd: estimatedRewardUSDValue,
+        },
+      ];
     }
-    
+
     // Create or get the pool group
     if (!poolGroups[poolId]) {
       poolGroups[poolId] = {
@@ -239,20 +285,20 @@ async function processSuistakePositions(
         tokenALogo: stake.validatorImage,
       };
     }
-    
+
     // Add position and update totals
     poolGroups[poolId].positions.push(position);
     poolGroups[poolId].totalValueUsd += stakeUSDValue;
-    
+
     console.log(`Added Suistake position with value: $${stakeUSDValue}`);
   }
 }
 
 // Process Cetus positions
-async function processCetusPositions(
+function processCetusPositions(
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   if (!data.lps || !Array.isArray(data.lps)) return;
 
   console.log(`Processing ${data.lps.length} Cetus positions`);
@@ -265,22 +311,28 @@ async function processCetusPositions(
     // Handle decimals properly - use from metadata or default to 9
     const tokenADecimals = lp.coinTypeADecimals || 9;
     const tokenBDecimals = lp.coinTypeBDecimals || 9;
-    
+
     const tokenASymbol = getSymbolFromType(lp.coinTypeA);
     const tokenBSymbol = getSymbolFromType(lp.coinTypeB);
-    
+
     // Store token decimals in cache
     if (lp.coinTypeA && tokenADecimals) {
       if (!tokenCache[lp.coinTypeA]) {
-        tokenCache[lp.coinTypeA] = { symbol: tokenASymbol, decimals: tokenADecimals };
+        tokenCache[lp.coinTypeA] = {
+          symbol: tokenASymbol,
+          decimals: tokenADecimals,
+        };
       } else {
         tokenCache[lp.coinTypeA].decimals = tokenADecimals;
       }
     }
-    
+
     if (lp.coinTypeB && tokenBDecimals) {
       if (!tokenCache[lp.coinTypeB]) {
-        tokenCache[lp.coinTypeB] = { symbol: tokenBSymbol, decimals: tokenBDecimals };
+        tokenCache[lp.coinTypeB] = {
+          symbol: tokenBSymbol,
+          decimals: tokenBDecimals,
+        };
       } else {
         tokenCache[lp.coinTypeB].decimals = tokenBDecimals;
       }
@@ -291,7 +343,7 @@ async function processCetusPositions(
     const balanceB = lp.balanceB || "0";
     const normalizedBalanceA = normalizeAmount(balanceA, tokenADecimals);
     const normalizedBalanceB = normalizeAmount(balanceB, tokenBDecimals);
-    
+
     // Format balances for display
     const formattedBalanceA = formatTokenAmount(normalizedBalanceA);
     const formattedBalanceB = formatTokenAmount(normalizedBalanceB);
@@ -304,14 +356,17 @@ async function processCetusPositions(
       for (const reward of lp.rewards) {
         const rewardSymbol = getSymbolFromType(reward.coinType);
         const rewardDecimals = reward.decimals || 9;
-        
+
         // Store reward token info in cache
         if (reward.coinType) {
           if (!tokenCache[reward.coinType]) {
-            tokenCache[reward.coinType] = { symbol: rewardSymbol, decimals: rewardDecimals };
+            tokenCache[reward.coinType] = {
+              symbol: rewardSymbol,
+              decimals: rewardDecimals,
+            };
           }
         }
-        
+
         // Handle both amount_owed (old API) and amount (new API)
         const rewardAmount = reward.amount_owed || reward.amount || "0";
         const normalizedAmount = normalizeAmount(rewardAmount, rewardDecimals);
@@ -332,17 +387,24 @@ async function processCetusPositions(
         });
       }
     }
-    
+
     // Extract fees data
     const feesUsd = extractFeesUsd(lp, "cetus");
-    
+
     // Get position USD value
     const valueUsd = lp.valueUsd || 0;
     console.log(`Cetus position value: $${valueUsd}`);
 
     // Create normalized position
     const position: NormalizedPosition = {
-      id: lp.position || lp.id || generateUniqueId("Cetus", "liquidity", Math.floor(Math.random() * 10000)),
+      id:
+        lp.position ||
+        lp.id ||
+        generateUniqueId(
+          "Cetus",
+          "liquidity",
+          Math.floor(Math.random() * 10000)
+        ),
       liquidity: lp.liquidity || "0",
       balanceA: balanceA,
       balanceB: balanceB,
@@ -357,7 +419,7 @@ async function processCetusPositions(
     };
 
     console.log(`Processed position with value: $${valueUsd}`);
-    
+
     // Add to pool or create new pool
     if (!poolGroups[poolAddress]) {
       poolGroups[poolAddress] = {
@@ -383,46 +445,59 @@ async function processCetusPositions(
 
     // Add position and update pool totals
     poolGroups[poolAddress].positions.push(position);
-    poolGroups[poolAddress].totalLiquidity += parseInt(position.liquidity || "0");
+    poolGroups[poolAddress].totalLiquidity += parseInt(
+      position.liquidity || "0"
+    );
     poolGroups[poolAddress].totalValueUsd += position.valueUsd;
-    poolGroups[poolAddress].totalFeesUsd = (poolGroups[poolAddress].totalFeesUsd || 0) + feesUsd;
-    poolGroups[poolAddress].totalRewardsUsd = (poolGroups[poolAddress].totalRewardsUsd || 0) + rewardsUsd;
+    poolGroups[poolAddress].totalFeesUsd =
+      (poolGroups[poolAddress].totalFeesUsd || 0) + feesUsd;
+    poolGroups[poolAddress].totalRewardsUsd =
+      (poolGroups[poolAddress].totalRewardsUsd || 0) + rewardsUsd;
   }
 }
 
 // Process Turbos positions
-async function processTurbosPositions(
+function processTurbosPositions(
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   if (!data.liquidity || !Array.isArray(data.liquidity)) return;
 
   console.log(`Processing ${data.liquidity.length} Turbos positions`);
 
   // Process each liquidity position
   for (const lp of data.liquidity) {
-    const poolAddress = lp.poolAddress || lp.id || `turbos-pool-${Math.random().toString(36).substring(2, 9)}`;
+    const poolAddress =
+      lp.poolAddress ||
+      lp.id ||
+      `turbos-pool-${Math.random().toString(36).substring(2, 9)}`;
     if (!poolAddress) continue;
 
     // Get decimals from API or use defaults
     const tokenADecimals = lp.coinA?.decimals || 9;
     const tokenBDecimals = lp.coinB?.decimals || 9;
-    
+
     const tokenASymbol = getSymbolFromType(lp.coinAType);
     const tokenBSymbol = getSymbolFromType(lp.coinBType);
 
     // Store token decimals in cache
     if (lp.coinAType) {
       if (!tokenCache[lp.coinAType]) {
-        tokenCache[lp.coinAType] = { symbol: tokenASymbol, decimals: tokenADecimals };
+        tokenCache[lp.coinAType] = {
+          symbol: tokenASymbol,
+          decimals: tokenADecimals,
+        };
       } else {
         tokenCache[lp.coinAType].decimals = tokenADecimals;
       }
     }
-    
+
     if (lp.coinBType) {
       if (!tokenCache[lp.coinBType]) {
-        tokenCache[lp.coinBType] = { symbol: tokenBSymbol, decimals: tokenBDecimals };
+        tokenCache[lp.coinBType] = {
+          symbol: tokenBSymbol,
+          decimals: tokenBDecimals,
+        };
       } else {
         tokenCache[lp.coinBType].decimals = tokenBDecimals;
       }
@@ -433,29 +508,31 @@ async function processTurbosPositions(
     const balanceB = lp.coinBAmount || "0";
     const normalizedBalanceA = normalizeAmount(balanceA, tokenADecimals);
     const normalizedBalanceB = normalizeAmount(balanceB, tokenBDecimals);
-    
+
     // Format balances for display
     const formattedBalanceA = formatTokenAmount(normalizedBalanceA);
     const formattedBalanceB = formatTokenAmount(normalizedBalanceB);
 
     // Calculate total value
     const valueUsd = Number(lp.valueUsd || lp.totalValueUsd || 0);
-      
+
     // Extract fees
     const feesUsd = extractFeesUsd(lp, "turbos");
 
     // Create rewards if available
     const rewards: RewardInfo[] = [];
     let rewardsUsd = Number(lp.unclaimedRewardsUSD || 0);
-    
+
     if (lp.rewards && Array.isArray(lp.rewards)) {
       for (const reward of lp.rewards) {
-        const rewardSymbol = getSymbolFromType(reward.coinType || reward.tokenType);
+        const rewardSymbol = getSymbolFromType(
+          reward.coinType || reward.tokenType
+        );
         const rewardDecimals = reward.decimals || 9;
         const normalizedAmount = normalizeAmount(reward.amount, rewardDecimals);
-        
+
         const rewardValueUsd = reward.valueUsd || 0;
-        
+
         rewards.push({
           tokenSymbol: rewardSymbol,
           tokenAddress: reward.coinType || reward.tokenType,
@@ -463,7 +540,7 @@ async function processTurbosPositions(
           formatted: formatTokenAmount(normalizedAmount),
           decimals: rewardDecimals,
           valueUsd: rewardValueUsd,
-          logoUrl: reward.logoUrl
+          logoUrl: reward.logoUrl,
         });
       }
     } else if (rewardsUsd > 0) {
@@ -472,13 +549,19 @@ async function processTurbosPositions(
         tokenSymbol: "Rewards",
         amount: "0",
         formatted: "0",
-        valueUsd: rewardsUsd
+        valueUsd: rewardsUsd,
       });
     }
 
     // Create normalized position
     const position: NormalizedPosition = {
-      id: lp.id || generateUniqueId("Turbos", "liquidity", Math.floor(Math.random() * 10000)),
+      id:
+        lp.id ||
+        generateUniqueId(
+          "Turbos",
+          "liquidity",
+          Math.floor(Math.random() * 10000)
+        ),
       liquidity: lp.liquidity || "0",
       balanceA,
       balanceB,
@@ -491,7 +574,7 @@ async function processTurbosPositions(
       positionType: "turbos",
       raw: lp,
     };
-    
+
     console.log(`Processed Turbos position with value: $${valueUsd}`);
 
     // Get or create pool group
@@ -517,51 +600,55 @@ async function processTurbosPositions(
 
     // Add position to pool group
     poolGroups[poolAddress].positions.push(position);
-    poolGroups[poolAddress].totalLiquidity += parseInt(position.liquidity || "0");
+    poolGroups[poolAddress].totalLiquidity += parseInt(
+      position.liquidity || "0"
+    );
     poolGroups[poolAddress].totalValueUsd += position.valueUsd;
-    poolGroups[poolAddress].totalFeesUsd = (poolGroups[poolAddress].totalFeesUsd || 0) + feesUsd;
-    poolGroups[poolAddress].totalRewardsUsd = (poolGroups[poolAddress].totalRewardsUsd || 0) + rewardsUsd;
+    poolGroups[poolAddress].totalFeesUsd =
+      (poolGroups[poolAddress].totalFeesUsd || 0) + feesUsd;
+    poolGroups[poolAddress].totalRewardsUsd =
+      (poolGroups[poolAddress].totalRewardsUsd || 0) + rewardsUsd;
   }
 }
 
 // Implement remaining processor functions for each protocol
-async function processFlowXPositions(
+function processFlowXPositions(
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   // FlowX implementation...
   // (Similar processing logic as other protocols)
 }
 
-async function processSuiLendPositions(
+function processSuiLendPositions(
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   // SuiLend implementation...
   // (Similar processing logic as other protocols)
 }
 
-async function processKriyaPositions(
+function processKriyaPositions(
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   // Kriya implementation...
   // (Similar processing logic as other protocols)
 }
 
-async function processNaviPositions(
+function processNaviPositions(
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   // Navi implementation...
   // (Similar processing logic as other protocols)
 }
 
-async function processGenericProtocolPositions(
+function processGenericProtocolPositions(
   protocol: string,
   data: any,
   poolGroups: Record<string, PoolGroup>
-): Promise<void> {
+): void {
   // Generic protocol implementation...
   // (Similar processing logic as other protocols)
 }

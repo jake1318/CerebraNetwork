@@ -1,4 +1,6 @@
 /* src/pages/Dex/components/LimitOrderManager.scss */
+/* Last Updated: 2025-07-07 00:44:50 UTC by jake1318 */
+
 .limit-order-manager {
   position: relative; // make parent a positioning context
   background: rgba(5, 15, 30, 0.7);
@@ -164,8 +166,20 @@
     }
 
     &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.3);
-      border-radius: 2px;
+      background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.3),
+        rgba(255, 0, 255, 0.3)
+      );
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.5),
+        rgba(255, 0, 255, 0.5)
+      );
     }
 
     p {
@@ -245,31 +259,6 @@
       );
     }
 
-    /* Show scrollbar controls (buttons) */
-    &::-webkit-scrollbar-button {
-      width: 22px; /* Width of button */
-      background-color: rgba(5, 15, 30, 0.8); /* Dark button background */
-      border-radius: 4px; /* Rounded corners */
-      box-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
-
-      /* Add directional arrows */
-      &:start {
-        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(0,255,255,0.8)' stroke-width='2'><path d='M15 18l-6-6 6-6'/></svg>");
-        background-repeat: no-repeat;
-        background-position: center;
-      }
-
-      &:end {
-        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,0,255,0.8)' stroke-width='2'><path d='M9 18l6-6-6-6'/></svg>");
-        background-repeat: no-repeat;
-        background-position: center;
-      }
-
-      &:hover {
-        background-color: rgba(10, 30, 60, 0.9); /* Darker on hover */
-      }
-    }
-
     /* For Firefox */
     scrollbar-width: thin;
     scrollbar-color: rgba(0, 255, 255, 0.5) rgba(0, 0, 0, 0.3);
@@ -345,6 +334,7 @@
 
         &:hover {
           background: rgba(255, 255, 255, 0.05);
+          transform: translateY(-2px);
         }
 
         &.expired-order {
@@ -379,7 +369,7 @@
 
           button {
             padding: 6px 12px;
-            border-radius: 6px;
+            border-radius: 8px;
             border: none;
             cursor: pointer;
             font-size: 13px;
@@ -387,11 +377,20 @@
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
             background: rgba(0, 0, 0, 0.3);
-            color: rgba(255, 255, 255, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid;
+            border-image: linear-gradient(
+                45deg,
+                rgba(0, 255, 255, 0.3),
+                rgba(255, 0, 255, 0.3)
+              )
+              1;
+            color: #fff;
 
             &:hover:not(:disabled) {
               transform: translateY(-2px);
+              background: rgba(0, 0, 0, 0.5);
+              box-shadow: 0 5px 15px rgba(0, 255, 255, 0.15),
+                0 5px 15px rgba(255, 0, 255, 0.15);
             }
 
             &:disabled {
