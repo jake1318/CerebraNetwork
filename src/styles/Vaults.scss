@@ -548,3 +548,20 @@ $box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     }
   }
 }
+.protocol-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  margin-left: 8px;
+}
+
+.protocol-chip.haedal {
+  background: #9b59b6; /* purple-ish */
+}
+
+.protocol-chip.cetus {
+  background: #27ae60; /* cetus green */
+}
