@@ -1,0 +1,295 @@
+/* src/pages/Dex/components/OrderBook.scss */
+/* Last Updated: 2025-07-07 00:50:29 UTC by jake1318 */
+
+.order-book {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
+    0 8px 32px rgba(255, 0, 255, 0.08);
+
+  &:hover {
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
+      0 8px 32px rgba(255, 0, 255, 0.15);
+  }
+
+  // Glowing scan effect
+  &::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 255, 255, 0.5),
+      transparent
+    );
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .order-book-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    background: rgba(5, 15, 30, 0.9);
+
+    h3 {
+      font-size: 1.2rem;
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+
+    .order-book-controls {
+      display: flex;
+      gap: 0.3rem;
+
+      button {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 0.3rem 0.6rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.1);
+          transform: translateY(-1px);
+        }
+
+        &.active {
+          background: linear-gradient(
+            45deg,
+            rgba(0, 255, 255, 0.3),
+            rgba(255, 0, 255, 0.3)
+          );
+          border-color: rgba(255, 255, 255, 0.2);
+          color: #fff;
+          box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
+            0 0 15px rgba(255, 0, 255, 0.15);
+        }
+      }
+    }
+  }
+
+  .order-book-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .order-book-header-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.2);
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.6);
+      border-bottom: 1px solid;
+      border-image: linear-gradient(
+          90deg,
+          rgba(0, 255, 255, 0.1),
+          rgba(255, 0, 255, 0.1)
+        )
+        1;
+    }
+
+    .sell-orders,
+    .buy-orders {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+
+      &::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+          180deg,
+          rgba(0, 255, 255, 0.3),
+          rgba(255, 0, 255, 0.3)
+        );
+        border-radius: 3px;
+      }
+
+      &::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+          180deg,
+          rgba(0, 255, 255, 0.5),
+          rgba(255, 0, 255, 0.5)
+        );
+      }
+    }
+
+    .sell-orders {
+      display: flex;
+      flex-direction: column-reverse;
+    }
+
+    .buy-orders {
+      border-top: 1px solid;
+      border-image: linear-gradient(
+          90deg,
+          rgba(0, 255, 255, 0.1),
+          rgba(255, 0, 255, 0.1)
+        )
+        1;
+    }
+
+    .order-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 0.4rem 1rem;
+      font-size: 0.9rem;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+        transform: translateY(-1px);
+      }
+
+      &.sell {
+        color: #ff4d6d;
+        text-shadow: 0 0 10px rgba(255, 77, 109, 0.3);
+      }
+
+      &.buy {
+        color: #00ff88;
+        text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+      }
+
+      .price-col,
+      .amount-col,
+      .total-col {
+        position: relative;
+        z-index: 1;
+      }
+
+      .amount-col,
+      .total-col {
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .depth-indicator {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        z-index: 0;
+        opacity: 0.15;
+
+        &.sell {
+          background: #ff4d6d;
+        }
+
+        &.buy {
+          background: #00ff88;
+        }
+      }
+    }
+
+    .current-price {
+      padding: 0.7rem 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      text-align: center;
+      border-top: 1px solid;
+      border-bottom: 1px solid;
+      border-image: linear-gradient(
+          90deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(255, 0, 255, 0.2)
+        )
+        1;
+
+      .price-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        background: linear-gradient(45deg, #00ffff, #ff00ff);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+      }
+    }
+  }
+}
+
+// Animation keyframes
+@keyframes horizonScan {
+  0% {
+    transform: translateX(-150vw) translateY(-50%);
+  }
+  100% {
+    transform: translateX(150vw) translateY(-50%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Responsive adaptations
+@media (max-width: 768px) {
+  .order-book {
+    .order-book-header {
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: flex-start;
+
+      .order-book-controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
+  }
+}

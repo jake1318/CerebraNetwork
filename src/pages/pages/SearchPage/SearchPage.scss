@@ -1,0 +1,934 @@
+// Enhanced Search Page Styling with dual-color background matching homepage
+
+.search-page {
+  min-height: 100vh;
+  // Updated background with both teal and magenta colors
+  background: radial-gradient(
+      circle at top left,
+      rgba(0, 255, 255, 0.15) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 0, 255, 0.15) 0%,
+      rgba(5, 15, 30, 0.5) 40%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(5, 5, 15, 0.95) 0%,
+      rgba(10, 10, 30, 0.95) 100%
+    );
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: center, center, center;
+  padding: 40px 20px;
+  color: #fff;
+  font-family: "Inter", "Segoe UI", Roboto, sans-serif;
+  position: relative;
+  overflow: hidden;
+
+  // Adding grid overlay
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  // Container with proper z-index to sit above background effects
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+}
+
+// Enhanced glass morphism for search form with dual-color accents
+.search-form {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+    0 8px 32px rgba(255, 0, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  margin-bottom: 40px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.2),
+      0 8px 32px rgba(255, 0, 255, 0.2);
+  }
+}
+
+.input-group {
+  display: flex;
+  gap: 16px;
+
+  .search-input {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.3),
+        rgba(255, 0, 255, 0.3)
+      )
+      1;
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: #fff;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    letter-spacing: 0.3px;
+
+    &:focus {
+      outline: none;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2),
+        0 0 20px rgba(255, 0, 255, 0.2);
+    }
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
+
+  .search-button {
+    padding: 16px 32px;
+    background: linear-gradient(45deg, #00ffff, #ff00ff);
+    border: none;
+    border-radius: 12px;
+    color: #000;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 140px;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
+        0 0 20px rgba(255, 0, 255, 0.3);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+}
+
+// Enhanced loading animation with dual-color theme
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin: 60px 0;
+
+  .loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top: 3px solid #00ffff;
+    border-right: 3px solid #ff00ff;
+    border-bottom: 3px solid #00ffff;
+    border-left: 3px solid #ff00ff;
+    animation: spin 1s ease-in-out infinite;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2), 0 0 15px rgba(255, 0, 255, 0.2);
+  }
+
+  .loading-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 18px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.3),
+      0 0 10px rgba(255, 0, 255, 0.3);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Enhanced search results styling with dual-color theme
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.result-card {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  transition: all 0.3s ease;
+  position: relative; // Added for toggle button positioning
+  padding-bottom: 50px; // Add space for the toggle button
+
+  &:hover {
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+      0 8px 32px rgba(255, 0, 255, 0.1);
+  }
+
+  .result-header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    padding-bottom: 12px;
+    display: flex;
+    align-items: center;
+
+    h2 {
+      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+  }
+
+  // New wrapper to ensure content area works with height transition
+  .result-content-wrapper {
+    position: relative;
+  }
+
+  .result-content {
+    line-height: 1.7;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.2px;
+    padding: 4px 8px;
+    word-wrap: break-word;
+    transition: max-height 0.5s ease;
+  }
+}
+
+// Styling for the Show More/Show Less toggle button
+.toggle-btn {
+  background: transparent;
+  border: none;
+  position: absolute;
+  bottom: 16px;
+  left: 36px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  z-index: 5;
+
+  // Gradient text color to match your theme
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  // Subtle effects
+  transition: all 0.3s ease;
+
+  &:hover,
+  &:focus {
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.5), 0 0 8px rgba(255, 0, 255, 0.5);
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.3),
+      0 0 0 2px rgba(255, 0, 255, 0.3);
+    border-radius: 4px;
+  }
+
+  // Add a small icon/indicator
+  &::after {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-left: 6px;
+    border-right: 2px solid;
+    border-bottom: 2px solid;
+    border-image: linear-gradient(45deg, #00ffff, #ff00ff) 1;
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+    vertical-align: 1px;
+  }
+
+  // Flip the arrow when expanded
+  &[aria-expanded="true"]::after {
+    transform: rotate(-135deg);
+    vertical-align: -1px;
+  }
+}
+
+// Video Results Carousel - NEW DESIGN
+.video-result-card {
+  position: relative;
+  padding-bottom: 76px; // Increase padding-bottom to accommodate controls
+}
+
+// Rest of your SCSS remains the same...
+// (carousel controls, video cards, web results, etc.)
+
+.carousel-controls {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  display: flex;
+  gap: 10px;
+  z-index: 5;
+}
+
+.carousel-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    );
+    transform: scale(1.05);
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.5);
+  }
+}
+
+.video-carousel-container {
+  overflow: hidden;
+  padding: 16px 0;
+  margin: 0 -8px;
+}
+
+.video-carousel {
+  display: flex;
+  gap: 20px;
+  padding: 0 8px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none; // Hide scrollbar on Firefox
+  -ms-overflow-style: none; // Hide scrollbar on IE/Edge
+
+  &::-webkit-scrollbar {
+    display: none; // Hide scrollbar on Chrome/Safari
+  }
+}
+
+.video-card {
+  min-width: 300px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.1),
+      rgba(255, 0, 255, 0.1)
+    )
+    1;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+      0 8px 32px rgba(255, 0, 255, 0.1);
+  }
+
+  a {
+    text-decoration: none;
+    color: #fff;
+    display: block;
+  }
+
+  .thumbnail-container {
+    position: relative;
+    overflow: hidden;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent 60%,
+        rgba(0, 0, 0, 0.8)
+      );
+      z-index: 1;
+      opacity: 0.7;
+      transition: opacity 0.3s ease;
+    }
+
+    .play-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 50px;
+      height: 50px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      opacity: 0.8;
+      transition: all 0.3s ease;
+
+      svg {
+        width: 24px;
+        height: 24px;
+        fill: #fff;
+      }
+    }
+
+    &:hover {
+      &:before {
+        opacity: 0.4;
+      }
+
+      .play-icon {
+        background: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.8),
+          rgba(255, 0, 255, 0.8)
+        );
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.1);
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
+          0 0 20px rgba(255, 0, 255, 0.3);
+      }
+    }
+  }
+
+  h3 {
+    padding: 14px;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    transition: color 0.2s ease;
+    height: 64px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+
+  &:hover h3 {
+    background: linear-gradient(45deg, #00ffff, #ff00ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: all 0.3s ease;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+  }
+
+  &:hover img {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.carousel-progress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+
+  .progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+
+    .progress-indicator {
+      height: 100%;
+      width: 33%; // A third of the way, to start
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      border-radius: 2px;
+    }
+  }
+
+  .progress-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+  }
+}
+
+// Enhanced web result links with domain display
+.web-link-card {
+  padding: 18px;
+  border-bottom: 1px solid;
+  border-image: linear-gradient(
+      90deg,
+      rgba(0, 255, 255, 0.1),
+      rgba(255, 0, 255, 0.1)
+    )
+    1;
+  transition: all 0.2s ease;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .web-link-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+
+    a {
+      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      letter-spacing: 0.3px;
+
+      &:hover {
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.3),
+          0 0 10px rgba(255, 0, 255, 0.3);
+      }
+    }
+
+    .website-domain {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      padding: 2px 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      display: inline-block;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  p {
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: 0.2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    max-width: 100%;
+  }
+}
+
+// Enhanced functional progress bar styling (replaces existing progress bar styling)
+.carousel-progress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+
+  .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: visible;
+    position: relative;
+    cursor: pointer;
+    transition: height 0.2s ease;
+
+    &:hover {
+      height: 8px;
+
+      .progress-indicator {
+        background: linear-gradient(
+          90deg,
+          rgba(0, 255, 255, 1),
+          rgba(255, 0, 255, 1)
+        );
+      }
+
+      .progress-handle {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+      }
+    }
+
+    .progress-indicator {
+      height: 100%;
+      width: 0%; // Will be set dynamically via JS
+      background: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.8),
+        rgba(255, 0, 255, 0.8)
+      );
+      border-radius: 3px;
+      transition: width 0.1s ease-out;
+    }
+
+    .progress-handle {
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #fff;
+      top: 50%;
+      left: 0%; // Will be set dynamically via JS
+      transform: translate(-50%, -50%) scale(0.8);
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
+        0 0 10px rgba(255, 0, 255, 0.5);
+      opacity: 0.6;
+      transition: all 0.2s ease;
+      pointer-events: none; // Let clicks pass through to progress bar
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      background-image: linear-gradient(#fff, #fff),
+        linear-gradient(90deg, #00ffff, #ff00ff);
+      background-origin: border-box;
+      background-clip: content-box, border-box;
+    }
+  }
+
+  .progress-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+  }
+}
+
+// Load more buttons styling
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.load-more-button {
+  background: transparent;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.4),
+      rgba(255, 0, 255, 0.4)
+    )
+    1;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  min-width: 160px;
+  text-align: center;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.1),
+      rgba(255, 0, 255, 0.1)
+    );
+    z-index: -1;
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    transition: transform 0.5s ease-out;
+  }
+
+  &:hover {
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3), 0 0 15px rgba(255, 0, 255, 0.3);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+
+    &::before {
+      transform: scaleX(1);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    border-image: linear-gradient(
+        45deg,
+        rgba(150, 150, 150, 0.3),
+        rgba(100, 100, 100, 0.3)
+      )
+      1;
+
+    &:hover {
+      box-shadow: none;
+      text-shadow: none;
+
+      &::before {
+        transform: scaleX(0);
+      }
+    }
+  }
+
+  // Loading dots animation for "Loading" state
+  .loading-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    margin: 0 3px;
+    animation: loadingDots 1.4s infinite ease-in-out both;
+
+    &:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    &:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+  }
+}
+
+@keyframes loadingDots {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+// Add more spacing between web results for better readability
+.web-results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+// Subtle animations
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-results {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.result-card {
+  animation: fadeIn 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.result-card:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.result-card:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.result-card:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+// Carousel scroll indicator animation
+@keyframes scrollIndicator {
+  0% {
+    transform: translateX(-100%);
+  }
+  15% {
+    transform: translateX(0);
+  }
+  85% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.video-carousel:hover .progress-indicator {
+  animation: scrollIndicator 2s ease-in-out infinite;
+}
+
+// Add the following to your existing responsive section
+@media (max-width: 768px) {
+  .load-more-button {
+    width: 100%;
+    max-width: 300px;
+    padding: 12px 20px;
+  }
+
+  .carousel-progress {
+    .progress-bar {
+      height: 8px;
+
+      .progress-handle {
+        width: 18px;
+        height: 18px;
+        opacity: 0.8;
+      }
+    }
+  }
+
+  .toggle-btn {
+    left: 28px;
+    bottom: 14px;
+  }
+
+  .video-carousel {
+    gap: 16px;
+  }
+
+  .video-card {
+    min-width: 250px;
+  }
+
+  .web-link-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+
+    .website-domain {
+      font-size: 11px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .carousel-controls {
+    top: 20px;
+    right: 20px;
+  }
+
+  .video-card {
+    min-width: 220px;
+  }
+
+  .carousel-button {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+
+  .video-result-card {
+    padding-bottom: 60px;
+  }
+
+  .toggle-btn {
+    left: 20px;
+    bottom: 12px;
+  }
+}
+
+// Better touch interactions for mobile
+@media (hover: none) {
+  .carousel-progress {
+    .progress-bar {
+      height: 10px;
+      margin: 5px 0;
+
+      .progress-handle {
+        width: 20px;
+        height: 20px;
+        opacity: 1;
+      }
+    }
+  }
+
+  .load-more-button {
+    padding: 14px 24px;
+    font-size: 16px;
+  }
+}

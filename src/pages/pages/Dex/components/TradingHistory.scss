@@ -1,0 +1,225 @@
+/* src/pages/Dex/components/TradingHistory.scss */
+/* Last Updated: 2025-07-07 00:50:29 UTC by jake1318 */
+
+.trading-history {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(255, 0, 255, 0.2)
+    )
+    1;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
+    0 8px 32px rgba(255, 0, 255, 0.08);
+  animation: fadeIn 0.5s ease-out;
+
+  &:hover {
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
+      0 8px 32px rgba(255, 0, 255, 0.15);
+  }
+
+  // Glowing scan effect
+  &::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 255, 255, 0.5),
+      transparent
+    );
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .history-header {
+    display: flex;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(255, 0, 255, 0.2)
+      )
+      1;
+    background: rgba(5, 15, 30, 0.9);
+
+    .col {
+      &.price {
+        width: 40%;
+        text-align: left;
+      }
+
+      &.amount {
+        width: 30%;
+        text-align: right;
+      }
+
+      &.time {
+        width: 30%;
+        text-align: right;
+      }
+    }
+  }
+
+  .history-list {
+    flex: 1;
+    overflow-y: auto;
+
+    /* Loading state */
+    .loading {
+      padding: 20px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.6);
+      font-style: italic;
+    }
+
+    /* Error state */
+    .error {
+      padding: 20px;
+      text-align: center;
+      color: #ff3b30;
+      font-style: italic;
+    }
+
+    .no-trades {
+      padding: 20px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+      font-style: italic;
+    }
+
+    .history-item {
+      display: flex;
+      padding: 8px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid;
+      border-image: linear-gradient(
+          90deg,
+          rgba(0, 255, 255, 0.05),
+          rgba(255, 0, 255, 0.05)
+        )
+        1;
+      font-family: "Orbitron", monospace;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.03);
+        transform: translateY(-1px);
+      }
+
+      &.buy {
+        .price {
+          color: #4caf50;
+          text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+        }
+      }
+
+      &.sell {
+        .price {
+          color: #ff3b30;
+          text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+        }
+      }
+
+      .col {
+        &.price {
+          width: 40%;
+          text-align: left;
+        }
+
+        &.amount {
+          width: 30%;
+          text-align: right;
+        }
+
+        &.time {
+          width: 30%;
+          text-align: right;
+          color: rgba(255, 255, 255, 0.6);
+        }
+      }
+    }
+
+    /* Scrollbar styling */
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.3),
+        rgba(255, 0, 255, 0.3)
+      );
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.5),
+        rgba(255, 0, 255, 0.5)
+      );
+    }
+  }
+}
+
+// Animation keyframes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes horizonScan {
+  0% {
+    transform: translateX(-150vw) translateY(-50%);
+  }
+  100% {
+    transform: translateX(150vw) translateY(-50%);
+  }
+}
+
+// Responsive adaptations
+@media (max-width: 576px) {
+  .trading-history {
+    .history-header {
+      padding: 8px 12px;
+      font-size: 11px;
+    }
+
+    .history-list .history-item {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+  }
+}
