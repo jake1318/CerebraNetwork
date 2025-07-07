@@ -1,5 +1,5 @@
-// src/pages/Portfolio.tsx
-// Last Updated: 2025-06-24 00:56:25 UTC by jake1318
+// src/pages/Portfolio/Portfolio.tsx
+// Last Updated: 2025-07-07 22:49:05 UTC by jake1318
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -13,7 +13,7 @@ import blockvisionService, {
   getScallopPortfolioData,
   PoolGroup,
 } from "../../services/blockvisionService";
-import * as birdeyeService from "../../services/birdeyeService"; // <-- still needed
+import * as birdeyeService from "../../services/birdeyeService";
 
 // Import components
 import ProtocolBadge from "../PoolsPage/ProtocolBadge";
@@ -170,9 +170,8 @@ function formatTokenBalance(
   }
 }
 
-// Wallet dropdown component
-function WalletTokensDropdown({ walletTokens }: { walletTokens: any[] }) {
-  const [isOpen, setIsOpen] = useState(true); // Start open by default
+// Wallet Assets Section Component
+function WalletAssetsSection({ walletTokens }: { walletTokens: any[] }) {
   const [showAll, setShowAll] = useState(false);
 
   // Sort tokens by value from highest to lowest
@@ -182,9 +181,6 @@ function WalletTokensDropdown({ walletTokens }: { walletTokens: any[] }) {
       (a, b) => parseFloat(b.usdValue || "0") - parseFloat(a.usdValue || "0")
     );
 
-  // Get the top 5 tokens
-  const topTokens = sortedTokens.slice(0, 5);
-
   // Calculate total wallet value
   const totalValue = sortedTokens.reduce(
     (sum, token) => sum + parseFloat(token.usdValue || "0"),
@@ -192,242 +188,510 @@ function WalletTokensDropdown({ walletTokens }: { walletTokens: any[] }) {
   );
 
   return (
-    <div className="wallet-dropdown">
-      <div className="wallet-header" onClick={() => setIsOpen(!isOpen)}>
-        <div className="wallet-title">
-          <div className="wallet-icon">💰</div>
-          <div className="wallet-label">
-            <div className="wallet-name">Wallet Assets</div>
-            <div className="wallet-value">${totalValue.toFixed(2)}</div>
-          </div>
-        </div>
-        <div className={`dropdown-arrow ${isOpen ? "open" : ""}`}>
-          <FaChevronDown />
-        </div>
+    <div className="wallet-assets-section">
+      <div className="section-header">
+        <h3>Wallet Assets</h3>
+        <div className="total-value">Total: ${totalValue.toFixed(2)}</div>
       </div>
 
-      {isOpen && (
-        <div className="wallet-content">
-          <div className="wallet-tokens">
-            {(showAll ? sortedTokens : topTokens).map((token, idx) => (
-              <div className="wallet-token-item" key={`wallet-token-${idx}`}>
-                <div className="token-info">
-                  <TokenIcon symbol={token.symbol} address={token.coinType} />
-                  <span className="token-symbol">{token.symbol}</span>
+      <div className="wallet-assets-grid">
+        {(showAll ? sortedTokens : sortedTokens.slice(0, 8)).map(
+          (token, idx) => (
+            <div className="wallet-asset-card" key={`wallet-token-${idx}`}>
+              <div className="asset-header">
+                <TokenIcon
+                  symbol={token.symbol}
+                  address={token.coinType}
+                  size="md"
+                />
+                <span className="asset-symbol">{token.symbol}</span>
+              </div>
+              <div className="asset-details">
+                <div className="asset-balance">
+                  {formatTokenBalance(token.balance, token.decimals)}
                 </div>
-                <div className="token-details">
-                  {/* Display the balance with proper formatting based on decimals */}
-                  <div className="token-balance">
-                    {formatTokenBalance(token.balance, token.decimals)}
-                  </div>
-                  <div className="token-value">
-                    ${parseFloat(token.usdValue || "0").toFixed(2)}
-                  </div>
+                <div className="asset-value">
+                  ${parseFloat(token.usdValue || "0").toFixed(2)}
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )
+        )}
+      </div>
 
-          {sortedTokens.length > 5 && (
-            <button
-              className="view-all-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowAll(!showAll);
-              }}
-            >
-              {showAll
-                ? "Show Less"
-                : `View All Assets (${sortedTokens.length})`}
-            </button>
-          )}
+      {sortedTokens.length > 8 && (
+        <div className="view-all-container">
+          <button className="view-all-btn" onClick={() => setShowAll(!showAll)}>
+            {showAll ? "Show Less" : `View All Assets (${sortedTokens.length})`}
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-// Scallop Summary Component with SUI icon handling
-function ScallopSummary({ scallopData }: { scallopData: any }) {
-  if (!scallopData) return null;
+// Portfolio Charts Row component
+function PortfolioChartsRow({
+  portfolioHistory,
+  portfolioChange24h,
+  allPositions,
+  categorizedPositions,
+  walletTokens,
+  selectedTimeframe,
+  setSelectedTimeframe,
+}: {
+  portfolioHistory: { dates: string[]; values: number[] };
+  portfolioChange24h: { value: number; percent: number };
+  allPositions: PoolGroup[];
+  categorizedPositions: {
+    lpPools: PoolGroup[];
+    vaults: PoolGroup[];
+    farms: PoolGroup[];
+    lending: PoolGroup[];
+    staking: PoolGroup[];
+  };
+  walletTokens: any[];
+  selectedTimeframe: "7d" | "30d";
+  setSelectedTimeframe: React.Dispatch<React.SetStateAction<"7d" | "30d">>;
+}) {
+  // Calculate total wallet value
+  const walletValue = useMemo(
+    () =>
+      walletTokens.reduce(
+        (sum, token) => sum + parseFloat(token.usdValue || "0"),
+        0
+      ),
+    [walletTokens]
+  );
 
-  // Extract values from scallopData
-  const {
-    totalSupplyValue = 0,
-    totalDebtValue = 0,
-    totalCollateralValue = 0,
-    lendings = [],
-    borrowings = [],
-    pendingRewards = {},
-  } = scallopData;
+  // Create distribution data by protocol
+  const protocolData = useMemo(() => {
+    const protocolMap: Record<string, number> = {};
 
-  // Format pending rewards if they exist
-  const hasRewards =
-    pendingRewards &&
-    pendingRewards.borrowIncentives &&
-    pendingRewards.borrowIncentives.length > 0;
+    // Add wallet as a "protocol"
+    if (walletValue > 0) {
+      protocolMap["Wallet"] = walletValue;
+    }
+
+    let totalValue = walletValue;
+
+    // Group by protocol and sum values
+    allPositions.forEach((position) => {
+      if (!protocolMap[position.protocol]) {
+        protocolMap[position.protocol] = 0;
+      }
+      protocolMap[position.protocol] += position.totalValueUsd;
+      totalValue += position.totalValueUsd;
+    });
+
+    // Convert to series format
+    const series: number[] = [];
+    const labels: string[] = [];
+    const colors: string[] = [];
+
+    // Define default colors
+    const defaultColors = [
+      "#ff9500", // Wallet
+      "#00c2ff", // Cetus
+      "#6c5ce7", // Scallop
+      "#00d2d3", // Haedal
+      "#e84393", // Bluefin
+      "#00b894", // Turbos
+      "#ff5252", // SuiLend
+      "#55efc4", // Suistake
+      "#fdcb6e", // Aftermath
+      "#74b9ff", // Other
+    ];
+
+    Object.entries(protocolMap)
+      .sort((a, b) => b[1] - a[1]) // Sort by value descending
+      .forEach(([protocol, value], index) => {
+        labels.push(protocol);
+        series.push(parseFloat(value.toFixed(2)));
+
+        // Assign specific colors to common protocols
+        let color;
+        switch (protocol.toLowerCase()) {
+          case "wallet":
+            color = "#ff9500";
+            break;
+          case "cetus":
+            color = "#00c2ff";
+            break;
+          case "scallop":
+            color = "#6c5ce7";
+            break;
+          case "haedal":
+            color = "#00d2d3";
+            break;
+          case "bluefin":
+            color = "#e84393";
+            break;
+          case "turbos":
+            color = "#00b894";
+            break;
+          case "suilend":
+            color = "#ff5252";
+            break;
+          case "suistake":
+            color = "#55efc4";
+            break;
+          default:
+            color = defaultColors[index % defaultColors.length];
+        }
+        colors.push(color);
+      });
+
+    return { series, labels, colors, totalValue };
+  }, [allPositions, walletValue]);
+
+  // Create distribution data by category
+  const categoryData = useMemo(() => {
+    const categories = {
+      Wallet: walletValue,
+      "LP Pools": categorizedPositions.lpPools.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Vaults: categorizedPositions.vaults.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Farms: categorizedPositions.farms.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Lending: categorizedPositions.lending.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Staking: categorizedPositions.staking.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+    };
+
+    const totalValue = Object.values(categories).reduce(
+      (sum, value) => sum + value,
+      0
+    );
+
+    // Convert to series format and sort by value
+    const entries = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+
+    const series: number[] = [];
+    const labels: string[] = [];
+    const colors: string[] = [
+      "#ff9500", // Wallet
+      "#00c2ff", // LP Pools
+      "#ff9900", // Lending
+      "#6c5ce7", // Vaults
+      "#00d2d3", // Farms
+      "#e84393", // Staking
+    ];
+
+    // Predefined colors for categories
+    const categoryColors: Record<string, string> = {
+      Wallet: "#ff9500",
+      "LP Pools": "#00c2ff",
+      Lending: "#ff9900",
+      Vaults: "#6c5ce7",
+      Farms: "#00d2d3",
+      Staking: "#e84393",
+    };
+
+    // Create arrays for series, labels, and colors
+    const categoryOrder: string[] = [];
+    entries.forEach(([category, value]) => {
+      if (value > 0) {
+        labels.push(category);
+        series.push(parseFloat(value.toFixed(2)));
+        categoryOrder.push(category);
+      }
+    });
+
+    // Create colors array that follows the same order as labels
+    const orderedColors = labels.map(
+      (label) => categoryColors[label] || "#74b9ff"
+    );
+
+    return { series, labels, colors: orderedColors, totalValue };
+  }, [categorizedPositions, walletValue]);
+
+  // Value chart options
+  const valueChartOptions: ApexOptions = useMemo(
+    () => ({
+      chart: {
+        type: "area",
+        height: 180,
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        background: "transparent",
+      },
+      dataLabels: { enabled: false },
+      stroke: {
+        curve: "smooth",
+        width: 2,
+        colors: ["#00c2ff"],
+      },
+      fill: {
+        type: "gradient",
+        gradient: {
+          shadeIntensity: 1,
+          opacityFrom: 0.3,
+          opacityTo: 0.1,
+          stops: [0, 90, 100],
+          colorStops: [
+            { offset: 0, color: "#00c2ff", opacity: 0.4 },
+            { offset: 100, color: "#00c2ff", opacity: 0 },
+          ],
+        },
+      },
+      grid: { show: false },
+      xaxis: {
+        type: "datetime",
+        categories: portfolioHistory.dates,
+        labels: { show: false },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+      },
+      yaxis: { labels: { show: false } },
+      tooltip: {
+        x: { format: "yyyy-MM-dd" },
+        y: { formatter: (value) => `$${value.toFixed(2)}` },
+        theme: "dark",
+      },
+      theme: { mode: "dark" },
+    }),
+    [portfolioHistory]
+  );
+
+  // Protocol chart options
+  const protocolOptions = useMemo(
+    () => ({
+      chart: {
+        type: "donut",
+        background: "transparent",
+        height: 180,
+      },
+      dataLabels: {
+        enabled: false,
+      },
+      tooltip: {
+        y: {
+          formatter: (value: number) => {
+            return `$${value.toFixed(2)} (${(
+              (value / protocolData.totalValue) *
+              100
+            ).toFixed(1)}%)`;
+          },
+        },
+        theme: "dark",
+      },
+      legend: {
+        show: false,
+      },
+      labels: protocolData.labels,
+      colors: protocolData.colors,
+      plotOptions: {
+        pie: {
+          donut: {
+            size: "70%",
+            background: "transparent",
+            labels: {
+              show: true,
+              name: {
+                show: false,
+              },
+              value: {
+                show: false,
+              },
+              total: {
+                show: false,
+              },
+            },
+          },
+        },
+      },
+    }),
+    [protocolData]
+  );
+
+  // Category chart options
+  const categoryOptions = useMemo(
+    () => ({
+      chart: {
+        type: "donut",
+        background: "transparent",
+        height: 180,
+      },
+      dataLabels: {
+        enabled: false,
+      },
+      tooltip: {
+        y: {
+          formatter: (value: number) => {
+            return `$${value.toFixed(2)} (${(
+              (value / categoryData.totalValue) *
+              100
+            ).toFixed(1)}%)`;
+          },
+        },
+        theme: "dark",
+      },
+      legend: {
+        show: false,
+      },
+      labels: categoryData.labels,
+      colors: categoryData.colors,
+      plotOptions: {
+        pie: {
+          donut: {
+            size: "70%",
+            background: "transparent",
+            labels: {
+              show: true,
+              name: {
+                show: false,
+              },
+              value: {
+                show: false,
+              },
+              total: {
+                show: false,
+              },
+            },
+          },
+        },
+      },
+    }),
+    [categoryData]
+  );
 
   return (
-    <div className="scallop-summary-container">
-      <div className="scallop-header">
-        <div className="protocol-icon">
-          <TokenIcon symbol="SCALLOP" size="md" />
-        </div>
-        <h3>Scallop Summary</h3>
-      </div>
-
-      <div className="scallop-stats">
-        <div className="stat-item">
-          <span className="stat-label">Total Supply:</span>
-          <span className="stat-value">${totalSupplyValue.toFixed(2)}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Total Collateral:</span>
-          <span className="stat-value">${totalCollateralValue.toFixed(2)}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Total Borrow:</span>
-          <span className="stat-value">${totalDebtValue.toFixed(2)}</span>
-        </div>
-      </div>
-
-      {hasRewards && (
-        <div className="scallop-rewards">
-          <h4>Pending Rewards</h4>
-          <div className="rewards-list">
-            {pendingRewards.borrowIncentives.map(
-              (reward: any, index: number) => (
-                <div className="reward-item" key={`reward-${index}`}>
-                  <TokenIcon
-                    symbol={reward.symbol}
-                    address={reward.coinType}
-                    size="sm"
-                  />
-                  <span className="reward-amount">
-                    {reward.pendingRewardInCoin.toFixed(6)}
-                  </span>
-                  <span className="reward-value">
-                    ${reward.pendingRewardInUsd.toFixed(6)}
-                  </span>
-                </div>
-              )
-            )}
+    <div className="portfolio-charts-row">
+      <div className="chart-box portfolio-value-chart">
+        <div className="chart-header">
+          <div>
+            <h3>Portfolio Value</h3>
+            <div
+              className={`value-change ${
+                portfolioChange24h.value >= 0 ? "positive" : "negative"
+              }`}
+            >
+              <span className="change-icon">
+                {portfolioChange24h.value >= 0 ? (
+                  <FaCaretUp />
+                ) : (
+                  <FaCaretDown />
+                )}
+              </span>
+              <span className="change-amount">
+                ${Math.abs(portfolioChange24h.value).toFixed(2)}
+              </span>
+              <span className="change-percent">
+                {portfolioChange24h.percent.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+          <div className="chart-controls">
+            <div className="timeframe-selector">
+              <button
+                className={selectedTimeframe === "7d" ? "active" : ""}
+                onClick={() => setSelectedTimeframe("7d")}
+              >
+                7D
+              </button>
+              <button
+                className={selectedTimeframe === "30d" ? "active" : ""}
+                onClick={() => setSelectedTimeframe("30d")}
+              >
+                30D
+              </button>
+            </div>
           </div>
         </div>
-      )}
+        <div className="chart-content">
+          <ReactApexChart
+            options={valueChartOptions}
+            series={[
+              {
+                name: "Portfolio Value",
+                data: portfolioHistory.values,
+              },
+            ]}
+            type="area"
+            height={180}
+          />
+        </div>
+      </div>
 
-      <div className="scallop-positions">
-        {lendings.length > 0 && (
-          <div className="position-section">
-            <h4>Supply Positions</h4>
-            <div className="positions-list">
-              {lendings.map((lending: any, index: number) => (
-                <div className="position-item" key={`lending-${index}`}>
-                  <div className="position-token">
-                    <TokenIcon
-                      symbol={lending.symbol}
-                      address={lending.coinType}
-                      size="sm"
-                    />
-                    <span>{lending.symbol}</span>
-                  </div>
-                  <div className="position-details">
-                    <div className="position-amount">
-                      {lending.suppliedCoin.toFixed(6)}
-                    </div>
-                    <div className="position-value">
-                      ${lending.suppliedValue.toFixed(2)}
-                    </div>
-                    <div className="position-apy">
-                      {(lending.supplyApy * 100).toFixed(2)}% APY
-                    </div>
-                  </div>
+      <div className="chart-box protocol-chart">
+        <div className="chart-container">
+          <div className="chart-header">
+            <h3>By Protocol</h3>
+            <div className="chart-total-value">
+              ${protocolData.totalValue.toFixed(2)}
+            </div>
+          </div>
+          <div className="chart-content-with-legend">
+            <div className="chart-donut">
+              <ReactApexChart
+                options={protocolOptions}
+                series={protocolData.series}
+                type="donut"
+                height={180}
+              />
+            </div>
+            <div className="chart-legend-vertical">
+              {protocolData.labels.map((label, index) => (
+                <div className="legend-item" key={`protocol-legend-${index}`}>
+                  <div
+                    className="legend-color"
+                    style={{
+                      backgroundColor: protocolData.colors[index] || "#00c2ff",
+                    }}
+                  ></div>
+                  <div className="legend-label">{label}</div>
                 </div>
               ))}
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {borrowings.length > 0 && (
-          <div className="position-section">
-            <h4>Borrows & Collateral</h4>
-            {borrowings.map((obligation: any, idx: number) => (
-              <div className="obligation-item" key={`obligation-${idx}`}>
-                <div className="obligation-header">
-                  <span className="obligation-id">Obligation {idx + 1}</span>
-                  <span
-                    className="risk-level"
-                    style={{
-                      color:
-                        obligation.riskLevel < 0.3
-                          ? "#4CAF50"
-                          : obligation.riskLevel < 0.6
-                          ? "#FFC107"
-                          : "#FF5722",
-                    }}
-                  >
-                    Risk: {(obligation.riskLevel * 100).toFixed(0)}%
-                  </span>
-                </div>
-
-                {obligation.collaterals &&
-                  obligation.collaterals.length > 0 && (
-                    <div className="collateral-list">
-                      <h5>Collateral</h5>
-                      {obligation.collaterals.map(
-                        (collateral: any, cIdx: number) => (
-                          <div
-                            className="collateral-item"
-                            key={`collateral-${cIdx}`}
-                          >
-                            <TokenIcon
-                              symbol={collateral.symbol}
-                              address={collateral.coinType}
-                              size="sm"
-                            />
-                            <span>
-                              {collateral.depositedCoin.toFixed(6)}{" "}
-                              {collateral.symbol}
-                            </span>
-                            <span className="item-value">
-                              ${collateral.depositedValueInUsd.toFixed(2)}
-                            </span>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  )}
-
-                {obligation.borrowedPools &&
-                  obligation.borrowedPools.length > 0 && (
-                    <div className="borrowed-list">
-                      <h5>Borrows</h5>
-                      {obligation.borrowedPools.map(
-                        (borrow: any, bIdx: number) => (
-                          <div className="borrow-item" key={`borrow-${bIdx}`}>
-                            <TokenIcon
-                              symbol={borrow.symbol}
-                              address={borrow.coinType}
-                              size="sm"
-                            />
-                            <span>
-                              {borrow.borrowedCoin.toFixed(6)} {borrow.symbol}
-                            </span>
-                            <span className="item-value">
-                              ${borrow.borrowedValueInUsd.toFixed(2)}
-                            </span>
-                            <span className="borrow-rate">
-                              {(borrow.borrowApy * 100).toFixed(2)}% APY
-                            </span>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  )}
-              </div>
-            ))}
+      <div className="chart-box category-chart">
+        <div className="chart-container">
+          <div className="chart-header">
+            <h3>By Category</h3>
+            <div className="chart-total-value">
+              ${categoryData.totalValue.toFixed(2)}
+            </div>
           </div>
-        )}
+          <div className="chart-content-with-legend">
+            <div className="chart-donut">
+              <ReactApexChart
+                options={categoryOptions}
+                series={categoryData.series}
+                type="donut"
+                height={180}
+              />
+            </div>
+            <div className="chart-legend-vertical">
+              {categoryData.labels.map((label, index) => (
+                <div className="legend-item" key={`category-legend-${index}`}>
+                  <div
+                    className="legend-color"
+                    style={{
+                      backgroundColor: categoryData.colors[index] || "#00c2ff",
+                    }}
+                  ></div>
+                  <div className="legend-label">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -437,6 +701,45 @@ function ScallopSummary({ scallopData }: { scallopData: any }) {
 interface PortfolioDataPoint {
   date: string;
   value: number;
+}
+
+// Position card component for displaying individual position data
+function PositionCard({ position }: { position: PoolGroup }) {
+  return (
+    <div className="position-card">
+      <div className="position-card-header">
+        <div className="protocol-badge">
+          <ProtocolBadge
+            protocol={position.protocol}
+            protocolClass={position.protocol
+              .toLowerCase()
+              .replace(/[-\s]/g, "")}
+            isVault={position.positions[0]?.positionType === "cetus-vault"}
+          />
+        </div>
+        <div className="position-pair">
+          <PoolPair
+            tokenASymbol={position.tokenASymbol}
+            tokenBSymbol={position.tokenBSymbol}
+            tokenAAddress={position.tokenA}
+            tokenBAddress={position.tokenB}
+          />
+        </div>
+      </div>
+      <div className="position-card-stats">
+        <div className="stat">
+          <span className="stat-label">Value</span>
+          <span className="stat-value">
+            ${position.totalValueUsd.toFixed(2)}
+          </span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">APR</span>
+          <span className="stat-value">{position.apr.toFixed(2)}%</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Function to fetch historical portfolio data
@@ -515,6 +818,9 @@ function Portfolio() {
   const [selectedTimeframe, setSelectedTimeframe] = useState<"7d" | "30d">(
     "30d"
   );
+
+  // Active tab state for position sections
+  const [activeTab, setActiveTab] = useState<string>("all");
 
   // Fetch portfolio history data
   const loadPortfolioHistory = useCallback(
@@ -608,6 +914,140 @@ function Portfolio() {
     }
   }, [connected, account]);
 
+  // Create Scallop position cards function
+  const createScallopPositionCards = useCallback(() => {
+    if (!scallopData) return [];
+
+    console.log("Creating Scallop position cards from:", scallopData);
+    const scallopCards: PoolGroup[] = [];
+
+    // Add lending positions
+    if (scallopData.lendings && scallopData.lendings.length > 0) {
+      console.log(
+        `Processing ${scallopData.lendings.length} Scallop lending positions`
+      );
+
+      scallopData.lendings.forEach((lending: any, index: number) => {
+        console.log(`Creating Scallop lending card for ${lending.symbol}`);
+
+        // Make sure we have the required data
+        if (!lending.coinType || !lending.symbol) {
+          console.warn(
+            "Missing required data for Scallop lending position:",
+            lending
+          );
+          return;
+        }
+
+        const position: PoolGroup = {
+          poolAddress: `scallop-lending-${lending.coinType}-${index}`, // Add index to ensure uniqueness
+          poolName: `${lending.symbol} Supply`,
+          protocol: "Scallop",
+          positions: [
+            {
+              id: `scallop-lending-${lending.coinType}-${index}`,
+              liquidity: lending.suppliedCoin.toString(),
+              balanceA: lending.suppliedCoin.toString(),
+              balanceB: "0",
+              valueUsd: lending.suppliedValue,
+              isOutOfRange: false,
+              positionType: "scallop-lending",
+            },
+          ],
+          totalLiquidity: lending.suppliedCoin,
+          totalValueUsd: lending.suppliedValue,
+          apr: lending.supplyApy * 100,
+          tokenA: lending.coinType,
+          tokenB: "",
+          tokenASymbol: lending.symbol,
+          tokenBSymbol: "",
+        };
+
+        scallopCards.push(position);
+      });
+    }
+
+    // Add borrowing positions
+    if (scallopData.borrowings && scallopData.borrowings.length > 0) {
+      console.log(
+        `Processing ${scallopData.borrowings.length} Scallop borrowing obligations`
+      );
+
+      scallopData.borrowings.forEach(
+        (obligation: any, obligationIdx: number) => {
+          if (obligation.borrowedPools && obligation.borrowedPools.length > 0) {
+            console.log(
+              `Processing ${obligation.borrowedPools.length} borrowed pools in obligation ${obligationIdx}`
+            );
+
+            obligation.borrowedPools.forEach((borrow: any, index: number) => {
+              console.log(`Creating Scallop borrow card for ${borrow.symbol}`);
+
+              // Make sure we have the required data
+              if (!borrow.coinType || !borrow.symbol) {
+                console.warn(
+                  "Missing required data for Scallop borrow position:",
+                  borrow
+                );
+                return;
+              }
+
+              const position: PoolGroup = {
+                poolAddress: `scallop-borrow-${borrow.coinType}-${obligationIdx}-${index}`, // Ensure uniqueness
+                poolName: `${borrow.symbol} Borrow`,
+                protocol: "Scallop",
+                positions: [
+                  {
+                    id: `scallop-borrow-${borrow.coinType}-${obligationIdx}-${index}`,
+                    liquidity: borrow.borrowedCoin.toString(),
+                    balanceA: borrow.borrowedCoin.toString(),
+                    balanceB: "0",
+                    valueUsd: borrow.borrowedValueInUsd,
+                    isOutOfRange: false,
+                    positionType: "scallop-borrow",
+                  },
+                ],
+                totalLiquidity: borrow.borrowedCoin,
+                totalValueUsd: borrow.borrowedValueInUsd,
+                apr: borrow.borrowApy * 100,
+                tokenA: borrow.coinType,
+                tokenB: "",
+                tokenASymbol: borrow.symbol,
+                tokenBSymbol: "",
+              };
+
+              scallopCards.push(position);
+            });
+          }
+        }
+      );
+    }
+
+    console.log(`Created ${scallopCards.length} Scallop position cards`);
+    return scallopCards;
+  }, [scallopData]);
+
+  // Directly combine pool positions with Scallop positions for display
+  const allPositions = useMemo(() => {
+    if (!scallopData || !poolPositions.length) return poolPositions;
+
+    const scallopPositions = createScallopPositionCards();
+    console.log(
+      `Adding ${scallopPositions.length} Scallop positions to ${poolPositions.length} existing positions`
+    );
+
+    // Check if we already have any Scallop positions to avoid duplicates
+    const hasScallopPositions = poolPositions.some(
+      (p) => p.protocol === "Scallop"
+    );
+
+    if (hasScallopPositions || !scallopPositions.length) {
+      return poolPositions;
+    }
+
+    return [...poolPositions, ...scallopPositions];
+  }, [poolPositions, scallopData, createScallopPositionCards]);
+
   // Load positions - similar to the Positions page approach that works
   const loadPositions = useCallback(async () => {
     if (connected && account?.address) {
@@ -641,12 +1081,19 @@ function Portfolio() {
             parseFloat(scallopData.totalCollateralValue || "0")
           : 0;
 
+        // Calculate wallet value
+        const walletValue = walletTokens.reduce(
+          (sum, token) => sum + parseFloat(token.usdValue || "0"),
+          0
+        );
+
         // Generate portfolio data
-        const portfolioTotalValue = positionValue + scallopValue;
+        const portfolioTotalValue = positionValue + scallopValue + walletValue;
         setPortfolioData({
           positions,
           positionValue,
           scallopValue,
+          walletValue,
           totalValue: portfolioTotalValue,
         });
 
@@ -659,7 +1106,7 @@ function Portfolio() {
         setLoading(false);
       }
     }
-  }, [connected, account, scallopData, loadPortfolioHistory]);
+  }, [connected, account, scallopData, walletTokens, loadPortfolioHistory]);
 
   // Use separate effect for loading wallet tokens to avoid rate limiting
   const loadWalletTokens = useCallback(async () => {
@@ -685,11 +1132,6 @@ function Portfolio() {
     fetchScallopData();
   }, [fetchScallopData]);
 
-  // Then load positions once Scallop data is available
-  useEffect(() => {
-    loadPositions();
-  }, [loadPositions, scallopData]);
-
   // Load wallet tokens separately to avoid rate limiting
   useEffect(() => {
     // Add a small delay to avoid rate limiting
@@ -700,6 +1142,11 @@ function Portfolio() {
     return () => clearTimeout(timer);
   }, [loadWalletTokens]);
 
+  // Then load positions once Scallop data and wallet tokens are available
+  useEffect(() => {
+    loadPositions();
+  }, [loadPositions, walletTokens]);
+
   // Reload portfolio history when timeframe changes
   useEffect(() => {
     if (portfolioData?.totalValue) {
@@ -707,81 +1154,92 @@ function Portfolio() {
     }
   }, [selectedTimeframe, portfolioData?.totalValue, loadPortfolioHistory]);
 
-  // Simple function to determine if a pool group is a vault pool
-  const isVaultPool = (poolGroup: any): boolean => {
-    return (
-      poolGroup.positions?.length > 0 &&
-      poolGroup.positions[0].positionType === "cetus-vault"
-    );
+  // Function to categorize positions
+  const categorizePositions = (positions: PoolGroup[]) => {
+    const categories = {
+      lpPools: [] as PoolGroup[],
+      vaults: [] as PoolGroup[],
+      farms: [] as PoolGroup[],
+      lending: [] as PoolGroup[],
+      staking: [] as PoolGroup[],
+    };
+
+    positions.forEach((position) => {
+      const positionType = position.positions[0]?.positionType || "";
+      const protocol = position.protocol;
+
+      // Specific protocol-based categorization
+      if (protocol === "Haedal" || protocol === "haedal") {
+        // Haedal goes into vaults
+        categories.vaults.push(position);
+      } else if (
+        positionType.includes("vault") ||
+        position.poolName.toLowerCase().includes("vault")
+      ) {
+        categories.vaults.push(position);
+      } else if (
+        positionType.includes("farm") ||
+        position.poolName.toLowerCase().includes("farm")
+      ) {
+        categories.farms.push(position);
+      } else if (
+        positionType.includes("lend") ||
+        positionType.includes("borrow") ||
+        protocol === "Scallop" ||
+        protocol === "SuiLend"
+      ) {
+        categories.lending.push(position);
+      } else if (positionType.includes("staking") || protocol === "Suistake") {
+        categories.staking.push(position);
+      } else if (positionType.includes("lp") || position.tokenBSymbol) {
+        // Most LP pools have two tokens
+        categories.lpPools.push(position);
+      } else {
+        // Default to LP Pools
+        categories.lpPools.push(position);
+      }
+    });
+
+    return categories;
   };
 
-  // Chart options
-  const chartOptions: ApexOptions = useMemo(
-    () => ({
-      chart: {
-        type: "area",
-        height: 180,
-        toolbar: { show: false },
-        zoom: { enabled: false },
-        background: "transparent",
-      },
-      dataLabels: { enabled: false },
-      stroke: {
-        curve: "smooth",
-        width: 2,
-        colors: ["#00c2ff"],
-      },
-      fill: {
-        type: "gradient",
-        gradient: {
-          shadeIntensity: 1,
-          opacityFrom: 0.3,
-          opacityTo: 0.1,
-          stops: [0, 90, 100],
-          colorStops: [
-            { offset: 0, color: "#00c2ff", opacity: 0.4 },
-            { offset: 100, color: "#00c2ff", opacity: 0 },
-          ],
-        },
-      },
-      grid: { show: false },
-      xaxis: {
-        type: "datetime",
-        categories: portfolioHistory.dates,
-        labels: { show: false },
-        axisBorder: { show: false },
-        axisTicks: { show: false },
-      },
-      yaxis: { labels: { show: false } },
-      tooltip: {
-        x: { format: "yyyy-MM-dd" },
-        y: { formatter: (value) => `$${value.toFixed(2)}` },
-        theme: "dark",
-      },
-      theme: { mode: "dark" },
-    }),
-    [portfolioHistory]
+  // Categorize positions using allPositions instead of poolPositions
+  const categorizedPositions = useMemo(
+    () => categorizePositions(allPositions),
+    [allPositions]
   );
+
+  // Calculate category counts
+  const lpPoolsCount = categorizedPositions.lpPools.length;
+  const vaultsCount = categorizedPositions.vaults.length;
+  const farmsCount = categorizedPositions.farms.length;
+  const lendingCount = categorizedPositions.lending.length;
+  const stakingCount = categorizedPositions.staking.length;
+  const totalCount = allPositions.length;
+
+  // Helper to get visible positions based on active tab
+  const getVisiblePositions = (): PoolGroup[] => {
+    switch (activeTab) {
+      case "lp-pools":
+        return categorizedPositions.lpPools;
+      case "vaults":
+        return categorizedPositions.vaults;
+      case "farms":
+        return categorizedPositions.farms;
+      case "lending":
+        return categorizedPositions.lending;
+      case "staking":
+        return categorizedPositions.staking;
+      default:
+        return allPositions;
+    }
+  };
+
+  const visiblePositions = getVisiblePositions();
 
   return (
     <div className="portfolio-page">
       <div className="content-container">
-        {/* Updated navigation bar to match the other pages */}
-        <div className="main-navigation">
-          <Link to="/pools" className="nav-link">
-            Pools
-          </Link>
-          <Link to="/positions" className="nav-link">
-            My Positions
-          </Link>
-          <Link to="/portfolio" className="nav-link active">
-            Portfolio
-          </Link>
-          <Link to="/pools?tab=vaults" className="nav-link">
-            Vaults
-          </Link>
-        </div>
-
         {error ? (
           <div className="empty-state">
             <div className="empty-icon">⚠️</div>
@@ -813,7 +1271,7 @@ function Portfolio() {
             <div className="spinner"></div>
             <div className="loading-text">Loading portfolio...</div>
           </div>
-        ) : !portfolioData && !scallopData ? (
+        ) : !portfolioData && !scallopData && walletTokens.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
             <h3>No Portfolio Data</h3>
@@ -826,127 +1284,93 @@ function Portfolio() {
           <>
             <div className="portfolio-header">
               <h2>Your Portfolio</h2>
-              <div className="portfolio-summary">
-                <div className="portfolio-value-section">
-                  <div className="total-value">
-                    <span className="value-label">Total Value</span>
-                    <span className="value-amount">
-                      ${portfolioData?.totalValue.toFixed(2) || "0.00"}
-                    </span>
-                    <div
-                      className={`value-change ${
-                        portfolioChange24h.value >= 0 ? "positive" : "negative"
-                      }`}
-                    >
-                      <span className="change-icon">
-                        {portfolioChange24h.value >= 0 ? (
-                          <FaCaretUp />
-                        ) : (
-                          <FaCaretDown />
-                        )}
-                      </span>
-                      <span className="change-amount">
-                        ${Math.abs(portfolioChange24h.value).toFixed(2)}
-                      </span>
-                      <span className="change-percent">
-                        {portfolioChange24h.percent.toFixed(2)}%
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="chart-controls">
-                    <div className="timeframe-selector">
-                      <button
-                        className={selectedTimeframe === "7d" ? "active" : ""}
-                        onClick={() => setSelectedTimeframe("7d")}
-                      >
-                        7D
-                      </button>
-                      <button
-                        className={selectedTimeframe === "30d" ? "active" : ""}
-                        onClick={() => setSelectedTimeframe("30d")}
-                      >
-                        30D
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="portfolio-chart">
-                    <ReactApexChart
-                      options={chartOptions}
-                      series={[
-                        {
-                          name: "Portfolio Value",
-                          data: portfolioHistory.values,
-                        },
-                      ]}
-                      type="area"
-                      height={180}
-                    />
-                  </div>
-                </div>
-
-                <div className="wallet-section">
-                  {walletTokens && walletTokens.length > 0 && (
-                    <WalletTokensDropdown walletTokens={walletTokens} />
-                  )}
-                </div>
-              </div>
+              {/* Charts Row - All Three Charts */}
+              {(portfolioHistory.dates.length > 0 ||
+                allPositions.length > 0 ||
+                walletTokens.length > 0) && (
+                <PortfolioChartsRow
+                  portfolioHistory={portfolioHistory}
+                  portfolioChange24h={portfolioChange24h}
+                  allPositions={allPositions}
+                  categorizedPositions={categorizedPositions}
+                  walletTokens={walletTokens}
+                  selectedTimeframe={selectedTimeframe}
+                  setSelectedTimeframe={setSelectedTimeframe}
+                />
+              )}
             </div>
 
-            {/* Scallop Section */}
-            {scallopData && <ScallopSummary scallopData={scallopData} />}
-
+            {/* Position Sections Tabs */}
             <div className="positions-section">
-              <h3>
-                Your Positions{" "}
-                <span className="positions-count">
-                  ({poolPositions.length})
-                </span>
-              </h3>
+              <div className="section-tabs">
+                <button
+                  className={`section-tab ${
+                    activeTab === "all" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("all")}
+                >
+                  All <span className="tab-count">{totalCount}</span>
+                </button>
 
-              {poolPositions.length > 0 ? (
-                <div className="positions-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Protocol</th>
-                        <th>Position</th>
-                        <th>Value</th>
-                        <th>APR</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {poolPositions.map((position: any, idx: number) => (
-                        <tr key={`position-${idx}`}>
-                          <td>
-                            <ProtocolBadge
-                              protocol={position.protocol}
-                              protocolClass={position.protocol
-                                .toLowerCase()
-                                .replace(/[-\s]/g, "")}
-                              isVault={isVaultPool(position)}
-                            />
-                          </td>
-                          <td>
-                            <PoolPair
-                              tokenASymbol={position.tokenASymbol}
-                              tokenBSymbol={position.tokenBSymbol}
-                              tokenAAddress={position.tokenA}
-                              tokenBAddress={position.tokenB}
-                            />
-                          </td>
-                          <td>${position.totalValueUsd.toFixed(2)}</td>
-                          <td>{position.apr.toFixed(2)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <button
+                  className={`section-tab ${
+                    activeTab === "lp-pools" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("lp-pools")}
+                >
+                  LP Pools <span className="tab-count">{lpPoolsCount}</span>
+                </button>
+
+                <button
+                  className={`section-tab ${
+                    activeTab === "vaults" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("vaults")}
+                >
+                  Vaults <span className="tab-count">{vaultsCount}</span>
+                </button>
+
+                <button
+                  className={`section-tab ${
+                    activeTab === "farms" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("farms")}
+                >
+                  Farms <span className="tab-count">{farmsCount}</span>
+                </button>
+
+                <button
+                  className={`section-tab ${
+                    activeTab === "lending" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("lending")}
+                >
+                  Lending <span className="tab-count">{lendingCount}</span>
+                </button>
+
+                <button
+                  className={`section-tab ${
+                    activeTab === "staking" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("staking")}
+                >
+                  Staking <span className="tab-count">{stakingCount}</span>
+                </button>
+              </div>
+
+              {visiblePositions.length > 0 ? (
+                <div className="positions-grid">
+                  {visiblePositions.map((position, idx) => (
+                    <PositionCard key={`position-${idx}`} position={position} />
+                  ))}
                 </div>
               ) : (
                 <div className="empty-positions">
                   <p>
-                    No positions found. Start by adding liquidity to a pool.
+                    {activeTab === "all"
+                      ? "No positions found. Start by adding liquidity to a pool."
+                      : `No ${activeTab.replace("-", " ")} positions found.`}
                   </p>
                   <Link to="/pools" className="btn btn--primary">
                     Explore Pools
@@ -954,6 +1378,11 @@ function Portfolio() {
                 </div>
               )}
             </div>
+
+            {/* Wallet Assets Section - Now moved to the bottom */}
+            {walletTokens && walletTokens.length > 0 && (
+              <WalletAssetsSection walletTokens={walletTokens} />
+            )}
           </>
         )}
       </div>
@@ -961,30 +1390,6 @@ function Portfolio() {
         .portfolio-page {
           color: #fff;
           padding: 20px 0;
-        }
-
-        .main-navigation {
-          display: flex;
-          margin-bottom: 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .nav-link {
-          padding: 12px 24px;
-          font-size: 16px;
-          color: #787f92;
-          text-decoration: none;
-          border-bottom: 2px solid transparent;
-          transition: all 0.2s;
-        }
-
-        .nav-link:hover {
-          color: #a0a7b8;
-        }
-
-        .nav-link.active {
-          color: #fff;
-          border-bottom: 2px solid #00c2ff;
         }
 
         .portfolio-header {
@@ -996,44 +1401,106 @@ function Portfolio() {
           margin-bottom: 16px;
         }
 
-        .portfolio-summary {
+        /* Portfolio Charts Row Styles */
+        .portfolio-charts-row {
           display: flex;
-          gap: 24px;
-          margin-bottom: 32px;
+          gap: 16px;
+          margin-bottom: 24px;
         }
 
-        .portfolio-value-section {
+        .chart-box {
           flex: 1;
+          min-width: 0;
           background: rgba(20, 30, 48, 0.6);
           border-radius: 12px;
-          padding: 20px;
           border: 1px solid rgba(255, 255, 255, 0.05);
+          padding: 16px;
           display: flex;
           flex-direction: column;
         }
 
-        .total-value {
-          margin-bottom: 16px;
+        .chart-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 8px;
         }
 
-        .value-label {
+        .chart-header h3 {
+          font-size: 16px;
+          font-weight: 500;
+          margin: 0;
+        }
+
+        .chart-content {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .chart-content-with-legend {
+          display: flex;
+          align-items: center;
+        }
+
+        .chart-donut {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .chart-legend-vertical {
+          width: 100px;
+          padding-left: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-top: -20px; /* Move up a bit to align with the chart */
+        }
+
+        .chart-container {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .chart-total-value {
           font-size: 14px;
-          color: #a0a7b8;
-          display: block;
-          margin-bottom: 4px;
+          font-weight: 600;
+          color: #00c2ff;
         }
 
-        .value-amount {
-          font-size: 28px;
-          font-weight: 600;
-          display: block;
-          margin-bottom: 4px;
+        .chart-legend {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          font-size: 12px;
+        }
+
+        .legend-color {
+          width: 12px;
+          height: 12px;
+          border-radius: 2px;
+          margin-right: 4px;
+        }
+
+        .legend-more {
+          font-size: 12px;
+          color: #a0a7b8;
         }
 
         .value-change {
           display: flex;
           align-items: center;
           font-size: 14px;
+          margin-top: 4px;
         }
 
         .value-change.positive {
@@ -1057,7 +1524,6 @@ function Portfolio() {
         .chart-controls {
           display: flex;
           justify-content: flex-end;
-          margin-bottom: 8px;
         }
 
         .timeframe-selector {
@@ -1082,244 +1548,195 @@ function Portfolio() {
           color: #00c2ff;
         }
 
-        .portfolio-chart {
-          flex: 1;
-          min-height: 180px;
-        }
-
-        .wallet-section {
-          width: 350px;
-        }
-
-        .wallet-dropdown {
+        /* Wallet Assets Section */
+        .wallet-assets-section {
+          margin-top: 32px;
+          margin-bottom: 24px;
           background: rgba(20, 30, 48, 0.6);
           border-radius: 12px;
           border: 1px solid rgba(255, 255, 255, 0.05);
-          overflow: hidden;
+          padding: 20px;
         }
 
-        .wallet-header {
-          padding: 16px;
+        .section-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          cursor: pointer;
-          transition: background-color 0.2s;
+          margin-bottom: 16px;
         }
 
-        .wallet-header:hover {
-          background: rgba(255, 255, 255, 0.05);
+        .section-header h3 {
+          font-size: 18px;
+          font-weight: 500;
+          margin: 0;
         }
 
-        .wallet-title {
+        .total-value {
+          font-size: 16px;
+          font-weight: 600;
+          color: #00c2ff;
+        }
+
+        .wallet-assets-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 16px;
+        }
+
+        .wallet-asset-card {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 10px;
+          padding: 12px;
+          transition: all 0.2s;
+        }
+
+        .wallet-asset-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .asset-header {
           display: flex;
           align-items: center;
+          margin-bottom: 8px;
         }
 
-        .wallet-icon {
-          margin-right: 12px;
-          font-size: 20px;
+        .asset-symbol {
+          margin-left: 8px;
+          font-weight: 500;
+          font-size: 16px;
         }
 
-        .wallet-name {
-          font-size: 14px;
-          color: #a0a7b8;
+        .asset-details {
+          margin-top: 8px;
+        }
+
+        .asset-balance {
+          font-weight: 500;
+          font-size: 15px;
           margin-bottom: 4px;
         }
 
-        .wallet-value {
-          font-size: 18px;
-          font-weight: 600;
-        }
-
-        .dropdown-arrow {
-          transition: transform 0.3s ease;
-        }
-
-        .dropdown-arrow.open {
-          transform: rotate(180deg);
-        }
-
-        .wallet-content {
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .wallet-tokens {
-          max-height: 300px;
-          overflow-y: auto;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
-        }
-
-        .wallet-tokens::-webkit-scrollbar {
-          width: 8px;
-        }
-
-        .wallet-tokens::-webkit-scrollbar-thumb {
-          background-color: rgba(255, 255, 255, 0.1);
-          border-radius: 4px;
-        }
-
-        .wallet-tokens::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .wallet-token-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 16px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        }
-
-        .token-info {
-          display: flex;
-          align-items: center;
-        }
-
-        .token-symbol {
-          margin-left: 8px;
-          font-weight: 500;
-          color: #00c2ff;
-        }
-
-        .token-details {
-          text-align: right;
-        }
-
-        .token-balance {
+        .asset-value {
+          color: #a0a7b8;
           font-size: 14px;
-          text-align: right;
-          margin-bottom: 2px;
         }
 
-        .token-value {
-          font-size: 14px;
-          font-weight: 500;
+        .view-all-container {
+          margin-top: 16px;
+          text-align: center;
         }
 
         .view-all-btn {
-          width: 100%;
-          padding: 12px;
-          background: transparent;
+          background: none;
           border: none;
           color: #00c2ff;
           cursor: pointer;
-          font-weight: 500;
-          transition: background 0.2s;
+          font-size: 14px;
+          padding: 8px 16px;
+          border-radius: 4px;
+          transition: background-color 0.2s;
         }
 
         .view-all-btn:hover {
+          background-color: rgba(0, 194, 255, 0.1);
+        }
+
+        /* Section Tabs */
+        .section-tabs {
+          display: flex;
+          overflow-x: auto;
+          margin-bottom: 20px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section-tab {
+          background: none;
+          border: none;
+          padding: 12px 16px;
+          color: #a0a7b8;
+          font-size: 15px;
+          cursor: pointer;
+          border-bottom: 2px solid transparent;
+          transition: all 0.2s;
+          white-space: nowrap;
+          position: relative;
+        }
+
+        .section-tab:hover {
+          color: #d0d7e8;
+        }
+
+        .section-tab.active {
+          color: #00c2ff;
+          border-bottom: 2px solid #00c2ff;
+        }
+
+        .tab-count {
+          font-size: 12px;
           background: rgba(0, 194, 255, 0.1);
+          padding: 2px 6px;
+          border-radius: 10px;
+          margin-left: 6px;
         }
 
         .positions-section {
           margin-bottom: 24px;
         }
 
-        .positions-section h3 {
-          font-size: 18px;
-          margin-bottom: 16px;
-          display: flex;
-          align-items: center;
+        .positions-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 16px;
         }
 
-        .positions-count {
-          font-size: 14px;
-          color: #a0a7b8;
-          margin-left: 8px;
-          font-weight: normal;
-        }
-
-        .positions-table {
+        .position-card {
           background: rgba(20, 30, 48, 0.6);
           border-radius: 12px;
           border: 1px solid rgba(255, 255, 255, 0.05);
           overflow: hidden;
+          transition: all 0.2s;
         }
 
-        table {
-          width: 100%;
-          border-collapse: collapse;
+        .position-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+          border: 1px solid rgba(0, 194, 255, 0.2);
         }
 
-        table th {
-          text-align: left;
-          padding: 12px 16px;
-          font-size: 14px;
+        .position-card-header {
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .position-card-stats {
+          padding: 16px;
+          display: flex;
+          justify-content: space-between;
+        }
+
+        .stat {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .stat-label {
+          font-size: 13px;
           color: #a0a7b8;
+          margin-bottom: 4px;
+        }
+
+        .stat-value {
+          font-size: 16px;
           font-weight: 500;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        table td {
-          padding: 12px 16px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        table tr:last-child td {
-          border-bottom: none;
-        }
-
-        /* Token Icon Styles */
-        .token-icon {
+        .protocol-badge {
           display: flex;
           align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
-          min-width: 24px;
-          min-height: 24px;
-          border-radius: 50%;
-          overflow: hidden;
-          background: #141e30;
-        }
-
-        .token-icon img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .token-icon-sm {
-          width: 24px;
-          height: 24px;
-        }
-
-        .token-icon-md {
-          width: 32px;
-          height: 32px;
-        }
-
-        .token-icon-lg {
-          width: 48px;
-          height: 48px;
-        }
-
-        .token-letter {
-          font-weight: bold;
-          font-size: 12px;
-          color: #fff;
-        }
-
-        .token-icons {
-          display: flex;
-          align-items: center;
-        }
-
-        .second-token {
-          margin-left: -8px;
-          z-index: 1;
-        }
-
-        .portfolio-pair {
-          display: flex;
-          align-items: center;
-        }
-
-        .pair-name {
-          margin-left: 16px;
-          font-weight: 500;
         }
 
         .empty-positions {
@@ -1400,203 +1817,132 @@ function Portfolio() {
           background-color: #33cfff;
         }
 
-        /* Scallop Summary Styles */
-        .scallop-summary-container {
-          background: rgba(20, 30, 48, 0.6);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 20px;
-          margin-bottom: 24px;
-        }
-
-        .scallop-header {
+        /* Token Icon Styles */
+        .token-icon {
           display: flex;
           align-items: center;
-          margin-bottom: 16px;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          min-width: 24px;
+          min-height: 24px;
+          border-radius: 50%;
+          overflow: hidden;
+          background: #141e30;
         }
 
-        .protocol-icon {
-          margin-right: 12px;
+        .token-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
 
-        .scallop-stats {
-          display: flex;
-          gap: 20px;
-          margin-bottom: 16px;
-          flex-wrap: wrap;
+        .token-icon-sm {
+          width: 24px;
+          height: 24px;
         }
 
-        .stat-item {
-          display: flex;
-          flex-direction: column;
-          min-width: 150px;
+        .token-icon-md {
+          width: 32px;
+          height: 32px;
         }
 
-        .stat-label {
-          font-size: 14px;
-          color: #a0a7b8;
-          margin-bottom: 4px;
+        .token-icon-lg {
+          width: 48px;
+          height: 48px;
         }
 
-        .stat-value {
-          font-size: 18px;
-          font-weight: 500;
-        }
-
-        .scallop-rewards {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 8px;
-          padding: 12px;
-          margin-bottom: 16px;
-        }
-
-        .scallop-rewards h4 {
-          margin-bottom: 8px;
-          color: #eb6662;
-        }
-
-        .rewards-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-        }
-
-        .reward-item {
-          display: flex;
-          align-items: center;
-          background: rgba(0, 0, 0, 0.2);
-          padding: 8px;
-          border-radius: 6px;
-        }
-
-        .reward-item .token-icon {
-          margin-right: 8px;
-        }
-
-        .reward-amount {
-          font-weight: 500;
-          margin-right: 8px;
-        }
-
-        .reward-value {
-          color: #a0a7b8;
+        .token-letter {
+          font-weight: bold;
           font-size: 12px;
+          color: #fff;
         }
 
-        .scallop-positions {
-          margin-top: 16px;
-        }
-
-        .position-section h4 {
-          padding-bottom: 8px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          margin-bottom: 12px;
-        }
-
-        .positions-list {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 12px;
-        }
-
-        .position-item {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 8px;
-          padding: 12px;
+        .token-icons {
           display: flex;
           align-items: center;
         }
 
-        .position-token {
+        .second-token {
+          margin-left: -8px;
+          z-index: 1;
+        }
+
+        .portfolio-pair {
           display: flex;
           align-items: center;
-          margin-right: 12px;
-          min-width: 80px;
         }
 
-        .position-token .token-icon {
-          margin-right: 8px;
-        }
-
-        .position-details {
-          flex: 1;
-        }
-
-        .position-amount {
+        .pair-name {
+          margin-left: 16px;
           font-weight: 500;
         }
 
-        .position-value {
-          color: #a0a7b8;
-          font-size: 12px;
+        /* Responsive design */
+        @media (max-width: 1200px) {
+          .portfolio-charts-row {
+            flex-wrap: wrap;
+          }
+
+          .chart-box {
+            min-width: calc(50% - 8px);
+            flex: 1 1 calc(50% - 8px);
+          }
+
+          .portfolio-value-chart {
+            flex-basis: 100%;
+            margin-bottom: 16px;
+          }
+
+          .chart-content-with-legend {
+            flex-direction: column;
+          }
+
+          .chart-legend-vertical {
+            width: 100%;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 8px;
+            padding-left: 0;
+          }
         }
 
-        .position-apy {
-          color: #00c48c;
-          font-size: 12px;
-          font-weight: 500;
+        @media (max-width: 768px) {
+          .portfolio-charts-row {
+            flex-direction: column;
+          }
+
+          .chart-box {
+            width: 100%;
+            margin-bottom: 16px;
+          }
+
+          .positions-grid,
+          .wallet-assets-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          }
+
+          .section-tabs {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 5px;
+          }
+
+          .section-tab {
+            padding: 8px 12px;
+            font-size: 14px;
+          }
+
+          .chart-legend-vertical .legend-item {
+            margin-bottom: 4px;
+          }
         }
 
-        .obligation-item {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 8px;
-          padding: 16px;
-          margin-bottom: 16px;
-        }
-
-        .obligation-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-
-        .obligation-id {
-          font-weight: 500;
-        }
-
-        .risk-level {
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 12px;
-          background: rgba(0, 0, 0, 0.2);
-        }
-
-        .collateral-list h5,
-        .borrowed-list h5 {
-          margin-bottom: 8px;
-          font-size: 14px;
-          color: #a0a7b8;
-        }
-
-        .collateral-item,
-        .borrow-item {
-          display: flex;
-          align-items: center;
-          margin-bottom: 8px;
-          padding: 8px;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 6px;
-        }
-
-        .collateral-item .token-icon,
-        .borrow-item .token-icon {
-          margin-right: 8px;
-        }
-
-        .item-value {
-          margin-left: auto;
-          font-weight: 500;
-        }
-
-        .borrow-rate {
-          margin-left: 10px;
-          color: #ff5252;
-          font-size: 12px;
-        }
-
-        .borrowed-list {
-          margin-top: 16px;
+        @media (max-width: 480px) {
+          .wallet-assets-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>
