@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-06-26 20:38:56 UTC by jake1318
+// Last Updated: 2025-07-07 03:33:15 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -47,6 +47,7 @@ const SUPPORTED_PROTOCOLS = [
   "unihouse",
   "alphafi",
   "bluefin",
+  "haedal", // Added Haedal protocol support
 ];
 
 export interface AccountCoin {
@@ -738,6 +739,318 @@ function processSuilendData(rawSuilendData: any): PoolGroup[] {
 }
 
 /**
+ * Process raw Haedal position data into standardized PoolGroup format
+ * @param rawHaedalData Raw Haedal data from BlockVision API
+ * @returns Processed PoolGroup[] for Haedal positions
+ */
+function processHaedalData(rawHaedalData: any): PoolGroup[] {
+  console.log("Processing Haedal data:", rawHaedalData);
+
+  if (!rawHaedalData) {
+    console.log("No valid Haedal data found");
+    return [];
+  }
+
+  const poolGroups: PoolGroup[] = [];
+
+  // Process LP positions
+  if (
+    rawHaedalData.lps &&
+    Array.isArray(rawHaedalData.lps) &&
+    rawHaedalData.lps.length > 0
+  ) {
+    console.log(`Found ${rawHaedalData.lps.length} Haedal LP positions`);
+
+    // Group positions by pool ID to create pool groups
+    const positionsByPool: Record<string, any[]> = {};
+
+    // First, organize positions by pool
+    for (const lp of rawHaedalData.lps) {
+      if (!lp.poolId) continue;
+
+      if (!positionsByPool[lp.poolId]) {
+        positionsByPool[lp.poolId] = [];
+      }
+      positionsByPool[lp.poolId].push(lp);
+    }
+
+    // Create pool groups from the grouped positions
+    for (const [poolId, positions] of Object.entries(positionsByPool)) {
+      if (!positions.length) continue;
+
+      // Use the first position to get pool metadata
+      const firstPosition = positions[0];
+      const tokenASymbol = getSymbolFromType(firstPosition.coinTypeA);
+      const tokenBSymbol = getSymbolFromType(firstPosition.coinTypeB);
+
+      // Create normalized positions for this pool
+      const normalizedPositions: NormalizedPosition[] = positions.map((pos) => {
+        return {
+          id: `haedal-lp-${poolId}`,
+          liquidity: "0",
+          balanceA: pos.balanceA || "0",
+          balanceB: pos.balanceB || "0",
+          valueUsd: 0, // Will be calculated later with token prices
+          isOutOfRange: false, // Not applicable for Haedal
+          positionType: "haedal-lp",
+          raw: pos,
+        };
+      });
+
+      // Create the pool group
+      poolGroups.push({
+        poolAddress: poolId,
+        poolName: `${tokenASymbol}/${tokenBSymbol}`,
+        protocol: "Haedal",
+        positions: normalizedPositions,
+        totalLiquidity: 0, // Will be calculated later
+        totalValueUsd: 0, // Will be calculated later with token prices
+        apr: 0, // Haedal may not provide APR directly
+        tokenA: firstPosition.coinTypeA || "",
+        tokenB: firstPosition.coinTypeB || "",
+        tokenASymbol,
+        tokenBSymbol,
+        tokenAAddress: firstPosition.coinTypeA,
+        tokenBAddress: firstPosition.coinTypeB,
+      });
+    }
+  }
+
+  // Process staking positions if they exist
+  if (
+    rawHaedalData.stakings &&
+    Array.isArray(rawHaedalData.stakings) &&
+    rawHaedalData.stakings.length > 0
+  ) {
+    console.log(
+      `Found ${rawHaedalData.stakings.length} Haedal staking positions`
+    );
+
+    for (const staking of rawHaedalData.stakings) {
+      if (!staking.coinType) continue;
+
+      const tokenSymbol = getSymbolFromType(staking.coinType);
+
+      const position: NormalizedPosition = {
+        id: `haedal-staking-${staking.coinType}`,
+        liquidity: staking.amount || "0",
+        balanceA: staking.amount || "0",
+        balanceB: "0",
+        valueUsd: 0, // Will be calculated later
+        isOutOfRange: false,
+        positionType: "haedal-staking",
+        raw: staking,
+      };
+
+      poolGroups.push({
+        poolAddress: `haedal-staking-${staking.coinType}`,
+        poolName: `${tokenSymbol} Staking`,
+        protocol: "Haedal",
+        positions: [position],
+        totalLiquidity: 0,
+        totalValueUsd: 0,
+        apr: staking.apr ? parseFloat(staking.apr) : 0,
+        tokenA: staking.coinType,
+        tokenB: "",
+        tokenASymbol: tokenSymbol,
+        tokenBSymbol: "",
+      });
+    }
+  }
+
+  console.log(`Created ${poolGroups.length} Haedal pool groups`);
+  return poolGroups;
+}
+
+/**
+ * Process raw Aftermath position data into standardized PoolGroup format
+ * @param rawAftermathData Raw Aftermath data from BlockVision API
+ * @returns Processed PoolGroup[] for Aftermath positions
+ */
+function processAftermathData(rawAftermathData: any): PoolGroup[] {
+  console.log("Processing Aftermath data:", rawAftermathData);
+
+  if (!rawAftermathData) {
+    console.log("No valid Aftermath data found");
+    return [];
+  }
+
+  const poolGroups: PoolGroup[] = [];
+
+  // Process LP positions
+  if (
+    rawAftermathData.lpPositions &&
+    Array.isArray(rawAftermathData.lpPositions) &&
+    rawAftermathData.lpPositions.length > 0
+  ) {
+    console.log(
+      `Found ${rawAftermathData.lpPositions.length} Aftermath LP positions`
+    );
+
+    // Group positions by pool ID
+    const positionsByPool: Record<string, any[]> = {};
+
+    for (const lp of rawAftermathData.lpPositions) {
+      if (!lp.poolId) continue;
+
+      if (!positionsByPool[lp.poolId]) {
+        positionsByPool[lp.poolId] = [];
+      }
+      positionsByPool[lp.poolId].push(lp);
+    }
+
+    // Create pool groups for LP positions
+    for (const [poolId, positions] of Object.entries(positionsByPool)) {
+      if (!positions.length) continue;
+
+      // Extract token information from the first position
+      const firstPosition = positions[0];
+
+      // Find token A and token B from the coins array
+      let tokenA = "",
+        tokenB = "",
+        tokenASymbol = "",
+        tokenBSymbol = "";
+
+      if (
+        firstPosition.coins &&
+        Array.isArray(firstPosition.coins) &&
+        firstPosition.coins.length >= 2
+      ) {
+        tokenA = firstPosition.coins[0]?.coinType || "";
+        tokenB = firstPosition.coins[1]?.coinType || "";
+
+        tokenASymbol = getSymbolFromType(tokenA);
+        tokenBSymbol = getSymbolFromType(tokenB);
+      }
+
+      // Create normalized position
+      const normalizedPosition: NormalizedPosition = {
+        id: `aftermath-lp-${poolId}`,
+        liquidity: "0",
+        balanceA: firstPosition.coins?.[0]?.amount || "0",
+        balanceB: firstPosition.coins?.[1]?.amount || "0",
+        valueUsd: 0, // Will be calculated later
+        isOutOfRange: false, // Not applicable for Aftermath
+        positionType: "aftermath-lp",
+        raw: firstPosition,
+      };
+
+      // Add the pool group
+      poolGroups.push({
+        poolAddress: poolId,
+        poolName: `${tokenASymbol}/${tokenBSymbol}`,
+        protocol: "Aftermath",
+        positions: [normalizedPosition],
+        totalLiquidity: 0, // Will be calculated later
+        totalValueUsd: 0, // Will be calculated later
+        apr: 0, // Not directly available
+        tokenA,
+        tokenB,
+        tokenASymbol,
+        tokenBSymbol,
+      });
+    }
+  }
+
+  // Process farm positions
+  if (
+    rawAftermathData.farmPositions &&
+    Array.isArray(rawAftermathData.farmPositions) &&
+    rawAftermathData.farmPositions.length > 0
+  ) {
+    console.log(
+      `Found ${rawAftermathData.farmPositions.length} Aftermath Farm positions`
+    );
+
+    // Group positions by pool ID
+    const farmsByPool: Record<string, any[]> = {};
+
+    for (const farm of rawAftermathData.farmPositions) {
+      if (!farm.poolId) continue;
+
+      if (!farmsByPool[farm.poolId]) {
+        farmsByPool[farm.poolId] = [];
+      }
+      farmsByPool[farm.poolId].push(farm);
+    }
+
+    // Create pool groups for farm positions
+    for (const [poolId, farms] of Object.entries(farmsByPool)) {
+      if (!farms.length) continue;
+
+      // Extract token information from the first position
+      const firstFarm = farms[0];
+
+      // Find token A and token B from the coins array
+      let tokenA = "",
+        tokenB = "",
+        tokenASymbol = "",
+        tokenBSymbol = "";
+
+      if (
+        firstFarm.coins &&
+        Array.isArray(firstFarm.coins) &&
+        firstFarm.coins.length >= 2
+      ) {
+        tokenA = firstFarm.coins[0]?.coinType || "";
+        tokenB = firstFarm.coins[1]?.coinType || "";
+
+        tokenASymbol = getSymbolFromType(tokenA);
+        tokenBSymbol = getSymbolFromType(tokenB);
+      }
+
+      // Extract reward information
+      const rewards: RewardInfo[] = [];
+
+      if (firstFarm.rewards && Array.isArray(firstFarm.rewards)) {
+        for (const reward of firstFarm.rewards) {
+          rewards.push({
+            tokenSymbol: getSymbolFromType(reward.coinType),
+            tokenAddress: reward.coinType,
+            amount: reward.amount || "0",
+            formatted: "0", // Will be calculated during enrichment
+            valueUsd: 0,
+            decimals: 9, // Default
+          });
+        }
+      }
+
+      // Create normalized position
+      const normalizedPosition: NormalizedPosition = {
+        id: `aftermath-farm-${poolId}`,
+        liquidity: "0",
+        balanceA: firstFarm.coins?.[0]?.amount || "0",
+        balanceB: firstFarm.coins?.[1]?.amount || "0",
+        valueUsd: 0, // Will be calculated later
+        isOutOfRange: false, // Not applicable for Aftermath
+        positionType: "aftermath-farm",
+        rewards,
+        raw: firstFarm,
+      };
+
+      // Add the pool group
+      poolGroups.push({
+        poolAddress: poolId,
+        poolName: `${tokenASymbol}/${tokenBSymbol} Farm`,
+        protocol: "Aftermath",
+        positions: [normalizedPosition],
+        totalLiquidity: 0, // Will be calculated later
+        totalValueUsd: 0, // Will be calculated later
+        apr: 0, // Not directly available
+        tokenA,
+        tokenB,
+        tokenASymbol,
+        tokenBSymbol,
+      });
+    }
+  }
+
+  console.log(`Created ${poolGroups.length} Aftermath pool groups`);
+  return poolGroups;
+}
+
+/**
  * Process and extract Cetus vault data from BlockVision API response
  *
  * @param rawData Raw response data from BlockVision API
@@ -790,7 +1103,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑06‑24 06:34:16 UTC by jake1318
+//  last‑updated: 2025‑07‑07 03:33:15 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1015,7 +1328,7 @@ export const blockvisionService = {
    * @param address Wallet address to get Scallop data for
    * @returns Processed pool groups for Scallop positions
    */
-  getScallopPortfolioData: async (address: string): Promise<PoolGroup[]> => {
+  getScallopPortfolioData: async (address: string): Promise<any> => {
     try {
       console.log(`Fetching Scallop data for: ${address}`);
 
@@ -1030,166 +1343,8 @@ export const blockvisionService = {
       const { code, result } = response.data;
       console.log(`BlockVision API response code for Scallop: ${code}`);
 
-      if (code === 200 && result) {
-        // Process the raw Scallop data
-        const poolGroups: PoolGroup[] = [];
-
-        if (result.scallop) {
-          // Process deposits
-          if (
-            result.scallop.deposits &&
-            Array.isArray(result.scallop.deposits)
-          ) {
-            const deposits = result.scallop.deposits;
-
-            // Group deposits by token
-            const depositsByToken: Record<string, any[]> = {};
-            for (const deposit of deposits) {
-              const coinType = deposit.coinType;
-              if (!coinType) continue;
-
-              if (!depositsByToken[coinType]) {
-                depositsByToken[coinType] = [];
-              }
-              depositsByToken[coinType].push(deposit);
-            }
-
-            // Create a pool group for each token type
-            for (const [coinType, tokenDeposits] of Object.entries(
-              depositsByToken
-            )) {
-              if (!tokenDeposits.length) continue;
-
-              // Get token info for this deposit
-              const tokenInfo = await blockvisionService.getTokenInfo(coinType);
-
-              // Create positions for each deposit
-              const positions: NormalizedPosition[] = tokenDeposits.map(
-                (deposit, index) => {
-                  // Convert raw amounts to normalized values
-                  const rawAmount = deposit.amount || "0";
-                  const normalizedAmount = normalizeAmount(
-                    rawAmount,
-                    tokenInfo.decimals
-                  );
-                  const valueUsd = normalizedAmount * (tokenInfo.price || 0);
-
-                  return {
-                    id: `scallop-deposit-${coinType}-${index}`,
-                    liquidity: rawAmount,
-                    balanceA: rawAmount,
-                    balanceB: "0",
-                    formattedBalanceA: formatTokenAmount(normalizedAmount),
-                    formattedBalanceB: "0",
-                    valueUsd: valueUsd,
-                    isOutOfRange: false,
-                    positionType: "scallop-deposit",
-                    raw: deposit,
-                  };
-                }
-              );
-
-              // Calculate total value
-              const totalValue = positions.reduce(
-                (sum, pos) => sum + (pos.valueUsd || 0),
-                0
-              );
-
-              // Create the pool group
-              poolGroups.push({
-                poolAddress: `scallop-deposits-${coinType}`,
-                poolName: `${tokenInfo.symbol} Deposits`,
-                protocol: "Scallop",
-                positions: positions,
-                totalLiquidity: 0,
-                totalValueUsd: totalValue,
-                apr: parseFloat(tokenDeposits[0]?.apy || "0"),
-                tokenA: coinType,
-                tokenB: "",
-                tokenASymbol: tokenInfo.symbol,
-                tokenBSymbol: "",
-                tokenALogo: tokenInfo.logo,
-              });
-            }
-          }
-
-          // Process borrows
-          if (result.scallop.borrows && Array.isArray(result.scallop.borrows)) {
-            const borrows = result.scallop.borrows;
-
-            // Group borrows by token
-            const borrowsByToken: Record<string, any[]> = {};
-            for (const borrow of borrows) {
-              const coinType = borrow.coinType;
-              if (!coinType) continue;
-
-              if (!borrowsByToken[coinType]) {
-                borrowsByToken[coinType] = [];
-              }
-              borrowsByToken[coinType].push(borrow);
-            }
-
-            // Create a pool group for each token type
-            for (const [coinType, tokenBorrows] of Object.entries(
-              borrowsByToken
-            )) {
-              if (!tokenBorrows.length) continue;
-
-              // Get token info for this borrow
-              const tokenInfo = await blockvisionService.getTokenInfo(coinType);
-
-              // Create positions for each borrow
-              const positions: NormalizedPosition[] = tokenBorrows.map(
-                (borrow, index) => {
-                  // Convert raw amounts to normalized values
-                  const rawAmount = borrow.amount || "0";
-                  const normalizedAmount = normalizeAmount(
-                    rawAmount,
-                    tokenInfo.decimals
-                  );
-                  const valueUsd = normalizedAmount * (tokenInfo.price || 0);
-
-                  return {
-                    id: `scallop-borrow-${coinType}-${index}`,
-                    liquidity: rawAmount,
-                    balanceA: rawAmount,
-                    balanceB: "0",
-                    formattedBalanceA: formatTokenAmount(normalizedAmount),
-                    formattedBalanceB: "0",
-                    valueUsd: valueUsd,
-                    isOutOfRange: false,
-                    positionType: "scallop-borrow",
-                    raw: borrow,
-                  };
-                }
-              );
-
-              // Calculate total value
-              const totalValue = positions.reduce(
-                (sum, pos) => sum + (pos.valueUsd || 0),
-                0
-              );
-
-              // Create the pool group
-              poolGroups.push({
-                poolAddress: `scallop-borrows-${coinType}`,
-                poolName: `${tokenInfo.symbol} Borrows`,
-                protocol: "Scallop",
-                positions: positions,
-                totalLiquidity: 0,
-                totalValueUsd: totalValue,
-                apr: parseFloat(tokenBorrows[0]?.apy || "0"),
-                tokenA: coinType,
-                tokenB: "",
-                tokenASymbol: tokenInfo.symbol,
-                tokenBSymbol: "",
-                tokenALogo: tokenInfo.logo,
-              });
-            }
-          }
-        }
-
-        return poolGroups;
+      if (code === 200 && result && result.scallop) {
+        return result.scallop;
       } else {
         throw new Error(
           `BlockVision API returned error: ${response.data.message}`
@@ -1197,7 +1352,7 @@ export const blockvisionService = {
       }
     } catch (error) {
       console.error("Error fetching Scallop data:", error);
-      return []; // Return empty array on error instead of throwing
+      return null; // Return empty array on error instead of throwing
     }
   },
 
@@ -1336,7 +1491,37 @@ export const blockvisionService = {
         }
       }
 
-      // ─── patch START ──────────────────────────────────────────────────────�[...]
+      // Process Haedal data separately to ensure correct structure
+      if (combinedRawData.haedal) {
+        console.log("Found Haedal data, processing separately");
+        const haedalPoolGroups = processHaedalData(combinedRawData.haedal);
+
+        // Add the processed Haedal groups to the main pool groups array
+        if (haedalPoolGroups.length > 0) {
+          console.log(
+            `Adding ${haedalPoolGroups.length} Haedal pool groups to results`
+          );
+          poolGroups.push(...haedalPoolGroups);
+        }
+      }
+
+      // Process Aftermath data separately to ensure correct structure
+      if (combinedRawData.aftermath) {
+        console.log("Found Aftermath data, processing separately");
+        const aftermathPoolGroups = processAftermathData(
+          combinedRawData.aftermath
+        );
+
+        // Add the processed Aftermath groups to the main pool groups array
+        if (aftermathPoolGroups.length > 0) {
+          console.log(
+            `Adding ${aftermathPoolGroups.length} Aftermath pool groups to results`
+          );
+          poolGroups.push(...aftermathPoolGroups);
+        }
+      }
+
+      // ─── patch START ──────────────────────────────────────────────────────�[...[...]
       // Now "enrich" every poolGroup & each position with real USD values
       await Promise.all(
         poolGroups.map(async (pool) => {
@@ -1749,6 +1934,152 @@ export const blockvisionService = {
                 }
               }
             }
+          }
+
+          // Special handling for Aftermath
+          if (pool.protocol === "Aftermath") {
+            // Get token info for proper price and decimal information
+            if (pool.tokenA) {
+              tokenAInfo = await blockvisionService.getTokenInfo(pool.tokenA);
+            }
+            if (pool.tokenB) {
+              tokenBInfo = await blockvisionService.getTokenInfo(pool.tokenB);
+            }
+
+            for (const pos of pool.positions) {
+              if (pos.raw) {
+                // For each position in Aftermath, calculate value from coin amounts
+                if (pos.raw.coins && Array.isArray(pos.raw.coins)) {
+                  let totalValue = 0;
+
+                  // Process each coin in the position
+                  for (let i = 0; i < pos.raw.coins.length; i++) {
+                    const coin = pos.raw.coins[i];
+                    const coinType = coin.coinType;
+                    const amount = coin.amount || "0";
+
+                    // Get token info for this coin
+                    const tokenInfo = await blockvisionService.getTokenInfo(
+                      coinType
+                    );
+
+                    // Calculate value
+                    const normalizedAmount = normalizeAmount(
+                      amount,
+                      tokenInfo.decimals
+                    );
+                    const coinValue = normalizedAmount * (tokenInfo.price || 0);
+                    totalValue += coinValue;
+
+                    // Store formatted values
+                    if (i === 0) {
+                      pos.formattedBalanceA =
+                        formatTokenAmount(normalizedAmount);
+                    } else if (i === 1) {
+                      pos.formattedBalanceB =
+                        formatTokenAmount(normalizedAmount);
+                    }
+                  }
+
+                  pos.valueUsd = totalValue;
+                }
+
+                // Process rewards if they exist
+                if (pos.rewards && Array.isArray(pos.rewards)) {
+                  for (const reward of pos.rewards) {
+                    if (reward.tokenAddress) {
+                      const rewardTokenInfo =
+                        await blockvisionService.getTokenInfo(
+                          reward.tokenAddress
+                        );
+
+                      const normalizedAmount = normalizeAmount(
+                        reward.amount || "0",
+                        rewardTokenInfo.decimals
+                      );
+                      reward.formatted = formatTokenAmount(normalizedAmount);
+                      reward.valueUsd =
+                        normalizedAmount * (rewardTokenInfo.price || 0);
+                    }
+                  }
+                }
+              }
+            }
+
+            // Update the total values for the pool
+            pool.totalValueUsd = pool.positions.reduce(
+              (sum, p) => sum + (p.valueUsd || 0),
+              0
+            );
+
+            // Estimate APR if rewards exist
+            if (
+              pool.positions[0]?.rewards &&
+              pool.positions[0]?.rewards.length > 0
+            ) {
+              // Simple APR estimation based on rewards value vs position value
+              const rewardValue = pool.positions[0].rewards.reduce(
+                (sum, r) => sum + (r.valueUsd || 0),
+                0
+              );
+
+              if (pool.totalValueUsd > 0) {
+                // Assume rewards are weekly, annualize to get APR
+                pool.apr = (rewardValue / pool.totalValueUsd) * 52 * 100;
+              }
+            }
+          }
+
+          // Special handling for Haedal
+          if (pool.protocol === "Haedal") {
+            // Get token info for proper price and decimal information
+            if (pool.tokenA) {
+              tokenAInfo = await blockvisionService.getTokenInfo(pool.tokenA);
+            }
+            if (pool.tokenB) {
+              tokenBInfo = await blockvisionService.getTokenInfo(pool.tokenB);
+            }
+
+            for (const pos of pool.positions) {
+              // Calculate USD values
+              if (pos.positionType === "haedal-lp") {
+                const normA = normalizeAmount(
+                  pos.balanceA || "0",
+                  tokenAInfo.decimals
+                );
+                const normB = normalizeAmount(
+                  pos.balanceB || "0",
+                  tokenBInfo.decimals
+                );
+                const usdA = normA * (tokenAInfo.price || 0);
+                const usdB = normB * (tokenBInfo.price || 0);
+                pos.valueUsd = usdA + usdB;
+
+                pos.formattedBalanceA = formatTokenAmount(normA);
+                pos.formattedBalanceB = formatTokenAmount(normB);
+              } else if (pos.positionType === "haedal-staking") {
+                const normA = normalizeAmount(
+                  pos.balanceA || "0",
+                  tokenAInfo.decimals
+                );
+                pos.valueUsd = normA * (tokenAInfo.price || 0);
+                pos.formattedBalanceA = formatTokenAmount(normA);
+              }
+            }
+
+            // Set logos for the pool
+            if (!pool.tokenALogo && tokenAInfo.logo) {
+              pool.tokenALogo = tokenAInfo.logo;
+            }
+            if (!pool.tokenBLogo && tokenBInfo.logo) {
+              pool.tokenBLogo = tokenBInfo.logo;
+            }
+
+            // Update the total values for the pool
+            pool.totalValueUsd = pool.positions.reduce(
+              (sum, p) => sum + (p.valueUsd || 0),
+              0
+            );
           }
 
           for (const pos of pool.positions) {
