@@ -1,3 +1,4 @@
+// routes/search.js
 import express from "express";
 import axios from "axios";
 
@@ -5,18 +6,19 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   const query = req.query.q;
-  if (!query)
+  if (!query) {
     return res.status(400).json({ error: 'Query parameter "q" is required' });
+  }
 
   try {
     const [aiRes, ytRes, googleRes] = await Promise.all([
-      // OpenAI API call using GPT-4 via Chat Completion endpoint
+      // OpenAI GPT-4O (no max_tokens → full-length answers up to context limit)
       axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
           model: "gpt-4o",
           messages: [{ role: "user", content: query }],
-          max_tokens: 100,
+          // max_tokens removed to allow full-length output
         },
         {
           headers: {
@@ -25,7 +27,8 @@ router.get("/", async (req, res) => {
           },
         }
       ),
-      // YouTube Data API call
+
+      // YouTube Data API
       axios.get("https://www.googleapis.com/youtube/v3/search", {
         params: {
           part: "snippet",
@@ -35,7 +38,8 @@ router.get("/", async (req, res) => {
           key: process.env.YOUTUBE_API_KEY,
         },
       }),
-      // SerpAPI call for Google web search results
+
+      // SerpAPI Google results
       axios.get("https://serpapi.com/search.json", {
         params: {
           q: query,
@@ -46,13 +50,14 @@ router.get("/", async (req, res) => {
 
     const result = {
       query,
-      aiAnswer: aiRes.data.choices[0]?.message.content.trim() || "No response",
-      videos: ytRes.data.items.map((v) => ({
+      aiAnswer:
+        aiRes.data.choices?.[0]?.message?.content.trim() || "No response",
+      videos: (ytRes.data.items || []).map((v) => ({
         title: v.snippet.title,
         videoId: v.id.videoId,
         thumbnail: v.snippet.thumbnails.default.url,
       })),
-      webResults: googleRes.data.organic_results.map((r) => ({
+      webResults: (googleRes.data.organic_results || []).map((r) => ({
         title: r.title,
         url: r.link,
         snippet: r.snippet,
