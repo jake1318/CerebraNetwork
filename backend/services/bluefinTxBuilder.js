@@ -1,11 +1,11 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-05-15 22:52:10 UTC by jake1318
+// Updated: 2025-07-08 06:56:42 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
   BLUEFIN_PACKAGE_ID,
-  GLOBAL_CONFIG_ID,
   SUI_CLOCK_OBJECT_ID,
+  getBluefinConfigObjectId,
 } from "./bluefinService.js";
 import { getSuiClient } from "./suiClient.js";
 import { getPoolDetails } from "./bluefinService.js";
@@ -28,7 +28,7 @@ function toSignedI32(u) {
 
 /**
  * Builds a transaction for opening a position with liquidity in one step
- * with much more conservative approach to balance handling
+ * with proper handling of SUI whether it's coinTypeA or coinTypeB
  */
 export async function buildDepositTx({
   poolId,
@@ -43,6 +43,10 @@ export async function buildDepositTx({
   }
 
   const suiClient = await getSuiClient();
+
+  // Get the latest Bluefin config object ID
+  const configId = await getBluefinConfigObjectId();
+  console.log(`Using Bluefin config object ID: ${configId}`);
 
   try {
     // Get the pool object with content details
@@ -78,45 +82,67 @@ export async function buildDepositTx({
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
 
+    // Determine if either coin is SUI
+    const SUI_TYPE = "0x2::sui::SUI";
+    const isCoinA_SUI = coinTypeA === SUI_TYPE;
+    const isCoinB_SUI = coinTypeB === SUI_TYPE;
+
+    console.log(
+      `Pool ${poolId} coin types: A=${coinTypeA} (${
+        isCoinA_SUI ? "SUI" : "not SUI"
+      }), B=${coinTypeB} (${isCoinB_SUI ? "SUI" : "not SUI"})`
+    );
+
     // === GET USER BALANCE INFORMATION ===
-    // Get the SUI balance FROM GAS COIN
-    // Use actual objects instead of getBalance to see individual coins
-    const gasCoin = await suiClient.getCoins({
+    // Get coins for both token types
+    const coinsA = await suiClient.getCoins({
       owner: walletAddress,
       coinType: coinTypeA,
-      limit: 1, // Just get the first coin (gas)
     });
 
-    if (!gasCoin.data || gasCoin.data.length === 0) {
-      throw new Error("Cannot retrieve gas coin information");
-    }
-
-    // Get the exact balance of the gas coin
-    const gasBalance = parseInt(gasCoin.data[0].balance);
-    const availableSui = gasBalance / 1_000_000_000;
-
-    console.log(`Gas coin balance: ${gasBalance} MIST (${availableSui} SUI)`);
-
-    // Fetch the USDC coins
-    const ownedUsdcCoins = await suiClient.getCoins({
+    const coinsB = await suiClient.getCoins({
       owner: walletAddress,
       coinType: coinTypeB,
     });
 
-    // Calculate total USDC balance
-    let totalUsdcBalance = 0;
-    if (ownedUsdcCoins.data && ownedUsdcCoins.data.length > 0) {
-      for (const coin of ownedUsdcCoins.data) {
-        totalUsdcBalance += Number(coin.balance);
-      }
+    // Check if we have the coins available
+    if (!coinsA.data || coinsA.data.length === 0) {
+      throw new Error(`No coins of type ${coinTypeA} found in wallet`);
     }
 
-    // Convert to human-readable amount (USDC has 6 decimals)
-    const availableUsdc = totalUsdcBalance / 1_000_000;
+    if (!coinsB.data || coinsB.data.length === 0) {
+      throw new Error(`No coins of type ${coinTypeB} found in wallet`);
+    }
 
-    // Force very small amounts that we know will work
-    amountB = 0.1; // Small USDC amount
-    amountA = 0.03; // Small SUI amount that matches approximately at current price
+    // Calculate total balances
+    let totalBalanceA = 0;
+    for (const coin of coinsA.data) {
+      totalBalanceA += Number(coin.balance);
+    }
+
+    let totalBalanceB = 0;
+    for (const coin of coinsB.data) {
+      totalBalanceB += Number(coin.balance);
+    }
+
+    // Get the correct decimal places for each token
+    const decimalsA = isCoinA_SUI ? 9 : 6; // SUI has 9 decimals, most others have 6
+    const decimalsB = isCoinB_SUI ? 9 : 6; // SUI has 9 decimals, most others have 6
+
+    // Convert to human-readable amounts
+    const availableA = totalBalanceA / 10 ** decimalsA;
+    const availableB = totalBalanceB / 10 ** decimalsB;
+
+    console.log(
+      `Available ${coinTypeA}: ${availableA} (${totalBalanceA} base units)`
+    );
+    console.log(
+      `Available ${coinTypeB}: ${availableB} (${totalBalanceB} base units)`
+    );
+
+    // Use user-provided amounts or set reasonable defaults
+    const effectiveAmountA = amountA || 0.03;
+    const effectiveAmountB = amountB || 0.1;
 
     // Calculate price range ticks
     const lowerTick = Math.floor(
@@ -139,41 +165,47 @@ export async function buildDepositTx({
       throw new Error("Tick out of allowed range");
     }
 
+    // Convert human amounts to chain amounts
+    const amountAOnChain = Math.floor(effectiveAmountA * 10 ** decimalsA);
+    const amountBOnChain = Math.floor(effectiveAmountB * 10 ** decimalsB);
+
     console.log("Building transaction to provide liquidity:", {
       poolId,
       coinTypeA,
       coinTypeB,
-      amountA,
-      amountB,
+      amountA: effectiveAmountA,
+      amountB: effectiveAmountB,
+      amountAOnChain,
+      amountBOnChain,
       lowerTick: lowerTickSnapped,
       upperTick: upperTickSnapped,
       currentTick,
       tickSpacing,
+      decimalsA,
+      decimalsB,
     });
 
-    // Convert human amounts to chain amounts
-    const decimalsA = coinTypeA === "0x2::sui::SUI" ? 9 : 6;
-    const decimalsB = 6; // Default for most stablecoins, adjust as needed
-
-    const amountAOnChain = Math.floor(amountA * Math.pow(10, decimalsA));
-    const amountBOnChain = Math.floor(amountB * Math.pow(10, decimalsB));
-
-    console.log(`SUI amount: ${amountA} (${amountAOnChain} base units)`);
-    console.log(`USDC amount: ${amountB} (${amountBOnChain} base units)`);
-
-    // Double check the gas coin balance
-    if (amountAOnChain > gasBalance * 0.9) {
-      const reducedAmount = Math.floor(gasBalance * 0.3); // Even more conservative
-      console.log(
-        `WARNING: Requested SUI amount ${amountAOnChain} is too close to gas balance ${gasBalance}. Reducing to ${reducedAmount}`
-      );
-      amountAOnChain = reducedAmount;
-      amountA = amountAOnChain / Math.pow(10, decimalsA);
+    // Safety checks for amounts
+    if (isCoinA_SUI) {
+      // If coinA is SUI, ensure we're not using more than 90% of balance for gas safety
+      if (amountAOnChain > totalBalanceA * 0.9) {
+        const reducedAmount = Math.floor(totalBalanceA * 0.3);
+        console.log(
+          `WARNING: Requested SUI amount ${amountAOnChain} is too close to balance ${totalBalanceA}. Reducing to ${reducedAmount}`
+        );
+        amountAOnChain = reducedAmount;
+      }
     }
 
-    // Check if we have enough USDC
-    if (!ownedUsdcCoins.data || ownedUsdcCoins.data.length === 0) {
-      throw new Error(`No USDC coins found in wallet - cannot proceed`);
+    if (isCoinB_SUI) {
+      // If coinB is SUI, ensure we're not using more than 90% of balance for gas safety
+      if (amountBOnChain > totalBalanceB * 0.9) {
+        const reducedAmount = Math.floor(totalBalanceB * 0.3);
+        console.log(
+          `WARNING: Requested SUI amount ${amountBOnChain} is too close to balance ${totalBalanceB}. Reducing to ${reducedAmount}`
+        );
+        amountBOnChain = reducedAmount;
+      }
     }
 
     // Create transaction block - essential to create a new one for each attempt
@@ -182,11 +214,11 @@ export async function buildDepositTx({
     txb.setGasBudget(30_000_000);
 
     // =========== STEP 1: Create the Position ============
-    // First, we create the position
+    // First, we create the position - NOW WITH UPDATED CONFIG ID
     const position = txb.moveCall({
       target: `${BLUEFIN_PACKAGE_ID}::pool::open_position`,
       arguments: [
-        txb.object(GLOBAL_CONFIG_ID),
+        txb.object(configId), // Use the current config object
         txb.object(poolId),
         txb.pure(toU32(lowerTickSnapped), "u32"),
         txb.pure(toU32(upperTickSnapped), "u32"),
@@ -195,20 +227,39 @@ export async function buildDepositTx({
     });
 
     // =========== STEP 2: Prepare Coins ================
-    // Split SUI coin from gas
-    const coinA = txb.splitCoins(txb.gas, [txb.pure(amountAOnChain)]);
+    let coinA, coinB;
 
-    // Get first USDC coin and split from it
-    const usdcCoin = txb.object(ownedUsdcCoins.data[0].coinObjectId);
-    const coinB = txb.splitCoins(usdcCoin, [txb.pure(amountBOnChain)]);
+    // Handle coinA preparation based on whether it's SUI or not
+    if (isCoinA_SUI) {
+      // If coinA is SUI, use the gas coin
+      coinA = txb.splitCoins(txb.gas, [txb.pure(amountAOnChain)]);
+    } else {
+      // If coinA is not SUI, use a regular coin
+      const firstCoinAId = coinsA.data[0].coinObjectId;
+      coinA = txb.splitCoins(txb.object(firstCoinAId), [
+        txb.pure(amountAOnChain),
+      ]);
+    }
+
+    // Handle coinB preparation based on whether it's SUI or not
+    if (isCoinB_SUI) {
+      // If coinB is SUI, use the gas coin
+      coinB = txb.splitCoins(txb.gas, [txb.pure(amountBOnChain)]);
+    } else {
+      // If coinB is not SUI, use a regular coin
+      const firstCoinBId = coinsB.data[0].coinObjectId;
+      coinB = txb.splitCoins(txb.object(firstCoinBId), [
+        txb.pure(amountBOnChain),
+      ]);
+    }
 
     // =========== STEP 3: Add Liquidity to Position ============
-    // Add liquidity to the created position
+    // Add liquidity to the created position - UPDATED WITH CORRECT PARAMETER ORDER
     txb.moveCall({
       target: `${BLUEFIN_PACKAGE_ID}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
-        txb.object(GLOBAL_CONFIG_ID),
+        txb.object(configId), // Use the current config object
         txb.object(poolId),
         position,
         coinA,
@@ -230,7 +281,7 @@ export async function buildDepositTx({
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
-    console.log("Transaction built successfully with minimal steps");
+    console.log("Transaction built successfully with proper coin handling");
     return base64Tx;
   } catch (error) {
     console.error("Error building transaction:", error);
@@ -240,6 +291,7 @@ export async function buildDepositTx({
 
 /**
  * Builds a transaction for adding liquidity to an existing position
+ * with proper handling of SUI whether it's coinTypeA or coinTypeB
  */
 export async function buildAddLiquidityTx({
   poolId,
@@ -256,74 +308,115 @@ export async function buildAddLiquidityTx({
 
   const suiClient = await getSuiClient();
 
+  // Get the latest Bluefin config object ID
+  const configId = await getBluefinConfigObjectId();
+  console.log(`Using Bluefin config object ID: ${configId}`);
+
   try {
     // Get pool details
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
 
+    // Determine if either coin is SUI
+    const SUI_TYPE = "0x2::sui::SUI";
+    const isCoinA_SUI = coinTypeA === SUI_TYPE;
+    const isCoinB_SUI = coinTypeB === SUI_TYPE;
+
+    console.log(
+      `Pool ${poolId} coin types: A=${coinTypeA} (${
+        isCoinA_SUI ? "SUI" : "not SUI"
+      }), B=${coinTypeB} (${isCoinB_SUI ? "SUI" : "not SUI"})`
+    );
+
     // === GET USER BALANCE INFORMATION ===
-    // Get the SUI balance FROM GAS COIN
-    // Use actual objects instead of getBalance to see individual coins
-    const gasCoin = await suiClient.getCoins({
+    // Get coins for both token types
+    const coinsA = await suiClient.getCoins({
       owner: walletAddress,
       coinType: coinTypeA,
-      limit: 1, // Just get the first coin (gas)
     });
 
-    if (!gasCoin.data || gasCoin.data.length === 0) {
-      throw new Error("Cannot retrieve gas coin information");
-    }
-
-    // Get the exact balance of the gas coin
-    const gasBalance = parseInt(gasCoin.data[0].balance);
-    const availableSui = gasBalance / 1_000_000_000;
-
-    console.log(`Gas coin balance: ${gasBalance} MIST (${availableSui} SUI)`);
-
-    // Fetch the USDC coins
-    const ownedUsdcCoins = await suiClient.getCoins({
+    const coinsB = await suiClient.getCoins({
       owner: walletAddress,
       coinType: coinTypeB,
     });
 
-    // Calculate total USDC balance
-    let totalUsdcBalance = 0;
-    if (ownedUsdcCoins.data && ownedUsdcCoins.data.length > 0) {
-      for (const coin of ownedUsdcCoins.data) {
-        totalUsdcBalance += Number(coin.balance);
+    // Check if we have the coins available
+    if (!coinsA.data || coinsA.data.length === 0) {
+      throw new Error(`No coins of type ${coinTypeA} found in wallet`);
+    }
+
+    if (!coinsB.data || coinsB.data.length === 0) {
+      throw new Error(`No coins of type ${coinTypeB} found in wallet`);
+    }
+
+    // Calculate total balances
+    let totalBalanceA = 0;
+    for (const coin of coinsA.data) {
+      totalBalanceA += Number(coin.balance);
+    }
+
+    let totalBalanceB = 0;
+    for (const coin of coinsB.data) {
+      totalBalanceB += Number(coin.balance);
+    }
+
+    // Get the correct decimal places for each token
+    const decimalsA = isCoinA_SUI ? 9 : 6; // SUI has 9 decimals, most others have 6
+    const decimalsB = isCoinB_SUI ? 9 : 6; // SUI has 9 decimals, most others have 6
+
+    // Convert to human-readable amounts
+    const availableA = totalBalanceA / 10 ** decimalsA;
+    const availableB = totalBalanceB / 10 ** decimalsB;
+
+    console.log(
+      `Available ${coinTypeA}: ${availableA} (${totalBalanceA} base units)`
+    );
+    console.log(
+      `Available ${coinTypeB}: ${availableB} (${totalBalanceB} base units)`
+    );
+
+    // Use user-provided amounts or set reasonable defaults
+    const effectiveAmountA = amountA || 0.03;
+    const effectiveAmountB = amountB || 0.1;
+
+    // Convert human amounts to chain amounts
+    const amountAOnChain = Math.floor(effectiveAmountA * 10 ** decimalsA);
+    const amountBOnChain = Math.floor(effectiveAmountB * 10 ** decimalsB);
+
+    console.log("Building transaction to add liquidity:", {
+      poolId,
+      positionId,
+      coinTypeA,
+      coinTypeB,
+      amountA: effectiveAmountA,
+      amountB: effectiveAmountB,
+      amountAOnChain,
+      amountBOnChain,
+      decimalsA,
+      decimalsB,
+    });
+
+    // Safety checks for amounts
+    if (isCoinA_SUI) {
+      // If coinA is SUI, ensure we're not using more than 90% of balance for gas safety
+      if (amountAOnChain > totalBalanceA * 0.9) {
+        const reducedAmount = Math.floor(totalBalanceA * 0.3);
+        console.log(
+          `WARNING: Requested SUI amount ${amountAOnChain} is too close to balance ${totalBalanceA}. Reducing to ${reducedAmount}`
+        );
+        amountAOnChain = reducedAmount;
       }
     }
 
-    // Convert to human-readable amount (USDC has 6 decimals)
-    const availableUsdc = totalUsdcBalance / 1_000_000;
-
-    // Force very small amounts that we know will work
-    amountB = 0.1; // Small USDC amount
-    amountA = 0.03; // Small SUI amount that matches approximately at current price
-
-    console.log(`Using amounts: ${amountA} SUI and ${amountB} USDC`);
-
-    // Convert human amounts to chain amounts
-    const decimalsA = coinTypeA === "0x2::sui::SUI" ? 9 : 6;
-    const decimalsB = 6; // Default for most stablecoins, adjust as needed
-
-    const amountAOnChain = Math.floor(amountA * Math.pow(10, decimalsA));
-    const amountBOnChain = Math.floor(amountB * Math.pow(10, decimalsB));
-
-    console.log(`SUI amount: ${amountA} (${amountAOnChain} base units)`);
-    console.log(`USDC amount: ${amountB} (${amountBOnChain} base units)`);
-
-    // Double check the gas coin balance
-    if (amountAOnChain > gasBalance * 0.5) {
-      const reducedAmount = Math.floor(gasBalance * 0.3);
-      console.log(`WARNING: Reducing SUI amount to ${reducedAmount}`);
-      amountAOnChain = reducedAmount;
-      amountA = amountAOnChain / Math.pow(10, decimalsA);
-    }
-
-    // Check if we have enough USDC
-    if (!ownedUsdcCoins.data || ownedUsdcCoins.data.length === 0) {
-      throw new Error(`No USDC coins found in wallet - cannot proceed`);
+    if (isCoinB_SUI) {
+      // If coinB is SUI, ensure we're not using more than 90% of balance for gas safety
+      if (amountBOnChain > totalBalanceB * 0.9) {
+        const reducedAmount = Math.floor(totalBalanceB * 0.3);
+        console.log(
+          `WARNING: Requested SUI amount ${amountBOnChain} is too close to balance ${totalBalanceB}. Reducing to ${reducedAmount}`
+        );
+        amountBOnChain = reducedAmount;
+      }
     }
 
     // Create the transaction block
@@ -332,19 +425,38 @@ export async function buildAddLiquidityTx({
     txb.setGasBudget(30_000_000);
 
     // =========== STEP 1: Prepare Coins ================
-    // Split SUI coin from gas
-    const coinA = txb.splitCoins(txb.gas, [txb.pure(amountAOnChain)]);
+    let coinA, coinB;
 
-    // Get first USDC coin and split from it
-    const usdcCoin = txb.object(ownedUsdcCoins.data[0].coinObjectId);
-    const coinB = txb.splitCoins(usdcCoin, [txb.pure(amountBOnChain)]);
+    // Handle coinA preparation based on whether it's SUI or not
+    if (isCoinA_SUI) {
+      // If coinA is SUI, use the gas coin
+      coinA = txb.splitCoins(txb.gas, [txb.pure(amountAOnChain)]);
+    } else {
+      // If coinA is not SUI, use a regular coin
+      const firstCoinAId = coinsA.data[0].coinObjectId;
+      coinA = txb.splitCoins(txb.object(firstCoinAId), [
+        txb.pure(amountAOnChain),
+      ]);
+    }
+
+    // Handle coinB preparation based on whether it's SUI or not
+    if (isCoinB_SUI) {
+      // If coinB is SUI, use the gas coin
+      coinB = txb.splitCoins(txb.gas, [txb.pure(amountBOnChain)]);
+    } else {
+      // If coinB is not SUI, use a regular coin
+      const firstCoinBId = coinsB.data[0].coinObjectId;
+      coinB = txb.splitCoins(txb.object(firstCoinBId), [
+        txb.pure(amountBOnChain),
+      ]);
+    }
 
     // =========== STEP 2: Add Liquidity to Position ============
     const liquidity = txb.moveCall({
       target: `${BLUEFIN_PACKAGE_ID}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
-        txb.object(GLOBAL_CONFIG_ID),
+        txb.object(configId), // Use the current config object
         txb.object(poolId),
         txb.object(positionId),
         coinA,
@@ -389,6 +501,10 @@ export async function buildRemoveLiquidityTx({
 
   const suiClient = await getSuiClient();
 
+  // Get the latest Bluefin config object ID
+  const configId = await getBluefinConfigObjectId();
+  console.log(`Using Bluefin config object ID: ${configId}`);
+
   try {
     // Get pool details using the helper
     const pool = await getPoolDetails(poolId);
@@ -429,7 +545,7 @@ export async function buildRemoveLiquidityTx({
       target: `${BLUEFIN_PACKAGE_ID}::gateway::remove_liquidity`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(GLOBAL_CONFIG_ID), // then GlobalConfig
+        txb.object(configId), // Updated: Use the current config object
         txb.object(poolId), // Pool
         txb.object(positionId), // Position
         txb.pure(liquidityToRemove.toString(), "u64"),
@@ -468,6 +584,10 @@ export async function buildCollectFeesTx({
 
   const suiClient = await getSuiClient();
 
+  // Get the latest Bluefin config object ID
+  const configId = await getBluefinConfigObjectId();
+  console.log(`Using Bluefin config object ID: ${configId}`);
+
   try {
     // Get pool details using the helper
     const pool = await getPoolDetails(poolId);
@@ -488,7 +608,7 @@ export async function buildCollectFeesTx({
       target: `${BLUEFIN_PACKAGE_ID}::gateway::collect_fee`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(GLOBAL_CONFIG_ID), // then GlobalConfig
+        txb.object(configId), // Updated: Use the current config object
         txb.object(poolId), // Pool
         txb.object(positionId), // Position
       ],
@@ -526,6 +646,10 @@ export async function buildCollectRewardsTx({
 
   const suiClient = await getSuiClient();
 
+  // Get the latest Bluefin config object ID
+  const configId = await getBluefinConfigObjectId();
+  console.log(`Using Bluefin config object ID: ${configId}`);
+
   try {
     // Get pool details using the helper
     const pool = await getPoolDetails(poolId);
@@ -550,7 +674,7 @@ export async function buildCollectRewardsTx({
       target: `${BLUEFIN_PACKAGE_ID}::gateway::collect_reward`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(GLOBAL_CONFIG_ID), // then GlobalConfig
+        txb.object(configId), // Updated: Use the current config object
         txb.object(poolId), // Pool
         txb.object(positionId), // Position
       ],
@@ -587,6 +711,10 @@ export async function buildClosePositionTx({
   }
 
   const suiClient = await getSuiClient();
+
+  // Get the latest Bluefin config object ID
+  const configId = await getBluefinConfigObjectId();
+  console.log(`Using Bluefin config object ID: ${configId}`);
 
   try {
     // Get pool details using the helper
@@ -627,7 +755,7 @@ export async function buildClosePositionTx({
         target: `${BLUEFIN_PACKAGE_ID}::gateway::remove_liquidity`,
         arguments: [
           txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-          txb.object(GLOBAL_CONFIG_ID), // then GlobalConfig
+          txb.object(configId), // Updated: Use the current config object
           txb.object(poolId), // Pool
           txb.object(positionId), // Position
           txb.pure(currentLiquidity.toString(), "u64"),
@@ -643,7 +771,7 @@ export async function buildClosePositionTx({
         target: `${BLUEFIN_PACKAGE_ID}::gateway::collect_fee`,
         arguments: [
           txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-          txb.object(GLOBAL_CONFIG_ID), // then GlobalConfig
+          txb.object(configId), // Updated: Use the current config object
           txb.object(poolId), // Pool
           txb.object(positionId), // Position
         ],
@@ -659,7 +787,7 @@ export async function buildClosePositionTx({
       target: `${BLUEFIN_PACKAGE_ID}::gateway::close_position`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(GLOBAL_CONFIG_ID), // then GlobalConfig
+        txb.object(configId), // Updated: Use the current config object
         txb.object(poolId), // Pool
         txb.object(positionId), // Position
       ],
