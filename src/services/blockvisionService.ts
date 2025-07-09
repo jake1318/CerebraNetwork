@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-07 03:33:15 UTC by jake1318
+// Last Updated: 2025-07-07 23:38:04 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -375,6 +375,161 @@ function processCetusVaultData(rawCetusData: any): PoolGroup[] {
   }
 
   console.log(`Created ${poolGroups.length} Cetus vault pool groups`);
+  return poolGroups;
+}
+
+/**
+ * Process Cetus farms data into standardized PoolGroup format
+ * @param rawCetusFarms Raw Cetus farms data from BlockVision API
+ * @returns Processed PoolGroup[] for Cetus farms
+ */
+function processCetusFarmsData(rawCetusFarms: any[]): PoolGroup[] {
+  console.log(`Processing ${rawCetusFarms.length} Cetus farms`);
+
+  if (
+    !rawCetusFarms ||
+    !Array.isArray(rawCetusFarms) ||
+    rawCetusFarms.length === 0
+  ) {
+    console.log("No valid Cetus farm positions found");
+    return [];
+  }
+
+  const poolGroups: PoolGroup[] = [];
+
+  // Process each farm into a pool group
+  for (const farm of rawCetusFarms) {
+    if (!farm.pool) continue;
+
+    // Create a position for this farm
+    const position: NormalizedPosition = {
+      id: farm.position || `cetus-farm-${farm.pool}`,
+      liquidity: "0", // Not directly applicable for farms
+      balanceA: farm.balanceA || "0",
+      balanceB: farm.balanceB || "0",
+      valueUsd: 0, // Will be calculated later with token prices
+      isOutOfRange: farm.isOut === true,
+      positionType: "cetus-farm",
+      raw: farm,
+    };
+
+    // Create reward info if available
+    if (farm.rewards && Array.isArray(farm.rewards)) {
+      position.rewards = farm.rewards.map((reward: any) => ({
+        tokenSymbol: getSymbolFromType(reward.coinType),
+        tokenAddress: reward.coinType,
+        amount: reward.amount || "0",
+        formatted: "0", // Will be calculated during enrichment
+        valueUsd: 0,
+        decimals: reward.decimals || 9,
+      }));
+    }
+
+    // Create the pool group for this farm
+    poolGroups.push({
+      poolAddress: farm.pool,
+      poolName: farm.name || `Cetus Farm ${farm.position}`,
+      protocol: "Cetus",
+      positions: [position],
+      totalLiquidity: 0, // Will be calculated later
+      totalValueUsd: 0, // Will be calculated later with token prices
+      apr: farm.apr || 0,
+      tokenA: farm.coinTypeA,
+      tokenB: farm.coinTypeB || "",
+      tokenASymbol: getSymbolFromType(farm.coinTypeA),
+      tokenBSymbol: farm.coinTypeB ? getSymbolFromType(farm.coinTypeB) : "",
+    });
+  }
+
+  console.log(`Created ${poolGroups.length} Cetus farm pool groups`);
+  return poolGroups;
+}
+
+/**
+ * Process Cetus LP positions into standardized PoolGroup format
+ * @param rawCetusLPs Raw Cetus LP positions data from BlockVision API
+ * @returns Processed PoolGroup[] for Cetus LP positions
+ */
+function processCetusLPsData(rawCetusLPs: any[]): PoolGroup[] {
+  console.log(`Processing ${rawCetusLPs.length} Cetus LP positions`);
+
+  if (!rawCetusLPs || !Array.isArray(rawCetusLPs) || rawCetusLPs.length === 0) {
+    console.log("No valid Cetus LP positions found");
+    return [];
+  }
+
+  // Group positions by pool
+  const positionsByPool: Record<string, any[]> = {};
+  for (const lp of rawCetusLPs) {
+    if (!lp.pool) continue;
+
+    if (!positionsByPool[lp.pool]) {
+      positionsByPool[lp.pool] = [];
+    }
+    positionsByPool[lp.pool].push(lp);
+  }
+
+  const poolGroups: PoolGroup[] = [];
+
+  // Process each pool group
+  for (const [poolId, positions] of Object.entries(positionsByPool)) {
+    if (!positions.length) continue;
+
+    // Use first position for pool metadata
+    const firstPosition = positions[0];
+    const tokenASymbol = getSymbolFromType(firstPosition.coinTypeA);
+    const tokenBSymbol = getSymbolFromType(firstPosition.coinTypeB);
+
+    // Create normalized positions
+    const normalizedPositions = positions.map((lp) => {
+      const position: NormalizedPosition = {
+        id: lp.position || `cetus-lp-${lp.pool}`,
+        liquidity: "0",
+        balanceA: lp.balanceA || "0",
+        balanceB: lp.balanceB || "0",
+        valueUsd: 0, // Will be calculated later
+        isOutOfRange: lp.isOut === true,
+        positionType: "cetus-lp",
+        raw: lp,
+      };
+
+      // Add fees if available
+      if (lp.fees) {
+        position.feesUsd = 0; // Will be calculated during enrichment
+      }
+
+      // Add rewards if available
+      if (lp.rewards && Array.isArray(lp.rewards)) {
+        position.rewards = lp.rewards.map((reward: any) => ({
+          tokenSymbol: getSymbolFromType(reward.coinType),
+          tokenAddress: reward.coinType,
+          amount: reward.amount || "0",
+          formatted: "0", // Will be calculated during enrichment
+          valueUsd: 0,
+          decimals: reward.decimals || 9,
+        }));
+      }
+
+      return position;
+    });
+
+    // Create pool group
+    poolGroups.push({
+      poolAddress: poolId,
+      poolName: `${tokenASymbol}/${tokenBSymbol}`,
+      protocol: "Cetus",
+      positions: normalizedPositions,
+      totalLiquidity: 0, // Will be calculated later
+      totalValueUsd: 0, // Will be calculated later
+      apr: firstPosition.apr || 0,
+      tokenA: firstPosition.coinTypeA,
+      tokenB: firstPosition.coinTypeB,
+      tokenASymbol,
+      tokenBSymbol,
+    });
+  }
+
+  console.log(`Created ${poolGroups.length} Cetus LP pool groups`);
   return poolGroups;
 }
 
@@ -1103,7 +1258,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑07‑07 03:33:15 UTC by jake1318
+//  last‑updated: 2025‑07‑07 23:38:04 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1426,28 +1581,79 @@ export const blockvisionService = {
         `Finished fetching data for ${protocolsToFetch.length} protocols`
       );
 
-      // Process Cetus vault data separately and extract APYs for cetusVaultService
-      if (combinedRawData.cetus && combinedRawData.cetus.vaults) {
-        console.log("Found Cetus vault data, processing separately");
-        const cetusVaults = extractCetusVaultData(combinedRawData);
-        console.log(
-          `Extracted ${cetusVaults.length} Cetus vaults for APY data`
-        );
+      // Initialize pool groups array
+      let poolGroups: PoolGroup[] = [];
 
-        const cetusVaultPoolGroups = processCetusVaultData(
-          combinedRawData.cetus
-        );
+      // Process Cetus data separately to ensure correct structure
+      if (combinedRawData.cetus) {
+        console.log("Found Cetus data, processing separately");
 
-        // Add the processed Cetus vault groups to the main pool groups array
-        if (cetusVaultPoolGroups.length > 0) {
+        // Process vaults
+        if (
+          combinedRawData.cetus.vaults &&
+          combinedRawData.cetus.vaults.length > 0
+        ) {
           console.log(
-            `Adding ${cetusVaultPoolGroups.length} Cetus vault pool groups to results`
+            `Processing ${combinedRawData.cetus.vaults.length} Cetus vaults`
           );
+          const cetusVaultPoolGroups = processCetusVaultData(
+            combinedRawData.cetus
+          );
+
+          // Add the processed Cetus vault groups to the main pool groups array
+          if (cetusVaultPoolGroups.length > 0) {
+            console.log(
+              `Adding ${cetusVaultPoolGroups.length} Cetus vault pool groups to results`
+            );
+            poolGroups.push(...cetusVaultPoolGroups);
+          }
+        }
+
+        // Process farms
+        if (
+          combinedRawData.cetus.farms &&
+          combinedRawData.cetus.farms.length > 0
+        ) {
+          console.log(
+            `Processing ${combinedRawData.cetus.farms.length} Cetus farms`
+          );
+          const cetusFarmPoolGroups = processCetusFarmsData(
+            combinedRawData.cetus.farms
+          );
+
+          // Add the processed Cetus farm groups to the main pool groups array
+          if (cetusFarmPoolGroups.length > 0) {
+            console.log(
+              `Adding ${cetusFarmPoolGroups.length} Cetus farm pool groups to results`
+            );
+            poolGroups.push(...cetusFarmPoolGroups);
+          }
+        }
+
+        // Process LPs
+        if (combinedRawData.cetus.lps && combinedRawData.cetus.lps.length > 0) {
+          console.log(
+            `Processing ${combinedRawData.cetus.lps.length} Cetus LP positions`
+          );
+          const cetusLPPoolGroups = processCetusLPsData(
+            combinedRawData.cetus.lps
+          );
+
+          // Add the processed Cetus LP groups to the main pool groups array
+          if (cetusLPPoolGroups.length > 0) {
+            console.log(
+              `Adding ${cetusLPPoolGroups.length} Cetus LP pool groups to results`
+            );
+            poolGroups.push(...cetusLPPoolGroups);
+          }
         }
       }
 
       // Process the combined data into standardized pool groups
-      const poolGroups = await processDefiPortfolioData(combinedRawData);
+      const processedPoolGroups = await processDefiPortfolioData(
+        combinedRawData
+      );
+      poolGroups = [...poolGroups, ...processedPoolGroups];
 
       // Process Turbos data separately to ensure correct structure
       if (combinedRawData.turbos) {
@@ -1602,6 +1808,62 @@ export const blockvisionService = {
             if (pool.positions[0]?.raw?.apy) {
               pool.apr = parseFloat(pool.positions[0].raw.apy);
             }
+          }
+
+          // Special handling for Cetus farms
+          if (
+            pool.protocol === "Cetus" &&
+            pool.positions[0]?.positionType === "cetus-farm"
+          ) {
+            // Get token info for proper price and decimal information
+            const tokenAInfo = await blockvisionService.getTokenInfo(
+              pool.tokenA
+            );
+            let tokenBInfo = { symbol: "Unknown", decimals: 9, price: 0 };
+
+            if (pool.tokenB) {
+              tokenBInfo = await blockvisionService.getTokenInfo(pool.tokenB);
+            }
+
+            for (const pos of pool.positions) {
+              // Calculate USD values
+              const normA = normalizeAmount(
+                pos.balanceA || "0",
+                tokenAInfo.decimals
+              );
+              const normB = normalizeAmount(
+                pos.balanceB || "0",
+                tokenBInfo.decimals
+              );
+              const usdA = normA * (tokenAInfo.price || 0);
+              const usdB = normB * (tokenBInfo.price || 0);
+              pos.valueUsd = usdA + usdB;
+
+              // Format balances
+              pos.formattedBalanceA = formatTokenAmount(normA);
+              pos.formattedBalanceB = formatTokenAmount(normB);
+
+              // Process rewards if available
+              if (pos.rewards && Array.isArray(pos.rewards)) {
+                for (const reward of pos.rewards) {
+                  const rewardInfo = await blockvisionService.getTokenInfo(
+                    reward.tokenAddress || ""
+                  );
+                  const amount = normalizeAmount(
+                    reward.amount || "0",
+                    rewardInfo.decimals
+                  );
+                  reward.formatted = formatTokenAmount(amount);
+                  reward.valueUsd = amount * (rewardInfo.price || 0);
+                }
+              }
+            }
+
+            // Update the total values for the pool
+            pool.totalValueUsd = pool.positions.reduce(
+              (sum, p) => sum + (p.valueUsd || 0),
+              0
+            );
           }
 
           // Special handling for Turbos
