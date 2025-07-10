@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-07 23:38:04 UTC by jake1318
+// Last Updated: 2025-07-09 03:05:02 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -7,6 +7,7 @@ import {
   TokenMetadata,
 } from "./birdeyeService";
 import processDefiPortfolioData from "./blockvisionDataProcessor";
+import { getCoinMeta } from "./suiMetadataService";
 
 const BLOCKVISION_API_BASE_URL = "https://api.blockvision.org";
 const BLOCKVISION_API_KEY =
@@ -1258,7 +1259,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑07‑07 23:38:04 UTC by jake1318
+//  last‑updated: 2025‑07‑09 03:05:02 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1381,17 +1382,23 @@ export const blockvisionService = {
       });
       const { code, message, result } = response.data;
       if (code === 200 && result) {
-        // Cache the token info
+        // Get authoritative decimals from on-chain metadata
+        const { decimals } = await getCoinMeta(coinType);
+
+        // Cache the token info with correct decimals
         if (!tokenCache[coinType]) {
           tokenCache[coinType] = {
             symbol: result.symbol,
-            decimals: result.decimals || 9,
+            decimals: decimals, // Use authoritative decimals
             price: result.price,
             logo: result.logo,
           };
+        } else {
+          // Update the decimals in the cache with the authoritative value
+          tokenCache[coinType].decimals = decimals;
         }
 
-        return { data: result };
+        return { data: { ...result, decimals } };
       } else {
         throw new Error(
           `Blockvision getCoinDetail error: code=${code}, msg=${message}`
@@ -1412,17 +1419,25 @@ export const blockvisionService = {
       const { code, message, result } = response.data;
       console.log(`BlockVision API response code: ${code}`);
       if (code === 200 && result && Array.isArray(result.coins)) {
-        // Update cache with coin metadata
-        result.coins.forEach((coin: AccountCoin) => {
+        // Update cache with coin metadata - use getCoinMeta to ensure accurate decimals
+        for (const coin of result.coins) {
           if (coin.coinType) {
+            // Get authoritative decimals from on-chain metadata
+            const { decimals: authoritativeDecimals } = await getCoinMeta(
+              coin.coinType
+            );
+
             tokenCache[coin.coinType] = {
               symbol: coin.symbol,
-              decimals: coin.decimals,
+              decimals: authoritativeDecimals, // Use authoritative decimals
               price: parseFloat(coin.price || "0"),
               logo: coin.logo,
             };
+
+            // Update the coin's decimals with authoritative value
+            coin.decimals = authoritativeDecimals;
           }
-        });
+        }
 
         return { data: result.coins as AccountCoin[] };
       } else {
@@ -1727,7 +1742,7 @@ export const blockvisionService = {
         }
       }
 
-      // ─── patch START ──────────────────────────────────────────────────────�[...[...]
+      // ─── patch START ──────────────────────────────────────────────────────
       // Now "enrich" every poolGroup & each position with real USD values
       await Promise.all(
         poolGroups.map(async (pool) => {
@@ -2434,7 +2449,7 @@ export const blockvisionService = {
           }
         }
       }
-      // ─── patch END ───────────────────────────────────────────────────────[...]
+      // ─── patch END ───────────────────────────────────────────────────────
 
       return poolGroups;
     } catch (error) {
@@ -2502,28 +2517,32 @@ export const blockvisionService = {
 
     // Check cache first
     if (tokenCache[coinType] && tokenCache[coinType].price !== undefined) {
+      // If the cache still has the optimistic default (9), upgrade it silently
+      if (tokenCache[coinType].decimals === 9) {
+        getCoinMeta(coinType).then(({ decimals }) => {
+          tokenCache[coinType].decimals = decimals;
+        });
+      }
       return tokenCache[coinType];
     }
 
-    // Try Blockvision first
     try {
+      // Try BlockVision first
       const { data } = await blockvisionService.getCoinDetail(coinType);
+      // Get authoritative decimals from on-chain metadata
+      const { decimals } = await getCoinMeta(coinType);
+
       if (data.price) {
         console.log(
           `Got price for ${coinType} from BlockVision: $${data.price}`
         );
-        // Update cache
-        if (!tokenCache[coinType]) {
-          tokenCache[coinType] = {
-            symbol: data.symbol,
-            decimals: data.decimals || 9,
-            price: data.price,
-            logo: data.logo,
-          };
-        } else {
-          tokenCache[coinType].price = data.price;
-          tokenCache[coinType].decimals = data.decimals || 9;
-        }
+        // Update cache with authoritative decimals
+        tokenCache[coinType] = {
+          symbol: data.symbol,
+          decimals, // Use authoritative decimals from on-chain metadata
+          price: data.price,
+          logo: data.logo,
+        };
         return tokenCache[coinType];
       }
     } catch (err) {
@@ -2537,6 +2556,9 @@ export const blockvisionService = {
     try {
       return await enqueueBirdeyeRequest(async () => {
         const metadata = await getBirdeyeTokenMetadata(coinType);
+        // Get authoritative decimals from on-chain metadata
+        const coinMeta = await getCoinMeta(coinType);
+
         if (metadata) {
           // Make a second call to get the price from Birdeye
           const response = await fetch(
@@ -2557,46 +2579,37 @@ export const blockvisionService = {
             if (price) {
               console.log(`Got price for ${coinType} from Birdeye: $${price}`);
 
-              // Update cache
-              if (!tokenCache[coinType]) {
-                tokenCache[coinType] = {
-                  symbol: metadata.symbol,
-                  decimals: metadata.decimals || 9,
-                  price: price,
-                  logo: metadata.logo_uri,
-                };
-              } else {
-                tokenCache[coinType].price = price;
-                tokenCache[coinType].symbol = metadata.symbol;
-                tokenCache[coinType].decimals = metadata.decimals || 9;
-              }
+              // Update cache with authoritative decimals
+              tokenCache[coinType] = {
+                symbol: metadata.symbol,
+                decimals: coinMeta.decimals, // Use authoritative decimals from on-chain metadata
+                price: price,
+                logo: metadata.logo_uri,
+              };
               return tokenCache[coinType];
             }
           }
         }
 
-        // If all fails, return cached data or defaults
-        return (
-          tokenCache[coinType] || {
-            symbol: getSymbolFromType(coinType),
-            decimals: 9,
-            price: 0,
-            logo: undefined,
-          }
-        );
+        // If all fails, return with authoritative decimals but fallback values for other fields
+        return {
+          symbol: getSymbolFromType(coinType),
+          decimals: coinMeta.decimals, // Use authoritative decimals from on-chain metadata
+          price: 0,
+          logo: undefined,
+        };
       });
     } catch (err) {
       console.warn(`Failed to get price from Birdeye for ${coinType}:`, err);
 
-      // If all fails, return cached data or defaults
-      return (
-        tokenCache[coinType] || {
-          symbol: getSymbolFromType(coinType),
-          decimals: 9,
-          price: 0,
-          logo: undefined,
-        }
-      );
+      // If all fails, at least get authoritative decimals
+      const coinMeta = await getCoinMeta(coinType);
+      return {
+        symbol: getSymbolFromType(coinType),
+        decimals: coinMeta.decimals, // Use authoritative decimals from on-chain metadata
+        price: 0,
+        logo: undefined,
+      };
     }
   },
 

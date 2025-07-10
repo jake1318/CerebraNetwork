@@ -1,5 +1,5 @@
 // src/pages/Home.tsx
-// Last Updated: 2025-04-27 22:43:53 UTC by jake1318
+// Last Updated: 2025-07-10 20:40:45 UTC by jake1318
 
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -58,10 +58,10 @@ const Home: React.FC = () => {
   return (
     <div className="home">
       <section className="hero">
-        {/* Add the missing vertical scan line here */}
+        {/* Vertical scan line */}
         <div className="vertical-scan"></div>
 
-        {/* Add glow effects */}
+        {/* Glow effects */}
         <div className="glow-1"></div>
         <div className="glow-2"></div>
 
@@ -192,7 +192,7 @@ const Home: React.FC = () => {
             </p>
           </motion.div>
 
-          {/* New Feature Card for AI Search */}
+          {/* AI Search Feature Card */}
           <motion.div
             className="feature-card"
             initial={{ opacity: 0, y: 20 }}
@@ -216,7 +216,7 @@ const Home: React.FC = () => {
             </p>
           </motion.div>
 
-          {/* New Feature Card for Multi-Source Results */}
+          {/* Multi-Source Results Feature Card */}
           <motion.div
             className="feature-card"
             initial={{ opacity: 0, y: 20 }}

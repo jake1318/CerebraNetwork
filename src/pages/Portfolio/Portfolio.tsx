@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-07 22:49:05 UTC by jake1318
+// Last Updated: 2025-07-08 02:20:40 UTC by jake1318
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -55,6 +55,16 @@ function TokenIcon({ symbol, address, size = "sm" }: TokenIconProps) {
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Special case for haSUI - use local logo
+      if (
+        symbol.toLowerCase() === "hasui" ||
+        (address && address.toLowerCase().includes("hasui"))
+      ) {
+        setLogoUrl("/haSui.webp");
+        logoCache[id] = "/haSui.webp";
+        return;
+      }
+
       if (logoUrl || logoCache[id]) return; // already have it
 
       let tokenAddr = address;
@@ -251,8 +261,10 @@ function PortfolioChartsRow({
     staking: PoolGroup[];
   };
   walletTokens: any[];
-  selectedTimeframe: "7d" | "30d";
-  setSelectedTimeframe: React.Dispatch<React.SetStateAction<"7d" | "30d">>;
+  selectedTimeframe: "7d" | "30d" | "1yr";
+  setSelectedTimeframe: React.Dispatch<
+    React.SetStateAction<"7d" | "30d" | "1yr">
+  >;
 }) {
   // Calculate total wallet value
   const walletValue = useMemo(
@@ -418,55 +430,7 @@ function PortfolioChartsRow({
     return { series, labels, colors: orderedColors, totalValue };
   }, [categorizedPositions, walletValue]);
 
-  // Value chart options
-  const valueChartOptions: ApexOptions = useMemo(
-    () => ({
-      chart: {
-        type: "area",
-        height: 180,
-        toolbar: { show: false },
-        zoom: { enabled: false },
-        background: "transparent",
-      },
-      dataLabels: { enabled: false },
-      stroke: {
-        curve: "smooth",
-        width: 2,
-        colors: ["#00c2ff"],
-      },
-      fill: {
-        type: "gradient",
-        gradient: {
-          shadeIntensity: 1,
-          opacityFrom: 0.3,
-          opacityTo: 0.1,
-          stops: [0, 90, 100],
-          colorStops: [
-            { offset: 0, color: "#00c2ff", opacity: 0.4 },
-            { offset: 100, color: "#00c2ff", opacity: 0 },
-          ],
-        },
-      },
-      grid: { show: false },
-      xaxis: {
-        type: "datetime",
-        categories: portfolioHistory.dates,
-        labels: { show: false },
-        axisBorder: { show: false },
-        axisTicks: { show: false },
-      },
-      yaxis: { labels: { show: false } },
-      tooltip: {
-        x: { format: "yyyy-MM-dd" },
-        y: { formatter: (value) => `$${value.toFixed(2)}` },
-        theme: "dark",
-      },
-      theme: { mode: "dark" },
-    }),
-    [portfolioHistory]
-  );
-
-  // Protocol chart options
+  // Protocol chart options - removed dollar amount from tooltip
   const protocolOptions = useMemo(
     () => ({
       chart: {
@@ -480,10 +444,7 @@ function PortfolioChartsRow({
       tooltip: {
         y: {
           formatter: (value: number) => {
-            return `$${value.toFixed(2)} (${(
-              (value / protocolData.totalValue) *
-              100
-            ).toFixed(1)}%)`;
+            return `${((value / protocolData.totalValue) * 100).toFixed(1)}%`;
           },
         },
         theme: "dark",
@@ -517,7 +478,7 @@ function PortfolioChartsRow({
     [protocolData]
   );
 
-  // Category chart options
+  // Category chart options - removed dollar amount from tooltip
   const categoryOptions = useMemo(
     () => ({
       chart: {
@@ -531,10 +492,7 @@ function PortfolioChartsRow({
       tooltip: {
         y: {
           formatter: (value: number) => {
-            return `$${value.toFixed(2)} (${(
-              (value / categoryData.totalValue) *
-              100
-            ).toFixed(1)}%)`;
+            return `${((value / categoryData.totalValue) * 100).toFixed(1)}%`;
           },
         },
         theme: "dark",
@@ -568,8 +526,12 @@ function PortfolioChartsRow({
     [categoryData]
   );
 
+  // Get the latest portfolio value
+  const currentValue = protocolData.totalValue.toFixed(2);
+
   return (
     <div className="portfolio-charts-row">
+      {/* First box: Portfolio Value - Removed chart, showing just the total value */}
       <div className="chart-box portfolio-value-chart">
         <div className="chart-header">
           <div>
@@ -594,7 +556,7 @@ function PortfolioChartsRow({
               </span>
             </div>
           </div>
-          <div className="chart-controls">
+          <div className="timeframe-selector-container">
             <div className="timeframe-selector">
               <button
                 className={selectedTimeframe === "7d" ? "active" : ""}
@@ -608,31 +570,28 @@ function PortfolioChartsRow({
               >
                 30D
               </button>
+              <button
+                className={selectedTimeframe === "1yr" ? "active" : ""}
+                onClick={() => setSelectedTimeframe("1yr")}
+              >
+                1Y
+              </button>
             </div>
           </div>
         </div>
-        <div className="chart-content">
-          <ReactApexChart
-            options={valueChartOptions}
-            series={[
-              {
-                name: "Portfolio Value",
-                data: portfolioHistory.values,
-              },
-            ]}
-            type="area"
-            height={180}
-          />
+
+        {/* Display total value instead of chart */}
+        <div className="portfolio-value-display">
+          <div className="total-value-label">Total Value</div>
+          <div className="total-value-amount">${currentValue}</div>
         </div>
       </div>
 
+      {/* Second box: By Protocol chart */}
       <div className="chart-box protocol-chart">
         <div className="chart-container">
           <div className="chart-header">
             <h3>By Protocol</h3>
-            <div className="chart-total-value">
-              ${protocolData.totalValue.toFixed(2)}
-            </div>
           </div>
           <div className="chart-content-with-legend">
             <div className="chart-donut">
@@ -660,13 +619,11 @@ function PortfolioChartsRow({
         </div>
       </div>
 
+      {/* Third box: By Category chart */}
       <div className="chart-box category-chart">
         <div className="chart-container">
           <div className="chart-header">
             <h3>By Category</h3>
-            <div className="chart-total-value">
-              ${categoryData.totalValue.toFixed(2)}
-            </div>
           </div>
           <div className="chart-content-with-legend">
             <div className="chart-donut">
@@ -745,14 +702,31 @@ function PositionCard({ position }: { position: PoolGroup }) {
 // Function to fetch historical portfolio data
 async function fetchPortfolioHistory(
   address: string,
-  days: number = 30
+  timeframe: "7d" | "30d" | "1yr" = "30d"
 ): Promise<{ dates: string[]; values: number[] }> {
   try {
     // Use SUI price history as a proxy for portfolio history
     const suiToken = "0x2::sui::SUI";
+
+    // Determine the correct interval based on the timeframe
+    let interval;
+    switch (timeframe) {
+      case "7d":
+        interval = "1d"; // Use daily intervals for 7d view
+        break;
+      case "30d":
+        interval = "1w"; // Use weekly intervals for 30d view
+        break;
+      case "1yr":
+        interval = "1M"; // Use monthly intervals for 1yr view
+        break;
+      default:
+        interval = "1w";
+    }
+
     const historyData = await birdeyeService.getLineChartData(
       suiToken,
-      days === 7 ? "1d" : days === 30 ? "1w" : "1w"
+      interval
     );
 
     // Check if we got valid data
@@ -815,9 +789,9 @@ function Portfolio() {
   const [scallopData, setScallopData] = useState<any>(null);
   const [loadingScallop, setLoadingScallop] = useState(false);
   const [walletTokens, setWalletTokens] = useState<any[]>([]);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<"7d" | "30d">(
-    "30d"
-  );
+  const [selectedTimeframe, setSelectedTimeframe] = useState<
+    "7d" | "30d" | "1yr"
+  >("30d");
 
   // Active tab state for position sections
   const [activeTab, setActiveTab] = useState<string>("all");
@@ -835,8 +809,23 @@ function Portfolio() {
         );
 
         // Fetch real historical data based on selected timeframe
-        const days = selectedTimeframe === "7d" ? 7 : 30;
-        const history = await fetchPortfolioHistory(account.address, days);
+        const days = (() => {
+          switch (selectedTimeframe) {
+            case "7d":
+              return 7;
+            case "30d":
+              return 30;
+            case "1yr":
+              return 365;
+            default:
+              return 30;
+          }
+        })();
+
+        const history = await fetchPortfolioHistory(
+          account.address,
+          selectedTimeframe
+        );
 
         if (history.dates.length > 0 && history.values.length > 0) {
           setPortfolioHistory(history);
@@ -1066,6 +1055,16 @@ function Portfolio() {
 
         console.log(`Loaded ${positions.length} positions`);
 
+        // Debug: Check for Cetus positions
+        console.log("Checking for Cetus positions:");
+        positions.forEach((position) => {
+          if (position.protocol === "Cetus") {
+            console.log(
+              `  Found Cetus position: ${position.poolName}, Type: ${position.positions[0]?.positionType}, Value: $${position.totalValueUsd}`
+            );
+          }
+        });
+
         // Set positions in state
         setPoolPositions(positions);
 
@@ -1167,20 +1166,42 @@ function Portfolio() {
     positions.forEach((position) => {
       const positionType = position.positions[0]?.positionType || "";
       const protocol = position.protocol;
+      const poolName = position.poolName.toLowerCase();
 
-      // Specific protocol-based categorization
+      // Debug logging to verify position types
+      console.log(
+        `Categorizing: ${protocol} - ${poolName} - Type: ${positionType}`
+      );
+
+      // Cetus vaults check
+      if (
+        positionType === "cetus-vault" ||
+        (protocol === "Cetus" &&
+          (positionType.includes("vault") || poolName.includes("vault")))
+      ) {
+        console.log(`  -> Categorized as vault: ${protocol} - ${poolName}`);
+        categories.vaults.push(position);
+        return;
+      }
+
+      // Cetus farms check
+      if (
+        positionType === "cetus-farm" ||
+        (protocol === "Cetus" &&
+          (positionType.includes("farm") || poolName.includes("farm")))
+      ) {
+        console.log(`  -> Categorized as farm: ${protocol} - ${poolName}`);
+        categories.farms.push(position);
+        return;
+      }
+
+      // Other protocol-based categorization
       if (protocol === "Haedal" || protocol === "haedal") {
         // Haedal goes into vaults
         categories.vaults.push(position);
-      } else if (
-        positionType.includes("vault") ||
-        position.poolName.toLowerCase().includes("vault")
-      ) {
+      } else if (positionType.includes("vault") || poolName.includes("vault")) {
         categories.vaults.push(position);
-      } else if (
-        positionType.includes("farm") ||
-        position.poolName.toLowerCase().includes("farm")
-      ) {
+      } else if (positionType.includes("farm") || poolName.includes("farm")) {
         categories.farms.push(position);
       } else if (
         positionType.includes("lend") ||
@@ -1204,10 +1225,25 @@ function Portfolio() {
   };
 
   // Categorize positions using allPositions instead of poolPositions
-  const categorizedPositions = useMemo(
-    () => categorizePositions(allPositions),
-    [allPositions]
-  );
+  const categorizedPositions = useMemo(() => {
+    const categorized = categorizePositions(allPositions);
+
+    // Debug info about categorization
+    console.log("All positions after categorization:", allPositions.length);
+    console.log(
+      "Protocols represented:",
+      [...new Set(allPositions.map((p) => p.protocol))].join(", ")
+    );
+    console.log("Categories count:", {
+      lpPools: categorized.lpPools.length,
+      vaults: categorized.vaults.length,
+      farms: categorized.farms.length,
+      lending: categorized.lending.length,
+      staking: categorized.staking.length,
+    });
+
+    return categorized;
+  }, [allPositions]);
 
   // Calculate category counts
   const lpPoolsCount = categorizedPositions.lpPools.length;
@@ -1432,6 +1468,32 @@ function Portfolio() {
           margin: 0;
         }
 
+        /* Portfolio value display styles */
+        .portfolio-value-display {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 180px;
+        }
+
+        .total-value-label {
+          font-size: 16px;
+          color: #a0a7b8;
+          margin-bottom: 10px;
+        }
+
+        .total-value-amount {
+          font-size: 32px;
+          font-weight: 600;
+          color: #00c2ff;
+        }
+
+        .timeframe-selector-container {
+          display: flex;
+          align-items: center;
+        }
+
         .chart-content {
           flex: 1;
           display: flex;
@@ -1541,6 +1603,7 @@ function Portfolio() {
           font-size: 12px;
           cursor: pointer;
           border-radius: 4px;
+          min-width: 32px;
         }
 
         .timeframe-selector button.active {
@@ -1937,11 +2000,23 @@ function Portfolio() {
           .chart-legend-vertical .legend-item {
             margin-bottom: 4px;
           }
+
+          .timeframe-selector button {
+            padding: 4px 6px;
+            font-size: 11px;
+            min-width: 28px;
+          }
         }
 
         @media (max-width: 480px) {
           .wallet-assets-grid {
             grid-template-columns: 1fr;
+          }
+
+          .timeframe-selector button {
+            padding: 3px 5px;
+            font-size: 10px;
+            min-width: 26px;
           }
         }
       `}</style>

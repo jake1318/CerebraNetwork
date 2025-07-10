@@ -1,6 +1,10 @@
+// src/pages/Home.scss
+// Last Updated: 2025-07-10 20:41:15 UTC by jake1318
+
 .home {
   width: 100%;
   overflow: hidden;
+  background-color: #020202; // Near-black background as specified
 
   .hero {
     position: relative;
@@ -9,25 +13,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    // Updated gradient to match the dual-color theme
+    // Updated gradient with darker base and neon accents
     background: radial-gradient(
         circle at top left,
         rgba(0, 255, 255, 0.15) 0%,
-        rgba(5, 15, 30, 0.5) 40%
+        rgba(2, 2, 2, 0.8) 40%
       ),
       radial-gradient(
         circle at bottom right,
-        rgba(255, 0, 255, 0.15) 0%,
-        rgba(5, 15, 30, 0.5) 40%
+        rgba(196, 92, 242, 0.15) 0%,
+        // Using #C45CF2 from reference
+        rgba(2, 2, 2, 0.8) 40%
       ),
-      linear-gradient(
-        135deg,
-        rgba(5, 5, 15, 0.95) 0%,
-        rgba(10, 10, 30, 0.95) 100%
-      );
+      linear-gradient(135deg, rgba(2, 2, 2, 0.95) 0%, rgba(5, 5, 15, 0.95) 100%);
     overflow: hidden;
 
-    // Grid overlay similar to other pages
+    // Grid overlay with cyber/circuit pattern
     &::before {
       content: "";
       position: absolute;
@@ -41,8 +42,8 @@
           transparent 1px
         ),
         linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
+        linear-gradient(90deg, rgba(196, 92, 242, 0.05) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(196, 92, 242, 0.05) 1px, transparent 1px);
       background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
       background-position: 0 0, 0 0, 10px 10px, 10px 10px;
       pointer-events: none;
@@ -58,7 +59,8 @@
       h1 {
         font-size: 3.5rem;
         margin-bottom: 1rem;
-        background: linear-gradient(90deg, #00ffff, #ff00ff);
+        // Updated gradient with cyan (#00ffff) and purple (#C45CF2)
+        background: linear-gradient(90deg, #00ffff, #c45cf2);
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -71,7 +73,8 @@
       p {
         font-size: 1.5rem;
         margin-bottom: 2rem;
-        color: rgba(255, 255, 255, 0.8);
+        // Using softer gray as mentioned (#B1A5C8)
+        color: #b1a5c8;
         letter-spacing: 0.5px;
       }
     }
@@ -95,13 +98,13 @@
         ),
         radial-gradient(
           circle at 80% 70%,
-          rgba(255, 0, 255, 0.12),
+          rgba(196, 92, 242, 0.12),
           transparent 25%
         );
       z-index: 2;
     }
 
-    // Scanning horizontal line
+    // Scanning horizontal line (neon cyan)
     &::after {
       content: "";
       position: absolute;
@@ -116,22 +119,22 @@
       box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
     }
 
-    // Vertical scan line
+    // Vertical scan line (neon purple)
     .vertical-scan {
       content: "";
       position: absolute;
       width: 2px;
       height: 100vh;
-      background: linear-gradient(180deg, transparent, #ff00ff, transparent);
+      background: linear-gradient(180deg, transparent, #c45cf2, transparent);
       left: 50%;
       top: 50%;
       transform: translateY(-50%);
       animation: verticalScan 15s linear infinite;
       z-index: 2;
-      box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+      box-shadow: 0 0 20px rgba(196, 92, 242, 0.5);
     }
 
-    // Add glow effects
+    // Glow effects (cyan and purple)
     .glow-1 {
       position: absolute;
       width: 300px;
@@ -149,7 +152,7 @@
       position: absolute;
       width: 300px;
       height: 300px;
-      background: rgba(255, 0, 255, 0.12);
+      background: rgba(196, 92, 242, 0.12);
       border-radius: 50%;
       filter: blur(80px);
       bottom: -100px;
@@ -161,12 +164,13 @@
 
   .stats {
     padding: 3rem 2rem;
-    background: rgba(10, 15, 30, 0.9);
+    // Darker background color (#020202)
+    background: rgba(2, 2, 2, 0.9);
     border-bottom: 1px solid;
     border-image: linear-gradient(
         90deg,
         rgba(0, 255, 255, 0.1),
-        rgba(255, 0, 255, 0.1)
+        rgba(196, 92, 242, 0.1)
       )
       1;
     position: relative;
@@ -183,20 +187,21 @@
   }
 
   .stat-card {
-    background: rgba(5, 15, 30, 0.7);
+    // Darker card background (#020202)
+    background: rgba(2, 2, 2, 0.7);
     border-radius: 16px;
     padding: 1.8rem;
     width: 280px;
     text-align: center;
     box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-      0 8px 32px rgba(255, 0, 255, 0.08);
+      0 8px 32px rgba(196, 92, 242, 0.08);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid;
     border-image: linear-gradient(
         45deg,
         rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
+        rgba(196, 92, 242, 0.2)
       )
       1;
     transition: all 0.3s ease;
@@ -204,12 +209,13 @@
     &:hover {
       transform: translateY(-5px);
       box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-        0 8px 32px rgba(255, 0, 255, 0.15);
+        0 8px 32px rgba(196, 92, 242, 0.15);
     }
 
     h3 {
       font-size: 1.1rem;
-      color: rgba(255, 255, 255, 0.8);
+      // Using softer gray as mentioned (#3F4C60)
+      color: #3f4c60;
       margin-bottom: 1rem;
       letter-spacing: 0.5px;
     }
@@ -217,7 +223,8 @@
     .stat-value {
       font-size: 2.4rem;
       font-weight: 700;
-      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      // Updated gradient with cyan and purple
+      background: linear-gradient(90deg, #00ffff, #c45cf2);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -225,17 +232,18 @@
       margin: 0;
     }
   }
+
   .features {
     padding: 5rem 2rem;
     background: radial-gradient(
         circle at top left,
         rgba(0, 255, 255, 0.1) 0%,
-        rgba(5, 15, 30, 0.5) 40%
+        rgba(2, 2, 2, 0.5) 40%
       ),
       radial-gradient(
         circle at bottom right,
-        rgba(255, 0, 255, 0.1) 0%,
-        rgba(5, 15, 30, 0.5) 40%
+        rgba(196, 92, 242, 0.1) 0%,
+        rgba(2, 2, 2, 0.5) 40%
       );
     position: relative;
     overflow: hidden;
@@ -244,7 +252,8 @@
       text-align: center;
       font-size: 2.5rem;
       margin-bottom: 3rem;
-      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      // Updated gradient with cyan and purple
+      background: linear-gradient(90deg, #00ffff, #c45cf2);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -262,10 +271,11 @@
         transform: translateX(-50%);
         width: 100px;
         height: 4px;
-        background: linear-gradient(90deg, #00ffff, #ff00ff);
+        // Updated gradient with cyan and purple
+        background: linear-gradient(90deg, #00ffff, #c45cf2);
         border-radius: 4px;
         box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
-          0 0 10px rgba(255, 0, 255, 0.5);
+          0 0 10px rgba(196, 92, 242, 0.5);
       }
     }
 
@@ -279,19 +289,20 @@
   }
 
   .feature-card {
-    background: rgba(5, 15, 30, 0.7);
+    // Darker card background (#020202)
+    background: rgba(2, 2, 2, 0.7);
     border-radius: 16px;
     padding: 2rem;
     text-align: center;
     box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-      0 8px 32px rgba(255, 0, 255, 0.08);
+      0 8px 32px rgba(196, 92, 242, 0.08);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid;
     border-image: linear-gradient(
         45deg,
         rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
+        rgba(196, 92, 242, 0.2)
       )
       1;
     transition: all 0.3s ease;
@@ -299,7 +310,7 @@
     &:hover {
       transform: translateY(-5px);
       box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-        0 8px 32px rgba(255, 0, 255, 0.15);
+        0 8px 32px rgba(196, 92, 242, 0.15);
     }
 
     // Updated feature icon styling for SVGs
@@ -310,11 +321,12 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(5, 15, 30, 0.6);
+      // Darker background (#020202)
+      background: rgba(2, 2, 2, 0.6);
       border-radius: 50%;
       position: relative;
       box-shadow: 0 0 20px rgba(0, 255, 255, 0.15),
-        0 0 20px rgba(255, 0, 255, 0.15);
+        0 0 20px rgba(196, 92, 242, 0.15);
 
       &::before {
         content: "";
@@ -322,7 +334,8 @@
         inset: -2px;
         border-radius: 50%;
         padding: 2px;
-        background: linear-gradient(45deg, #00ffff, #ff00ff);
+        // Updated gradient with cyan and purple
+        background: linear-gradient(45deg, #00ffff, #c45cf2);
         -webkit-mask: linear-gradient(#fff 0 0) content-box,
           linear-gradient(#fff 0 0);
         -webkit-mask-composite: xor;
@@ -335,7 +348,7 @@
         color: #fff;
         fill: #fff;
         filter: drop-shadow(0 0 5px rgba(0, 255, 255, 0.5))
-          drop-shadow(0 0 5px rgba(255, 0, 255, 0.5));
+          drop-shadow(0 0 5px rgba(196, 92, 242, 0.5));
         transition: all 0.3s ease;
       }
 
@@ -343,7 +356,7 @@
         color: #fff;
         fill: #fff;
         filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.8))
-          drop-shadow(0 0 8px rgba(255, 0, 255, 0.8));
+          drop-shadow(0 0 8px rgba(196, 92, 242, 0.8));
         transform: scale(1.1);
       }
     }
@@ -351,7 +364,8 @@
     h3 {
       font-size: 1.5rem;
       margin-bottom: 1rem;
-      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      // Updated gradient with cyan and purple
+      background: linear-gradient(45deg, #00ffff, #c45cf2);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -360,21 +374,22 @@
     }
 
     p {
-      color: rgba(255, 255, 255, 0.8);
+      // Using softer gray as mentioned (#B1A5C8)
+      color: #b1a5c8;
       line-height: 1.6;
       font-size: 1.05rem;
     }
   }
-}
-.home {
+
   .top-pools {
     padding: 5rem 2rem;
-    background: rgba(10, 15, 30, 0.9);
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.9);
     border-top: 1px solid;
     border-image: linear-gradient(
         90deg,
         rgba(0, 255, 255, 0.1),
-        rgba(255, 0, 255, 0.1)
+        rgba(196, 92, 242, 0.1)
       )
       1;
 
@@ -382,7 +397,8 @@
       text-align: center;
       font-size: 2.5rem;
       margin-bottom: 3rem;
-      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      // Updated gradient with cyan and purple
+      background: linear-gradient(90deg, #00ffff, #c45cf2);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -400,10 +416,11 @@
         transform: translateX(-50%);
         width: 100px;
         height: 4px;
-        background: linear-gradient(90deg, #00ffff, #ff00ff);
+        // Updated gradient with cyan and purple
+        background: linear-gradient(90deg, #00ffff, #c45cf2);
         border-radius: 4px;
         box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
-          0 0 10px rgba(255, 0, 255, 0.5);
+          0 0 10px rgba(196, 92, 242, 0.5);
       }
     }
 
@@ -416,19 +433,20 @@
     }
 
     .pool-card {
-      background: rgba(5, 15, 30, 0.7);
+      // Darker background (#020202)
+      background: rgba(2, 2, 2, 0.7);
       border-radius: 16px;
       padding: 2rem;
       text-decoration: none;
       box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-        0 8px 32px rgba(255, 0, 255, 0.08);
+        0 8px 32px rgba(196, 92, 242, 0.08);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid;
       border-image: linear-gradient(
           45deg,
           rgba(0, 255, 255, 0.2),
-          rgba(255, 0, 255, 0.2)
+          rgba(196, 92, 242, 0.2)
         )
         1;
       transition: all 0.3s ease;
@@ -437,7 +455,7 @@
       &:hover {
         transform: translateY(-5px);
         box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-          0 8px 32px rgba(255, 0, 255, 0.15);
+          0 8px 32px rgba(196, 92, 242, 0.15);
       }
 
       h3 {
@@ -449,7 +467,7 @@
         border-image: linear-gradient(
             90deg,
             rgba(0, 255, 255, 0.2),
-            rgba(255, 0, 255, 0.2)
+            rgba(196, 92, 242, 0.2)
           )
           1;
         padding-bottom: 1rem;
@@ -467,7 +485,8 @@
         align-items: center;
 
         .label {
-          color: rgba(255, 255, 255, 0.7);
+          // Using softer gray as mentioned (#3F4C60)
+          color: #3f4c60;
         }
 
         .value {
@@ -488,17 +507,17 @@
     background: radial-gradient(
         circle at top left,
         rgba(0, 255, 255, 0.1) 0%,
-        rgba(5, 15, 30, 0.5) 40%
+        rgba(2, 2, 2, 0.5) 40%
       ),
       radial-gradient(
         circle at bottom right,
-        rgba(255, 0, 255, 0.1) 0%,
-        rgba(5, 15, 30, 0.5) 40%
+        rgba(196, 92, 242, 0.1) 0%,
+        rgba(2, 2, 2, 0.5) 40%
       );
     position: relative;
     overflow: hidden;
 
-    // Add glow effects
+    // Add glow effects (cyan and purple)
     &::before {
       content: "";
       position: absolute;
@@ -518,7 +537,7 @@
       position: absolute;
       width: 300px;
       height: 300px;
-      background: rgba(255, 0, 255, 0.12);
+      background: rgba(196, 92, 242, 0.12);
       border-radius: 50%;
       filter: blur(80px);
       bottom: -150px;
@@ -536,7 +555,8 @@
 
       h2 {
         font-size: 2.5rem;
-        background: linear-gradient(90deg, #00ffff, #ff00ff);
+        // Updated gradient with cyan and purple
+        background: linear-gradient(90deg, #00ffff, #c45cf2);
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -549,7 +569,8 @@
 
       p {
         font-size: 1.3rem;
-        color: rgba(255, 255, 255, 0.8);
+        // Using softer gray as mentioned (#B1A5C8)
+        color: #b1a5c8;
         margin-bottom: 2.5rem;
         line-height: 1.6;
         letter-spacing: 0.5px;
@@ -576,45 +597,48 @@
     letter-spacing: 0.5px;
 
     &--primary {
-      background: linear-gradient(45deg, #00ffff, #ff00ff);
-      color: #000;
+      // Updated gradient with cyan and purple
+      background: linear-gradient(45deg, #00ffff, #c45cf2);
+      color: #000; // Dark text on bright background for contrast
       border: none;
       box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
-        0 0 20px rgba(255, 0, 255, 0.3);
+        0 0 20px rgba(196, 92, 242, 0.3);
 
       &:hover {
         transform: translateY(-3px);
         box-shadow: 0 5px 25px rgba(0, 255, 255, 0.4),
-          0 5px 25px rgba(255, 0, 255, 0.4);
+          0 5px 25px rgba(196, 92, 242, 0.4);
       }
     }
 
     &--secondary {
-      background: rgba(0, 0, 0, 0.3);
+      // Darker background (#020202)
+      background: rgba(2, 2, 2, 0.3);
       border: 2px solid;
       border-image: linear-gradient(
           45deg,
           rgba(0, 255, 255, 0.6),
-          rgba(255, 0, 255, 0.6)
+          rgba(196, 92, 242, 0.6)
         )
         1;
       color: #fff;
 
       &:hover {
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(2, 2, 2, 0.5);
         transform: translateY(-3px);
         box-shadow: 0 5px 25px rgba(0, 255, 255, 0.2),
-          0 5px 25px rgba(255, 0, 255, 0.2);
+          0 5px 25px rgba(196, 92, 242, 0.2);
       }
     }
 
     &--outline {
-      background: rgba(0, 0, 0, 0.3);
+      // Darker background (#020202)
+      background: rgba(2, 2, 2, 0.3);
       border: 2px solid;
       border-image: linear-gradient(
           45deg,
           rgba(0, 255, 255, 0.5),
-          rgba(255, 0, 255, 0.5)
+          rgba(196, 92, 242, 0.5)
         )
         1;
       color: #fff;
@@ -622,10 +646,10 @@
       font-size: 1rem;
 
       &:hover {
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(2, 2, 2, 0.5);
         transform: translateY(-2px);
         box-shadow: 0 5px 15px rgba(0, 255, 255, 0.15),
-          0 5px 15px rgba(255, 0, 255, 0.15);
+          0 5px 15px rgba(196, 92, 242, 0.15);
       }
     }
   }

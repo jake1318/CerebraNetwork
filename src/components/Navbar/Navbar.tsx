@@ -63,7 +63,15 @@ const Navbar: React.FC = () => {
             Swap
           </Link>
 
-          {/* Yield dropdown */}
+          {/* DEX link - moved to be after Swap and before Yield */}
+          <Link
+            to="/dex"
+            className={location.pathname === "/dex" ? "active" : ""}
+          >
+            DEX
+          </Link>
+
+          {/* Yield dropdown - now without Portfolio */}
           <div
             className="dropdown"
             ref={yieldRef}
@@ -83,19 +91,18 @@ const Navbar: React.FC = () => {
                 <Link to="/positions" className="dropdown-item">
                   Positions
                 </Link>
-                <Link to="/portfolio" className="dropdown-item">
-                  Portfolio
-                </Link>
               </div>
             )}
           </div>
 
+          {/* Portfolio as a standalone link */}
           <Link
-            to="/dex"
-            className={location.pathname === "/dex" ? "active" : ""}
+            to="/portfolio"
+            className={location.pathname === "/portfolio" ? "active" : ""}
           >
-            DEX
+            Portfolio
           </Link>
+
           <Link
             to="/lending"
             className={location.pathname === "/lending" ? "active" : ""}
@@ -183,6 +190,7 @@ const Navbar: React.FC = () => {
             { to: "/", label: "Home" },
             { to: "/search", label: "Search" },
             { to: "/swap", label: "Swap" },
+            { to: "/dex", label: "DEX" }, // DEX moved here in mobile view too
           ].map(({ to, label }) => (
             <Link
               key={to}
@@ -194,14 +202,13 @@ const Navbar: React.FC = () => {
             </Link>
           ))}
 
-          {/* mobile Yield */}
+          {/* mobile Yield - now without Portfolio */}
           <div className="mobile-dropdown">
             <div className="mobile-dropdown-header">Yield</div>
             <div className="mobile-dropdown-items">
               {[
                 { to: "/pools", label: "Pools" },
                 { to: "/positions", label: "Positions" },
-                { to: "/portfolio", label: "Portfolio" },
               ].map(({ to, label }) => (
                 <Link key={to} to={to} onClick={() => setMobileOpen(false)}>
                   {label}
@@ -210,9 +217,17 @@ const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* rest of links */}
+          {/* Portfolio link */}
+          <Link
+            to="/portfolio"
+            className={location.pathname === "/portfolio" ? "active" : ""}
+            onClick={() => setMobileOpen(false)}
+          >
+            Portfolio
+          </Link>
+
+          {/* rest of links - DEX removed from here since it's moved above */}
           {[
-            { to: "/dex", label: "DEX" },
             { to: "/lending", label: "Lending" },
             { to: "/perpetual", label: "Perps" },
           ].map(({ to, label }) => (

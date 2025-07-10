@@ -1,10 +1,27 @@
 // src/services/birdeyeService.ts
-// Last Updated: 2025-05-19 02:15:48 UTC by jake1318
+// Last Updated: 2025-07-09 23:27:19 UTC by jake1318
 
 import axios from "axios";
 
 const API_BASE = "/api";
 const DEFAULT_CHAIN = "sui";
+
+/**
+ * Birdeye requires the 64‑byte canonical object address (0x + 64 hex chars).
+ * This helper expands any short Sui address *inside* a type‑tag, e.g.
+ *   0x2::sui::SUI  →  0x000…0002::sui::SUI
+ *   0x2            →  0x000…0002
+ */
+export function canonicaliseSuiAddress(addr: string): string {
+  if (!addr.startsWith("0x")) return addr; // nothing to do
+
+  // split at the first "::"  (addr may just be the object address)
+  const [head, ...rest] = addr.split("::");
+  const raw = head.slice(2).toLowerCase(); // drop "0x"
+  const full = "0x" + raw.padStart(64, "0");
+
+  return rest.length ? [full, ...rest].join("::") : full;
+}
 
 export interface BirdeyeTrendingToken {
   address: string; // KEEP original case!
@@ -157,8 +174,10 @@ export async function getTokenMetadata(
 
   return rateLimiter.schedule(async () => {
     try {
-      // Encode the token address properly for the URL
-      const encodedAddress = encodeURIComponent(tokenAddress);
+      // Encode the token address properly for the URL, using the canonicalized address
+      const encodedAddress = encodeURIComponent(
+        canonicaliseSuiAddress(tokenAddress)
+      );
 
       const response = await fetch(
         `${BIRDEYE_BASE_URL}/token/meta-data/single?address=${encodedAddress}`,
@@ -375,7 +394,7 @@ export const birdeyeService = {
     try {
       const resp = await axios.get(`${API_BASE}/price_volume/single`, {
         headers: { "x-chain": chain },
-        params: { address, type },
+        params: { address: canonicaliseSuiAddress(address), type },
       });
 
       // Enhanced logging to debug response format
@@ -418,7 +437,7 @@ export const birdeyeService = {
       const resp = await axios.get(`${API_BASE}/history_price`, {
         headers: { "x-chain": chain },
         params: {
-          address,
+          address: canonicaliseSuiAddress(address),
           address_type: "token",
           type,
           time_from,

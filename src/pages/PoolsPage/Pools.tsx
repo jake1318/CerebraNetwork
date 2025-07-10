@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Pools.tsx
-// Last Updated: 2025-07-06 19:35:31 UTC by jake1318
+// Last Updated: 2025-07-10 02:37:25 UTC by jake1318
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -37,24 +37,28 @@ interface DexInfo {
 // Pre-defined list of DEXes that CoinGecko supports
 // Keep Bluefin in the list since we want to display their pools
 const SUPPORTED_DEXES: DexInfo[] = [
-  { id: "bluemove", name: "BlueMove" },
+  // Full functionality
   { id: "cetus", name: "Cetus" },
-  { id: "kriya-dex", name: "KriyaDEX" },
-  { id: "turbos-finance", name: "Turbos Finance" },
   { id: "bluefin", name: "Bluefin" },
-  { id: "flow-x", name: "FlowX" },
-  { id: "aftermath", name: "Aftermath" },
-  { id: "alphafi", name: "AlphaFi" },
-  { id: "alphalend", name: "AlphaLend" },
-  { id: "bucket", name: "Bucket" },
-  { id: "haedal", name: "Haedal" },
-  { id: "kai", name: "Kai" },
-  { id: "navi", name: "Navi" },
-  { id: "scallop", name: "Scallop" },
-  { id: "suilend", name: "SuiLend" },
-  { id: "suistake", name: "Suistake" },
-  { id: "typus", name: "Typus" },
-  { id: "walrus", name: "Walrus" },
+
+  // Coming soon
+  { id: "turbos-finance", name: "Turbos (Coming Soon)" },
+  { id: "flow-x", name: "FlowX (Coming Soon)" },
+  { id: "aftermath", name: "Aftermath (Coming Soon)" },
+
+  // Removed protocols - commented out as per requirements
+  // { id: "kriya-dex", name: "KriyaDEX" },
+  // { id: "alphafi", name: "AlphaFi" },
+  // { id: "alphalend", name: "AlphaLend" },
+  // { id: "bucket", name: "Bucket" },
+  // { id: "haedal", name: "Haedal" },
+  // { id: "kai", name: "Kai" },
+  // { id: "navi", name: "Navi" },
+  // { id: "scallop", name: "Scallop" },
+  // { id: "suilend", name: "SuiLend" },
+  // { id: "suistake", name: "Suistake" },
+  // { id: "typus", name: "Typus" },
+  // { id: "walrus", name: "Walrus" },
 ];
 
 const DEFAULT_TOKEN_ICON = "/assets/token-placeholder.png";
@@ -1295,9 +1299,6 @@ const Pools: React.FC = () => {
           </div>
           <Link to="/positions" className="nav-link">
             My Positions
-          </Link>
-          <Link to="/portfolio" className="nav-link">
-            Portfolio
           </Link>
           <div
             className={`nav-link ${

@@ -1,5 +1,5 @@
 // src/components/DepositModal.tsx
-// Last Updated: 2025-06-27 06:24:18 UTC by jake1318
+// Last Updated: 2025-07-10 06:38:33 UTC by jake1318great
 
 import React, { useState, useEffect, useMemo } from "react";
 import { PoolInfo } from "../services/coinGeckoService";
@@ -7,7 +7,7 @@ import { formatDollars } from "../utils/formatters";
 import blockvisionService, {
   AccountCoin,
 } from "../services/blockvisionService";
-import { birdeyeService } from "../services/birdeyeService";
+import { birdeyeService, TokenMetadata } from "../services/birdeyeService";
 import { BN } from "bn.js";
 import { CetusClmmSDK } from "@cetusprotocol/sui-clmm-sdk";
 import {
@@ -23,6 +23,7 @@ import {
   depositToVault,
 } from "../services/cetusVaultService";
 import "../styles/components/DepositModal.scss";
+import { useTokenMeta } from "../hooks/useTokenMeta";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -50,6 +51,9 @@ const DEFAULT_TICK_SPACING = 60;
 // Flag to prioritize Birdeye API pricing for Cetus pools
 const USE_BIRDEYE_FOR_CETUS = true;
 
+// Path to placeholder token icon
+const TOKEN_PLACEHOLDER = "/assets/token-placeholder.png";
+
 const DepositModal: React.FC<DepositModalProps> = ({
   isOpen,
   onClose,
@@ -75,6 +79,11 @@ const DepositModal: React.FC<DepositModalProps> = ({
     isSuccess: boolean;
     txDigest?: string;
   } | null>(null);
+
+  // State to store token metadata for logos
+  const [tokenMetadata, setTokenMetadata] = useState<{
+    [address: string]: TokenMetadata | null;
+  }>({});
 
   // Vault-specific states
   const [useOneSide, setUseOneSide] = useState<boolean>(false);
@@ -119,18 +128,20 @@ const DepositModal: React.FC<DepositModalProps> = ({
     "onchain" | "birdeye" | "manual"
   >("onchain");
 
-  // Token decimals
-  const tokenADecimals = useMemo(() => {
-    if (!pool) return vault?.decimalsA || 9;
-    if (pool.tokenA.toUpperCase() === "USDC") return 6;
-    return pool.tokenAMetadata?.decimals || 9;
-  }, [pool?.tokenA, pool?.tokenAMetadata, vault?.decimalsA]);
+  // Cache for USD prices to avoid repeated calls to Birdeye
+  const [usdPriceCache, setUsdPriceCache] = useState<{
+    [address: string]: number;
+  }>({});
 
-  const tokenBDecimals = useMemo(() => {
-    if (!pool) return vault?.decimalsB || 9;
-    if (pool.tokenB.toUpperCase() === "SUI") return 9;
-    return pool.tokenBMetadata?.decimals || 9;
-  }, [pool?.tokenB, pool?.tokenBMetadata, vault?.decimalsB]);
+  // --------------------------------------------------------------------
+  // Decimals now resolved *asynchronously* by address/type‑tag
+  // --------------------------------------------------------------------
+  const typeA = pool?.tokenAAddress ?? pool?.tokenAMetadata?.address;
+  const typeB = pool?.tokenBAddress ?? pool?.tokenBMetadata?.address;
+  const metaA = useTokenMeta(typeA, vault?.decimalsA ?? 9);
+  const metaB = useTokenMeta(typeB, vault?.decimalsB ?? 9);
+  const tokenADecimals = metaA.decimals;
+  const tokenBDecimals = metaB.decimals;
 
   // Get display symbols
   const symbolA = pool ? pool.tokenA : vault?.symbolA || "";
@@ -150,6 +161,120 @@ const DepositModal: React.FC<DepositModalProps> = ({
       pool.tokenB.toUpperCase().includes("SUI")
     );
   }, [pool?.tokenA, pool?.tokenB, vault?.symbolA, vault?.symbolB]);
+
+  // Token logo handling - fetch metadata when the modal opens - with reduced logging
+  useEffect(() => {
+    if (isOpen && pool) {
+      const tokenAAddress = pool.tokenAAddress || pool.tokenAMetadata?.address;
+      const tokenBAddress = pool.tokenBAddress || pool.tokenBMetadata?.address;
+
+      // Only log once when modal opens
+      console.log(`Modal opened for ${pool.tokenA}/${pool.tokenB}`);
+
+      if (tokenAAddress || tokenBAddress) {
+        // Create an array of addresses to fetch, filtering out undefined values
+        const addressesToFetch = [tokenAAddress, tokenBAddress].filter(
+          (address) => !!address
+        ) as string[];
+
+        if (addressesToFetch.length > 0) {
+          birdeyeService
+            .getMultipleTokenMetadata(addressesToFetch)
+            .then((metadata) => {
+              // Log only the count of fetched metadata, not the full objects
+              console.log(
+                `Fetched metadata for ${Object.keys(metadata).length} tokens`
+              );
+              setTokenMetadata(metadata);
+            })
+            .catch((error) => {
+              console.error("Failed to fetch token metadata:", error);
+            });
+        }
+      }
+    }
+  }, [isOpen, pool]);
+
+  // Get token logo URL with improved fallbacks and minimal logging
+  const getTokenLogoUrl = (isTokenA: boolean): string => {
+    try {
+      // If no pool info, return placeholder
+      if (!pool) return TOKEN_PLACEHOLDER;
+
+      const symbol = isTokenA ? pool.tokenA : pool.tokenB;
+      const address = isTokenA
+        ? pool.tokenAAddress || pool.tokenAMetadata?.address
+        : pool.tokenBAddress || pool.tokenBMetadata?.address;
+
+      // Remove all the verbose logging here
+
+      if (!address) {
+        // Direct pool logo properties
+        if (isTokenA && pool.tokenALogo) {
+          return pool.tokenALogo;
+        }
+        if (!isTokenA && pool.tokenBLogo) {
+          return pool.tokenBLogo;
+        }
+
+        // Try pool metadata
+        const poolMetadata = isTokenA
+          ? pool.tokenAMetadata
+          : pool.tokenBMetadata;
+        if (poolMetadata) {
+          const logo =
+            poolMetadata.logo_uri ||
+            poolMetadata.logoUrl ||
+            poolMetadata.logoURI ||
+            poolMetadata.logo;
+          if (logo) {
+            return logo;
+          }
+        }
+
+        return TOKEN_PLACEHOLDER;
+      }
+
+      // Try to get from our fetched Birdeye metadata
+      if (tokenMetadata[address]) {
+        const metadata = tokenMetadata[address];
+        const logo =
+          metadata.logo_uri ||
+          metadata.logoUrl ||
+          metadata.logoURI ||
+          metadata.logo;
+        if (logo) {
+          return logo;
+        }
+      }
+
+      // Fallbacks - try from pool object
+      if (isTokenA && pool.tokenALogo) {
+        return pool.tokenALogo;
+      }
+      if (!isTokenA && pool.tokenBLogo) {
+        return pool.tokenBLogo;
+      }
+
+      // Try metadata from pool
+      const poolMetadata = isTokenA ? pool.tokenAMetadata : pool.tokenBMetadata;
+      if (poolMetadata) {
+        const logo =
+          poolMetadata.logo_uri ||
+          poolMetadata.logoUrl ||
+          poolMetadata.logoURI ||
+          poolMetadata.logo;
+        if (logo) {
+          return logo;
+        }
+      }
+
+      return TOKEN_PLACEHOLDER;
+    } catch (error) {
+      console.warn(`Failed to get token logo for ${isTokenA ? "A" : "B"}`);
+      return TOKEN_PLACEHOLDER;
+    }
+  };
 
   // Handle amount changes for vault inputs
   const handleAmountChange = (token: "A" | "B", value: string) => {
@@ -369,61 +494,26 @@ const DepositModal: React.FC<DepositModalProps> = ({
   const calculateCorrectPrice = (
     tickIndex: number,
     decimalsA: number,
-    decimalsB: number
+    decimalsB: number,
+    usdA?: number,
+    usdB?: number
   ): number => {
     // Standard formula: price = 1.0001^tick * 10^(decimalsA - decimalsB)
     const rawPrice = Math.pow(1.0001, tickIndex);
     const decimalAdjustment = Math.pow(10, decimalsA - decimalsB);
-    let price = rawPrice * decimalAdjustment;
+    const raw = rawPrice * decimalAdjustment;
 
-    // For SUI pairs, use standard calculation
-    if (isSuiPair) {
-      return price;
+    // If we know the USD prices we can determine orientation
+    if (usdA && usdB) {
+      const onChainIsBperA = usdB > usdA ? raw < 1 : raw > 1;
+      const wantBperA = true; // UI convention
+      return onChainIsBperA === wantBperA ? raw : 1 / raw;
     }
 
-    // Check if this is a WAL/USDC pool to apply special handling
-    const isWalUsdc =
-      (symbolA.toUpperCase() === "WAL" && symbolB.toUpperCase() === "USDC") ||
-      (symbolA.toUpperCase() === "USDC" && symbolB.toUpperCase() === "WAL");
-
-    if (isWalUsdc) {
-      // For WAL/USDC specifically, we know the price should be around 1.5-2 USDC per WAL
-      // Check if WAL is token A or token B to get direction correct
-      if (symbolA.toUpperCase() === "WAL") {
-        // WAL is token A, so price is USDC per WAL
-        // Apply correction - divide by special factor for WAL/USDC
-        const correctedPrice = price / 1000;
-        console.log(
-          `Applied WAL/USDC price correction. Original: ${price}, Corrected: ${correctedPrice}`
-        );
-        return correctedPrice;
-      } else {
-        // WAL is token B, so price is WAL per USDC
-        // Apply correction - multiply by special factor for USDC/WAL
-        const correctedPrice = price * 1000;
-        console.log(
-          `Applied USDC/WAL price correction. Original: ${price}, Corrected: ${correctedPrice}`
-        );
-        return correctedPrice;
-      }
-    }
-
-    // For other non-SUI pairs, apply a more general correction
-    // Check if price seems very high (indicating potential issue)
-    if (price > 100) {
-      // Apply a more moderate correction
-      const correctedPrice = price / 10;
-      console.log(
-        `Applied general price correction for non-SUI pair. Original: ${price}, Corrected: ${correctedPrice}`
-      );
-      return correctedPrice;
-    }
-
-    // For other pairs, use the standard formula
-    return price;
+    return raw; // fall back: assume raw already is B per A
   };
 
-  // Enhanced fetchTokenPrices to be the primary price source for Cetus pools
+  // Enhanced fetchTokenPrices to be the primary price source for Cetus pools - with reduced logging
   const fetchTokenPrices = async (): Promise<boolean> => {
     if (!pool) return false;
 
@@ -439,29 +529,66 @@ const DepositModal: React.FC<DepositModalProps> = ({
       const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address!;
       const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address!;
 
-      console.log(
-        `Fetching token prices from Birdeye API for ${pool.tokenA} (${aAddr}) and ${pool.tokenB} (${bAddr})`
-      );
+      console.log(`Fetching prices for ${pool.tokenA}/${pool.tokenB}`);
 
-      const [aData, bData] = await Promise.all([
-        birdeyeService.getPriceVolumeSingle(aAddr),
-        birdeyeService.getPriceVolumeSingle(bAddr),
-      ]);
+      // Also fetch token metadata if not already available
+      if (!tokenMetadata[aAddr] || !tokenMetadata[bAddr]) {
+        try {
+          const addresses = [aAddr, bAddr].filter((a) => !!a) as string[];
+          const metadata = await birdeyeService.getMultipleTokenMetadata(
+            addresses
+          );
+          if (Object.keys(metadata).length > 0) {
+            // Simplified logging
+            console.log(
+              `Fetched additional metadata for ${
+                Object.keys(metadata).length
+              } tokens`
+            );
+            setTokenMetadata((prev) => ({ ...prev, ...metadata }));
+          }
+        } catch (metaErr) {
+          console.error("Error fetching token metadata");
+        }
+      }
 
-      console.log("Birdeye token price data:", {
-        [pool.tokenA]: aData,
-        [pool.tokenB]: bData,
-      });
+      // Check cache first to avoid duplicate calls
+      const cachedPa = usdPriceCache[aAddr];
+      const cachedPb = usdPriceCache[bAddr];
 
-      const pa = aData.price ?? aData.data?.price;
-      const pb = bData.price ?? bData.data?.price;
+      let pa = cachedPa;
+      let pb = cachedPb;
+
+      // Fetch prices if not already in cache
+      if (!pa || !pb) {
+        const [aData, bData] = await Promise.all([
+          birdeyeService.getPriceVolumeSingle(aAddr),
+          birdeyeService.getPriceVolumeSingle(bAddr),
+        ]);
+
+        pa = aData?.price ?? aData?.data?.price;
+        pb = bData?.price ?? bData?.data?.price;
+
+        // Update cache
+        if (pa && pb) {
+          setUsdPriceCache((prev) => ({
+            ...prev,
+            [aAddr]: parseFloat(pa.toString()),
+            [bAddr]: parseFloat(pb.toString()),
+          }));
+        }
+      }
 
       if (pa && pb) {
-        // Calculate price ratio using USD values
+        // Calculate price ratio correctly
+        // tokenB per tokenA = (USD-price of tokenA) / (USD-price of tokenB)
         const priceRatio =
-          parseFloat(pb.toString()) / parseFloat(pa.toString());
+          parseFloat(pa.toString()) / parseFloat(pb.toString());
+
         console.log(
-          `Setting price from Birdeye API: ${priceRatio} ${pool.tokenB} per ${pool.tokenA}`
+          `Price from Birdeye: ${priceRatio.toFixed(6)} ${pool.tokenB} per ${
+            pool.tokenA
+          }`
         );
 
         setCurrentPrice(priceRatio);
@@ -537,8 +664,57 @@ const DepositModal: React.FC<DepositModalProps> = ({
         setCurrentTick(ct);
         setTickSpacing(ts);
 
-        // Use the corrected price calculation
-        const price = calculateCorrectPrice(ct, tokenADecimals, tokenBDecimals);
+        // Try to get USD prices from Birdeye if available for orientation check
+        let pa, pb;
+        try {
+          const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
+          const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
+
+          // Check cache first
+          pa = aAddr ? usdPriceCache[aAddr] : undefined;
+          pb = bAddr ? usdPriceCache[bAddr] : undefined;
+
+          if (aAddr && bAddr && (!pa || !pb)) {
+            const [aData, bData] = await Promise.all([
+              birdeyeService.getPriceVolumeSingle(aAddr),
+              birdeyeService.getPriceVolumeSingle(bAddr),
+            ]);
+
+            pa = aData?.price ?? aData?.data?.price;
+            pb = bData?.price ?? bData?.data?.price;
+
+            // Update cache
+            if (pa && pb) {
+              setUsdPriceCache((prev) => ({
+                ...prev,
+                [aAddr]: parseFloat(pa.toString()),
+                [bAddr]: parseFloat(pb.toString()),
+              }));
+            }
+
+            // Also fetch metadata if not already available
+            if (!tokenMetadata[aAddr] || !tokenMetadata[bAddr]) {
+              const addresses = [aAddr, bAddr].filter((a) => !!a) as string[];
+              const metadata = await birdeyeService.getMultipleTokenMetadata(
+                addresses
+              );
+              if (Object.keys(metadata).length > 0) {
+                setTokenMetadata((prev) => ({ ...prev, ...metadata }));
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to get USD prices for orientation check:", e);
+        }
+
+        // Pass USD prices to calculateCorrectPrice
+        const price = calculateCorrectPrice(
+          ct,
+          tokenADecimals,
+          tokenBDecimals,
+          pa ? +pa : undefined,
+          pb ? +pb : undefined
+        );
         setCurrentPrice(price);
         setPriceSource("onchain");
 
@@ -563,9 +739,58 @@ const DepositModal: React.FC<DepositModalProps> = ({
       setCurrentTick(ct);
       setTickSpacing(ts);
 
-      // Use the corrected price calculation, but treat as fallback
-      const price = calculateCorrectPrice(ct, tokenADecimals, tokenBDecimals);
-      console.log(`Using on-chain price: ${price} (fallback)`);
+      // Try to get USD prices from Birdeye if available for orientation check
+      let pa, pb;
+      try {
+        const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
+        const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
+
+        // Check cache first
+        pa = aAddr ? usdPriceCache[aAddr] : undefined;
+        pb = bAddr ? usdPriceCache[bAddr] : undefined;
+
+        if (aAddr && bAddr && (!pa || !pb)) {
+          const [aData, bData] = await Promise.all([
+            birdeyeService.getPriceVolumeSingle(aAddr),
+            birdeyeService.getPriceVolumeSingle(bAddr),
+          ]);
+
+          pa = aData?.price ?? aData?.data?.price;
+          pb = bData?.price ?? bData?.data?.price;
+
+          // Update cache
+          if (pa && pb) {
+            setUsdPriceCache((prev) => ({
+              ...prev,
+              [aAddr]: parseFloat(pa.toString()),
+              [bAddr]: parseFloat(pb.toString()),
+            }));
+          }
+
+          // Also fetch metadata if not already available
+          if (!tokenMetadata[aAddr] || !tokenMetadata[bAddr]) {
+            const addresses = [aAddr, bAddr].filter((a) => !!a) as string[];
+            const metadata = await birdeyeService.getMultipleTokenMetadata(
+              addresses
+            );
+            if (Object.keys(metadata).length > 0) {
+              setTokenMetadata((prev) => ({ ...prev, ...metadata }));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to get USD prices for orientation check");
+      }
+
+      // Pass USD prices to calculateCorrectPrice
+      const price = calculateCorrectPrice(
+        ct,
+        tokenADecimals,
+        tokenBDecimals,
+        pa ? +pa : undefined,
+        pb ? +pb : undefined
+      );
+      console.log(`Using on-chain price: ${price.toFixed(6)}`);
       setCurrentPrice(price);
       setPriceSource("onchain");
 
@@ -677,30 +902,49 @@ const DepositModal: React.FC<DepositModalProps> = ({
       setTickLower(low);
       setTickUpper(high);
 
+      // Get USD prices from cache if available
+      let pa, pb;
+      if (pool) {
+        const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
+        const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
+        if (aAddr && bAddr) {
+          pa = usdPriceCache[aAddr];
+          pb = usdPriceCache[bAddr];
+        }
+      }
+
       // Calculate prices from the ticks using the corrected price calculation
       try {
         const snappedLowPrice = calculateCorrectPrice(
           low,
           tokenADecimals,
-          tokenBDecimals
+          tokenBDecimals,
+          pa,
+          pb
         );
         const snappedHighPrice = calculateCorrectPrice(
           high,
           tokenADecimals,
-          tokenBDecimals
+          tokenBDecimals,
+          pa,
+          pb
         );
 
         setMinPrice(snappedLowPrice.toFixed(6));
         setMaxPrice(snappedHighPrice.toFixed(6));
 
-        console.log(`Price range: ${snappedLowPrice} - ${snappedHighPrice}`);
+        console.log(
+          `Price range: ${snappedLowPrice.toFixed(
+            6
+          )} - ${snappedHighPrice.toFixed(6)}`
+        );
       } catch (error) {
-        console.error("Error calculating price from ticks:", error);
+        console.error("Error calculating price from ticks");
         setMinPrice("0.001000");
         setMaxPrice("5.000000");
       }
     } catch (error) {
-      console.error("Error in initializeLiquidityRange:", error);
+      console.error("Error in initializeLiquidityRange");
       // Set safe defaults
       setTickLower(0);
       setTickUpper(DEFAULT_TICK_SPACING * 10);
@@ -841,17 +1085,30 @@ const DepositModal: React.FC<DepositModalProps> = ({
       console.log(`Setting lower tick to ${s} from price ${n}`);
       setTickLower(s);
 
+      // Get USD prices from cache if available
+      let pa, pb;
+      if (pool) {
+        const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
+        const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
+        if (aAddr && bAddr) {
+          pa = usdPriceCache[aAddr];
+          pb = usdPriceCache[bAddr];
+        }
+      }
+
       // Update display price to match the actual tick using corrected calculation
       const actualPrice = calculateCorrectPrice(
         s,
         tokenADecimals,
-        tokenBDecimals
+        tokenBDecimals,
+        pa,
+        pb
       );
       if (!isNaN(actualPrice)) {
         setMinPrice(actualPrice.toFixed(6));
       }
     } catch (error) {
-      console.error("Error in min price change:", error);
+      console.error("Error in min price change");
     }
   };
 
@@ -885,17 +1142,30 @@ const DepositModal: React.FC<DepositModalProps> = ({
       console.log(`Setting upper tick to ${s} from price ${n}`);
       setTickUpper(s);
 
+      // Get USD prices from cache if available
+      let pa, pb;
+      if (pool) {
+        const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
+        const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
+        if (aAddr && bAddr) {
+          pa = usdPriceCache[aAddr];
+          pb = usdPriceCache[bAddr];
+        }
+      }
+
       // Update display price to match the actual tick using corrected calculation
       const actualPrice = calculateCorrectPrice(
         s,
         tokenADecimals,
-        tokenBDecimals
+        tokenBDecimals,
+        pa,
+        pb
       );
       if (!isNaN(actualPrice)) {
         setMaxPrice(actualPrice.toFixed(6));
       }
     } catch (error) {
-      console.error("Error in max price change:", error);
+      console.error("Error in max price change");
     }
   };
 
@@ -927,17 +1197,32 @@ const DepositModal: React.FC<DepositModalProps> = ({
       setTickLower(tickLower);
       setTickUpper(tickUpper);
 
+      // Get USD prices from cache if available
+      let pa, pb;
+      if (pool) {
+        const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
+        const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
+        if (aAddr && bAddr) {
+          pa = usdPriceCache[aAddr];
+          pb = usdPriceCache[bAddr];
+        }
+      }
+
       // Calculate prices using corrected calculation
       try {
         const lowerPrice = calculateCorrectPrice(
           tickLower,
           tokenADecimals,
-          tokenBDecimals
+          tokenBDecimals,
+          pa,
+          pb
         );
         const upperPrice = calculateCorrectPrice(
           tickUpper,
           tokenADecimals,
-          tokenBDecimals
+          tokenBDecimals,
+          pa,
+          pb
         );
 
         // For UI display, we might want to format very small/large numbers specially
@@ -960,16 +1245,16 @@ const DepositModal: React.FC<DepositModalProps> = ({
         setMinPrice(formattedLowerPrice);
         setMaxPrice(formattedUpperPrice);
         console.log(
-          `Full range prices: ${lowerPrice} to ${upperPrice} (displayed as ${formattedLowerPrice} to ${formattedUpperPrice})`
+          `Full range prices: ${formattedLowerPrice} to ${formattedUpperPrice}`
         );
       } catch (error) {
-        console.error("Error calculating full range prices:", error);
+        console.error("Error calculating full range prices");
         // Set reasonable defaults that work for typical token decimals
         setMinPrice("0.000001");
         setMaxPrice("1000000.000000");
       }
     } catch (error) {
-      console.error("Error in setFullRange:", error);
+      console.error("Error in setFullRange");
       // Use hardcoded fallbacks that are very likely to work
       setTickLower(-443636); // Max negative tick
       setTickUpper(443636); // Max positive tick
@@ -1131,7 +1416,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
         const estimatedLiquidity = Math.sqrt(baseA * baseB).toString();
         setDeltaLiquidity(estimatedLiquidity);
       } catch (error) {
-        console.error("Error in final liquidity calculation:", error);
+        console.error("Error in final liquidity calculation");
         // Set a fallback value that should be reasonable
         const fallbackLiquidity = "1000000000";
         setDeltaLiquidity(fallbackLiquidity);
@@ -1224,6 +1509,26 @@ const DepositModal: React.FC<DepositModalProps> = ({
         <div className="deposit-modal">
           <div className="modal-header">
             <h3>
+              <div className="token-pair-icons">
+                <img
+                  className="token-icon"
+                  src={getTokenLogoUrl(true)}
+                  alt={symbolA}
+                  onError={(e) => {
+                    // Simplified error handling
+                    (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                  }}
+                />
+                <img
+                  className="token-icon"
+                  src={getTokenLogoUrl(false)}
+                  alt={symbolB}
+                  onError={(e) => {
+                    // Simplified error handling
+                    (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                  }}
+                />
+              </div>
               Deposit into Vault {symbolA}-{symbolB}
             </h3>
             <button
@@ -1243,6 +1548,24 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
           {txNotification?.txDigest ? (
             <div className="success-confirmation">
+              <div className="token-pair-icons">
+                <img
+                  src={getTokenLogoUrl(true)}
+                  alt={symbolA}
+                  onError={(e) => {
+                    // Simplified error handling
+                    (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                  }}
+                />
+                <img
+                  src={getTokenLogoUrl(false)}
+                  alt={symbolB}
+                  onError={(e) => {
+                    // Simplified error handling
+                    (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                  }}
+                />
+              </div>
               <div className="success-check-icon">
                 <svg
                   width="80"
@@ -1312,175 +1635,157 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
                 {/* Amount inputs */}
                 <div className="input-group">
-                  <label>{symbolA}</label>
-                  <input
-                    type="number"
-                    value={amountA}
-                    min="0"
-                    step="0.000001"
-                    placeholder="0.0"
-                    disabled={useOneSide && activeToken !== "A"}
-                    onChange={(e) => handleAmountChange("A", e.target.value)}
-                  />
+                  <div className="input-label">
+                    <div className="token-with-icon">
+                      <img
+                        className="token-icon"
+                        src={getTokenLogoUrl(true)}
+                        alt={symbolA}
+                        onError={(e) => {
+                          // Simplified error handling
+                          (e.target as HTMLImageElement).src =
+                            TOKEN_PLACEHOLDER;
+                        }}
+                      />
+                      <span>{symbolA}</span>
+                    </div>
+                    <span className="balance">
+                      Balance: {formatBalance(symbolA)}
+                    </span>
+                  </div>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={amountA}
+                      min="0"
+                      step="0.000001"
+                      placeholder="0.0"
+                      disabled={useOneSide && activeToken !== "A"}
+                      onChange={(e) => handleAmountChange("A", e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="max-button"
+                      onClick={handleMaxAClick}
+                      disabled={!walletConnected}
+                    >
+                      MAX
+                    </button>
+                  </div>
                   {useOneSide && activeToken === "A" && (
                     <span className="badge">Single token mode</span>
                   )}
                 </div>
 
                 <div className="input-group">
-                  <label>{symbolB}</label>
-                  <input
-                    type="number"
-                    value={amountB}
-                    min="0"
-                    step="0.000001"
-                    placeholder="0.0"
-                    disabled={useOneSide && activeToken !== "B"}
-                    onChange={(e) => handleAmountChange("B", e.target.value)}
-                  />
+                  <div className="input-label">
+                    <div className="token-with-icon">
+                      <img
+                        className="token-icon"
+                        src={getTokenLogoUrl(false)}
+                        alt={symbolB}
+                        onError={(e) => {
+                          // Simplified error handling
+                          (e.target as HTMLImageElement).src =
+                            TOKEN_PLACEHOLDER;
+                        }}
+                      />
+                      <span>{symbolB}</span>
+                    </div>
+                    <span className="balance">
+                      Balance: {formatBalance(symbolB)}
+                    </span>
+                  </div>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={amountB}
+                      min="0"
+                      step="0.000001"
+                      placeholder="0.0"
+                      disabled={useOneSide && activeToken !== "B"}
+                      onChange={(e) => handleAmountChange("B", e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="max-button"
+                      onClick={handleMaxBClick}
+                      disabled={!walletConnected}
+                    >
+                      MAX
+                    </button>
+                  </div>
                   {useOneSide && activeToken === "B" && (
                     <span className="badge">Single token mode</span>
                   )}
                 </div>
 
                 {Object.keys(estimations).length > 0 && (
-                  <div className="estimates">
-                    <h4>Estimated Details:</h4>
-                    {useOneSide ? (
-                      <p>
-                        Deposit:{" "}
-                        {estimations.coinA
-                          ? `${estimations.coinA} ${symbolA}`
-                          : ""}
-                        {estimations.coinB
-                          ? ` + ${estimations.coinB} ${symbolB}`
-                          : ""}
-                        <br />
-                        LP to receive: ~{estimations.lpAmount || "-"}
-                      </p>
-                    ) : (
-                      <p>
-                        LP tokens to receive: ~{estimations.lpAmount || "-"}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Summary for Vault */}
-                {vault.apy && (
-                  <div className="summary-panel">
-                    <div className="summary-item">
-                      <span className="item-label">Vault APY:</span>
-                      <span className="item-value highlight">
-                        {typeof vault.apy === "number"
-                          ? vault.apy.toFixed(2)
-                          : vault.apy}
-                        %
+                  <div className="estimates-section">
+                    <h4>Deposit Summary</h4>
+                    <div className="estimate-item">
+                      <span>You'll deposit:</span>
+                      <span>
+                        {activeToken === "A"
+                          ? `${amountA} ${symbolA}`
+                          : `${amountB} ${symbolB}`}
                       </span>
                     </div>
-                    {vault.tvl && (
-                      <div className="summary-item">
-                        <span className="item-label">Vault TVL:</span>
-                        <span className="item-value">
-                          ${formatDollars(vault.tvl)}
+                    {useOneSide ? (
+                      <div className="estimate-item">
+                        <span>Vault converts to:</span>
+                        <span>
+                          {activeToken === "A"
+                            ? `~ ${estimations.coinB || "0"} ${symbolB}`
+                            : `~ ${estimations.coinA || "0"} ${symbolA}`}
                         </span>
                       </div>
+                    ) : (
+                      <>
+                        <div className="estimate-item">
+                          <span>Required {symbolA}:</span>
+                          <span>{estimations.coinA || "0"}</span>
+                        </div>
+                        <div className="estimate-item">
+                          <span>Required {symbolB}:</span>
+                          <span>{estimations.coinB || "0"}</span>
+                        </div>
+                      </>
                     )}
+                    <div className="estimate-item">
+                      <span>Estimated LP tokens:</span>
+                      <span>{estimations.lpAmount || "0"}</span>
+                    </div>
                   </div>
                 )}
 
-                {/* Wallet Warning */}
-                {!walletConnected && (
-                  <div className="wallet-warning">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                      <line x1="12" y1="9" x2="12" y2="13"></line>
-                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                    <span>Connect your wallet to deposit</span>
-                  </div>
-                )}
-
-                {/* Transaction Notification */}
-                {txNotification && !txNotification.txDigest && (
+                {txNotification && (
                   <div
-                    className={`transaction-notification ${
+                    className={`notification ${
                       txNotification.isSuccess ? "success" : "error"
                     }`}
                   >
-                    {txNotification.isSuccess ? (
-                      <div className="spinner"></div>
-                    ) : (
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        />
-                        <line
-                          x1="15"
-                          y1="9"
-                          x2="9"
-                          y2="15"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        />
-                        <line
-                          x1="9"
-                          y1="9"
-                          x2="15"
-                          y2="15"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    )}
-                    <span>{txNotification.message}</span>
+                    {txNotification.message}
                   </div>
                 )}
               </div>
 
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  onClick={onClose}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="btn btn--primary"
-                  onClick={handleSubmit}
-                  disabled={isSubmitDisabled}
-                >
-                  {isSubmitting ? (
-                    <span className="loading-text">
-                      <span className="spinner-small"></span>
-                      Processing...
-                    </span>
-                  ) : (
-                    "Deposit to Vault"
-                  )}
-                </button>
+                {!walletConnected && (
+                  <button disabled className="submit-button">
+                    Connect wallet to deposit
+                  </button>
+                )}
+
+                {walletConnected && (
+                  <button
+                    className="submit-button"
+                    onClick={handleSubmit}
+                    disabled={isSubmitDisabled}
+                  >
+                    {isSubmitting ? "Processing..." : "Deposit to Vault"}
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -1489,12 +1794,34 @@ const DepositModal: React.FC<DepositModalProps> = ({
     );
   }
 
-  // Render pool deposit modal
+  // Render pool deposit modal (not vault)
   return (
     <div className="modal-overlay">
       <div className="deposit-modal">
         <div className="modal-header">
-          <h3>Deposit Liquidity</h3>
+          <h3>
+            <div className="token-pair-icons">
+              <img
+                className="token-icon"
+                src={getTokenLogoUrl(true)}
+                alt={symbolA}
+                onError={(e) => {
+                  // Simplified error handling
+                  (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                }}
+              />
+              <img
+                className="token-icon"
+                src={getTokenLogoUrl(false)}
+                alt={symbolB}
+                onError={(e) => {
+                  // Simplified error handling
+                  (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                }}
+              />
+            </div>
+            Add Liquidity to {symbolA}/{symbolB}
+          </h3>
           <button className="close-button" onClick={onClose} aria-label="Close">
             <svg width="20" height="20" viewBox="0 0 24 24">
               <path
@@ -1505,438 +1832,282 @@ const DepositModal: React.FC<DepositModalProps> = ({
             </svg>
           </button>
         </div>
-
-        {txNotification?.txDigest ? (
-          <div className="success-confirmation">
-            <div className="success-check-icon">
-              <svg
-                width="80"
-                height="80"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="11"
-                  stroke="#2EC37C"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M7 12L10 15L17 8"
-                  stroke="#2EC37C"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+        <div className="modal-body">
+          {/* Pool and current price */}
+          <div className="current-price">
+            <div className="price-label">
+              Current Price:{" "}
+              <span className="price-value">
+                {currentPrice > 0
+                  ? `${currentPrice.toFixed(6)} ${symbolB} per ${symbolA}`
+                  : "Loading..."}
+              </span>
             </div>
-
-            <h2 className="success-title">Deposit Successful!</h2>
-
-            <p className="success-message">
-              Added liquidity to {symbolA}/{symbolB}
-            </p>
-
-            <p className="transaction-id">
-              Transaction ID: {txNotification.txDigest}
-            </p>
-
-            <div className="success-actions">
-              <a
-                href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="view-tx-link"
-              >
-                View on SuiVision
-              </a>
-
-              <button className="done-button" onClick={onClose}>
-                Done
-              </button>
-            </div>
+            {renderPriceSource()}
           </div>
-        ) : (
-          <>
-            <form onSubmit={handleSubmit} className="modal-body">
-              {/* Pool Info */}
-              <div className="pool-info">
-                <div className="token-pair">
-                  <div className="token-icons">
-                    <div className="token-icon">
-                      {pool.tokenAMetadata?.logo_uri ? (
-                        <img
-                          src={pool.tokenAMetadata.logo_uri}
-                          alt={pool.tokenA}
-                        />
-                      ) : (
-                        <span>{pool.tokenA[0]}</span>
-                      )}
-                    </div>
-                    <div className="token-icon">
-                      {pool.tokenBMetadata?.logo_uri ? (
-                        <img
-                          src={pool.tokenBMetadata.logo_uri}
-                          alt={pool.tokenB}
-                        />
-                      ) : (
-                        <span>{pool.tokenB[0]}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="pair-details">
-                    <div className="pair-name">
-                      {pool.tokenA} / {pool.tokenB}
-                    </div>
-                  </div>
+
+          <form onSubmit={handleSubmit}>
+            {/* Token A input */}
+            <div className="input-group">
+              <div className="input-label">
+                <div className="token-with-icon">
+                  <img
+                    className="token-icon"
+                    src={getTokenLogoUrl(true)}
+                    alt={symbolA}
+                    onError={(e) => {
+                      // Simplified error handling
+                      (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                    }}
+                  />
+                  <span>{symbolA}</span>
                 </div>
-                <div className="dex-badge">{pool.dex}</div>
+                <span className="balance">
+                  Balance: {formatBalance(symbolA)}
+                </span>
               </div>
-
-              {/* Price Range */}
-              <div className="liquidity-range-selector">
-                <h4 className="section-title">Select Price Range</h4>
-                <div className="current-price">
-                  <span className="label">Current Price:</span>
-                  <span className="value">
-                    {(currentPrice || 0).toFixed(6)} {pool.tokenB} per{" "}
-                    {pool.tokenA}
-                  </span>
-                </div>
-
-                {renderPriceSource()}
-
-                {/* Full Range Button */}
-                <div className="range-presets" style={{ marginBottom: "10px" }}>
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={setFullRange}
-                    disabled={isSubmitting}
-                  >
-                    Full Range
-                  </button>
-                </div>
-
-                <div className="price-inputs">
-                  <div className="input-group">
-                    <label htmlFor="min-price">Min Price</label>
-                    <input
-                      id="min-price"
-                      type="text"
-                      value={minPrice}
-                      onChange={onMinPriceChange}
-                      className="price-input"
-                    />
-                    <span className="token-pair">
-                      {pool.tokenB} per {pool.tokenA}
-                    </span>
-                  </div>
-                  <div className="input-group">
-                    <label htmlFor="max-price">Max Price</label>
-                    <input
-                      id="max-price"
-                      type="text"
-                      value={maxPrice}
-                      onChange={onMaxPriceChange}
-                      className="price-input"
-                    />
-                    <span className="token-pair">
-                      {pool.tokenB} per {pool.tokenA}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Tick Values Display (Debug) */}
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "#666",
-                    marginTop: "5px",
-                    textAlign: "center",
-                  }}
+              <div className="input-wrapper">
+                <input
+                  type="text"
+                  value={amountA}
+                  onChange={handleAmountAChange}
+                  placeholder="0.0"
+                />
+                <button
+                  type="button"
+                  className="max-button"
+                  onClick={handleMaxAClick}
+                  disabled={!walletConnected}
                 >
-                  Tick Range: {tickLower} to {tickUpper}
-                </div>
+                  MAX
+                </button>
               </div>
-
-              {/* Amount Inputs */}
-              <div className="input-groups">
-                <div className="input-group">
-                  <label htmlFor="tokenA-amount">
-                    Enter {pool.tokenA} amount:
-                  </label>
-                  <div className="input-with-max">
-                    <input
-                      id="tokenA-amount"
-                      type="text"
-                      value={amountA}
-                      onChange={handleAmountAChange}
-                      disabled={isSubmitting}
-                      className={`token-input ${
-                        fixedToken === "A" ? "fixed" : ""
-                      }`}
-                      placeholder="0.0"
-                    />
-                    <button
-                      type="button"
-                      className="max-button"
-                      onClick={handleMaxAClick}
-                      disabled={!balances[pool.tokenA] || isSubmitting}
-                    >
-                      MAX
-                    </button>
-                  </div>
-                  <div className="balance-info">
-                    <span className="balance-label">Balance:</span>
-                    <span className="balance-value">
-                      {formatBalance(pool.tokenA)} {pool.tokenA}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="input-group">
-                  <label htmlFor="tokenB-amount">
-                    Enter {pool.tokenB} amount:
-                  </label>
-                  <div className="input-with-max">
-                    <input
-                      id="tokenB-amount"
-                      type="text"
-                      value={amountB}
-                      onChange={handleAmountBChange}
-                      disabled={isSubmitting}
-                      className={`token-input ${
-                        fixedToken === "B" ? "fixed" : ""
-                      }`}
-                      placeholder="0.0"
-                    />
-                    <button
-                      type="button"
-                      className="max-button"
-                      onClick={handleMaxBClick}
-                      disabled={!balances[pool.tokenB] || isSubmitting}
-                    >
-                      MAX
-                    </button>
-                  </div>
-                  <div className="balance-info">
-                    <span className="balance-label">Balance:</span>
-                    <span className="balance-value">
-                      {formatBalance(pool.tokenB)} {pool.tokenB}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Slippage */}
-              <div className="slippage-setting">
-                <label>Slippage Tolerance:</label>
-                <div className="slippage-options">
-                  <button
-                    type="button"
-                    className={slippage === "0.1" ? "selected" : ""}
-                    onClick={() => setSlippage("0.1")}
-                    disabled={isSubmitting}
-                  >
-                    0.1%
-                  </button>
-                  <button
-                    type="button"
-                    className={slippage === "0.1" ? "selected" : ""}
-                    onClick={() => setSlippage("0.1")}
-                    disabled={isSubmitting}
-                  >
-                    0.1%
-                  </button>
-                  <button
-                    type="button"
-                    className={slippage === "0.5" ? "selected" : ""}
-                    onClick={() => setSlippage("0.5")}
-                    disabled={isSubmitting}
-                  >
-                    0.5%
-                  </button>
-                  <button
-                    type="button"
-                    className={slippage === "1" ? "selected" : ""}
-                    onClick={() => setSlippage("1")}
-                    disabled={isSubmitting}
-                  >
-                    1%
-                  </button>
-                  <div className="custom-slippage">
-                    <input
-                      type="text"
-                      value={slippage}
-                      onChange={(e) =>
-                        setSlippage(e.target.value.replace(/[^0-9.]/g, ""))
-                      }
-                      placeholder="Custom"
-                      disabled={isSubmitting}
-                    />
-                    <span className="percent-sign">%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Summary */}
-              <div className="summary-panel">
-                <div className="summary-item">
-                  <span className="item-label">Estimated APR:</span>
-                  <span className="item-value highlight">
-                    {pool.apr.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="summary-item">
-                  <span className="item-label">Pool Liquidity:</span>
-                  <span className="item-value">
-                    {formatDollars(pool.liquidityUSD)}
-                  </span>
-                </div>
-                <div className="summary-item">
-                  <span className="item-label">24h Volume:</span>
-                  <span className="item-value">
-                    {formatDollars(pool.volumeUSD)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Wallet Warning */}
-              {!walletConnected && (
-                <div className="wallet-warning">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                  </svg>
-                  <span>Connect your wallet to deposit</span>
-                </div>
-              )}
-
-              {/* SDK Error Message */}
-              {sdkError && (
-                <div className="error-message">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                    <line
-                      x1="12"
-                      y1="8"
-                      x2="12"
-                      y2="12"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                    <line
-                      x1="12"
-                      y1="16"
-                      x2="12.01"
-                      y2="16"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                  {sdkError}
-                </div>
-              )}
-
-              {/* Transaction Notification */}
-              {txNotification && !txNotification.txDigest && (
-                <div
-                  className={`transaction-notification ${
-                    txNotification.isSuccess ? "success" : "error"
-                  }`}
-                >
-                  {txNotification.isSuccess ? (
-                    <div className="spinner"></div>
-                  ) : (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <circle
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      />
-                      <line
-                        x1="15"
-                        y1="9"
-                        x2="9"
-                        y2="15"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      />
-                      <line
-                        x1="9"
-                        y1="9"
-                        x2="15"
-                        y2="15"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      />
-                    </svg>
-                  )}
-                  <span>{txNotification.message}</span>
-                </div>
-              )}
-            </form>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn--secondary"
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn--primary"
-                onClick={handleSubmit}
-                disabled={isSubmitDisabled}
-              >
-                {isSubmitting ? (
-                  <span className="loading-text">
-                    <span className="spinner-small"></span>
-                    Processing...
-                  </span>
-                ) : (
-                  "Deposit"
-                )}
-              </button>
             </div>
-          </>
-        )}
+
+            {/* Token B input */}
+            <div className="input-group">
+              <div className="input-label">
+                <div className="token-with-icon">
+                  <img
+                    className="token-icon"
+                    src={getTokenLogoUrl(false)}
+                    alt={symbolB}
+                    onError={(e) => {
+                      // Simplified error handling
+                      (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                    }}
+                  />
+                  <span>{symbolB}</span>
+                </div>
+                <span className="balance">
+                  Balance: {formatBalance(symbolB)}
+                </span>
+              </div>
+              <div className="input-wrapper">
+                <input
+                  type="text"
+                  value={amountB}
+                  onChange={handleAmountBChange}
+                  placeholder="0.0"
+                />
+                <button
+                  type="button"
+                  className="max-button"
+                  onClick={handleMaxBClick}
+                  disabled={!walletConnected}
+                >
+                  MAX
+                </button>
+              </div>
+            </div>
+
+            {/* Price range inputs */}
+            <div className="price-range-section">
+              <div className="section-header">
+                <h4>Set Price Range</h4>
+                <button
+                  type="button"
+                  className="full-range-button"
+                  onClick={setFullRange}
+                >
+                  Full Range
+                </button>
+              </div>
+
+              <div className="price-inputs">
+                <div className="input-group">
+                  <label>Min Price</label>
+                  <input
+                    type="text"
+                    value={minPrice}
+                    onChange={onMinPriceChange}
+                    placeholder="0.0"
+                  />
+                  <span className="price-suffix">
+                    <div className="token-mini-icons">
+                      <img
+                        className="token-mini-icon"
+                        src={getTokenLogoUrl(false)}
+                        alt={symbolB}
+                        onError={(e) => {
+                          // Simplified error handling
+                          (e.target as HTMLImageElement).src =
+                            TOKEN_PLACEHOLDER;
+                        }}
+                      />
+                      <img
+                        className="token-mini-icon"
+                        src={getTokenLogoUrl(true)}
+                        alt={symbolA}
+                        onError={(e) => {
+                          // Simplified error handling
+                          (e.target as HTMLImageElement).src =
+                            TOKEN_PLACEHOLDER;
+                        }}
+                      />
+                    </div>
+                    {symbolB} per {symbolA}
+                  </span>
+                </div>
+
+                <div className="input-group">
+                  <label>Max Price</label>
+                  <input
+                    type="text"
+                    value={maxPrice}
+                    onChange={onMaxPriceChange}
+                    placeholder="0.0"
+                  />
+                  <span className="price-suffix">
+                    <div className="token-mini-icons">
+                      <img
+                        className="token-mini-icon"
+                        src={getTokenLogoUrl(false)}
+                        alt={symbolB}
+                        onError={(e) => {
+                          // Simplified error handling
+                          (e.target as HTMLImageElement).src =
+                            TOKEN_PLACEHOLDER;
+                        }}
+                      />
+                      <img
+                        className="token-mini-icon"
+                        src={getTokenLogoUrl(true)}
+                        alt={symbolA}
+                        onError={(e) => {
+                          // Simplified error handling
+                          (e.target as HTMLImageElement).src =
+                            TOKEN_PLACEHOLDER;
+                        }}
+                      />
+                    </div>
+                    {symbolB} per {symbolA}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Slippage tolerance */}
+            <div className="slippage-section">
+              <label>Slippage Tolerance</label>
+              <div className="slippage-options">
+                <button
+                  type="button"
+                  className={slippage === "0.1" ? "active" : ""}
+                  onClick={() => setSlippage("0.1")}
+                >
+                  0.1%
+                </button>
+                <button
+                  type="button"
+                  className={slippage === "0.5" ? "active" : ""}
+                  onClick={() => setSlippage("0.5")}
+                >
+                  0.5%
+                </button>
+                <button
+                  type="button"
+                  className={slippage === "1.0" ? "active" : ""}
+                  onClick={() => setSlippage("1.0")}
+                >
+                  1.0%
+                </button>
+                <div className="custom-slippage">
+                  <input
+                    type="text"
+                    value={slippage}
+                    onChange={(e) => setSlippage(e.target.value)}
+                    placeholder="Custom"
+                    maxLength={5}
+                  />
+                  <span>%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Estimated position value */}
+            <div className="position-summary">
+              <div className="summary-item">
+                <span>Est. Position Value:</span>
+                <span>
+                  {currentPrice > 0 && amountA && amountB
+                    ? formatDollars(
+                        Number(amountA) * Number(pool?.tokenAUsdPrice || 0) +
+                          Number(amountB) * Number(pool?.tokenBUsdPrice || 0)
+                      )
+                    : "$0.00"}
+                </span>
+              </div>
+              <div className="summary-item tick-values">
+                <span>Tick Range:</span>
+                <span>
+                  {tickLower} to {tickUpper}
+                </span>
+              </div>
+            </div>
+
+            {/* Submit button */}
+            <div className="submit-section">
+              {!walletConnected ? (
+                <button type="button" disabled className="submit-button">
+                  Connect wallet to deposit
+                </button>
+              ) : sdkError ? (
+                <div className="error-message">{sdkError}</div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSubmitDisabled}
+                  className="submit-button"
+                >
+                  {isSubmitting ? "Processing..." : "Add Liquidity"}
+                </button>
+              )}
+            </div>
+
+            {/* Notification */}
+            {txNotification && (
+              <div
+                className={`notification ${
+                  txNotification.isSuccess ? "success" : "error"
+                }`}
+              >
+                {txNotification.message}
+                {txNotification.txDigest && (
+                  <div className="tx-link">
+                    <a
+                      href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View Transaction ↗
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </form>
+        </div>
       </div>
     </div>
   );
