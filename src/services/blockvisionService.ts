@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-12 05:01:23 UTC by jake1318
+// Last Updated: 2025-07-12 23:16:00 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -12,6 +12,9 @@ import { getCoinMeta } from "./suiMetadataService";
 const BLOCKVISION_API_BASE_URL = "https://api.blockvision.org";
 const BLOCKVISION_API_KEY =
   import.meta.env.VITE_BLOCKVISION_API_KEY || "2ugIlviim3ywrgFI0BMniB9wdzU";
+
+// Add this new constant for the list endpoint limit
+const LIST_LIMIT = 20;
 
 const blockvisionApi = axios.create({
   baseURL: BLOCKVISION_API_BASE_URL,
@@ -1259,7 +1262,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑07‑12 05:01:23 UTC by jake1318
+//  last‑updated: 2025‑07‑12 23:16:00 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1373,6 +1376,81 @@ export async function getCoinOhlcv(
   if (start) params.start = String(start);
   const result = await bvGet<{ ohlcs: OhlcvPoint[] }>("/coin/ohlcv", params);
   return result.ohlcs;
+}
+
+/**
+ * Fetch a batch of up to 20 coinTypes with the "market/list" bulk endpoint.
+ * Returns a map keyed by coinType (address string).
+ */
+export async function getCoinMarketDataBulk(
+  coinTypes: string[]
+): Promise<Record<string, CoinMarketData>> {
+  if (!coinTypes.length) return {};
+
+  const base = "https://api.blockvision.org/v2/sui/coin/market/list";
+  const qs = new URLSearchParams({
+    coinTypes: coinTypes.join(","),
+    show24hChange: "true",
+  }).toString();
+
+  const res = await fetch(`${base}?${qs}`, {
+    headers: {
+      accept: "application/json",
+      "x-api-key": BLOCKVISION_API_KEY,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`BlockVision list failed – ${res.status}`);
+  }
+
+  type Resp = { result: CoinMarketData[] };
+  const json: Resp = await res.json();
+
+  // Map by coinType for easier merging
+  return (json.result ?? []).reduce<Record<string, CoinMarketData>>(
+    (acc, item) => {
+      acc[item.tokenId] = item;
+      return acc;
+    },
+    {}
+  );
+}
+
+/**
+ * Helper: split the *full* token list into <=20‑item chunks,
+ * fire them in parallel (up to `concurrency` promises),
+ * and merge all results into one big map.
+ */
+export async function getCoinMarketDataBulkChunked(
+  coinTypes: string[],
+  concurrency = 4
+): Promise<Record<string, CoinMarketData>> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < coinTypes.length; i += LIST_LIMIT) {
+    chunks.push(coinTypes.slice(i, i + LIST_LIMIT));
+  }
+
+  const out: Record<string, CoinMarketData> = {};
+  let idx = 0;
+
+  // simple pool
+  async function runNext(): Promise<void> {
+    if (idx >= chunks.length) return;
+    const myIndex = idx++;
+    const chunk = chunks[myIndex];
+    try {
+      const m = await getCoinMarketDataBulk(chunk);
+      Object.assign(out, m);
+    } finally {
+      await runNext(); // take the next chunk
+    }
+  }
+
+  await Promise.all(
+    Array(Math.min(concurrency, chunks.length)).fill(0).map(runNext)
+  );
+  return out;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1660,6 +1738,8 @@ export const blockvisionService = {
           combinedRawData.cetus.farms &&
           combinedRawData.cetus.farms.length > 0
         ) {
+          // Continuing from where it was cut off:
+
           console.log(
             `Processing ${combinedRawData.cetus.farms.length} Cetus farms`
           );
@@ -1719,10 +1799,6 @@ export const blockvisionService = {
       if (combinedRawData.bluefin) {
         console.log("Found Bluefin data, processing separately");
         const bluefinPoolGroups = processBluefinData(combinedRawData.bluefin);
-        // src/services/blockvisionService.ts
-        // Last Updated: 2025-07-12 05:22:11 UTC by jake1318
-
-        // Continuing from where it cut off...
 
         // Add the processed Bluefin groups to the main pool groups array
         if (bluefinPoolGroups.length > 0) {
@@ -2657,6 +2733,8 @@ export const blockvisionService = {
   getCoinMarketDataPro,
   getCoinOhlcv,
   getCoinMarketDataBatch,
+  getCoinMarketDataBulk,
+  getCoinMarketDataBulkChunked,
 };
 
 export default blockvisionService;
