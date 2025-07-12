@@ -1,5 +1,5 @@
 // src/pages/Portfolio/MarketDashboard.tsx
-// Last Updated: 2025-07-12 05:22:11 UTC by jake1318
+// Last Updated: 2025-07-12 22:55:45 UTC by jake1318
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -12,12 +12,18 @@ import {
   FaCaretUp,
   FaCaretDown,
   FaChartBar,
-  FaExclamationTriangle
+  FaExclamationTriangle,
 } from "react-icons/fa";
 
 // Import services for direct API access
-import { birdeyeService, BirdeyeListToken } from "../../services/birdeyeService";
-import { blockvisionService, CoinMarketData } from "../../services/blockvisionService";
+import {
+  birdeyeService,
+  BirdeyeListToken,
+} from "../../services/birdeyeService";
+import {
+  blockvisionService,
+  CoinMarketData,
+} from "../../services/blockvisionService";
 
 import "./MarketDashboard.scss";
 
@@ -58,14 +64,14 @@ type SortDirection = "asc" | "desc";
 // Helper function to safely parse numeric values
 function safeParseFloat(value: any): number {
   if (value === undefined || value === null) return 0;
-  
-  if (typeof value === 'number') return value;
-  
-  if (typeof value === 'string') {
+
+  if (typeof value === "number") return value;
+
+  if (typeof value === "string") {
     const parsed = parseFloat(value);
     return isNaN(parsed) ? 0 : parsed;
   }
-  
+
   return 0;
 }
 
@@ -129,20 +135,25 @@ function filterTokens(tokens: TokenData[], searchTerm: string): TokenData[] {
 }
 
 // Specific address for haSui token
-const HASUI_ADDRESS = "0x5855451d273efbc5cd8cda16c10378aaf82d2ae4a1b2192e07beccc680e66c0::hasui::HASUI";
+const HASUI_ADDRESS =
+  "0x5855451d273efbc5cd8cda16c10378aaf82d2ae4a1b2192e07beccc680e66c0::hasui::HASUI";
 
 /* ------------------------------------------------------------------ */
 /*  Re‑usable skeleton row (shows 8 columns + logo placeholder)       */
 /* ------------------------------------------------------------------ */
 const SkeletonRow: React.FC = () => (
   <tr className="skeleton-row">
-    <td className="rank-col"><div className="sk-box short" /></td>
+    <td className="rank-col">
+      <div className="sk-box short" />
+    </td>
     <td className="name-col">
       <div className="sk-logo" />
       <div className="sk-box medium" />
     </td>
     {Array.from({ length: 8 }).map((_, i) => (
-      <td key={i}><div className="sk-box long" /></td>
+      <td key={i}>
+        <div className="sk-box long" />
+      </td>
     ))}
   </tr>
 );
@@ -163,7 +174,7 @@ function MarketDashboard() {
 
   // Ref to track if component is mounted
   const isMounted = useRef<boolean>(true);
-  
+
   // Ref to prevent overlapping refreshes (mutex)
   const inFlight = useRef<boolean>(false);
 
@@ -175,26 +186,35 @@ function MarketDashboard() {
 
     try {
       console.log("Fetching token market data...");
-      
+
       /* 1 ─ Birdeye list */
       console.log("Fetching token list from Birdeye API...");
-      const birdeyeTokens = await birdeyeService.getTokenList("sui", 50, 0, 500_000);
-      const tokenIds = birdeyeTokens.map(t => t.address);
-      
-      console.log(`Successfully fetched ${birdeyeTokens.length} tokens from Birdeye`);
+      const birdeyeTokens = await birdeyeService.getTokenList(
+        "sui",
+        50,
+        0,
+        500_000
+      );
+      const tokenIds = birdeyeTokens.map((t) => t.address);
+
+      console.log(
+        `Successfully fetched ${birdeyeTokens.length} tokens from Birdeye`
+      );
 
       /* 2 ─ BlockVision (all tokens with concurrency) */
-      console.log(`Fetching BlockVision market/pro (${tokenIds.length} tokens with 8-way concurrency)...`);
+      console.log(
+        `Fetching BlockVision market/pro (${tokenIds.length} tokens with 8-way concurrency)...`
+      );
       // pro plan – fetch all tokens (≈50) with 8‑way concurrency
       const bv = await blockvisionService.getCoinMarketDataBatch(tokenIds, 8);
 
       /* 3 ─ merge */
       const rows: TokenData[] = birdeyeTokens.map((t, i) => {
-        const m   = bv[t.address];             // undefined if not fetched
-        const px  = safeParseFloat(m?.priceInUsd ?? t.price);
-        const circ= safeParseFloat(m?.circulating);
-        const mc  = m ? safeParseFloat(m.marketCap) : px * circ;
-        
+        const m = bv[t.address]; // undefined if not fetched
+        const px = safeParseFloat(m?.priceInUsd ?? t.price);
+        const circ = safeParseFloat(m?.circulating);
+        const mc = m ? safeParseFloat(m.marketCap) : px * circ;
+
         // Check for haSui and use local logo
         let logoURI = t.logoURI;
         if (t.symbol === "HASUI" || t.address === HASUI_ADDRESS) {
@@ -221,7 +241,7 @@ function MarketDashboard() {
 
       rows.sort((a, b) => b.marketCap - a.marketCap);
       rows.forEach((r, idx) => (r.rank = idx + 1));
-      
+
       console.log(`Merged ${rows.length} tokens – dashboard ready`);
 
       setTokens(rows);
@@ -297,17 +317,25 @@ function MarketDashboard() {
       );
     }
   };
-  
+
   // Calculate market summary stats
   const marketStats = {
-    totalMarketCap: filteredTokens.reduce((sum, token) => sum + token.marketCap, 0),
-    totalVolume24h: filteredTokens.reduce((sum, token) => sum + token.volume24h, 0),
+    totalMarketCap: filteredTokens.reduce(
+      (sum, token) => sum + token.marketCap,
+      0
+    ),
+    totalVolume24h: filteredTokens.reduce(
+      (sum, token) => sum + token.volume24h,
+      0
+    ),
     totalTokens: filteredTokens.length,
-    averagePriceChange: filteredTokens.length > 0 
-      ? filteredTokens.reduce((sum, token) => sum + token.priceChange24h, 0) / filteredTokens.length
-      : 0
+    averagePriceChange:
+      filteredTokens.length > 0
+        ? filteredTokens.reduce((sum, token) => sum + token.priceChange24h, 0) /
+          filteredTokens.length
+        : 0,
   };
-  
+
   // Handle refresh click
   const handleRefresh = () => {
     if (!refreshing) {
@@ -325,186 +353,266 @@ function MarketDashboard() {
 
   return (
     <div className="market-dashboard">
-      {/* Market summary panel with shimmering placeholders when loading */}
-      <div className="market-summary">
-        <div className="summary-stat">
-          <div className="stat-label">Market Cap</div>
-          <div className="stat-value">
-            {loading
-              ? <span className="sk-box long" style={{height: '18px'}}/>
-              : formatDollarValue(marketStats.totalMarketCap)}
-          </div>
-        </div>
-        <div className="summary-stat">
-          <div className="stat-label">24h Volume</div>
-          <div className="stat-value">
-            {loading
-              ? <span className="sk-box long" style={{height: '18px'}}/>
-              : formatDollarValue(marketStats.totalVolume24h)}
-          </div>
-        </div>
-        <div className="summary-stat">
-          <div className="stat-label">Tokens</div>
-          <div className="stat-value">
-            {loading
-              ? <span className="sk-box long" style={{height: '18px'}}/>
-              : marketStats.totalTokens}
-          </div>
-        </div>
-        <div className="summary-stat">
-          <div className="stat-label">Avg Price Change (24h)</div>
-          <div className={`stat-value ${marketStats.averagePriceChange >= 0 ? 'positive' : 'negative'}`}>
-            {loading
-              ? <span className="sk-box long" style={{height: '18px'}}/>
-              : `${marketStats.averagePriceChange >= 0 ? '+' : ''}${formatPercentage(marketStats.averagePriceChange)}`}
-          </div>
-        </div>
-      </div>
-      
-      {/* Controls section */}
-      <div className="controls">
-        <div className="search-container">
-          <FaSearch className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search by name, symbol or address..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
-        <div className="refresh-container">
-          <button 
-            className={`refresh-button ${refreshing ? 'refreshing' : ''}`}
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <FaSync className={`refresh-icon ${refreshing ? 'spin' : ''}`} />
-            Refresh
-          </button>
-          <div className="last-updated">
-            Last updated: {lastUpdated || 'Never'}
-          </div>
-        </div>
-      </div>
+      <div className="container">
+        <h1>Market Dashboard</h1>
 
-      {/* Error display */}
-      {error && (
-        <div className="error-message">
-          <FaExclamationTriangle /> {error}
-        </div>
-      )}
-      
-      {/* Table component with skeleton loader */}
-      <div className="table-container">
-        <table className="market-table">
-          <thead>
-            <tr>
-              <th onClick={() => handleSort(SortColumn.Rank)} className="rank-col">
-                # {getSortIcon(SortColumn.Rank)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.Name)} className="name-col">
-                Name {getSortIcon(SortColumn.Name)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.Price)} className="price-col">
-                Price {getSortIcon(SortColumn.Price)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.PriceChange)} className="change-col">
-                24h Change {getSortIcon(SortColumn.PriceChange)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.Volume)} className="volume-col">
-                24h Volume {getSortIcon(SortColumn.Volume)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.MarketCap)} className="market-cap-col">
-                Market Cap {getSortIcon(SortColumn.MarketCap)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.Liquidity)} className="liquidity-col">
-                Liquidity {getSortIcon(SortColumn.Liquidity)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.FDV)} className="fdv-col">
-                FDV {getSortIcon(SortColumn.FDV)}
-                <span className="info-tooltip">
-                  <FaInfoCircle />
-                  <span className="tooltip-text">Fully Diluted Valuation = Price × Total Supply</span>
-                </span>
-              </th>
-              <th onClick={() => handleSort(SortColumn.CirculatingSupply)} className="supply-col">
-                Circ. Supply {getSortIcon(SortColumn.CirculatingSupply)}
-              </th>
-              <th onClick={() => handleSort(SortColumn.TotalSupply)} className="supply-col">
-                Total Supply {getSortIcon(SortColumn.TotalSupply)}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading
-              ? /* ⇢  Show 8 shimmering rows while we're fetching  */
-                Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
-              : filteredTokens.length === 0
-                  ? (
-                    <tr>
-                      <td colSpan={10} className="no-results">
-                        No tokens match your search criteria
-                      </td>
-                    </tr>
-                  )
-                  : filteredTokens.map((token) => (
-                    <tr key={token.address}>
-                      <td className="rank-col">{token.rank}</td>
-                      <td className="name-col">
-                        <img
-                          src={getTokenLogo(token)}
-                          alt={token.symbol}
-                          className="token-logo"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            console.log(`Failed to load logo for ${token.symbol}, using fallback`);
-                            // Try a second time with haSui local logo if applicable
-                            if (token.symbol === "HASUI" || token.address === HASUI_ADDRESS) {
-                              target.src = "/haSui.webp";
-                            } else {
-                              target.src = '/assets/images/unknown-token.png';
-                            }
-                          }}
-                        />
-                        <div className="token-info">
-                          <div className="token-name">{token.name}</div>
-                          <div className="token-symbol">{token.symbol}</div>
-                        </div>
-                      </td>
-                      <td className="price-col">{formatPrice(token.price)}</td>
-                      <td className={`change-col ${token.priceChange24h >= 0 ? 'positive' : 'negative'}`}>
-                        {token.priceChange24h >= 0 ? <FaCaretUp /> : <FaCaretDown />}
-                        {formatPercentage(Math.abs(token.priceChange24h))}
-                      </td>
-                      <td className="volume-col">{formatDollarValue(token.volume24h)}</td>
-                      <td className="market-cap-col">{formatDollarValue(token.marketCap)}</td>
-                      <td className="liquidity-col">{formatDollarValue(token.liquidity)}</td>
-                      <td className="fdv-col">
-                        {token.fdv ? formatDollarValue(token.fdv) : "N/A"}
-                      </td>
-                      <td className="supply-col">
-                        {token.circulatingSupply ? formatNumber(token.circulatingSupply) : "N/A"}
-                      </td>
-                      <td className="supply-col">
-                        {token.totalSupply ? formatNumber(token.totalSupply) : "N/A"}
-                      </td>
-                    </tr>
-                  ))}
-          </tbody>
-        </table>
-      </div>
-      
-      {/* Footer with info */}
-      <div className="dashboard-footer">
-        <div className="data-attribution">
-          <div className="attribution-item">
-            <FaChartBar className="attribution-icon" />
-            Data from Birdeye and BlockVision APIs
+        {/* Market summary panel with enhanced UI */}
+        <div className="market-summary">
+          <div className="summary-stat">
+            <div className="stat-label">Market Cap</div>
+            <div
+              className={`stat-value ${
+                marketStats.totalMarketCap > 0 ? "positive" : ""
+              }`}
+            >
+              {loading ? (
+                <span className="sk-box long" style={{ height: "18px" }} />
+              ) : (
+                formatDollarValue(marketStats.totalMarketCap)
+              )}
+            </div>
           </div>
-          <div className="update-frequency">
-            <FaSync className="update-icon" />
-            Data refreshed manually. Click Refresh for latest data.
+          <div className="summary-stat">
+            <div className="stat-label">24h Volume</div>
+            <div className="stat-value">
+              {loading ? (
+                <span className="sk-box long" style={{ height: "18px" }} />
+              ) : (
+                formatDollarValue(marketStats.totalVolume24h)
+              )}
+            </div>
+          </div>
+          <div className="summary-stat">
+            <div className="stat-label">Tokens</div>
+            <div className="stat-value">
+              {loading ? (
+                <span className="sk-box long" style={{ height: "18px" }} />
+              ) : (
+                marketStats.totalTokens
+              )}
+            </div>
+          </div>
+          <div className="summary-stat">
+            <div className="stat-label">Avg Price Change (24h)</div>
+            <div
+              className={`stat-value ${
+                marketStats.averagePriceChange >= 0 ? "positive" : "negative"
+              }`}
+            >
+              {loading ? (
+                <span className="sk-box long" style={{ height: "18px" }} />
+              ) : (
+                `${
+                  marketStats.averagePriceChange >= 0 ? "+" : ""
+                }${formatPercentage(marketStats.averagePriceChange)}`
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Controls section with enhanced UI */}
+        <div className="controls">
+          <div className="search-container">
+            <FaSearch className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search by name, symbol or address..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+          </div>
+          <div className="controls-right">
+            <button
+              className={`refresh-button ${refreshing ? "refreshing" : ""}`}
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <FaSync className={`refresh-icon ${refreshing ? "spin" : ""}`} />
+              {refreshing ? "REFRESHING..." : "REFRESH"}
+            </button>
+            {!loading && (
+              <span className="last-updated">
+                Updated {lastUpdated || "Never"}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Error display with enhanced UI */}
+        {error && (
+          <div className="error-message">
+            <FaExclamationTriangle /> {error}
+            <button onClick={handleRefresh}>Try Again</button>
+          </div>
+        )}
+
+        {/* Table component with enhanced UI */}
+        <div className="table-container">
+          <table className="token-table">
+            <thead>
+              <tr>
+                <th
+                  onClick={() => handleSort(SortColumn.Rank)}
+                  className="rank-col"
+                >
+                  # {getSortIcon(SortColumn.Rank)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.Name)}
+                  className="name-col"
+                >
+                  Name {getSortIcon(SortColumn.Name)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.Price)}
+                  className="price-col"
+                >
+                  Price {getSortIcon(SortColumn.Price)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.PriceChange)}
+                  className="change-col"
+                >
+                  24h Change {getSortIcon(SortColumn.PriceChange)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.Volume)}
+                  className="volume-col"
+                >
+                  24h Volume {getSortIcon(SortColumn.Volume)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.MarketCap)}
+                  className="market-cap-col"
+                >
+                  Market Cap {getSortIcon(SortColumn.MarketCap)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.Liquidity)}
+                  className="liquidity-col"
+                >
+                  Liquidity {getSortIcon(SortColumn.Liquidity)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.FDV)}
+                  className="fdv-col"
+                >
+                  FDV {getSortIcon(SortColumn.FDV)}
+                  <span className="info-tooltip">
+                    <FaInfoCircle />
+                    <span className="tooltip-text">
+                      Fully Diluted Valuation = Price × Total Supply
+                    </span>
+                  </span>
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.CirculatingSupply)}
+                  className="supply-col"
+                >
+                  Circ. Supply {getSortIcon(SortColumn.CirculatingSupply)}
+                </th>
+                <th
+                  onClick={() => handleSort(SortColumn.TotalSupply)}
+                  className="supply-col"
+                >
+                  Total Supply {getSortIcon(SortColumn.TotalSupply)}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                /* ⇢  Show 8 shimmering rows while we're fetching  */
+                Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
+              ) : filteredTokens.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="no-results">
+                    No tokens match your search criteria
+                  </td>
+                </tr>
+              ) : (
+                filteredTokens.map((token) => (
+                  <tr key={token.address}>
+                    <td className="rank-col">{token.rank}</td>
+                    <td className="name-col">
+                      <img
+                        src={getTokenLogo(token)}
+                        alt={token.symbol}
+                        className="token-logo"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          console.log(
+                            `Failed to load logo for ${token.symbol}, using fallback`
+                          );
+                          // Try a second time with haSui local logo if applicable
+                          if (
+                            token.symbol === "HASUI" ||
+                            token.address === HASUI_ADDRESS
+                          ) {
+                            target.src = "/haSui.webp";
+                          } else {
+                            target.src = "/assets/images/unknown-token.png";
+                          }
+                        }}
+                      />
+                      <div className="token-info">
+                        <div className="token-name">{token.name}</div>
+                        <div className="token-symbol">{token.symbol}</div>
+                      </div>
+                    </td>
+                    <td className="price-col">{formatPrice(token.price)}</td>
+                    <td
+                      className={`change-col ${
+                        token.priceChange24h >= 0 ? "positive" : "negative"
+                      }`}
+                    >
+                      {token.priceChange24h >= 0 ? (
+                        <FaCaretUp />
+                      ) : (
+                        <FaCaretDown />
+                      )}
+                      {formatPercentage(Math.abs(token.priceChange24h))}
+                    </td>
+                    <td className="volume-col">
+                      {formatDollarValue(token.volume24h)}
+                    </td>
+                    <td className="market-cap-col">
+                      {formatDollarValue(token.marketCap)}
+                    </td>
+                    <td className="liquidity-col">
+                      {formatDollarValue(token.liquidity)}
+                    </td>
+                    <td className="fdv-col">
+                      {token.fdv ? formatDollarValue(token.fdv) : "N/A"}
+                    </td>
+                    <td className="supply-col">
+                      {token.circulatingSupply
+                        ? formatNumber(token.circulatingSupply)
+                        : "N/A"}
+                    </td>
+                    <td className="supply-col">
+                      {token.totalSupply
+                        ? formatNumber(token.totalSupply)
+                        : "N/A"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer with info */}
+        <div className="dashboard-footer">
+          <div className="data-attribution">
+            <div className="attribution-item">
+              <FaChartBar className="attribution-icon" />
+              Data from Birdeye and BlockVision APIs
+            </div>
+            <div className="update-frequency">
+              <FaSync className="update-icon" />
+              Data refreshed manually. Click Refresh for latest data.
+            </div>
           </div>
         </div>
       </div>
