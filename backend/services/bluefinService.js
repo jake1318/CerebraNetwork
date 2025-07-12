@@ -1,85 +1,169 @@
 // services/bluefinService.js
-// Updated: 2025-07-08 07:01:51 UTC by jake1318
+// Updated: 2025-07-08 17:17:34 UTC by jake1318
 
 import { SuiClient } from "@mysten/sui.js/client";
 
 /*───────────────────────────────────────────────────────────────────────────*\
 │  Bluefin on-chain object / package IDs (main-net)                         │
-└───────────────────────────────────────────────────────────────────────────*/
-export const BLUEFIN_PACKAGE_ID =
-  // "CurrentPackage" extracted from the JSON blob you supplied
-  "0x6c796c3ab3421a68158e0df18e4657b2827b1f8fed5ed4b82dba9c935988711b";
+\*───────────────────────────────────────────────────────────────────────────*/
+// Current package ID (post-upgrade) as of July 2025
+export const BLUEFIN_CURRENT_PKG =
+  "0x67b34b728c4e28e704dcfecf7c5cf55c7fc593b6c65c20d1836d97c209c1928a";
 
-// NO LONGER USED DIRECTLY - only kept for backward compatibility
-export const GLOBAL_CONFIG_ID =
-  // "GlobalConfig" extracted from the same blob
+// Initial/genesis package ID (used for event querying)
+export const BLUEFIN_GENESIS_PKG =
+  "0x3492c874c1e3b3e2984e8c41b589e642d4d0a5d6459e5a9cfc2d52fd7c89c267";
+
+// Current GlobalConfig object ID
+export const BLUEFIN_CONFIG_ID =
   "0x03db251ba509a8d5d8777b6338836082335d93eecbdd09a11e190a1cff51c352";
 
-export const SUI_CLOCK_OBJECT_ID = "0x6"; // main-net clock object
+export const SUI_CLOCK_OBJECT_ID = "0x6"; // main-net clock object (never changes)
 
 const SUI_RPC_URL =
   process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443";
 
-// Cache for the Bluefin config object ID
-let cachedConfigObj = null;
-let configLastFetched = 0;
-const CONFIG_CACHE_TTL = 3600000; // 1 hour in milliseconds
+// Cache for the Bluefin IDs
+let cachedIds = {
+  packageId: BLUEFIN_CURRENT_PKG,
+  configId: BLUEFIN_CONFIG_ID,
+};
+let idsLastFetched = 0;
+const IDS_CACHE_TTL = 3600000; // 1 hour in milliseconds
 
 /**
- * Get the latest Bluefin global config object ID
+ * Get the current Bluefin package ID and config object ID
  * Uses caching to avoid too many RPC calls
+ *
+ * This function will query the latest InitializeConfig event to find the
+ * most current package ID and config ID, even after future upgrades.
  */
-export async function getBluefinConfigObjectId() {
+export async function getCurrentIds() {
   const now = Date.now();
 
   // Return cached value if it's still fresh
-  if (cachedConfigObj && now - configLastFetched < CONFIG_CACHE_TTL) {
-    console.log(`Using cached Bluefin config object ID: ${cachedConfigObj}`);
-    return cachedConfigObj;
+  if (idsLastFetched > 0 && now - idsLastFetched < IDS_CACHE_TTL) {
+    console.log(`Using cached Bluefin IDs: ${JSON.stringify(cachedIds)}`);
+    return cachedIds;
   }
 
   try {
     const client = new SuiClient({ url: SUI_RPC_URL });
 
-    // Bluefin publishes its global config under a well-known package;
-    // the current object id is emitted in the `InitializeConfig` event
-    // of module `config`. Query the latest event to discover it:
-    const events = await client.queryEvents({
-      query: {
-        MoveEventType: `${BLUEFIN_PACKAGE_ID}::config::InitializeConfig`,
-      },
-      limit: 1,
-      order: "descending", // newest first
-    });
+    // Try to query events from different package IDs in case Bluefin has upgraded
+    // First try current package, then fallback to genesis
+    const packageIds = [BLUEFIN_CURRENT_PKG, BLUEFIN_GENESIS_PKG];
+    let eventData = null;
 
-    if (!events.data || !events.data.length) {
-      console.warn(
-        "Cannot locate Bluefin global config object, falling back to hardcoded value"
-      );
-      // Fall back to hardcoded value if we can't get the new one
-      cachedConfigObj = GLOBAL_CONFIG_ID;
-      configLastFetched = now;
-      return GLOBAL_CONFIG_ID;
+    for (const pkgId of packageIds) {
+      try {
+        console.log(
+          `Querying InitializeConfig events from package ${pkgId}...`
+        );
+
+        const ev = await client.queryEvents({
+          query: {
+            MoveEventType: `${pkgId}::config::InitializeConfig`,
+          },
+          limit: 1, // newest first
+          order: "descending",
+        });
+
+        if (ev.data && ev.data.length > 0) {
+          eventData = ev.data[0];
+          console.log(`Found InitializeConfig event from package ${pkgId}`);
+          break;
+        }
+      } catch (err) {
+        console.warn(
+          `Failed to query events from package ${pkgId}:`,
+          err.message
+        );
+      }
     }
 
-    // Extract config_id from the event's parsed JSON data
-    cachedConfigObj = events.data[0].parsedJson.config_id;
-    configLastFetched = now;
+    if (eventData) {
+      // Every InitializeConfig event has the structure { current_package, config_id }
+      const { current_package, config_id } = eventData.parsedJson;
 
-    console.log(
-      `Retrieved latest Bluefin config object ID: ${cachedConfigObj}`
+      cachedIds = {
+        packageId: current_package,
+        configId: config_id,
+      };
+      idsLastFetched = now;
+
+      console.log(`Retrieved latest Bluefin IDs: ${JSON.stringify(cachedIds)}`);
+      return cachedIds;
+    }
+
+    console.warn(
+      "Could not find Bluefin InitializeConfig events, using hardcoded values"
     );
-    return cachedConfigObj;
+    // If no events found, use the current known values
+    cachedIds = {
+      packageId: BLUEFIN_CURRENT_PKG,
+      configId: BLUEFIN_CONFIG_ID,
+    };
+    idsLastFetched = now;
+    return cachedIds;
   } catch (error) {
-    console.error("Error fetching Bluefin config object ID:", error);
+    console.error("Error fetching Bluefin IDs:", error);
 
-    // Fall back to hardcoded value on error
-    if (!cachedConfigObj) {
-      cachedConfigObj = GLOBAL_CONFIG_ID;
+    // Fall back to hardcoded values on error
+    cachedIds = {
+      packageId: BLUEFIN_CURRENT_PKG,
+      configId: BLUEFIN_CONFIG_ID,
+    };
+    idsLastFetched = now;
+    return cachedIds;
+  }
+}
+
+/**
+ * Alternative method to get Bluefin IDs using the Bluefin API
+ * This can be used as a fallback if on-chain event querying fails
+ */
+export async function getBluefinIdsFromAPI() {
+  try {
+    const response = await fetch(
+      "https://swap.api.sui-prod.bluefin.io/api/v1/pools/info"
+    );
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
     }
 
-    return cachedConfigObj;
+    const data = await response.json();
+
+    // Extract the package ID and config ID from the API response
+    // Note: The exact structure may differ based on Bluefin's API response
+    const packageId = data.packageId || BLUEFIN_CURRENT_PKG;
+    const configId = data.configId || BLUEFIN_CONFIG_ID;
+
+    return { packageId, configId };
+  } catch (error) {
+    console.error("Failed to fetch Bluefin IDs from API:", error);
+    return {
+      packageId: BLUEFIN_CURRENT_PKG,
+      configId: BLUEFIN_CONFIG_ID,
+    };
   }
+}
+
+/**
+ * Get the latest Bluefin package ID (for building transactions)
+ */
+export async function getBluefinPackageId() {
+  const { packageId } = await getCurrentIds();
+  return packageId;
+}
+
+/**
+ * Get the latest Bluefin config object ID
+ */
+export async function getBluefinConfigObjectId() {
+  const { configId } = await getCurrentIds();
+  return configId;
 }
 
 /*───────────────────────────────────────────────────────────────────────────*\
@@ -96,7 +180,15 @@ export function priceToTick(price, tickSpacing) {
 }
 
 /**
+ * Get a SUI client instance with the default RPC URL
+ */
+export function getSuiClient() {
+  return new SuiClient({ url: SUI_RPC_URL });
+}
+
+/**
  * Fetch on-chain data for a Bluefin CLMM pool and derive a few useful fields.
+ * This function also ensures it uses the latest package ID.
  */
 export async function getPoolDetails(poolId) {
   console.log(`[Bluefin] fetch pool ${poolId}`);
@@ -137,13 +229,6 @@ export async function getPoolDetails(poolId) {
     },
     rawData: poolObj.data,
   };
-}
-
-/**
- * Get a SUI client instance with the default RPC URL
- */
-export function getSuiClient() {
-  return new SuiClient({ url: SUI_RPC_URL });
 }
 
 /**
@@ -290,6 +375,52 @@ export async function collectFees({ poolId, positionId, walletAddress }) {
 }
 
 /**
+ * Collects rewards from a position
+ * @param {Object} params - Parameters for collecting rewards
+ * @returns {Promise<Object>} Result of the rewards collection
+ */
+export async function collectRewards({ poolId, positionId, walletAddress }) {
+  console.log(`Starting Bluefin rewards collection with parameters:`, {
+    poolId,
+    positionId,
+    walletAddress,
+  });
+
+  try {
+    // Call backend API to create the transaction
+    const res = await fetch("/api/bluefin/create-collect-rewards-tx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        poolId,
+        positionId,
+        walletAddress,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`API request failed with status ${res.status}`);
+      const errorText = await res.text();
+      throw new Error(
+        `Failed to create collect rewards transaction: ${errorText}`
+      );
+    }
+
+    const { txb64 } = await res.json();
+    console.log(`Got base64 transaction payload (${txb64.length} bytes)`);
+
+    return {
+      txb64,
+      poolId,
+      positionId,
+    };
+  } catch (error) {
+    console.error(`Collect rewards error:`, error);
+    throw error;
+  }
+}
+
+/**
  * Closes a position completely
  * @param {Object} params - Parameters for closing a position
  * @returns {Promise<Object>} Result of the position closure
@@ -334,3 +465,8 @@ export async function closePosition({ poolId, positionId, walletAddress }) {
     throw error;
   }
 }
+
+// Export constants for backward compatibility with code that directly references
+// the package and config IDs, but use the current values
+export const BLUEFIN_PACKAGE_ID = BLUEFIN_CURRENT_PKG;
+export const GLOBAL_CONFIG_ID = BLUEFIN_CONFIG_ID;
