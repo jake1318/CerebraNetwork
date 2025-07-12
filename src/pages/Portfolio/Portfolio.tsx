@@ -1,12 +1,53 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-08 02:20:40 UTC by jake1318
+// Last Updated: 2025-07-11 07:17:06 UTC by jake1318
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useWallet } from "@suiet/wallet-kit";
 import ReactApexChart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
-import { FaCaretUp, FaCaretDown, FaChevronDown } from "react-icons/fa";
+import {
+  FaCaretUp,
+  FaCaretDown,
+  FaWallet,
+  FaExchangeAlt,
+  FaPiggyBank,
+  FaSeedling,
+  FaHandHoldingUsd,
+  FaLock,
+  FaChartLine,
+  FaChartPie,
+  FaLayerGroup,
+  FaPlus,
+  FaSearch,
+  FaNetworkWired,
+  FaInfoCircle,
+  FaRegChartBar,
+  FaRegClock,
+  FaChevronDown,
+  FaChevronUp,
+  FaBars,
+  FaTimes,
+  FaRegLightbulb,
+  FaRandom,
+  FaRobot,
+  FaUserCircle,
+  FaExclamationTriangle,
+  FaRedo,
+  FaArrowRight,
+  FaArrowDown,
+  FaCog,
+  FaFilter,
+  FaCalendarAlt,
+  FaSortAmountDown,
+} from "react-icons/fa";
+import { getSwapHistory } from "@7kprotocol/sdk-ts";
 
 import "./Portfolio.scss";
 import blockvisionService, {
@@ -14,6 +55,7 @@ import blockvisionService, {
   PoolGroup,
 } from "../../services/blockvisionService";
 import * as birdeyeService from "../../services/birdeyeService";
+import MarketDashboard from "./MarketDashboard";
 
 // Import components
 import ProtocolBadge from "../PoolsPage/ProtocolBadge";
@@ -38,6 +80,274 @@ import { getTokenMetadata, TokenMetadata } from "../../services/birdeyeService";
 const logoCache: Record<string, string> = {};
 const DEFAULT_LOGO = "/icons/default-coin.svg";
 
+// Types for swap history
+interface SwapHistoryItem {
+  id: string;
+  timestamp: number;
+  fromToken: {
+    address: string;
+    symbol: string;
+    amount: string;
+    decimals: number;
+  };
+  toToken: {
+    address: string;
+    symbol: string;
+    amount: string;
+    decimals: number;
+  };
+  txHash: string;
+  status: string;
+  priceImpact?: number;
+  slippage?: number;
+  route?: string;
+  fee?: string;
+}
+
+// Sidebar navigation component
+function Sidebar({
+  activeView,
+  setActiveView,
+  activeTab,
+  setActiveTab,
+  categoryData,
+}: {
+  activeView: string;
+  setActiveView: (tab: string) => void;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  categoryData: {
+    all: { count: number; value: number };
+    lpPools: { count: number; value: number };
+    vaults: { count: number; value: number };
+    farms: { count: number; value: number };
+    lending: { count: number; value: number };
+    staking: { count: number; value: number };
+  };
+}) {
+  const [sidebarActive, setSidebarActive] = useState(false);
+
+  return (
+    <>
+      <div className={`sidebar ${sidebarActive ? "active" : ""}`}>
+        <div className="sidebar__content">
+          <div className="sidebar__nav">
+            <div className="nav-section">
+              <div className="section-title">OVERVIEW</div>
+              <div className="nav-links">
+                <button
+                  className={`nav-link ${
+                    activeView === "dashboard" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveView("dashboard")}
+                >
+                  <span className="nav-icon">
+                    <FaRegChartBar />
+                  </span>
+                  <span className="nav-label">Market Dashboard</span>
+                </button>
+                <button
+                  className={`nav-link ${
+                    activeView === "portfolio" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveView("portfolio")}
+                >
+                  <span className="nav-icon">
+                    <FaChartPie />
+                  </span>
+                  <span className="nav-label">Portfolio</span>
+                </button>
+                <button
+                  className={`nav-link ${
+                    activeView === "activity" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveView("activity")}
+                >
+                  <span className="nav-icon">
+                    <FaRegClock />
+                  </span>
+                  <span className="nav-label">Activity</span>
+                </button>
+              </div>
+            </div>
+
+            {activeView === "portfolio" && (
+              <div className="nav-section">
+                <div className="section-title">PORTFOLIO</div>
+                <div className="nav-links">
+                  <button
+                    className={`nav-link ${
+                      activeTab === "all" ? "active" : ""
+                    }`}
+                    onClick={() => setActiveTab("all")}
+                  >
+                    <span className="nav-icon">
+                      <FaLayerGroup />
+                    </span>
+                    <span className="nav-label">All Positions</span>
+                    {categoryData.all.count > 0 && (
+                      <span className="nav-badge">
+                        {categoryData.all.count}
+                      </span>
+                    )}
+                    {categoryData.all.value > 0 && (
+                      <span className="nav-value">
+                        ${categoryData.all.value.toFixed(2)}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    className={`nav-link ${
+                      activeTab === "lp-pools" ? "active" : ""
+                    }`}
+                    onClick={() => setActiveTab("lp-pools")}
+                  >
+                    <span className="nav-icon">
+                      <FaExchangeAlt />
+                    </span>
+                    <span className="nav-label">LP Pools</span>
+                    {categoryData.lpPools.count > 0 && (
+                      <span className="nav-badge">
+                        {categoryData.lpPools.count}
+                      </span>
+                    )}
+                    {categoryData.lpPools.value > 0 && (
+                      <span className="nav-value">
+                        ${categoryData.lpPools.value.toFixed(2)}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    className={`nav-link ${
+                      activeTab === "vaults" ? "active" : ""
+                    }`}
+                    onClick={() => setActiveTab("vaults")}
+                  >
+                    <span className="nav-icon">
+                      <FaPiggyBank />
+                    </span>
+                    <span className="nav-label">Vaults</span>
+                    {categoryData.vaults.count > 0 && (
+                      <span className="nav-badge">
+                        {categoryData.vaults.count}
+                      </span>
+                    )}
+                    {categoryData.vaults.value > 0 && (
+                      <span className="nav-value">
+                        ${categoryData.vaults.value.toFixed(2)}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    className={`nav-link ${
+                      activeTab === "farms" ? "active" : ""
+                    }`}
+                    onClick={() => setActiveTab("farms")}
+                  >
+                    <span className="nav-icon">
+                      <FaSeedling />
+                    </span>
+                    <span className="nav-label">Farms</span>
+                    {categoryData.farms.count > 0 && (
+                      <span className="nav-badge">
+                        {categoryData.farms.count}
+                      </span>
+                    )}
+                    {categoryData.farms.value > 0 && (
+                      <span className="nav-value">
+                        ${categoryData.farms.value.toFixed(2)}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    className={`nav-link ${
+                      activeTab === "lending" ? "active" : ""
+                    }`}
+                    onClick={() => setActiveTab("lending")}
+                  >
+                    <span className="nav-icon">
+                      <FaHandHoldingUsd />
+                    </span>
+                    <span className="nav-label">Lending</span>
+                    {categoryData.lending.count > 0 && (
+                      <span className="nav-badge">
+                        {categoryData.lending.count}
+                      </span>
+                    )}
+                    {categoryData.lending.value > 0 && (
+                      <span className="nav-value">
+                        ${categoryData.lending.value.toFixed(2)}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    className={`nav-link ${
+                      activeTab === "staking" ? "active" : ""
+                    }`}
+                    onClick={() => setActiveTab("staking")}
+                  >
+                    <span className="nav-icon">
+                      <FaLock />
+                    </span>
+                    <span className="nav-label">Staking</span>
+                    {categoryData.staking.count > 0 && (
+                      <span className="nav-badge">
+                        {categoryData.staking.count}
+                      </span>
+                    )}
+                    {categoryData.staking.value > 0 && (
+                      <span className="nav-value">
+                        ${categoryData.staking.value.toFixed(2)}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="nav-section">
+              <div className="section-title">TOOLS</div>
+              <div className="nav-links">
+                <Link to="/search" className="nav-link">
+                  <span className="nav-icon">
+                    <FaRobot />
+                  </span>
+                  <span className="nav-label">AI Search</span>
+                </Link>
+                <Link to="/explore" className="nav-link">
+                  <span className="nav-icon">
+                    <FaSearch />
+                  </span>
+                  <span className="nav-label">Explorer</span>
+                </Link>
+                <Link to="/settings" className="nav-link">
+                  <span className="nav-icon">
+                    <FaCog />
+                  </span>
+                  <span className="nav-label">Settings</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="sidebar__mobile-toggle"
+        onClick={() => setSidebarActive(!sidebarActive)}
+      >
+        {sidebarActive ? <FaTimes /> : <FaBars />}
+      </div>
+    </>
+  );
+}
+
+// Token icon component
 interface TokenIconProps {
   symbol: string;
   /** full on‑chain address if you already have it – improves hit‑rate */
@@ -125,13 +435,11 @@ function PoolPair({
   const isSingleToken = !tokenBSymbol;
 
   return (
-    <div className="portfolio-pair">
+    <div className="token-pair">
       <div className="token-icons">
-        <TokenIcon symbol={tokenASymbol} address={tokenAAddress} />
+        <TokenIcon symbol={tokenASymbol} address={tokenAAddress} size="md" />
         {!isSingleToken && (
-          <div className="second-token">
-            <TokenIcon symbol={tokenBSymbol!} address={tokenBAddress} />
-          </div>
+          <TokenIcon symbol={tokenBSymbol!} address={tokenBAddress} size="md" />
         )}
       </div>
       <div className="pair-name">
@@ -180,6 +488,26 @@ function formatTokenBalance(
   }
 }
 
+// Helper function to format addresses
+function formatAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return `${address.substring(0, 6)}...${address.substring(
+    address.length - 4
+  )}`;
+}
+
+// Helper function to format date
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 // Wallet Assets Section Component
 function WalletAssetsSection({ walletTokens }: { walletTokens: any[] }) {
   const [showAll, setShowAll] = useState(false);
@@ -198,30 +526,47 @@ function WalletAssetsSection({ walletTokens }: { walletTokens: any[] }) {
   );
 
   return (
-    <div className="wallet-assets-section">
-      <div className="section-header">
-        <h3>Wallet Assets</h3>
-        <div className="total-value">Total: ${totalValue.toFixed(2)}</div>
+    <div className="wallet-assets">
+      <div className="wallet-header">
+        <h3>
+          <FaWallet className="header-icon" />
+          Wallet Assets
+        </h3>
+        <div className="wallet-total">Total: ${totalValue.toFixed(2)}</div>
       </div>
 
-      <div className="wallet-assets-grid">
+      <div className="assets-grid">
         {(showAll ? sortedTokens : sortedTokens.slice(0, 8)).map(
           (token, idx) => (
-            <div className="wallet-asset-card" key={`wallet-token-${idx}`}>
-              <div className="asset-header">
-                <TokenIcon
-                  symbol={token.symbol}
-                  address={token.coinType}
-                  size="md"
-                />
-                <span className="asset-symbol">{token.symbol}</span>
-              </div>
-              <div className="asset-details">
-                <div className="asset-balance">
-                  {formatTokenBalance(token.balance, token.decimals)}
+            <div className="asset-card" key={`wallet-token-${idx}`}>
+              <div className="asset-card__header">
+                <div className="token-info">
+                  <div className="token-icon">
+                    <img
+                      src={
+                        logoCache[token.coinType?.toLowerCase()] || DEFAULT_LOGO
+                      }
+                      alt={token.symbol}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          DEFAULT_LOGO;
+                      }}
+                    />
+                  </div>
+                  <span className="token-symbol">{token.symbol}</span>
                 </div>
-                <div className="asset-value">
-                  ${parseFloat(token.usdValue || "0").toFixed(2)}
+                <div className="token-price">
+                  ${parseFloat(token.priceUsd || "0").toFixed(2)}
+                </div>
+              </div>
+              <div className="asset-card__body">
+                <div className="token-stats">
+                  <div className="token-balance">
+                    {formatTokenBalance(token.balance, token.decimals)}
+                  </div>
+                  <div className="token-value">
+                    ${parseFloat(token.usdValue || "0").toFixed(2)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -231,8 +576,20 @@ function WalletAssetsSection({ walletTokens }: { walletTokens: any[] }) {
 
       {sortedTokens.length > 8 && (
         <div className="view-all-container">
-          <button className="view-all-btn" onClick={() => setShowAll(!showAll)}>
-            {showAll ? "Show Less" : `View All Assets (${sortedTokens.length})`}
+          <button
+            className="view-all-button"
+            onClick={() => setShowAll(!showAll)}
+          >
+            {showAll ? (
+              <>
+                Show Less <FaChevronUp className="button-icon" />
+              </>
+            ) : (
+              <>
+                View All Assets ({sortedTokens.length}){" "}
+                <FaChevronDown className="button-icon" />
+              </>
+            )}
           </button>
         </div>
       )}
@@ -240,302 +597,41 @@ function WalletAssetsSection({ walletTokens }: { walletTokens: any[] }) {
   );
 }
 
-// Portfolio Charts Row component
-function PortfolioChartsRow({
-  portfolioHistory,
+// Portfolio value card component
+function PortfolioValueCard({
+  totalValue,
   portfolioChange24h,
-  allPositions,
-  categorizedPositions,
-  walletTokens,
   selectedTimeframe,
   setSelectedTimeframe,
 }: {
-  portfolioHistory: { dates: string[]; values: number[] };
+  totalValue: number;
   portfolioChange24h: { value: number; percent: number };
-  allPositions: PoolGroup[];
-  categorizedPositions: {
-    lpPools: PoolGroup[];
-    vaults: PoolGroup[];
-    farms: PoolGroup[];
-    lending: PoolGroup[];
-    staking: PoolGroup[];
-  };
-  walletTokens: any[];
   selectedTimeframe: "7d" | "30d" | "1yr";
   setSelectedTimeframe: React.Dispatch<
     React.SetStateAction<"7d" | "30d" | "1yr">
   >;
 }) {
-  // Calculate total wallet value
-  const walletValue = useMemo(
-    () =>
-      walletTokens.reduce(
-        (sum, token) => sum + parseFloat(token.usdValue || "0"),
-        0
-      ),
-    [walletTokens]
-  );
-
-  // Create distribution data by protocol
-  const protocolData = useMemo(() => {
-    const protocolMap: Record<string, number> = {};
-
-    // Add wallet as a "protocol"
-    if (walletValue > 0) {
-      protocolMap["Wallet"] = walletValue;
-    }
-
-    let totalValue = walletValue;
-
-    // Group by protocol and sum values
-    allPositions.forEach((position) => {
-      if (!protocolMap[position.protocol]) {
-        protocolMap[position.protocol] = 0;
-      }
-      protocolMap[position.protocol] += position.totalValueUsd;
-      totalValue += position.totalValueUsd;
-    });
-
-    // Convert to series format
-    const series: number[] = [];
-    const labels: string[] = [];
-    const colors: string[] = [];
-
-    // Define default colors
-    const defaultColors = [
-      "#ff9500", // Wallet
-      "#00c2ff", // Cetus
-      "#6c5ce7", // Scallop
-      "#00d2d3", // Haedal
-      "#e84393", // Bluefin
-      "#00b894", // Turbos
-      "#ff5252", // SuiLend
-      "#55efc4", // Suistake
-      "#fdcb6e", // Aftermath
-      "#74b9ff", // Other
-    ];
-
-    Object.entries(protocolMap)
-      .sort((a, b) => b[1] - a[1]) // Sort by value descending
-      .forEach(([protocol, value], index) => {
-        labels.push(protocol);
-        series.push(parseFloat(value.toFixed(2)));
-
-        // Assign specific colors to common protocols
-        let color;
-        switch (protocol.toLowerCase()) {
-          case "wallet":
-            color = "#ff9500";
-            break;
-          case "cetus":
-            color = "#00c2ff";
-            break;
-          case "scallop":
-            color = "#6c5ce7";
-            break;
-          case "haedal":
-            color = "#00d2d3";
-            break;
-          case "bluefin":
-            color = "#e84393";
-            break;
-          case "turbos":
-            color = "#00b894";
-            break;
-          case "suilend":
-            color = "#ff5252";
-            break;
-          case "suistake":
-            color = "#55efc4";
-            break;
-          default:
-            color = defaultColors[index % defaultColors.length];
-        }
-        colors.push(color);
-      });
-
-    return { series, labels, colors, totalValue };
-  }, [allPositions, walletValue]);
-
-  // Create distribution data by category
-  const categoryData = useMemo(() => {
-    const categories = {
-      Wallet: walletValue,
-      "LP Pools": categorizedPositions.lpPools.reduce(
-        (sum, p) => sum + p.totalValueUsd,
-        0
-      ),
-      Vaults: categorizedPositions.vaults.reduce(
-        (sum, p) => sum + p.totalValueUsd,
-        0
-      ),
-      Farms: categorizedPositions.farms.reduce(
-        (sum, p) => sum + p.totalValueUsd,
-        0
-      ),
-      Lending: categorizedPositions.lending.reduce(
-        (sum, p) => sum + p.totalValueUsd,
-        0
-      ),
-      Staking: categorizedPositions.staking.reduce(
-        (sum, p) => sum + p.totalValueUsd,
-        0
-      ),
-    };
-
-    const totalValue = Object.values(categories).reduce(
-      (sum, value) => sum + value,
-      0
-    );
-
-    // Convert to series format and sort by value
-    const entries = Object.entries(categories).sort((a, b) => b[1] - a[1]);
-
-    const series: number[] = [];
-    const labels: string[] = [];
-    const colors: string[] = [
-      "#ff9500", // Wallet
-      "#00c2ff", // LP Pools
-      "#ff9900", // Lending
-      "#6c5ce7", // Vaults
-      "#00d2d3", // Farms
-      "#e84393", // Staking
-    ];
-
-    // Predefined colors for categories
-    const categoryColors: Record<string, string> = {
-      Wallet: "#ff9500",
-      "LP Pools": "#00c2ff",
-      Lending: "#ff9900",
-      Vaults: "#6c5ce7",
-      Farms: "#00d2d3",
-      Staking: "#e84393",
-    };
-
-    // Create arrays for series, labels, and colors
-    const categoryOrder: string[] = [];
-    entries.forEach(([category, value]) => {
-      if (value > 0) {
-        labels.push(category);
-        series.push(parseFloat(value.toFixed(2)));
-        categoryOrder.push(category);
-      }
-    });
-
-    // Create colors array that follows the same order as labels
-    const orderedColors = labels.map(
-      (label) => categoryColors[label] || "#74b9ff"
-    );
-
-    return { series, labels, colors: orderedColors, totalValue };
-  }, [categorizedPositions, walletValue]);
-
-  // Protocol chart options - removed dollar amount from tooltip
-  const protocolOptions = useMemo(
-    () => ({
-      chart: {
-        type: "donut",
-        background: "transparent",
-        height: 180,
-      },
-      dataLabels: {
-        enabled: false,
-      },
-      tooltip: {
-        y: {
-          formatter: (value: number) => {
-            return `${((value / protocolData.totalValue) * 100).toFixed(1)}%`;
-          },
-        },
-        theme: "dark",
-      },
-      legend: {
-        show: false,
-      },
-      labels: protocolData.labels,
-      colors: protocolData.colors,
-      plotOptions: {
-        pie: {
-          donut: {
-            size: "70%",
-            background: "transparent",
-            labels: {
-              show: true,
-              name: {
-                show: false,
-              },
-              value: {
-                show: false,
-              },
-              total: {
-                show: false,
-              },
-            },
-          },
-        },
-      },
-    }),
-    [protocolData]
-  );
-
-  // Category chart options - removed dollar amount from tooltip
-  const categoryOptions = useMemo(
-    () => ({
-      chart: {
-        type: "donut",
-        background: "transparent",
-        height: 180,
-      },
-      dataLabels: {
-        enabled: false,
-      },
-      tooltip: {
-        y: {
-          formatter: (value: number) => {
-            return `${((value / categoryData.totalValue) * 100).toFixed(1)}%`;
-          },
-        },
-        theme: "dark",
-      },
-      legend: {
-        show: false,
-      },
-      labels: categoryData.labels,
-      colors: categoryData.colors,
-      plotOptions: {
-        pie: {
-          donut: {
-            size: "70%",
-            background: "transparent",
-            labels: {
-              show: true,
-              name: {
-                show: false,
-              },
-              value: {
-                show: false,
-              },
-              total: {
-                show: false,
-              },
-            },
-          },
-        },
-      },
-    }),
-    [categoryData]
-  );
-
-  // Get the latest portfolio value
-  const currentValue = protocolData.totalValue.toFixed(2);
-
   return (
-    <div className="portfolio-charts-row">
-      {/* First box: Portfolio Value - Removed chart, showing just the total value */}
-      <div className="chart-box portfolio-value-chart">
-        <div className="chart-header">
-          <div>
-            <h3>Portfolio Value</h3>
+    <div className="dashboard-card dashboard-card--glass dashboard-card--hero portfolio-value-card">
+      <div className="dashboard-card__header">
+        <h2 className="card-title">
+          <FaChartLine className="card-icon" />
+          Portfolio Overview
+        </h2>
+        <div className="card-actions">
+          <FaInfoCircle style={{ color: "#B1A5C8", cursor: "pointer" }} />
+        </div>
+      </div>
+
+      <div className="dashboard-card__content">
+        <div className="value-container">
+          <div className="value-label">Total Value</div>
+          <div className="total-value">${totalValue.toFixed(2)}</div>
+        </div>
+
+        <div className="value-metrics">
+          <div className="metric">
+            <div className="metric-label">24h Change</div>
             <div
               className={`value-change ${
                 portfolioChange24h.value >= 0 ? "positive" : "negative"
@@ -551,149 +647,198 @@ function PortfolioChartsRow({
               <span className="change-amount">
                 ${Math.abs(portfolioChange24h.value).toFixed(2)}
               </span>
-              <span className="change-percent">
-                {portfolioChange24h.percent.toFixed(2)}%
-              </span>
+              <span>({portfolioChange24h.percent.toFixed(2)}%)</span>
             </div>
           </div>
-          <div className="timeframe-selector-container">
-            <div className="timeframe-selector">
-              <button
-                className={selectedTimeframe === "7d" ? "active" : ""}
-                onClick={() => setSelectedTimeframe("7d")}
-              >
-                7D
-              </button>
-              <button
-                className={selectedTimeframe === "30d" ? "active" : ""}
-                onClick={() => setSelectedTimeframe("30d")}
-              >
-                30D
-              </button>
-              <button
-                className={selectedTimeframe === "1yr" ? "active" : ""}
-                onClick={() => setSelectedTimeframe("1yr")}
-              >
-                1Y
-              </button>
+
+          <div className="metric">
+            <div className="metric-label">Assets</div>
+            <div className="metric-value">5 Tokens / 3 Positions</div>
+          </div>
+
+          <div className="metric">
+            <div className="metric-label">Highest APY</div>
+            <div
+              className="metric-value"
+              style={{
+                color: "#1ED760",
+                textShadow: "0 0 10px rgba(30, 215, 96, 0.5)",
+              }}
+            >
+              24.8%
             </div>
           </div>
         </div>
 
-        {/* Display total value instead of chart */}
-        <div className="portfolio-value-display">
-          <div className="total-value-label">Total Value</div>
-          <div className="total-value-amount">${currentValue}</div>
-        </div>
-      </div>
-
-      {/* Second box: By Protocol chart */}
-      <div className="chart-box protocol-chart">
-        <div className="chart-container">
-          <div className="chart-header">
-            <h3>By Protocol</h3>
-          </div>
-          <div className="chart-content-with-legend">
-            <div className="chart-donut">
-              <ReactApexChart
-                options={protocolOptions}
-                series={protocolData.series}
-                type="donut"
-                height={180}
-              />
-            </div>
-            <div className="chart-legend-vertical">
-              {protocolData.labels.map((label, index) => (
-                <div className="legend-item" key={`protocol-legend-${index}`}>
-                  <div
-                    className="legend-color"
-                    style={{
-                      backgroundColor: protocolData.colors[index] || "#00c2ff",
-                    }}
-                  ></div>
-                  <div className="legend-label">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Third box: By Category chart */}
-      <div className="chart-box category-chart">
-        <div className="chart-container">
-          <div className="chart-header">
-            <h3>By Category</h3>
-          </div>
-          <div className="chart-content-with-legend">
-            <div className="chart-donut">
-              <ReactApexChart
-                options={categoryOptions}
-                series={categoryData.series}
-                type="donut"
-                height={180}
-              />
-            </div>
-            <div className="chart-legend-vertical">
-              {categoryData.labels.map((label, index) => (
-                <div className="legend-item" key={`category-legend-${index}`}>
-                  <div
-                    className="legend-color"
-                    style={{
-                      backgroundColor: categoryData.colors[index] || "#00c2ff",
-                    }}
-                  ></div>
-                  <div className="legend-label">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="timeframe-selector">
+          <button
+            className={selectedTimeframe === "7d" ? "active" : ""}
+            onClick={() => setSelectedTimeframe("7d")}
+          >
+            7D
+          </button>
+          <button
+            className={selectedTimeframe === "30d" ? "active" : ""}
+            onClick={() => setSelectedTimeframe("30d")}
+          >
+            30D
+          </button>
+          <button
+            className={selectedTimeframe === "1yr" ? "active" : ""}
+            onClick={() => setSelectedTimeframe("1yr")}
+          >
+            1Y
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// Interface for portfolio history data point
-interface PortfolioDataPoint {
-  date: string;
-  value: number;
+// Distribution chart card
+function DistributionChartCard({
+  title,
+  icon,
+  data,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  data: {
+    series: number[];
+    labels: string[];
+    colors: string[];
+    totalValue: number;
+  };
+}) {
+  // Chart options
+  const chartOptions: ApexOptions = {
+    chart: {
+      type: "donut",
+      background: "transparent",
+      fontFamily: "Inter, sans-serif",
+    },
+    colors: data.colors,
+    labels: data.labels,
+    dataLabels: {
+      enabled: false,
+    },
+    legend: {
+      show: false,
+    },
+    tooltip: {
+      enabled: true,
+      theme: "dark",
+      y: {
+        formatter: (value: number) => {
+          return `$${value.toFixed(2)} (${(
+            (value / data.totalValue) *
+            100
+          ).toFixed(1)}%)`;
+        },
+      },
+    },
+    stroke: {
+      width: 2,
+      colors: ["#030924"],
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "70%",
+          background: "transparent",
+          labels: {
+            show: true,
+            name: {
+              show: false,
+            },
+            value: {
+              show: false,
+            },
+            total: {
+              show: true,
+              label: "Total",
+              formatter: function () {
+                return `$${data.totalValue.toFixed(2)}`;
+              },
+              color: "#FFFFFF",
+              fontSize: "16px",
+              fontWeight: 600,
+            },
+          },
+        },
+      },
+    },
+  };
+
+  return (
+    <div className="dashboard-card chart-card">
+      <div className="dashboard-card__header">
+        <h3 className="card-title">
+          {icon}
+          {title}
+        </h3>
+      </div>
+      <div className="dashboard-card__content">
+        <div className="chart-container">
+          <ReactApexChart
+            options={chartOptions}
+            series={data.series}
+            type="donut"
+            height={220}
+          />
+        </div>
+        <div className="chart-legend">
+          {data.labels.map((label, index) => (
+            <div className="legend-item" key={`${title}-legend-${index}`}>
+              <div
+                className="legend-color"
+                style={{
+                  backgroundColor: data.colors[index],
+                }}
+              ></div>
+              <div className="legend-label">{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Position card component for displaying individual position data
 function PositionCard({ position }: { position: PoolGroup }) {
   return (
     <div className="position-card">
-      <div className="position-card-header">
-        <div className="protocol-badge">
-          <ProtocolBadge
-            protocol={position.protocol}
-            protocolClass={position.protocol
-              .toLowerCase()
-              .replace(/[-\s]/g, "")}
-            isVault={position.positions[0]?.positionType === "cetus-vault"}
-          />
-        </div>
-        <div className="position-pair">
-          <PoolPair
-            tokenASymbol={position.tokenASymbol}
-            tokenBSymbol={position.tokenBSymbol}
-            tokenAAddress={position.tokenA}
-            tokenBAddress={position.tokenB}
-          />
+      <div className="position-card__header">
+        <div className="protocol-badge">{position.protocol}</div>
+        <PoolPair
+          tokenASymbol={position.tokenASymbol}
+          tokenBSymbol={position.tokenBSymbol}
+          tokenAAddress={position.tokenA}
+          tokenBAddress={position.tokenB}
+        />
+      </div>
+      <div className="position-card__body">
+        <div className="stats-grid">
+          <div className="stat">
+            <div className="stat-label">Value</div>
+            <div className="stat-value value">
+              ${position.totalValueUsd.toFixed(2)}
+            </div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">APR</div>
+            <div className="stat-value apr">{position.apr.toFixed(2)}%</div>
+          </div>
         </div>
       </div>
-      <div className="position-card-stats">
-        <div className="stat">
-          <span className="stat-label">Value</span>
-          <span className="stat-value">
-            ${position.totalValueUsd.toFixed(2)}
-          </span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">APR</span>
-          <span className="stat-value">{position.apr.toFixed(2)}%</span>
-        </div>
+      <div className="position-card__footer">
+        <button className="action-button">
+          <FaChartLine style={{ marginRight: "4px" }} /> Details
+        </button>
+        <button className="action-button action-button--green">
+          <FaPlus style={{ marginRight: "4px" }} /> Add More
+        </button>
       </div>
     </div>
   );
@@ -724,51 +869,590 @@ async function fetchPortfolioHistory(
         interval = "1w";
     }
 
-    const historyData = await birdeyeService.getLineChartData(
-      suiToken,
-      interval
-    );
+    // Check if getLineChartData function exists before calling it
+    if (typeof birdeyeService.getLineChartData === "function") {
+      try {
+        const historyData = await birdeyeService.getLineChartData(
+          suiToken,
+          interval
+        );
 
-    // Check if we got valid data
-    if (
-      !historyData ||
-      !Array.isArray(historyData) ||
-      historyData.length === 0
-    ) {
-      throw new Error("Invalid history data received");
+        // Check if we got valid data
+        if (
+          historyData &&
+          Array.isArray(historyData) &&
+          historyData.length > 0
+        ) {
+          // Extract the dates and prices
+          const dates: string[] = [];
+          const values: number[] = [];
+
+          // Get current portfolio value to use for scaling
+          const latestValue = historyData[historyData.length - 1]?.price || 1;
+          const currentPortfolioValue = address
+            ? parseFloat(
+                sessionStorage.getItem(`${address}_portfolioValue`) || "0"
+              )
+            : 0;
+          const scaleFactor =
+            currentPortfolioValue > 0
+              ? currentPortfolioValue / latestValue
+              : 100;
+
+          // Process data points
+          historyData.forEach((dataPoint) => {
+            // Convert timestamp to date string
+            const date = new Date(dataPoint.timestamp * 1000)
+              .toISOString()
+              .split("T")[0];
+            // Scale the price to simulate portfolio value
+            const value = dataPoint.price * scaleFactor || 0;
+
+            dates.push(date);
+            values.push(parseFloat(value.toFixed(2)));
+          });
+
+          return { dates, values };
+        }
+      } catch (err) {
+        console.error("Error in getLineChartData:", err);
+        // Fall through to the fallback below
+      }
+    } else {
+      console.warn(
+        "birdeyeService.getLineChartData is not available, using fallback data"
+      );
     }
 
-    // Extract the dates and prices
-    const dates: string[] = [];
-    const values: number[] = [];
+    // If we get here, either:
+    // 1. The function doesn't exist
+    // 2. The API call failed
+    // 3. The API returned invalid data
+    // So we use our fallback logic
 
-    // Get current portfolio value to use for scaling
-    const latestValue = historyData[historyData.length - 1]?.price || 1;
+    // Determine the number of days to simulate based on timeframe
+    const days = (() => {
+      switch (timeframe) {
+        case "7d":
+          return 7;
+        case "30d":
+          return 30;
+        case "1yr":
+          return 365;
+        default:
+          return 30;
+      }
+    })();
+
+    // Get the current portfolio value for scaling
     const currentPortfolioValue = address
       ? parseFloat(sessionStorage.getItem(`${address}_portfolioValue`) || "0")
-      : 0;
-    const scaleFactor =
-      currentPortfolioValue > 0 ? currentPortfolioValue / latestValue : 100;
+      : 100; // Default to 100 if no value is stored
 
-    // Process data points
-    historyData.forEach((dataPoint) => {
-      // Convert timestamp to date string
-      const date = new Date(dataPoint.timestamp * 1000)
-        .toISOString()
-        .split("T")[0];
-      // Scale the price to simulate portfolio value
-      const value = dataPoint.price * scaleFactor || 0;
+    // Generate fallback dates and values
+    const dates: string[] = [];
+    const values: number[] = [];
+    const today = new Date();
 
-      dates.push(date);
-      values.push(parseFloat(value.toFixed(2)));
-    });
+    // Generate a simple timeline
+    for (let i = days; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      dates.push(date.toISOString().split("T")[0]);
+
+      // For fallback, simulate a slight uptrend
+      const factor = 0.9 + (i / days) * 0.2;
+      values.push(parseFloat((currentPortfolioValue * factor).toFixed(2)));
+    }
 
     return { dates, values };
   } catch (error) {
     console.error("Error fetching portfolio history:", error);
-    // Return an empty dataset in case of error
+    // Return a minimal dataset in case of error
     return { dates: [], values: [] };
   }
+}
+
+// Swap History Component
+function SwapHistoryList({ swaps }: { swaps: SwapHistoryItem[] }) {
+  if (swaps.length === 0) {
+    return (
+      <div className="empty-activity">
+        <div className="empty-icon">
+          <FaExchangeAlt />
+        </div>
+        <h3>No Swap History</h3>
+        <p>
+          You haven't made any token swaps yet. Start trading to see your
+          activity here.
+        </p>
+        <Link to="/trade" className="action-button">
+          <FaExchangeAlt className="button-icon" /> Trade Now
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="activity-list">
+      {swaps.map((swap) => (
+        <div key={swap.id} className="activity-card">
+          <div className="activity-card__header">
+            <div className="activity-type swap">
+              <FaExchangeAlt />
+              <span>Swap</span>
+            </div>
+            <div className="activity-status">
+              <span className={`status-badge ${swap.status.toLowerCase()}`}>
+                {swap.status}
+              </span>
+            </div>
+          </div>
+
+          <div className="activity-card__body">
+            <div className="swap-details">
+              <div className="token-from">
+                <div className="token-amount">
+                  {formatTokenBalance(
+                    swap.fromToken.amount,
+                    swap.fromToken.decimals
+                  )}{" "}
+                  {swap.fromToken.symbol}
+                </div>
+              </div>
+
+              <div className="swap-arrow">
+                <FaArrowDown />
+              </div>
+
+              <div className="token-to">
+                <div className="token-amount">
+                  {formatTokenBalance(
+                    swap.toToken.amount,
+                    swap.toToken.decimals
+                  )}{" "}
+                  {swap.toToken.symbol}
+                </div>
+              </div>
+
+              {swap.priceImpact !== undefined && (
+                <div className="price-impact">
+                  Price Impact:{" "}
+                  <span
+                    className={
+                      parseFloat(swap.priceImpact.toString()) > 1
+                        ? "warning"
+                        : "normal"
+                    }
+                  >
+                    {parseFloat(swap.priceImpact.toString()).toFixed(2)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="activity-card__footer">
+            <div className="activity-meta">
+              <div className="activity-time">{formatDate(swap.timestamp)}</div>
+              <a
+                href={`https://explorer.sui.io/txblock/${swap.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="explorer-link"
+              >
+                View on Explorer <FaArrowRight className="icon-sm" />
+              </a>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Activity Filters Component
+function ActivityFilters({
+  onFilterChange,
+}: {
+  onFilterChange: (filters: any) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [filters, setFilters] = useState({
+    startDate: "",
+    endDate: "",
+    tokenPair: "",
+  });
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    const newFilters = { ...filters, [name]: value };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
+  };
+
+  return (
+    <div className="activity-filters">
+      <button
+        className="filter-toggle"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <FaFilter className="icon-sm" />
+        Filters
+        <FaChevronDown className={`icon-sm ${isExpanded ? "expanded" : ""}`} />
+      </button>
+
+      {isExpanded && (
+        <div className="filter-options">
+          <div className="filter-group">
+            <label>Date Range</label>
+            <div className="date-filters">
+              <div className="date-input">
+                <FaCalendarAlt className="input-icon" />
+                <input
+                  type="date"
+                  name="startDate"
+                  value={filters.startDate}
+                  onChange={handleChange}
+                  placeholder="From"
+                />
+              </div>
+              <div className="date-input">
+                <FaCalendarAlt className="input-icon" />
+                <input
+                  type="date"
+                  name="endDate"
+                  value={filters.endDate}
+                  onChange={handleChange}
+                  placeholder="To"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <label>Token Pair</label>
+            <div className="token-pair-filter">
+              <FaExchangeAlt className="input-icon" />
+              <select
+                name="tokenPair"
+                value={filters.tokenPair}
+                onChange={handleChange}
+              >
+                <option value="">All Pairs</option>
+                <option value="SUI-USDC">SUI-USDC</option>
+                <option value="SUI-USDT">SUI-USDT</option>
+                <option value="SUI-WETH">SUI-WETH</option>
+                <option value="USDC-USDT">USDC-USDT</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            className="clear-filters"
+            onClick={() => {
+              const emptyFilters = {
+                startDate: "",
+                endDate: "",
+                tokenPair: "",
+              };
+              setFilters(emptyFilters);
+              onFilterChange(emptyFilters);
+            }}
+          >
+            Clear Filters
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Activity View Component
+function ActivityView({ wallet }: { wallet: any }) {
+  const { connected, account } = wallet;
+  const [swaps, setSwaps] = useState<SwapHistoryItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState({});
+  const [pagination, setPagination] = useState({
+    offset: 0,
+    limit: 10,
+    hasMore: true,
+  });
+
+  // Updated loadSwapHistory function with better error handling and debugging
+  const loadSwapHistory = useCallback(
+    async (reset = false) => {
+      if (!connected || !account?.address) return;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Prepare parameters for our backend API
+        const offset = reset ? 0 : pagination.offset;
+
+        // Determine token pair filter if needed
+        let tokenPairFilter = "";
+        if ((filters as any)?.tokenPair) {
+          const pair = (filters as any).tokenPair;
+          if (pair === "SUI-USDC") {
+            tokenPairFilter =
+              "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI-0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
+          }
+          // Add other pairs as needed
+        }
+
+        console.log(
+          `[Portfolio] Fetching swap history for address: ${account.address.substring(
+            0,
+            10
+          )}...`
+        );
+
+        // Call our backend API that proxies the request to 7K's API
+        const backendUrl = "/api/7k/trading-history";
+
+        const response = await fetch(backendUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            address: account.address,
+            offset,
+            limit: pagination.limit,
+            tokenPair: tokenPairFilter || undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          // Handle backend errors
+          let errorMessage = `Backend responded with status ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {
+            // If we can't parse the error response, just use the status message
+          }
+          throw new Error(errorMessage);
+        }
+
+        // Parse the response data
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.message || "Failed to load swap history");
+        }
+
+        // Get the history array from the response
+        const historyItems: SwapHistoryItem[] = result.history || [];
+
+        console.log(
+          `[Portfolio] Loaded ${historyItems.length} swap history items via backend proxy`
+        );
+
+        // Apply date filtering if needed
+        let filteredHistory = historyItems;
+        if ((filters as any)?.startDate || (filters as any)?.endDate) {
+          const { startDate, endDate } = filters as any;
+          filteredHistory = historyItems.filter((swap) => {
+            const swapDate = new Date(swap.timestamp * 1000);
+            let include = true;
+
+            if (startDate) {
+              const startDateObj = new Date(startDate);
+              include = include && swapDate >= startDateObj;
+            }
+
+            if (endDate) {
+              const endDateObj = new Date(endDate);
+              endDateObj.setDate(endDateObj.getDate() + 1); // include the full end date
+              include = include && swapDate < endDateObj;
+            }
+
+            return include;
+          });
+
+          if (filteredHistory.length !== historyItems.length) {
+            console.log(
+              `[Portfolio] Filtered to ${filteredHistory.length} items based on date range`
+            );
+          }
+        }
+
+        // Update state with the new history data
+        setSwaps((prev) =>
+          reset ? filteredHistory : [...prev, ...filteredHistory]
+        );
+
+        // Update pagination "hasMore" flag
+        const hasMore = result.count > offset + pagination.limit;
+        setPagination((prev) => ({
+          ...prev,
+          offset: offset + pagination.limit,
+          hasMore,
+        }));
+
+        console.log(
+          `[Portfolio] Updated pagination - hasMore: ${hasMore}, new offset: ${
+            offset + pagination.limit
+          }`
+        );
+      } catch (err) {
+        console.error("Failed to load swap history:", err);
+
+        // Show error message unless it's just an empty result
+        if (
+          err instanceof Error &&
+          (err.message.includes("no history") || err.message.includes("empty"))
+        ) {
+          console.log("[Portfolio] No swap history found (expected)");
+          // Just set empty array, don't show error
+          if (reset) setSwaps([]);
+        } else {
+          setError(
+            `Failed to load your swap history: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }`
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [connected, account, pagination.limit, pagination.offset, filters]
+  );
+
+  // Initial load
+  useEffect(() => {
+    loadSwapHistory(true);
+  }, [loadSwapHistory]);
+
+  // Handle filter changes
+  const handleFilterChange = (newFilters: any) => {
+    setFilters(newFilters);
+    loadSwapHistory(true);
+  };
+
+  return (
+    <div className="activity-page">
+      <div className="dashboard-grid dashboard-grid--single">
+        <div className="dashboard-card dashboard-card--glass">
+          <div className="dashboard-card__header">
+            <h2 className="card-title">
+              <FaRegClock className="card-icon" />
+              Swap History
+            </h2>
+            <div className="card-actions">
+              <FaInfoCircle style={{ color: "#B1A5C8", cursor: "pointer" }} />
+            </div>
+          </div>
+
+          <div className="dashboard-card__content">
+            {/* Activity Filters */}
+            <ActivityFilters onFilterChange={handleFilterChange} />
+
+            {/* Swap History or Loading/Error States */}
+            {error ? (
+              <div className="error-state">
+                <div className="error-icon">
+                  <FaExclamationTriangle />
+                </div>
+                <h3>Error Loading Activity</h3>
+                <p>{error}</p>
+                <button
+                  className="retry-button"
+                  onClick={() => loadSwapHistory(true)}
+                >
+                  <FaRedo className="button-icon" /> Try Again
+                </button>
+              </div>
+            ) : !connected ? (
+              <div className="empty-state">
+                <div className="empty-icon">🔐</div>
+                <h3>Connect Your Wallet</h3>
+                <p>Please connect your wallet to view your activity history.</p>
+                <button
+                  className="action-button"
+                  onClick={() => wallet.select()}
+                >
+                  <FaWallet className="button-icon" /> Connect Wallet
+                </button>
+              </div>
+            ) : loading && swaps.length === 0 ? (
+              <div className="loading-state">
+                <div className="loading-spinner"></div>
+                <div className="loading-text">Loading Activity</div>
+                <div className="loading-subtext">
+                  Fetching your swap history from the blockchain...
+                </div>
+              </div>
+            ) : (
+              <>
+                <SwapHistoryList swaps={swaps} />
+
+                {/* Load More Button */}
+                {pagination.hasMore && !loading && (
+                  <div className="load-more-container">
+                    <button
+                      className="load-more-button"
+                      onClick={() => loadSwapHistory(false)}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          Loading... <div className="button-spinner"></div>
+                        </>
+                      ) : (
+                        <>
+                          Load More <FaChevronDown className="button-icon" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Loading More Indicator */}
+                {loading && swaps.length > 0 && (
+                  <div className="loading-more">
+                    <div className="loading-spinner-small"></div>
+                    <span>Loading more activities...</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Empty positions component
+function EmptyPositions({ activeTab }: { activeTab: string }) {
+  return (
+    <div className="empty-positions">
+      <div className="empty-icon">
+        <FaLayerGroup />
+      </div>
+      <h3>No Positions Found</h3>
+      <p>
+        {activeTab === "all"
+          ? "You don't have any DeFi positions yet. Start by adding liquidity to a pool or staking your assets."
+          : `You don't have any ${activeTab.replace(
+              "-",
+              " "
+            )} positions. Explore opportunities to grow your portfolio.`}
+      </p>
+      <Link to="/explore" className="action-button">
+        <FaSearch className="button-icon" /> Explore Opportunities
+      </Link>
+    </div>
+  );
 }
 
 function Portfolio() {
@@ -793,8 +1477,38 @@ function Portfolio() {
     "7d" | "30d" | "1yr"
   >("30d");
 
-  // Active tab state for position sections
+  // Active view and tab states
+  const [activeView, setActiveView] = useState<string>("portfolio");
   const [activeTab, setActiveTab] = useState<string>("all");
+
+  // URL handling for direct access to sections
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Set initial view based on URL if provided
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const view = searchParams.get("view");
+    const tab = searchParams.get("tab");
+
+    if (view) {
+      setActiveView(view);
+    }
+
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [location]);
+
+  // Update URL when view/tab changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("view", activeView);
+    if (activeView === "portfolio" && activeTab) {
+      params.set("tab", activeTab);
+    }
+    navigate(`?${params.toString()}`, { replace: true });
+  }, [activeView, activeTab, navigate]);
 
   // Fetch portfolio history data
   const loadPortfolioHistory = useCallback(
@@ -996,6 +1710,8 @@ function Portfolio() {
                     positionType: "scallop-borrow",
                   },
                 ],
+                // Last Updated: 2025-07-11 07:22:44 UTC by jake1318
+
                 totalLiquidity: borrow.borrowedCoin,
                 totalValueUsd: borrow.borrowedValueInUsd,
                 apr: borrow.borrowApy * 100,
@@ -1245,13 +1961,59 @@ function Portfolio() {
     return categorized;
   }, [allPositions]);
 
-  // Calculate category counts
+  // Calculate category counts and values
   const lpPoolsCount = categorizedPositions.lpPools.length;
+  const lpPoolsValue = categorizedPositions.lpPools.reduce(
+    (sum, p) => sum + p.totalValueUsd,
+    0
+  );
+
   const vaultsCount = categorizedPositions.vaults.length;
+  const vaultsValue = categorizedPositions.vaults.reduce(
+    (sum, p) => sum + p.totalValueUsd,
+    0
+  );
+
   const farmsCount = categorizedPositions.farms.length;
+  const farmsValue = categorizedPositions.farms.reduce(
+    (sum, p) => sum + p.totalValueUsd,
+    0
+  );
+
   const lendingCount = categorizedPositions.lending.length;
+  const lendingValue = categorizedPositions.lending.reduce(
+    (sum, p) => sum + p.totalValueUsd,
+    0
+  );
+
   const stakingCount = categorizedPositions.staking.length;
+  const stakingValue = categorizedPositions.staking.reduce(
+    (sum, p) => sum + p.totalValueUsd,
+    0
+  );
+
   const totalCount = allPositions.length;
+  const totalPositionsValue = allPositions.reduce(
+    (sum, p) => sum + p.totalValueUsd,
+    0
+  );
+
+  // Calculate wallet value
+  const walletValue = walletTokens.reduce(
+    (sum, token) => sum + parseFloat(token.usdValue || "0"),
+    0
+  );
+
+  // Category data for sidebar
+  const categoryData = {
+    all: { count: totalCount, value: totalPositionsValue },
+    lpPools: { count: lpPoolsCount, value: lpPoolsValue },
+    vaults: { count: vaultsCount, value: vaultsValue },
+    farms: { count: farmsCount, value: farmsValue },
+    lending: { count: lendingCount, value: lendingValue },
+    staking: { count: stakingCount, value: stakingValue },
+    wallet: { count: walletTokens.length, value: walletValue },
+  };
 
   // Helper to get visible positions based on active tab
   const getVisiblePositions = (): PoolGroup[] => {
@@ -1273,753 +2035,272 @@ function Portfolio() {
 
   const visiblePositions = getVisiblePositions();
 
-  return (
-    <div className="portfolio-page">
-      <div className="content-container">
-        {error ? (
-          <div className="empty-state">
-            <div className="empty-icon">⚠️</div>
-            <h3>Error Loading Portfolio</h3>
-            <p>{error}</p>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => loadPositions()}
-            >
-              Retry
-            </button>
+  // Create protocol distribution data
+  const protocolDistributionData = useMemo(() => {
+    // Calculate wallet value
+    const walletValue = walletTokens.reduce(
+      (sum, token) => sum + parseFloat(token.usdValue || "0"),
+      0
+    );
+
+    const protocolMap: Record<string, number> = {};
+
+    // Add wallet as a "protocol" if there are tokens
+    if (walletValue > 0) {
+      protocolMap["Wallet"] = walletValue;
+    }
+
+    // Sum values by protocol
+    allPositions.forEach((position) => {
+      if (!protocolMap[position.protocol]) {
+        protocolMap[position.protocol] = 0;
+      }
+      protocolMap[position.protocol] += position.totalValueUsd;
+    });
+
+    // Convert to series format
+    const series: number[] = [];
+    const labels: string[] = [];
+    const colors: string[] = [];
+
+    // Define protocol-specific colors
+    const protocolColors: Record<string, string> = {
+      Wallet: "#FF9500",
+      Cetus: "#4DA2FF",
+      Scallop: "#6C5CE7",
+      Haedal: "#00D2D3",
+      Bluefin: "#FF00FF",
+      Turbos: "#1ED760",
+      SuiLend: "#FF5252",
+      Suistake: "#55EFC4",
+      Aftermath: "#FDCB6E",
+    };
+
+    // Sort protocols by value and create data arrays
+    Object.entries(protocolMap)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([protocol, value]) => {
+        if (value > 0) {
+          labels.push(protocol);
+          series.push(parseFloat(value.toFixed(2)));
+          colors.push(protocolColors[protocol] || "#74B9FF");
+        }
+      });
+
+    return {
+      series,
+      labels,
+      colors,
+      totalValue: Object.values(protocolMap).reduce((sum, val) => sum + val, 0),
+    };
+  }, [allPositions, walletTokens]);
+
+  // Create category distribution data
+  const categoryDistributionData = useMemo(() => {
+    // Calculate wallet value
+    const walletValue = walletTokens.reduce(
+      (sum, token) => sum + parseFloat(token.usdValue || "0"),
+      0
+    );
+
+    const categories = {
+      Wallet: walletValue,
+      "LP Pools": categorizedPositions.lpPools.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Vaults: categorizedPositions.vaults.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Farms: categorizedPositions.farms.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Lending: categorizedPositions.lending.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+      Staking: categorizedPositions.staking.reduce(
+        (sum, p) => sum + p.totalValueUsd,
+        0
+      ),
+    };
+
+    // Predefined colors for categories
+    const categoryColors: Record<string, string> = {
+      Wallet: "#FF9500",
+      "LP Pools": "#4DA2FF",
+      Lending: "#FF00FF",
+      Vaults: "#6C5CE7",
+      Farms: "#1ED760",
+      Staking: "#55EFC4",
+    };
+
+    // Convert to series format and filter out zero values
+    const series: number[] = [];
+    const labels: string[] = [];
+    const colors: string[] = [];
+
+    Object.entries(categories)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([category, value]) => {
+        if (value > 0) {
+          labels.push(category);
+          series.push(parseFloat(value.toFixed(2)));
+          colors.push(categoryColors[category] || "#74B9FF");
+        }
+      });
+
+    return {
+      series,
+      labels,
+      colors,
+      totalValue: Object.values(categories).reduce((sum, val) => sum + val, 0),
+    };
+  }, [categorizedPositions, walletTokens]);
+
+  // Render the Portfolio View component
+  const renderPortfolioView = () => {
+    if (error) {
+      return (
+        <div className="error-state">
+          <div className="error-icon">
+            <FaExclamationTriangle />
           </div>
-        ) : !connected ? (
-          <div className="empty-state">
-            <div className="empty-icon">🔐</div>
-            <h3>Wallet Not Connected</h3>
-            <p>Please connect your wallet to view your portfolio.</p>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => wallet.select()}
-            >
-              Connect Wallet
-            </button>
+          <h3>Error Loading Portfolio</h3>
+          <p>{error}</p>
+          <button className="retry-button" onClick={() => loadPositions()}>
+            <FaRedo className="button-icon" /> Try Again
+          </button>
+        </div>
+      );
+    }
+
+    if (!connected) {
+      return (
+        <div className="empty-state">
+          <div className="empty-icon">🔐</div>
+          <h3>Connect Your Wallet</h3>
+          <p>Please connect your wallet to view and manage your portfolio.</p>
+          <button className="action-button" onClick={() => wallet.select()}>
+            <FaWallet className="button-icon" /> Connect Wallet
+          </button>
+        </div>
+      );
+    }
+
+    if (loading && !portfolioData) {
+      return (
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <div className="loading-text">Loading Portfolio Data</div>
+          <div className="loading-subtext">
+            Fetching your positions across DeFi protocols...
           </div>
-        ) : loading && !portfolioData ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <div className="loading-text">Loading portfolio...</div>
-          </div>
-        ) : !portfolioData && !scallopData && walletTokens.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📊</div>
-            <h3>No Portfolio Data</h3>
-            <p>We couldn't find any assets in your portfolio.</p>
-            <Link to="/pools" className="btn btn--primary">
-              Explore Pools
-            </Link>
+        </div>
+      );
+    }
+
+    if (!portfolioData && !scallopData && walletTokens.length === 0) {
+      return (
+        <div className="empty-state">
+          <div className="empty-icon">📊</div>
+          <h3>No Portfolio Data</h3>
+          <p>
+            We couldn't find any assets or positions in your portfolio. Start by
+            exploring opportunities and adding assets.
+          </p>
+          <Link to="/explore" className="action-button">
+            <FaSearch className="button-icon" /> Explore DeFi
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {/* Portfolio Value Card */}
+        <div className="dashboard-grid dashboard-grid--single">
+          <PortfolioValueCard
+            totalValue={portfolioData?.totalValue || 0}
+            portfolioChange24h={portfolioChange24h}
+            selectedTimeframe={selectedTimeframe}
+            setSelectedTimeframe={setSelectedTimeframe}
+          />
+        </div>
+
+        {/* Distribution Charts */}
+        <div className="dashboard-grid dashboard-grid--auto">
+          <DistributionChartCard
+            title="Distribution by Protocol"
+            icon={<FaLayerGroup className="card-icon" />}
+            data={protocolDistributionData}
+          />
+          <DistributionChartCard
+            title="Distribution by Category"
+            icon={<FaChartPie className="card-icon" />}
+            data={categoryDistributionData}
+          />
+        </div>
+
+        {/* Position Cards */}
+        {visiblePositions.length > 0 ? (
+          <div className="positions-grid">
+            {visiblePositions.map((position, idx) => (
+              <PositionCard key={`position-${idx}`} position={position} />
+            ))}
           </div>
         ) : (
-          <>
-            <div className="portfolio-header">
-              <h2>Your Portfolio</h2>
-
-              {/* Charts Row - All Three Charts */}
-              {(portfolioHistory.dates.length > 0 ||
-                allPositions.length > 0 ||
-                walletTokens.length > 0) && (
-                <PortfolioChartsRow
-                  portfolioHistory={portfolioHistory}
-                  portfolioChange24h={portfolioChange24h}
-                  allPositions={allPositions}
-                  categorizedPositions={categorizedPositions}
-                  walletTokens={walletTokens}
-                  selectedTimeframe={selectedTimeframe}
-                  setSelectedTimeframe={setSelectedTimeframe}
-                />
-              )}
-            </div>
-
-            {/* Position Sections Tabs */}
-            <div className="positions-section">
-              <div className="section-tabs">
-                <button
-                  className={`section-tab ${
-                    activeTab === "all" ? "active" : ""
-                  }`}
-                  onClick={() => setActiveTab("all")}
-                >
-                  All <span className="tab-count">{totalCount}</span>
-                </button>
-
-                <button
-                  className={`section-tab ${
-                    activeTab === "lp-pools" ? "active" : ""
-                  }`}
-                  onClick={() => setActiveTab("lp-pools")}
-                >
-                  LP Pools <span className="tab-count">{lpPoolsCount}</span>
-                </button>
-
-                <button
-                  className={`section-tab ${
-                    activeTab === "vaults" ? "active" : ""
-                  }`}
-                  onClick={() => setActiveTab("vaults")}
-                >
-                  Vaults <span className="tab-count">{vaultsCount}</span>
-                </button>
-
-                <button
-                  className={`section-tab ${
-                    activeTab === "farms" ? "active" : ""
-                  }`}
-                  onClick={() => setActiveTab("farms")}
-                >
-                  Farms <span className="tab-count">{farmsCount}</span>
-                </button>
-
-                <button
-                  className={`section-tab ${
-                    activeTab === "lending" ? "active" : ""
-                  }`}
-                  onClick={() => setActiveTab("lending")}
-                >
-                  Lending <span className="tab-count">{lendingCount}</span>
-                </button>
-
-                <button
-                  className={`section-tab ${
-                    activeTab === "staking" ? "active" : ""
-                  }`}
-                  onClick={() => setActiveTab("staking")}
-                >
-                  Staking <span className="tab-count">{stakingCount}</span>
-                </button>
-              </div>
-
-              {visiblePositions.length > 0 ? (
-                <div className="positions-grid">
-                  {visiblePositions.map((position, idx) => (
-                    <PositionCard key={`position-${idx}`} position={position} />
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-positions">
-                  <p>
-                    {activeTab === "all"
-                      ? "No positions found. Start by adding liquidity to a pool."
-                      : `No ${activeTab.replace("-", " ")} positions found.`}
-                  </p>
-                  <Link to="/pools" className="btn btn--primary">
-                    Explore Pools
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Wallet Assets Section - Now moved to the bottom */}
-            {walletTokens && walletTokens.length > 0 && (
-              <WalletAssetsSection walletTokens={walletTokens} />
-            )}
-          </>
+          <EmptyPositions activeTab={activeTab} />
         )}
+
+        {/* Wallet Assets Section */}
+        {walletTokens && walletTokens.length > 0 && (
+          <WalletAssetsSection walletTokens={walletTokens} />
+        )}
+      </>
+    );
+  };
+
+  // Render the view based on active section
+  const renderActiveView = () => {
+    switch (activeView) {
+      case "dashboard":
+        return <MarketDashboard />;
+      case "activity":
+        return <ActivityView wallet={wallet} />;
+      case "portfolio":
+      default:
+        return renderPortfolioView();
+    }
+  };
+
+  return (
+    <div className="app-layout">
+      {/* Sidebar Navigation with position categories */}
+      <Sidebar
+        activeView={activeView}
+        setActiveView={setActiveView}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        categoryData={categoryData}
+      />
+
+      {/* Main Content */}
+      <div className="main-content">
+        <div className="page-content">
+          <div className="portfolio-page">
+            {/* Colorful background glows */}
+            <div className="page-glow page-glow--blue"></div>
+            <div className="page-glow page-glow--green"></div>
+            <div className="page-glow page-glow--magenta"></div>
+
+            {/* Render the active view */}
+            {renderActiveView()}
+          </div>
+        </div>
       </div>
-      <style jsx>{`
-        .portfolio-page {
-          color: #fff;
-          padding: 20px 0;
-        }
-
-        .portfolio-header {
-          margin-bottom: 24px;
-        }
-
-        .portfolio-header h2 {
-          font-size: 24px;
-          margin-bottom: 16px;
-        }
-
-        /* Portfolio Charts Row Styles */
-        .portfolio-charts-row {
-          display: flex;
-          gap: 16px;
-          margin-bottom: 24px;
-        }
-
-        .chart-box {
-          flex: 1;
-          min-width: 0;
-          background: rgba(20, 30, 48, 0.6);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .chart-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 8px;
-        }
-
-        .chart-header h3 {
-          font-size: 16px;
-          font-weight: 500;
-          margin: 0;
-        }
-
-        /* Portfolio value display styles */
-        .portfolio-value-display {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 180px;
-        }
-
-        .total-value-label {
-          font-size: 16px;
-          color: #a0a7b8;
-          margin-bottom: 10px;
-        }
-
-        .total-value-amount {
-          font-size: 32px;
-          font-weight: 600;
-          color: #00c2ff;
-        }
-
-        .timeframe-selector-container {
-          display: flex;
-          align-items: center;
-        }
-
-        .chart-content {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .chart-content-with-legend {
-          display: flex;
-          align-items: center;
-        }
-
-        .chart-donut {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .chart-legend-vertical {
-          width: 100px;
-          padding-left: 10px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          margin-top: -20px; /* Move up a bit to align with the chart */
-        }
-
-        .chart-container {
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .chart-total-value {
-          font-size: 14px;
-          font-weight: 600;
-          color: #00c2ff;
-        }
-
-        .chart-legend {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-          gap: 8px;
-          margin-top: 8px;
-        }
-
-        .legend-item {
-          display: flex;
-          align-items: center;
-          font-size: 12px;
-        }
-
-        .legend-color {
-          width: 12px;
-          height: 12px;
-          border-radius: 2px;
-          margin-right: 4px;
-        }
-
-        .legend-more {
-          font-size: 12px;
-          color: #a0a7b8;
-        }
-
-        .value-change {
-          display: flex;
-          align-items: center;
-          font-size: 14px;
-          margin-top: 4px;
-        }
-
-        .value-change.positive {
-          color: #00c48c;
-        }
-
-        .value-change.negative {
-          color: #ff5252;
-        }
-
-        .change-icon {
-          margin-right: 4px;
-          display: flex;
-          align-items: center;
-        }
-
-        .change-amount {
-          margin-right: 4px;
-        }
-
-        .chart-controls {
-          display: flex;
-          justify-content: flex-end;
-        }
-
-        .timeframe-selector {
-          display: flex;
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 6px;
-          padding: 2px;
-        }
-
-        .timeframe-selector button {
-          background: none;
-          border: none;
-          color: #a0a7b8;
-          padding: 4px 8px;
-          font-size: 12px;
-          cursor: pointer;
-          border-radius: 4px;
-          min-width: 32px;
-        }
-
-        .timeframe-selector button.active {
-          background: rgba(0, 194, 255, 0.2);
-          color: #00c2ff;
-        }
-
-        /* Wallet Assets Section */
-        .wallet-assets-section {
-          margin-top: 32px;
-          margin-bottom: 24px;
-          background: rgba(20, 30, 48, 0.6);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 20px;
-        }
-
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 16px;
-        }
-
-        .section-header h3 {
-          font-size: 18px;
-          font-weight: 500;
-          margin: 0;
-        }
-
-        .total-value {
-          font-size: 16px;
-          font-weight: 600;
-          color: #00c2ff;
-        }
-
-        .wallet-assets-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 16px;
-        }
-
-        .wallet-asset-card {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 10px;
-          padding: 12px;
-          transition: all 0.2s;
-        }
-
-        .wallet-asset-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .asset-header {
-          display: flex;
-          align-items: center;
-          margin-bottom: 8px;
-        }
-
-        .asset-symbol {
-          margin-left: 8px;
-          font-weight: 500;
-          font-size: 16px;
-        }
-
-        .asset-details {
-          margin-top: 8px;
-        }
-
-        .asset-balance {
-          font-weight: 500;
-          font-size: 15px;
-          margin-bottom: 4px;
-        }
-
-        .asset-value {
-          color: #a0a7b8;
-          font-size: 14px;
-        }
-
-        .view-all-container {
-          margin-top: 16px;
-          text-align: center;
-        }
-
-        .view-all-btn {
-          background: none;
-          border: none;
-          color: #00c2ff;
-          cursor: pointer;
-          font-size: 14px;
-          padding: 8px 16px;
-          border-radius: 4px;
-          transition: background-color 0.2s;
-        }
-
-        .view-all-btn:hover {
-          background-color: rgba(0, 194, 255, 0.1);
-        }
-
-        /* Section Tabs */
-        .section-tabs {
-          display: flex;
-          overflow-x: auto;
-          margin-bottom: 20px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .section-tab {
-          background: none;
-          border: none;
-          padding: 12px 16px;
-          color: #a0a7b8;
-          font-size: 15px;
-          cursor: pointer;
-          border-bottom: 2px solid transparent;
-          transition: all 0.2s;
-          white-space: nowrap;
-          position: relative;
-        }
-
-        .section-tab:hover {
-          color: #d0d7e8;
-        }
-
-        .section-tab.active {
-          color: #00c2ff;
-          border-bottom: 2px solid #00c2ff;
-        }
-
-        .tab-count {
-          font-size: 12px;
-          background: rgba(0, 194, 255, 0.1);
-          padding: 2px 6px;
-          border-radius: 10px;
-          margin-left: 6px;
-        }
-
-        .positions-section {
-          margin-bottom: 24px;
-        }
-
-        .positions-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 16px;
-        }
-
-        .position-card {
-          background: rgba(20, 30, 48, 0.6);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          overflow: hidden;
-          transition: all 0.2s;
-        }
-
-        .position-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-          border: 1px solid rgba(0, 194, 255, 0.2);
-        }
-
-        .position-card-header {
-          padding: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .position-card-stats {
-          padding: 16px;
-          display: flex;
-          justify-content: space-between;
-        }
-
-        .stat {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .stat-label {
-          font-size: 13px;
-          color: #a0a7b8;
-          margin-bottom: 4px;
-        }
-
-        .stat-value {
-          font-size: 16px;
-          font-weight: 500;
-        }
-
-        .protocol-badge {
-          display: flex;
-          align-items: center;
-        }
-
-        .empty-positions {
-          padding: 32px;
-          text-align: center;
-          background: rgba(20, 30, 48, 0.6);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .empty-positions p {
-          margin-bottom: 16px;
-          color: #a0a7b8;
-        }
-
-        .loading-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 40px;
-        }
-
-        .spinner {
-          width: 40px;
-          height: 40px;
-          border: 3px solid rgba(0, 194, 255, 0.3);
-          border-top-color: rgba(0, 194, 255, 1);
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 16px;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .loading-text {
-          color: #a0a7b8;
-        }
-
-        .empty-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 40px;
-          text-align: center;
-        }
-
-        .empty-icon {
-          font-size: 48px;
-          margin-bottom: 16px;
-        }
-
-        .empty-state h3 {
-          margin-bottom: 8px;
-        }
-
-        .empty-state p {
-          color: #a0a7b8;
-          margin-bottom: 24px;
-        }
-
-        .btn--primary {
-          background-color: #00c2ff;
-          color: #0a1120;
-          border: none;
-          border-radius: 4px;
-          padding: 8px 16px;
-          cursor: pointer;
-          font-weight: 500;
-        }
-
-        .btn--primary:hover {
-          background-color: #33cfff;
-        }
-
-        /* Token Icon Styles */
-        .token-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
-          min-width: 24px;
-          min-height: 24px;
-          border-radius: 50%;
-          overflow: hidden;
-          background: #141e30;
-        }
-
-        .token-icon img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .token-icon-sm {
-          width: 24px;
-          height: 24px;
-        }
-
-        .token-icon-md {
-          width: 32px;
-          height: 32px;
-        }
-
-        .token-icon-lg {
-          width: 48px;
-          height: 48px;
-        }
-
-        .token-letter {
-          font-weight: bold;
-          font-size: 12px;
-          color: #fff;
-        }
-
-        .token-icons {
-          display: flex;
-          align-items: center;
-        }
-
-        .second-token {
-          margin-left: -8px;
-          z-index: 1;
-        }
-
-        .portfolio-pair {
-          display: flex;
-          align-items: center;
-        }
-
-        .pair-name {
-          margin-left: 16px;
-          font-weight: 500;
-        }
-
-        /* Responsive design */
-        @media (max-width: 1200px) {
-          .portfolio-charts-row {
-            flex-wrap: wrap;
-          }
-
-          .chart-box {
-            min-width: calc(50% - 8px);
-            flex: 1 1 calc(50% - 8px);
-          }
-
-          .portfolio-value-chart {
-            flex-basis: 100%;
-            margin-bottom: 16px;
-          }
-
-          .chart-content-with-legend {
-            flex-direction: column;
-          }
-
-          .chart-legend-vertical {
-            width: 100%;
-            flex-direction: row;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-top: 8px;
-            padding-left: 0;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .portfolio-charts-row {
-            flex-direction: column;
-          }
-
-          .chart-box {
-            width: 100%;
-            margin-bottom: 16px;
-          }
-
-          .positions-grid,
-          .wallet-assets-grid {
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-          }
-
-          .section-tabs {
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            padding-bottom: 5px;
-          }
-
-          .section-tab {
-            padding: 8px 12px;
-            font-size: 14px;
-          }
-
-          .chart-legend-vertical .legend-item {
-            margin-bottom: 4px;
-          }
-
-          .timeframe-selector button {
-            padding: 4px 6px;
-            font-size: 11px;
-            min-width: 28px;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .wallet-assets-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .timeframe-selector button {
-            padding: 3px 5px;
-            font-size: 10px;
-            min-width: 26px;
-          }
-        }
-      `}</style>
     </div>
   );
 }
