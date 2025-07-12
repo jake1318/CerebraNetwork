@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-09 03:05:02 UTC by jake1318
+// Last Updated: 2025-07-12 01:14:42 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -1259,7 +1259,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑07‑09 03:05:02 UTC by jake1318
+//  last‑updated: 2025‑07‑12 01:14:42 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1284,6 +1284,7 @@ export interface CoinMarketData {
   circulating: string;
   supply: string;
   volume24H: number;
+  tokenId: string; // Token address (type tag)
   market: {
     /** 30‑minute window   */ m30: MarketWindow;
     /** 1‑hour window      */ hour1: MarketWindow;
@@ -1372,6 +1373,54 @@ export async function getCoinOhlcv(
   if (start) params.start = String(start);
   const result = await bvGet<{ ohlcs: OhlcvPoint[] }>("/coin/ohlcv", params);
   return result.ohlcs;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  3.  Bulk market snapshot for many tokens (≤ 50)                         */
+
+/** Bulk market snapshot for many tokens (≤ 50) */
+export async function getCoinMarketDataBulk(
+  coinTypes: string[]
+): Promise<Record<string, CoinMarketData>> {
+  if (!coinTypes.length) return {};
+
+  // BV caps the list at 50 – chunk if needed
+  const CHUNK = 50;
+  const chunks = [];
+  for (let i = 0; i < coinTypes.length; i += CHUNK)
+    chunks.push(coinTypes.slice(i, i + CHUNK));
+
+  const out: Record<string, CoinMarketData> = {};
+
+  for (const list of chunks) {
+    const params = new URLSearchParams({
+      coinTypes: list.join(","),
+      show24hChange: "true",
+    }).toString();
+
+    const res = await fetch(`${BLOCKVISION_BASE}/coin/market/list?${params}`, {
+      headers: {
+        accept: "application/json",
+        "x-api-key": BV_API_KEY,
+      },
+    });
+
+    if (!res.ok) throw new Error(`BlockVision list failed – ${res.status}`);
+
+    const json = await res.json();
+    if (json.code !== 200 || !json.result?.marketList)
+      throw new Error("BlockVision list unexpected payload");
+
+    for (const item of json.result.marketList as CoinMarketData[]) {
+      // every item already contains tokenId (full type tag)
+      out[item.tokenId] = item;
+    }
+
+    // polite 250 ms delay between chunks
+    if (chunks.length > 1) await new Promise((r) => setTimeout(r, 250));
+  }
+
+  return out;
 }
 
 export const blockvisionService = {
@@ -2618,9 +2667,10 @@ export const blockvisionService = {
   clearVaultApyCache,
   extractCetusVaultData,
 
-  // Export new market data functions
+  // Export market data functions
   getCoinMarketDataPro,
   getCoinOhlcv,
+  getCoinMarketDataBulk,
 };
 
 export default blockvisionService;
