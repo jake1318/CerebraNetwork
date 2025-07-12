@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-12 01:14:42 UTC by jake1318
+// Last Updated: 2025-07-12 05:01:23 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -1259,7 +1259,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑07‑12 01:14:42 UTC by jake1318
+//  last‑updated: 2025‑07‑12 05:01:23 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1375,51 +1375,33 @@ export async function getCoinOhlcv(
   return result.ohlcs;
 }
 
-/* ------------------------------------------------------------------------ */
-/*  3.  Bulk market snapshot for many tokens (≤ 50)                         */
-
-/** Bulk market snapshot for many tokens (≤ 50) */
-export async function getCoinMarketDataBulk(
-  coinTypes: string[]
+/* -------------------------------------------------------------------------- */
+/*  Fetch Coin Market Data for an arbitrary list of coinTypes (Pro key)       */
+/*  – concurrent batches of 8, up to any length                               */
+/* -------------------------------------------------------------------------- */
+export async function getCoinMarketDataBatch(
+  coinTypes: string[],
+  concurrency: number = 8 // 8 parallel calls, tweak if you like
 ): Promise<Record<string, CoinMarketData>> {
-  if (!coinTypes.length) return {};
-
-  // BV caps the list at 50 – chunk if needed
-  const CHUNK = 50;
-  const chunks = [];
-  for (let i = 0; i < coinTypes.length; i += CHUNK)
-    chunks.push(coinTypes.slice(i, i + CHUNK));
-
   const out: Record<string, CoinMarketData> = {};
+  let index = 0;
 
-  for (const list of chunks) {
-    const params = new URLSearchParams({
-      coinTypes: list.join(","),
-      show24hChange: "true",
-    }).toString();
+  async function worker() {
+    while (index < coinTypes.length) {
+      const myIndex = index++;
+      const ct = coinTypes[myIndex];
 
-    const res = await fetch(`${BLOCKVISION_BASE}/coin/market/list?${params}`, {
-      headers: {
-        accept: "application/json",
-        "x-api-key": BV_API_KEY,
-      },
-    });
-
-    if (!res.ok) throw new Error(`BlockVision list failed – ${res.status}`);
-
-    const json = await res.json();
-    if (json.code !== 200 || !json.result?.marketList)
-      throw new Error("BlockVision list unexpected payload");
-
-    for (const item of json.result.marketList as CoinMarketData[]) {
-      // every item already contains tokenId (full type tag)
-      out[item.tokenId] = item;
+      try {
+        const data = await getCoinMarketDataPro(ct); // existing single‑call helper
+        out[ct] = data;
+      } catch (e) {
+        console.warn(`BlockVision market/pro failed for ${ct}`, e);
+      }
     }
-
-    // polite 250 ms delay between chunks
-    if (chunks.length > 1) await new Promise((r) => setTimeout(r, 250));
   }
 
+  // spin up N workers in parallel
+  await Promise.all(Array.from({ length: concurrency }, worker));
   return out;
 }
 
@@ -1737,6 +1719,10 @@ export const blockvisionService = {
       if (combinedRawData.bluefin) {
         console.log("Found Bluefin data, processing separately");
         const bluefinPoolGroups = processBluefinData(combinedRawData.bluefin);
+        // src/services/blockvisionService.ts
+        // Last Updated: 2025-07-12 05:22:11 UTC by jake1318
+
+        // Continuing from where it cut off...
 
         // Add the processed Bluefin groups to the main pool groups array
         if (bluefinPoolGroups.length > 0) {
@@ -2262,6 +2248,58 @@ export const blockvisionService = {
             }
           }
 
+          // Special handling for Haedal
+          if (pool.protocol === "Haedal") {
+            // Get token info for proper price and decimal information
+            if (pool.tokenA) {
+              tokenAInfo = await blockvisionService.getTokenInfo(pool.tokenA);
+            }
+            if (pool.tokenB) {
+              tokenBInfo = await blockvisionService.getTokenInfo(pool.tokenB);
+            }
+
+            for (const pos of pool.positions) {
+              // Calculate USD values
+              if (pos.positionType === "haedal-lp") {
+                const normA = normalizeAmount(
+                  pos.balanceA || "0",
+                  tokenAInfo.decimals
+                );
+                const normB = normalizeAmount(
+                  pos.balanceB || "0",
+                  tokenBInfo.decimals
+                );
+                const usdA = normA * (tokenAInfo.price || 0);
+                const usdB = normB * (tokenBInfo.price || 0);
+                pos.valueUsd = usdA + usdB;
+
+                pos.formattedBalanceA = formatTokenAmount(normA);
+                pos.formattedBalanceB = formatTokenAmount(normB);
+              } else if (pos.positionType === "haedal-staking") {
+                const normA = normalizeAmount(
+                  pos.balanceA || "0",
+                  tokenAInfo.decimals
+                );
+                pos.valueUsd = normA * (tokenAInfo.price || 0);
+                pos.formattedBalanceA = formatTokenAmount(normA);
+              }
+            }
+
+            // Set logos for the pool
+            if (!pool.tokenALogo && tokenAInfo.logo) {
+              pool.tokenALogo = tokenAInfo.logo;
+            }
+            if (!pool.tokenBLogo && tokenBInfo.logo) {
+              pool.tokenBLogo = tokenBInfo.logo;
+            }
+
+            // Update the total values for the pool
+            pool.totalValueUsd = pool.positions.reduce(
+              (sum, p) => sum + (p.valueUsd || 0),
+              0
+            );
+          }
+
           // Special handling for Aftermath
           if (pool.protocol === "Aftermath") {
             // Get token info for proper price and decimal information
@@ -2354,58 +2392,6 @@ export const blockvisionService = {
                 pool.apr = (rewardValue / pool.totalValueUsd) * 52 * 100;
               }
             }
-          }
-
-          // Special handling for Haedal
-          if (pool.protocol === "Haedal") {
-            // Get token info for proper price and decimal information
-            if (pool.tokenA) {
-              tokenAInfo = await blockvisionService.getTokenInfo(pool.tokenA);
-            }
-            if (pool.tokenB) {
-              tokenBInfo = await blockvisionService.getTokenInfo(pool.tokenB);
-            }
-
-            for (const pos of pool.positions) {
-              // Calculate USD values
-              if (pos.positionType === "haedal-lp") {
-                const normA = normalizeAmount(
-                  pos.balanceA || "0",
-                  tokenAInfo.decimals
-                );
-                const normB = normalizeAmount(
-                  pos.balanceB || "0",
-                  tokenBInfo.decimals
-                );
-                const usdA = normA * (tokenAInfo.price || 0);
-                const usdB = normB * (tokenBInfo.price || 0);
-                pos.valueUsd = usdA + usdB;
-
-                pos.formattedBalanceA = formatTokenAmount(normA);
-                pos.formattedBalanceB = formatTokenAmount(normB);
-              } else if (pos.positionType === "haedal-staking") {
-                const normA = normalizeAmount(
-                  pos.balanceA || "0",
-                  tokenAInfo.decimals
-                );
-                pos.valueUsd = normA * (tokenAInfo.price || 0);
-                pos.formattedBalanceA = formatTokenAmount(normA);
-              }
-            }
-
-            // Set logos for the pool
-            if (!pool.tokenALogo && tokenAInfo.logo) {
-              pool.tokenALogo = tokenAInfo.logo;
-            }
-            if (!pool.tokenBLogo && tokenBInfo.logo) {
-              pool.tokenBLogo = tokenBInfo.logo;
-            }
-
-            // Update the total values for the pool
-            pool.totalValueUsd = pool.positions.reduce(
-              (sum, p) => sum + (p.valueUsd || 0),
-              0
-            );
           }
 
           for (const pos of pool.positions) {
@@ -2670,7 +2656,7 @@ export const blockvisionService = {
   // Export market data functions
   getCoinMarketDataPro,
   getCoinOhlcv,
-  getCoinMarketDataBulk,
+  getCoinMarketDataBatch,
 };
 
 export default blockvisionService;
