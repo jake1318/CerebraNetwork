@@ -1,36 +1,271 @@
 // src/pages/Home.scss
-// Last Updated: 2025-07-10 20:41:15 UTC by jake1318
+// Last Updated: 2025-07-11 00:11:21 UTC by jake1318
+
+// Variables for consistent colors - Adjusted color scheme
+$background-dark: #020314;
+$background-surface: #030924;
+$neon-blue: #4da2ff; // Primary color (Sui blue) - 50%
+$neon-green: #1ed760; // Darker neon green - 30% (changed from #39FF14 which was too bright)
+$neon-magenta: #ff00ff; // New magenta accent - 20%
+$text-primary: #ffffff;
+$text-secondary: #b1a5c8;
+$text-muted: #3f4c60;
+$border-dark: rgba(255, 255, 255, 0.05);
 
 .home {
   width: 100%;
-  overflow: hidden;
-  background-color: #020202; // Near-black background as specified
+  overflow-x: hidden;
+  background-color: $background-dark;
+  color: $text-primary;
+  font-family: "Inter", sans-serif;
 
+  // Common section padding
+  section {
+    padding: 6rem 0;
+
+    @media (max-width: 768px) {
+      padding: 4rem 0;
+    }
+  }
+
+  .container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  // Reusable section title style
+  .section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 3rem;
+    background: linear-gradient(
+      90deg,
+      $neon-blue 50%,
+      $neon-green 80%,
+      $neon-magenta 100%
+    ); // Color distribution
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: 0 0 15px rgba($neon-blue, 0.3);
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 3px;
+      background: linear-gradient(
+        90deg,
+        $neon-blue 50%,
+        $neon-green 80%,
+        $neon-magenta 100%
+      ); // Color distribution
+      border-radius: 2px;
+      box-shadow: 0 0 10px rgba($neon-blue, 0.5),
+        0 0 10px rgba($neon-green, 0.2);
+    }
+
+    @media (max-width: 768px) {
+      font-size: 2rem;
+    }
+  }
+
+  // Accent colors
+  .accent-blue {
+    color: $neon-blue;
+    text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+  }
+
+  .accent-green {
+    color: $neon-green;
+    text-shadow: 0 0 10px rgba($neon-green, 0.5);
+  }
+
+  .accent-magenta {
+    color: $neon-magenta;
+    text-shadow: 0 0 10px rgba($neon-magenta, 0.5);
+  }
+
+  // Navbar Styles
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 1rem 0;
+    transition: all 0.3s ease;
+    background: rgba($background-dark, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    &.scrolled {
+      background: rgba($background-dark, 0.8);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    &__container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 90%;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    &__logo {
+      a {
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        font-weight: 700;
+        font-size: 1.5rem;
+
+        .logo-text {
+          color: $neon-blue; // Blue for main brand
+          text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+        }
+
+        .logo-network {
+          color: $text-primary;
+          opacity: 0.7;
+          margin-left: 0.25rem;
+        }
+      }
+    }
+
+    &__links {
+      display: flex;
+      gap: 1.5rem;
+
+      a {
+        color: $text-primary;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        font-weight: 500;
+        position: relative;
+        padding: 0.25rem 0;
+
+        &:hover {
+          color: $neon-blue;
+        }
+
+        &::after {
+          content: "";
+          position: absolute;
+          width: 0;
+          height: 2px;
+          bottom: -3px;
+          left: 0;
+          background: $neon-blue; // Blue underline
+          transition: width 0.3s ease;
+          border-radius: 2px;
+        }
+
+        &:hover::after {
+          width: 100%;
+        }
+
+        &.search-link {
+          color: $neon-magenta; // Magenta for search to make it stand out
+
+          &:hover {
+            text-shadow: 0 0 10px rgba($neon-magenta, 0.5);
+          }
+
+          &::after {
+            background: $neon-magenta;
+          }
+        }
+      }
+    }
+
+    &__actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+
+      .btn--connect {
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        background: rgba(
+          $neon-green,
+          0.1
+        ); // Green background for connect button
+        border: 1px solid rgba($neon-green, 0.5);
+        color: $text-primary;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+        font-weight: 500;
+
+        &:hover {
+          background: rgba($neon-green, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba($neon-green, 0.2);
+        }
+      }
+
+      .mobile-menu-toggle {
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+        width: 30px;
+        height: 21px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+
+        span {
+          width: 100%;
+          height: 2px;
+          background: $neon-blue; // Blue for mobile menu
+          border-radius: 2px;
+        }
+      }
+    }
+
+    @media (max-width: 991px) {
+      .desktop-only {
+        display: none;
+      }
+
+      .mobile-only {
+        display: flex;
+      }
+    }
+
+    @media (min-width: 992px) {
+      .desktop-only {
+        display: flex;
+      }
+
+      .mobile-only {
+        display: none;
+      }
+    }
+  }
+
+  // Hero Section
   .hero {
     position: relative;
-    height: 80vh;
-    min-height: 600px;
+    height: 100vh;
+    min-height: 700px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    // Updated gradient with darker base and neon accents
-    background: radial-gradient(
-        circle at top left,
-        rgba(0, 255, 255, 0.15) 0%,
-        rgba(2, 2, 2, 0.8) 40%
-      ),
-      radial-gradient(
-        circle at bottom right,
-        rgba(196, 92, 242, 0.15) 0%,
-        // Using #C45CF2 from reference
-        rgba(2, 2, 2, 0.8) 40%
-      ),
-      linear-gradient(135deg, rgba(2, 2, 2, 0.95) 0%, rgba(5, 5, 15, 0.95) 100%);
+    padding: 6rem 0 4rem;
+    background-color: $background-dark;
     overflow: hidden;
 
-    // Grid overlay with cyber/circuit pattern
-    &::before {
-      content: "";
+    &__grid-background {
       position: absolute;
       top: 0;
       left: 0;
@@ -38,54 +273,284 @@
       bottom: 0;
       background: linear-gradient(
           90deg,
-          rgba(0, 255, 255, 0.05) 1px,
+          rgba($neon-blue, 0.05) 1px,
           transparent 1px
         ),
-        linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(196, 92, 242, 0.05) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(196, 92, 242, 0.05) 1px, transparent 1px);
+        linear-gradient(180deg, rgba($neon-blue, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba($neon-blue, 0.05) 1px, transparent 1px),
+        linear-gradient(180deg, rgba($neon-blue, 0.05) 1px, transparent 1px);
       background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
       background-position: 0 0, 0 0, 10px 10px, 10px 10px;
       pointer-events: none;
       z-index: 1;
     }
 
+    .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 2rem;
+      position: relative;
+      z-index: 10;
+
+      @media (max-width: 991px) {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+
     &__content {
-      z-index: 3;
-      text-align: center;
-      max-width: 800px;
-      padding: 0 2rem;
+      flex: 1;
+      max-width: 600px;
 
       h1 {
         font-size: 3.5rem;
-        margin-bottom: 1rem;
-        // Updated gradient with cyan (#00ffff) and purple (#C45CF2)
-        background: linear-gradient(90deg, #00ffff, #c45cf2);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-        color: transparent;
-        text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-        font-weight: bold;
-        letter-spacing: 1px;
+        font-weight: 800;
+        margin-bottom: 1.5rem;
+        line-height: 1.2;
+
+        @media (max-width: 768px) {
+          font-size: 2.5rem;
+        }
       }
 
       p {
-        font-size: 1.5rem;
-        margin-bottom: 2rem;
-        // Using softer gray as mentioned (#B1A5C8)
-        color: #b1a5c8;
-        letter-spacing: 0.5px;
+        font-size: 1.25rem;
+        color: $text-secondary;
+        margin-bottom: 2.5rem;
+        line-height: 1.5;
+
+        @media (max-width: 768px) {
+          font-size: 1.1rem;
+        }
       }
     }
 
     &__buttons {
       display: flex;
-      gap: 1.5rem;
-      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+
+      @media (max-width: 991px) {
+        justify-content: center;
+      }
+
+      @media (max-width: 480px) {
+        flex-direction: column;
+        align-items: center;
+      }
     }
 
-    &__overlay {
+    &__integrations {
+      margin-top: 3rem;
+
+      span {
+        display: block;
+        font-size: 0.9rem;
+        color: $text-secondary;
+        margin-bottom: 1rem;
+      }
+
+      .integration-logos {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+
+        img {
+          height: 24px;
+          opacity: 0.7;
+          transition: opacity 0.3s ease;
+
+          &:hover {
+            opacity: 1;
+          }
+        }
+
+        @media (max-width: 991px) {
+          justify-content: center;
+        }
+      }
+    }
+
+    &__image {
+      flex: 1;
+      max-width: 600px;
+      position: relative;
+
+      .dashboard-preview {
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .glow-effect {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          circle at center,
+          rgba($neon-blue, 0.15),
+          transparent 60%
+        );
+        filter: blur(40px);
+        z-index: -1;
+      }
+    }
+
+    &__glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.2;
+      z-index: 1;
+
+      &--blue {
+        background: $neon-blue;
+        width: 300px;
+        height: 300px;
+        top: -100px;
+        left: 10%;
+        animation: pulse 10s infinite alternate;
+      }
+
+      &--green {
+        background: $neon-green;
+        width: 200px; // Smaller green glow
+        height: 200px; // Smaller green glow
+        bottom: -100px;
+        right: 10%;
+        animation: pulse 12s infinite alternate-reverse;
+        opacity: 0.15; // More transparent
+      }
+
+      &--magenta {
+        background: $neon-magenta;
+        width: 150px; // Smaller magenta glow
+        height: 150px; // Smaller magenta glow
+        bottom: 100px;
+        right: 30%;
+        animation: pulse 8s infinite alternate;
+        opacity: 0.12; // More transparent
+      }
+    }
+
+    .scan-line {
+      position: absolute;
+      z-index: 2;
+
+      &.horizontal {
+        width: 100%;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          $neon-blue,
+          transparent
+        );
+        top: 50%;
+        left: 0;
+        box-shadow: 0 0 10px rgba($neon-blue, 0.7);
+        animation: horizontalScan 15s linear infinite;
+      }
+
+      &.vertical {
+        width: 1px;
+        height: 100%;
+        background: linear-gradient(
+          180deg,
+          transparent,
+          $neon-magenta,
+          transparent
+        ); // Changed to magenta for variety
+        left: 50%;
+        top: 0;
+        box-shadow: 0 0 10px rgba($neon-magenta, 0.7);
+        animation: verticalScan 18s linear infinite;
+      }
+    }
+  }
+
+  // Stats Section
+  .stats {
+    padding: 4rem 0;
+    background: linear-gradient(
+      180deg,
+      $background-dark,
+      rgba($background-surface, 0.8)
+    );
+    border-top: 1px solid rgba($neon-blue, 0.1);
+    border-bottom: 1px solid rgba($neon-blue, 0.1);
+
+    &__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
+    }
+  }
+
+  .stat-card {
+    background: rgba($background-surface, 0.5);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba($neon-blue, 0.1);
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      color: $text-secondary;
+      margin-bottom: 1rem;
+      font-weight: 500;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: $neon-blue; // Default to blue for stats
+      text-shadow: 0 0 10px rgba($neon-blue, 0.3);
+
+      &.accent-green {
+        color: $neon-green;
+        text-shadow: 0 0 10px rgba($neon-green, 0.5);
+      }
+
+      &.accent-magenta {
+        color: $neon-magenta;
+        text-shadow: 0 0 10px rgba($neon-magenta, 0.5);
+      }
+    }
+  }
+
+  // Features Section
+  .features {
+    background: linear-gradient(
+      0deg,
+      $background-dark,
+      rgba($background-surface, 0.5),
+      $background-dark
+    );
+    padding: 6rem 0;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: "";
       position: absolute;
       top: 0;
       left: 0;
@@ -93,227 +558,46 @@
       bottom: 0;
       background: radial-gradient(
           circle at 20% 30%,
-          rgba(0, 255, 255, 0.12),
-          transparent 25%
+          rgba($neon-blue, 0.1),
+          transparent 40%
         ),
         radial-gradient(
           circle at 80% 70%,
-          rgba(196, 92, 242, 0.12),
-          transparent 25%
+          rgba($neon-blue, 0.08),
+          transparent 40%
         );
-      z-index: 2;
-    }
-
-    // Scanning horizontal line (neon cyan)
-    &::after {
-      content: "";
-      position: absolute;
-      width: 100vw;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #00ffff, transparent);
-      top: 50%;
-      left: 50%;
-      transform: translateX(-50%);
-      animation: horizonScan 15s linear infinite;
-      z-index: 2;
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-    }
-
-    // Vertical scan line (neon purple)
-    .vertical-scan {
-      content: "";
-      position: absolute;
-      width: 2px;
-      height: 100vh;
-      background: linear-gradient(180deg, transparent, #c45cf2, transparent);
-      left: 50%;
-      top: 50%;
-      transform: translateY(-50%);
-      animation: verticalScan 15s linear infinite;
-      z-index: 2;
-      box-shadow: 0 0 20px rgba(196, 92, 242, 0.5);
-    }
-
-    // Glow effects (cyan and purple)
-    .glow-1 {
-      position: absolute;
-      width: 300px;
-      height: 300px;
-      background: rgba(0, 255, 255, 0.12);
-      border-radius: 50%;
-      filter: blur(70px);
-      top: -100px;
-      left: 10%;
-      z-index: 1;
-      animation: pulsate 8s ease-in-out infinite alternate;
-    }
-
-    .glow-2 {
-      position: absolute;
-      width: 300px;
-      height: 300px;
-      background: rgba(196, 92, 242, 0.12);
-      border-radius: 50%;
-      filter: blur(80px);
-      bottom: -100px;
-      right: 10%;
-      z-index: 1;
-      animation: pulsate 10s ease-in-out infinite alternate-reverse;
-    }
-  }
-
-  .stats {
-    padding: 3rem 2rem;
-    // Darker background color (#020202)
-    background: rgba(2, 2, 2, 0.9);
-    border-bottom: 1px solid;
-    border-image: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.1),
-        rgba(196, 92, 242, 0.1)
-      )
-      1;
-    position: relative;
-    z-index: 1;
-
-    &__container {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-around;
-      flex-wrap: wrap;
-      gap: 2rem;
-    }
-  }
-
-  .stat-card {
-    // Darker card background (#020202)
-    background: rgba(2, 2, 2, 0.7);
-    border-radius: 16px;
-    padding: 1.8rem;
-    width: 280px;
-    text-align: center;
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-      0 8px 32px rgba(196, 92, 242, 0.08);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(196, 92, 242, 0.2)
-      )
-      1;
-    transition: all 0.3s ease;
-
-    &:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-        0 8px 32px rgba(196, 92, 242, 0.15);
-    }
-
-    h3 {
-      font-size: 1.1rem;
-      // Using softer gray as mentioned (#3F4C60)
-      color: #3f4c60;
-      margin-bottom: 1rem;
-      letter-spacing: 0.5px;
-    }
-
-    .stat-value {
-      font-size: 2.4rem;
-      font-weight: 700;
-      // Updated gradient with cyan and purple
-      background: linear-gradient(90deg, #00ffff, #c45cf2);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      color: transparent;
-      margin: 0;
-    }
-  }
-
-  .features {
-    padding: 5rem 2rem;
-    background: radial-gradient(
-        circle at top left,
-        rgba(0, 255, 255, 0.1) 0%,
-        rgba(2, 2, 2, 0.5) 40%
-      ),
-      radial-gradient(
-        circle at bottom right,
-        rgba(196, 92, 242, 0.1) 0%,
-        rgba(2, 2, 2, 0.5) 40%
-      );
-    position: relative;
-    overflow: hidden;
-
-    h2 {
-      text-align: center;
-      font-size: 2.5rem;
-      margin-bottom: 3rem;
-      // Updated gradient with cyan and purple
-      background: linear-gradient(90deg, #00ffff, #c45cf2);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      color: transparent;
-      position: relative;
-      text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-      font-weight: bold;
-      letter-spacing: 1px;
-
-      &::after {
-        content: "";
-        position: absolute;
-        bottom: -15px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 100px;
-        height: 4px;
-        // Updated gradient with cyan and purple
-        background: linear-gradient(90deg, #00ffff, #c45cf2);
-        border-radius: 4px;
-        box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
-          0 0 10px rgba(196, 92, 242, 0.5);
-      }
+      pointer-events: none;
     }
 
     &__grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
     }
   }
 
   .feature-card {
-    // Darker card background (#020202)
-    background: rgba(2, 2, 2, 0.7);
+    background: rgba($background-surface, 0.3);
     border-radius: 16px;
     padding: 2rem;
     text-align: center;
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-      0 8px 32px rgba(196, 92, 242, 0.08);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(196, 92, 242, 0.2)
-      )
-      1;
-    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    z-index: 2;
 
     &:hover {
       transform: translateY(-5px);
-      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-        0 8px 32px rgba(196, 92, 242, 0.15);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba($neon-blue, 0.2);
     }
 
-    // Updated feature icon styling for SVGs
     .feature-icon {
       width: 80px;
       height: 80px;
@@ -321,177 +605,518 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      // Darker background (#020202)
-      background: rgba(2, 2, 2, 0.6);
       border-radius: 50%;
+      background: linear-gradient(
+        135deg,
+        rgba($neon-blue, 0.1),
+        rgba($neon-blue, 0.02)
+      );
+      border: 1px solid rgba($neon-blue, 0.2);
       position: relative;
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.15),
-        0 0 20px rgba(196, 92, 242, 0.15);
 
-      &::before {
+      svg {
+        width: 35px;
+        height: 35px;
+        color: $neon-blue; // Blue by default
+        filter: drop-shadow(0 0 8px rgba($neon-blue, 0.5));
+        transition: transform 0.3s ease;
+      }
+
+      &:hover svg {
+        transform: scale(1.1);
+      }
+
+      &::after {
         content: "";
         position: absolute;
-        inset: -2px;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
         border-radius: 50%;
-        padding: 2px;
-        // Updated gradient with cyan and purple
-        background: linear-gradient(45deg, #00ffff, #c45cf2);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box,
-          linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
+        background: linear-gradient(45deg, rgba($neon-blue, 0.5), transparent);
+        z-index: -1;
+        opacity: 0.4;
+        filter: blur(4px);
       }
 
-      .feature-icon-svg {
-        width: 40px;
-        height: 40px;
-        color: #fff;
-        fill: #fff;
-        filter: drop-shadow(0 0 5px rgba(0, 255, 255, 0.5))
-          drop-shadow(0 0 5px rgba(196, 92, 242, 0.5));
-        transition: all 0.3s ease;
+      &--green {
+        background: linear-gradient(
+          135deg,
+          rgba($neon-green, 0.1),
+          rgba($neon-green, 0.02)
+        );
+        border: 1px solid rgba($neon-green, 0.2);
+
+        svg {
+          color: $neon-green;
+          filter: drop-shadow(0 0 8px rgba($neon-green, 0.5));
+        }
+
+        &::after {
+          background: linear-gradient(
+            45deg,
+            rgba($neon-green, 0.5),
+            transparent
+          );
+        }
       }
 
-      &:hover .feature-icon-svg {
-        color: #fff;
-        fill: #fff;
-        filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.8))
-          drop-shadow(0 0 8px rgba(196, 92, 242, 0.8));
-        transform: scale(1.1);
+      &--magenta {
+        background: linear-gradient(
+          135deg,
+          rgba($neon-magenta, 0.1),
+          rgba($neon-magenta, 0.02)
+        );
+        border: 1px solid rgba($neon-magenta, 0.2);
+
+        svg {
+          color: $neon-magenta;
+          filter: drop-shadow(0 0 8px rgba($neon-magenta, 0.5));
+        }
+
+        &::after {
+          background: linear-gradient(
+            45deg,
+            rgba($neon-magenta, 0.5),
+            transparent
+          );
+        }
       }
     }
 
     h3 {
       font-size: 1.5rem;
       margin-bottom: 1rem;
-      // Updated gradient with cyan and purple
-      background: linear-gradient(45deg, #00ffff, #c45cf2);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      color: $neon-blue; // Blue heading by default
       font-weight: 600;
-      letter-spacing: 0.5px;
-    }
 
-    p {
-      // Using softer gray as mentioned (#B1A5C8)
-      color: #b1a5c8;
-      line-height: 1.6;
-      font-size: 1.05rem;
-    }
-  }
+      &.green {
+        color: $neon-green;
+      }
 
-  .top-pools {
-    padding: 5rem 2rem;
-    // Darker background (#020202)
-    background: rgba(2, 2, 2, 0.9);
-    border-top: 1px solid;
-    border-image: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.1),
-        rgba(196, 92, 242, 0.1)
-      )
-      1;
-
-    h2 {
-      text-align: center;
-      font-size: 2.5rem;
-      margin-bottom: 3rem;
-      // Updated gradient with cyan and purple
-      background: linear-gradient(90deg, #00ffff, #c45cf2);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      color: transparent;
-      position: relative;
-      text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-      font-weight: bold;
-      letter-spacing: 1px;
-
-      &::after {
-        content: "";
-        position: absolute;
-        bottom: -15px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 100px;
-        height: 4px;
-        // Updated gradient with cyan and purple
-        background: linear-gradient(90deg, #00ffff, #c45cf2);
-        border-radius: 4px;
-        box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
-          0 0 10px rgba(196, 92, 242, 0.5);
+      &.magenta {
+        color: $neon-magenta;
       }
     }
 
+    p {
+      color: $text-secondary;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+  }
+
+  // Dashboard Preview Section
+  .dashboard-preview {
+    background-color: $background-dark;
+    padding: 6rem 0;
+
+    &__content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+
+      @media (max-width: 991px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    &__text {
+      h2 {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        color: $neon-blue; // Blue heading
+        font-weight: 700;
+
+        @media (max-width: 768px) {
+          font-size: 2rem;
+        }
+      }
+
+      p {
+        color: $text-secondary;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+      }
+
+      .dashboard-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2.5rem;
+
+        @media (max-width: 480px) {
+          grid-template-columns: 1fr;
+        }
+
+        .dashboard-stat {
+          .label {
+            display: block;
+            color: $text-muted;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+          }
+
+          .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: $neon-blue; // Default to blue
+          }
+        }
+      }
+    }
+
+    &__image {
+      position: relative;
+
+      img {
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .glow-effect {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          circle at center,
+          rgba($neon-blue, 0.15),
+          transparent 60%
+        );
+        filter: blur(40px);
+        z-index: -1;
+      }
+    }
+  }
+
+  // AI Search Section
+  .ai-search {
+    position: relative;
+    padding: 6rem 0;
+    overflow: hidden;
+
+    &__background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba($background-surface, 0.5);
+      z-index: -1;
+    }
+
+    &__glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.2;
+      z-index: -1;
+
+      &--1 {
+        background: $neon-blue;
+        width: 300px;
+        height: 300px;
+        top: -100px;
+        right: 10%;
+        animation: pulse 10s infinite alternate-reverse;
+      }
+
+      &--2 {
+        background: $neon-magenta; // Using magenta in AI section
+        width: 200px;
+        height: 200px;
+        bottom: -100px;
+        left: 10%;
+        animation: pulse 8s infinite alternate;
+        opacity: 0.15; // More transparent
+      }
+    }
+
+    &__content {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    &__text {
+      text-align: center;
+      margin-bottom: 3rem;
+
+      h2 {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        color: $neon-magenta; // Magenta for AI section title for distinction
+        font-weight: 700;
+
+        @media (max-width: 768px) {
+          font-size: 2rem;
+        }
+      }
+
+      p {
+        color: $text-secondary;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        max-width: 700px;
+        margin: 0 auto;
+      }
+    }
+
+    &__demo {
+      .search-bar-container {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+
+        @media (max-width: 768px) {
+          flex-direction: column;
+        }
+
+        .search-bar {
+          flex: 1;
+          position: relative;
+
+          input {
+            width: 100%;
+            padding: 1.25rem 3.5rem 1.25rem 1.5rem;
+            border-radius: 12px;
+            background: rgba($background-dark, 0.7);
+            border: 1px solid rgba($neon-magenta, 0.3); // Magenta border for search
+            color: $text-primary;
+            font-size: 1.1rem;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+
+            &:focus {
+              border-color: $neon-magenta; // Magenta focus
+              outline: none;
+              box-shadow: 0 0 0 2px rgba($neon-magenta, 0.2);
+            }
+
+            &.focused {
+              border-color: $neon-magenta; // Magenta focus
+              box-shadow: 0 0 15px rgba($neon-magenta, 0.3);
+            }
+
+            &::placeholder {
+              color: rgba($text-secondary, 0.6);
+            }
+          }
+
+          .search-icon {
+            position: absolute;
+            right: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: $neon-magenta; // Magenta icon
+            font-size: 1.5rem;
+          }
+        }
+
+        .btn--search {
+          padding: 0 2rem;
+          background: $neon-magenta; // Magenta search button
+          border-radius: 12px;
+          border: none;
+          color: #000;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 0 20px rgba($neon-magenta, 0.3);
+          min-width: 120px;
+
+          &:hover {
+            box-shadow: 0 0 30px rgba($neon-magenta, 0.5);
+            transform: translateY(-2px);
+          }
+
+          @media (max-width: 768px) {
+            height: 50px;
+          }
+        }
+      }
+
+      .search-example {
+        background: rgba($background-dark, 0.7);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid rgba($neon-magenta, 0.2); // Magenta border
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        margin-bottom: 2rem;
+
+        .search-question {
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+          span {
+            font-weight: 600;
+            color: $text-primary;
+            font-size: 1.1rem;
+          }
+        }
+
+        .search-answer {
+          display: flex;
+          gap: 1rem;
+
+          .ai-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: $neon-magenta; // Magenta badge
+            color: #000;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            height: fit-content;
+          }
+
+          p {
+            flex: 1;
+            color: $text-secondary;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin: 0;
+          }
+        }
+      }
+    }
+
+    .sources-list {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.5rem;
+      margin-top: 2rem;
+      justify-content: center;
+
+      .sources-title {
+        color: $text-muted;
+        font-size: 0.9rem;
+      }
+
+      .source-items {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .source-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        .source-icon {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+
+          &.web {
+            background: linear-gradient(45deg, #5b86e5, #36d1dc);
+          }
+
+          &.youtube {
+            background: linear-gradient(45deg, #ff0000, #ff5e62);
+          }
+
+          &.blockchain {
+            background: linear-gradient(45deg, #a770ef, #cf8bf3);
+          }
+
+          &.ai {
+            background: $neon-magenta; // Magenta for AI
+          }
+        }
+
+        span {
+          color: $text-secondary;
+          font-size: 0.9rem;
+        }
+      }
+    }
+  }
+
+  // Top Pools Section
+  .top-pools {
+    background-color: $background-dark;
+    padding: 6rem 0;
+
     .pools-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 2rem;
-      max-width: 1200px;
-      margin: 0 auto 2rem;
+      margin-bottom: 3rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
     }
 
     .pool-card {
-      // Darker background (#020202)
-      background: rgba(2, 2, 2, 0.7);
+      background: rgba($background-surface, 0.3);
       border-radius: 16px;
       padding: 2rem;
-      text-decoration: none;
-      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-        0 8px 32px rgba(196, 92, 242, 0.08);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid;
-      border-image: linear-gradient(
-          45deg,
-          rgba(0, 255, 255, 0.2),
-          rgba(196, 92, 242, 0.2)
-        )
-        1;
-      transition: all 0.3s ease;
-      display: block;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
 
       &:hover {
         transform: translateY(-5px);
-        box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-          0 8px 32px rgba(196, 92, 242, 0.15);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3),
+          0 0 20px rgba($neon-blue, 0.2);
       }
 
       h3 {
         font-size: 1.5rem;
-        margin-bottom: 1.5rem;
-        color: #fff;
         text-align: center;
-        border-bottom: 1px solid;
-        border-image: linear-gradient(
-            90deg,
-            rgba(0, 255, 255, 0.2),
-            rgba(196, 92, 242, 0.2)
-          )
-          1;
+        margin-bottom: 1.5rem;
         padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       .pool-stats {
         display: flex;
         flex-direction: column;
         gap: 1rem;
-      }
 
-      .pool-stat {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        .pool-stat {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
 
-        .label {
-          // Using softer gray as mentioned (#3F4C60)
-          color: #3f4c60;
-        }
+          .label {
+            color: $text-muted;
+          }
 
-        .value {
-          font-weight: 600;
-          color: #fff;
+          .value {
+            font-weight: 600;
+
+            &.accent-blue {
+              color: $neon-blue;
+              text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+            }
+
+            &.accent-green {
+              color: $neon-green;
+              text-shadow: 0 0 10px rgba($neon-green, 0.5);
+            }
+          }
         }
       }
     }
@@ -502,48 +1127,47 @@
     }
   }
 
+  // CTA Section
   .cta {
-    padding: 5rem 2rem;
-    background: radial-gradient(
-        circle at top left,
-        rgba(0, 255, 255, 0.1) 0%,
-        rgba(2, 2, 2, 0.5) 40%
-      ),
-      radial-gradient(
-        circle at bottom right,
-        rgba(196, 92, 242, 0.1) 0%,
-        rgba(2, 2, 2, 0.5) 40%
-      );
     position: relative;
+    padding: 6rem 0;
     overflow: hidden;
 
-    // Add glow effects (cyan and purple)
-    &::before {
-      content: "";
+    &__glow {
       position: absolute;
-      width: 300px;
-      height: 300px;
-      background: rgba(0, 255, 255, 0.12);
-      border-radius: 50%;
-      filter: blur(70px);
-      top: -150px;
-      left: 10%;
-      z-index: 0;
-      animation: pulsate 8s ease-in-out infinite alternate;
-    }
-
-    &::after {
-      content: "";
-      position: absolute;
-      width: 300px;
-      height: 300px;
-      background: rgba(196, 92, 242, 0.12);
       border-radius: 50%;
       filter: blur(80px);
-      bottom: -150px;
-      right: 10%;
+      opacity: 0.2;
       z-index: 0;
-      animation: pulsate 10s ease-in-out infinite alternate-reverse;
+
+      &--1 {
+        background: $neon-blue;
+        width: 300px;
+        height: 300px;
+        top: -150px;
+        left: 10%;
+        animation: pulse 10s infinite alternate;
+      }
+
+      &--2 {
+        background: $neon-green;
+        width: 200px;
+        height: 200px;
+        bottom: -150px;
+        right: 10%;
+        animation: pulse 12s infinite alternate-reverse;
+        opacity: 0.15;
+      }
+
+      &--3 {
+        background: $neon-magenta;
+        width: 150px;
+        height: 150px;
+        bottom: 50px;
+        left: 30%;
+        animation: pulse 8s infinite alternate-reverse;
+        opacity: 0.12;
+      }
     }
 
     &__content {
@@ -551,175 +1175,431 @@
       margin: 0 auto;
       text-align: center;
       position: relative;
-      z-index: 2;
+      z-index: 1;
 
       h2 {
         font-size: 2.5rem;
-        // Updated gradient with cyan and purple
-        background: linear-gradient(90deg, #00ffff, #c45cf2);
+        margin-bottom: 1.5rem;
+        background: linear-gradient(
+          90deg,
+          $neon-blue 50%,
+          $neon-green 80%,
+          $neon-magenta 100%
+        ); // Tri-color gradient
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
         color: transparent;
-        margin-bottom: 1.5rem;
-        text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-        font-weight: bold;
-        letter-spacing: 1px;
+        font-weight: 700;
+
+        @media (max-width: 768px) {
+          font-size: 2rem;
+        }
       }
 
       p {
-        font-size: 1.3rem;
-        // Using softer gray as mentioned (#B1A5C8)
-        color: #b1a5c8;
-        margin-bottom: 2.5rem;
+        color: $text-secondary;
+        font-size: 1.1rem;
         line-height: 1.6;
-        letter-spacing: 0.5px;
+        margin-bottom: 2rem;
       }
-    }
 
-    &__buttons {
-      display: flex;
-      gap: 1.5rem;
-      justify-content: center;
+      &__buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+
+        @media (max-width: 480px) {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
     }
   }
 
+  // Footer
+  .footer {
+    background-color: $background-surface;
+    padding: 4rem 0 2rem;
+    border-top: 1px solid rgba($neon-blue, 0.1);
+
+    &__grid {
+      display: grid;
+      grid-template-columns: 2fr 3fr;
+      gap: 4rem;
+      margin-bottom: 4rem;
+
+      @media (max-width: 991px) {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+      }
+    }
+
+    &__brand {
+      .footer-logo {
+        display: inline-block;
+        text-decoration: none;
+        margin-bottom: 1.5rem;
+
+        .logo-text {
+          color: $neon-blue; // Blue logo text
+          text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+          font-size: 1.5rem;
+          font-weight: 700;
+        }
+
+        .logo-network {
+          color: $text-primary;
+          opacity: 0.7;
+          font-size: 1.5rem;
+          margin-left: 0.25rem;
+        }
+      }
+
+      p {
+        color: $text-secondary;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+      }
+
+      .social-links {
+        display: flex;
+        gap: 1rem;
+
+        a {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: rgba($background-dark, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: $text-secondary;
+          transition: all 0.3s ease;
+
+          &:hover {
+            color: $neon-blue;
+            border-color: $neon-blue;
+            box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+            transform: translateY(-3px);
+          }
+
+          // Assign different colors to different social icons
+          &:nth-child(1):hover {
+            color: $neon-blue;
+            border-color: $neon-blue;
+            box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+          }
+
+          &:nth-child(2):hover {
+            color: $neon-magenta;
+            border-color: $neon-magenta;
+            box-shadow: 0 0 15px rgba($neon-magenta, 0.3);
+          }
+
+          &:nth-child(3):hover {
+            color: $neon-green;
+            border-color: $neon-green;
+            box-shadow: 0 0 15px rgba($neon-green, 0.3);
+          }
+
+          &:nth-child(4):hover {
+            color: $neon-blue;
+            border-color: $neon-blue;
+            box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+          }
+        }
+      }
+    }
+
+    &__links {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      @media (max-width: 480px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    &__link-group {
+      h4 {
+        color: $text-primary;
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      a {
+        display: block;
+        color: $text-secondary;
+        text-decoration: none;
+        margin-bottom: 0.75rem;
+        transition: all 0.3s ease;
+
+        &:hover {
+          color: $neon-blue;
+          transform: translateX(5px);
+        }
+      }
+
+      // Color variations for different sections
+      &:nth-child(1) {
+        a:hover {
+          color: $neon-blue;
+        }
+      }
+
+      &:nth-child(2) {
+        a:hover {
+          color: $neon-green;
+        }
+      }
+
+      &:nth-child(3) {
+        a:hover {
+          color: $neon-magenta;
+        }
+      }
+    }
+
+    &__bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+      @media (max-width: 768px) {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+
+      .footer__copyright {
+        color: $text-muted;
+        font-size: 0.9rem;
+      }
+
+      .footer__legal {
+        display: flex;
+        gap: 1.5rem;
+
+        a {
+          color: $text-muted;
+          text-decoration: none;
+          font-size: 0.9rem;
+          transition: color 0.3s ease;
+
+          &:hover {
+            color: $text-secondary;
+          }
+        }
+      }
+    }
+  }
+
+  // Button Styles
   .btn {
     display: inline-block;
     padding: 0.9rem 2.2rem;
     border-radius: 12px;
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1rem;
     text-decoration: none;
     text-align: center;
     transition: all 0.3s ease;
     cursor: pointer;
     letter-spacing: 0.5px;
+    border: none;
 
     &--primary {
-      // Updated gradient with cyan and purple
-      background: linear-gradient(45deg, #00ffff, #c45cf2);
-      color: #000; // Dark text on bright background for contrast
-      border: none;
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
-        0 0 20px rgba(196, 92, 242, 0.3);
+      background: $neon-blue; // Blue primary button
+      color: #000; // Dark text for contrast
+      box-shadow: 0 0 20px rgba($neon-blue, 0.3);
 
       &:hover {
         transform: translateY(-3px);
-        box-shadow: 0 5px 25px rgba(0, 255, 255, 0.4),
-          0 5px 25px rgba(196, 92, 242, 0.4);
+        box-shadow: 0 5px 25px rgba($neon-blue, 0.5);
+      }
+
+      &:active {
+        transform: translateY(-1px);
       }
     }
 
     &--secondary {
-      // Darker background (#020202)
-      background: rgba(2, 2, 2, 0.3);
-      border: 2px solid;
-      border-image: linear-gradient(
-          45deg,
-          rgba(0, 255, 255, 0.6),
-          rgba(196, 92, 242, 0.6)
-        )
-        1;
-      color: #fff;
+      background: rgba($background-surface, 0.3);
+      border: 1px solid $neon-green; // Green secondary button
+      color: $text-primary;
 
       &:hover {
-        background: rgba(2, 2, 2, 0.5);
+        background: rgba($background-surface, 0.5);
         transform: translateY(-3px);
-        box-shadow: 0 5px 25px rgba(0, 255, 255, 0.2),
-          0 5px 25px rgba(196, 92, 242, 0.2);
+        box-shadow: 0 5px 25px rgba($neon-green, 0.2);
+      }
+
+      &:active {
+        transform: translateY(-1px);
       }
     }
 
-    &--outline {
-      // Darker background (#020202)
-      background: rgba(2, 2, 2, 0.3);
-      border: 2px solid;
-      border-image: linear-gradient(
-          45deg,
-          rgba(0, 255, 255, 0.5),
-          rgba(196, 92, 242, 0.5)
-        )
-        1;
-      color: #fff;
-      padding: 0.8rem 2rem;
-      font-size: 1rem;
+    &--magenta {
+      background: rgba($background-surface, 0.3);
+      border: 1px solid $neon-magenta; // Magenta button option
+      color: $text-primary;
 
       &:hover {
-        background: rgba(2, 2, 2, 0.5);
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 255, 255, 0.15),
-          0 5px 15px rgba(196, 92, 242, 0.15);
+        background: rgba($background-surface, 0.5);
+        transform: translateY(-3px);
+        box-shadow: 0 5px 25px rgba($neon-magenta, 0.2);
       }
     }
   }
 
   // Animations
-  @keyframes horizonScan {
+  @keyframes horizontalScan {
     0% {
-      transform: translateX(-150vw);
+      transform: translateX(-100%);
     }
     100% {
-      transform: translateX(150vw);
+      transform: translateX(100%);
     }
   }
 
   @keyframes verticalScan {
     0% {
-      transform: translateY(-150vh);
+      transform: translateY(-100%);
     }
     100% {
-      transform: translateY(150vh);
+      transform: translateY(100%);
     }
   }
 
-  @keyframes pulsate {
+  @keyframes pulse {
     0% {
-      opacity: 0.5;
+      opacity: 0.2;
       transform: scale(0.8);
     }
     100% {
-      opacity: 0.8;
+      opacity: 0.3;
       transform: scale(1.2);
     }
   }
 
-  // Responsive styles
-  @media (max-width: 768px) {
+  // Media Queries for Responsive Design
+  @media (max-width: 1200px) {
     .hero {
-      min-height: 500px;
+      min-height: 600px;
 
       &__content {
+        h1 {
+          font-size: 3rem;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 991px) {
+    .hero {
+      padding: 8rem 0 4rem;
+      height: auto;
+
+      .container {
+        width: 90%;
+      }
+
+      &__content {
+        text-align: center;
+
         h1 {
           font-size: 2.5rem;
         }
 
         p {
-          font-size: 1.2rem;
+          font-size: 1.1rem;
         }
       }
 
       &__buttons {
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
+        justify-content: center;
+      }
+    }
 
-        .btn {
-          width: 200px;
+    .dashboard-preview {
+      &__text {
+        order: 2;
+      }
+
+      &__image {
+        order: 1;
+        margin-bottom: 2rem;
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    section {
+      padding: 4rem 0;
+    }
+
+    .hero {
+      padding: 6rem 0 3rem;
+
+      &__content {
+        h1 {
+          font-size: 2.2rem;
+        }
+
+        p {
+          font-size: 1rem;
         }
       }
     }
 
-    .feature-card {
-      padding: 1.5rem;
+    .section-title {
+      font-size: 2rem;
+    }
 
+    .stat-card {
+      .stat-value {
+        font-size: 2rem;
+      }
+    }
+
+    .feature-card {
       .feature-icon {
         width: 70px;
         height: 70px;
 
-        .feature-icon-svg {
-          width: 35px;
-          height: 35px;
+        svg {
+          width: 30px;
+          height: 30px;
+        }
+      }
+
+      h3 {
+        font-size: 1.3rem;
+      }
+    }
+
+    .dashboard-preview {
+      &__text {
+        h2 {
+          font-size: 2rem;
+        }
+      }
+    }
+
+    .ai-search {
+      &__text {
+        h2 {
+          font-size: 2rem;
         }
       }
     }
@@ -729,33 +1609,40 @@
         h2 {
           font-size: 2rem;
         }
+      }
+    }
+  }
 
-        p {
-          font-size: 1rem;
+  @media (max-width: 480px) {
+    .hero {
+      &__content {
+        h1 {
+          font-size: 2rem;
         }
       }
 
       &__buttons {
         flex-direction: column;
-        align-items: center;
-        gap: 1rem;
 
         .btn {
-          width: 200px;
+          width: 100%;
         }
       }
     }
-  }
 
-  // Additional responsive styles for smaller devices
-  @media (max-width: 480px) {
-    .feature-icon {
-      width: 60px;
-      height: 60px;
+    .btn {
+      width: 100%;
+    }
 
-      .feature-icon-svg {
-        width: 30px;
-        height: 30px;
+    .feature-card {
+      .feature-icon {
+        width: 60px;
+        height: 60px;
+
+        svg {
+          width: 25px;
+          height: 25px;
+        }
       }
     }
   }
