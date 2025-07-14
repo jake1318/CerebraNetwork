@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.scss
-// Last Updated: 2025-07-11 03:00:57 UTC by jake1318
+// Last Updated: 2025-07-14 05:19:32 UTC by jake1318
 
 // Variables for consistent colors - matching Home.scss
 $background-dark: #020314;
@@ -52,19 +52,45 @@ html {
     &__content {
       height: 100%;
       overflow-y: auto;
-      scrollbar-width: thin;
 
+      // ENHANCED SCROLLBAR STYLING
+      // Firefox
+      scrollbar-width: thin;
+      scrollbar-color: rgba($neon-blue, 0.5) rgba($background-dark, 0.3);
+
+      // Chrome, Edge, Safari
       &::-webkit-scrollbar {
-        width: 4px;
+        width: 6px;
       }
 
       &::-webkit-scrollbar-track {
-        background: rgba($text-primary, 0.05);
+        background: rgba($background-dark, 0.3);
+        border-radius: 6px;
+        margin: 4px 0;
       }
 
       &::-webkit-scrollbar-thumb {
-        background: rgba($neon-blue, 0.3);
-        border-radius: 4px;
+        background: linear-gradient(
+          180deg,
+          rgba($neon-blue, 0.5),
+          rgba($neon-magenta, 0.5)
+        );
+        border-radius: 6px;
+        border: 1px solid rgba($background-dark, 0.3);
+        box-shadow: inset 0 0 6px rgba($neon-blue, 0.3);
+      }
+
+      &::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+          180deg,
+          rgba($neon-blue, 0.7),
+          rgba($neon-magenta, 0.7)
+        );
+        box-shadow: inset 0 0 8px rgba($neon-blue, 0.5);
+      }
+
+      &::-webkit-scrollbar-corner {
+        background: transparent;
       }
     }
 
@@ -1273,23 +1299,39 @@ html {
   }
 }
 
-// Dark scrollbar styling
+// Dark scrollbar styling for the entire app
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
   background: rgba($background-dark, 0.5);
+  border-radius: 8px;
+  margin: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba($text-secondary, 0.3);
-  border-radius: 3px;
+  background: linear-gradient(
+    180deg,
+    rgba($neon-blue, 0.4),
+    rgba($neon-magenta, 0.4)
+  );
+  border-radius: 8px;
+  border: 1px solid rgba($background-dark, 0.4);
 
   &:hover {
-    background: rgba($text-secondary, 0.5);
+    background: linear-gradient(
+      180deg,
+      rgba($neon-blue, 0.6),
+      rgba($neon-magenta, 0.6)
+    );
+    box-shadow: inset 0 0 6px rgba($neon-blue, 0.4);
   }
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 // Activity specific styles
