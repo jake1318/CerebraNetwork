@@ -1501,7 +1501,7 @@ const LendingPage: React.FC = () => {
       <div className="glow-1"></div>
       <div className="glow-2"></div>
 
-      <h1>Scallop Lending Markets</h1>
+      <h1>Lending Markets</h1>
 
       {/* Simplified action buttons section */}
       <div className="action-section">
