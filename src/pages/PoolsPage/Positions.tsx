@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Positions.tsx
-// Last Updated: 2025-07-15 02:36:41 UTC by jake1318
+// Last Updated: 2025-07-15 05:10:24 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -14,6 +14,7 @@ import {
 
 import * as cetusService from "../../services/cetusService";
 import * as birdeyeService from "../../services/birdeyeService";
+import * as bluefinService from "../../services/bluefinService";
 
 // Import the TokenIcon component
 import TokenIcon from "../../components/TokenIcon";
@@ -33,7 +34,12 @@ import { formatLargeNumber, formatDollars } from "../../utils/formatters";
 
 import "../../styles/pages/Positions.scss";
 import "../../pages/PoolsPage/protocolBadges.scss";
-import { FaChartLine, FaExchangeAlt, FaCoins, FaPercentage } from "react-icons/fa";
+import {
+  FaChartLine,
+  FaExchangeAlt,
+  FaCoins,
+  FaPercentage,
+} from "react-icons/fa";
 
 interface WithdrawModalState {
   isOpen: boolean;
@@ -144,6 +150,24 @@ function isScallopPool(poolGroup: PoolGroup): boolean {
   );
 }
 
+// Helper function to determine if a pool is a Bluefin pool
+function isBluefinPool(poolGroup: PoolGroup | string): boolean {
+  if (typeof poolGroup === "string") {
+    // If provided a pool address as string, check if it contains 'bluefin' identifier
+    return poolGroup.toLowerCase().includes("bluefin");
+  }
+  // If provided a pool group object, check its protocol
+  return (
+    poolGroup.protocol === "Bluefin" ||
+    normalizeProtocolName(poolGroup.protocol) === "bluefin"
+  );
+}
+
+// Helper function to get the full protocol name for display
+function getProtocolDisplayName(poolGroup: PoolGroup): string {
+  return poolGroup.protocol || (isBluefinPool(poolGroup) ? "Bluefin" : "Cetus");
+}
+
 // Normalize protocol name for badge display
 const normalizeProtocolName = (protocol: string): string => {
   // Convert protocol to appropriate className format
@@ -156,6 +180,7 @@ const normalizeProtocolName = (protocol: string): string => {
     "turbos finance": "turbos",
     "kriya-dex": "kriya",
     scallop: "scallop",
+    bluefin: "bluefin", // Add Bluefin mapping
   };
 
   if (specialCases[normalized]) {
@@ -461,6 +486,11 @@ function PoolPair({
         {isVault && (
           <span className="position-type-badge vault-badge">Vault</span>
         )}
+
+        {/* Add Bluefin badge for Bluefin positions */}
+        {normalizeProtocolName(protocol || "") === "bluefin" && (
+          <span className="position-type-badge bluefin-badge">Bluefin</span>
+        )}
       </div>
     </div>
   );
@@ -468,6 +498,33 @@ function PoolPair({
 
 // New Portfolio Dashboard Component
 function PortfolioDashboard({ metrics }: { metrics: PortfolioMetrics }) {
+  // Function to format dollar values without adding a dollar sign, since we'll add it manually
+  const formatValueWithoutDollar = (value: number): string => {
+    // Remove any dollar signs that might be in the formatted value
+    return formatDollars(value).replace(/\$/g, "");
+  };
+
+  // Function to fix double dollar signs after component mounts
+  useEffect(() => {
+    // Add a timeout to ensure the DOM is ready
+    const timeoutId = setTimeout(() => {
+      try {
+        // Find protocol values and clean up any double dollar signs
+        const protocolValues = document.querySelectorAll(".protocol-value");
+        protocolValues.forEach((el) => {
+          if (el.textContent && el.textContent.includes("$$")) {
+            el.textContent = el.textContent.replace(/\$\$/g, "$");
+          }
+        });
+      } catch (err) {
+        console.error("Error fixing dollar signs:", err);
+      }
+    }, 100);
+
+    // Cleanup timeout on unmount
+    return () => clearTimeout(timeoutId);
+  }, [metrics]);
+
   return (
     <div className="portfolio-dashboard">
       <h2 className="dashboard-title">Portfolio Overview</h2>
@@ -478,32 +535,46 @@ function PortfolioDashboard({ metrics }: { metrics: PortfolioMetrics }) {
           </div>
           <div className="stat-content">
             <div className="stat-label">Total Value</div>
-            <div className="stat-value">
+            <div
+              className="stat-value"
+              data-clean-value={
+                metrics.loading
+                  ? ""
+                  : formatValueWithoutDollar(metrics.totalValueUsd)
+              }
+            >
               {metrics.loading ? (
                 <div className="stat-loading"></div>
               ) : (
-                `$${formatDollars(metrics.totalValueUsd)}`
+                `$${formatValueWithoutDollar(metrics.totalValueUsd)}`
               )}
             </div>
           </div>
         </div>
-        
+
         <div className="dashboard-stat-card">
           <div className="stat-icon">
             <FaExchangeAlt />
           </div>
           <div className="stat-content">
             <div className="stat-label">Total Rewards</div>
-            <div className="stat-value">
+            <div
+              className="stat-value"
+              data-clean-value={
+                metrics.loading
+                  ? ""
+                  : formatValueWithoutDollar(metrics.totalRewardsUsd)
+              }
+            >
               {metrics.loading ? (
                 <div className="stat-loading"></div>
               ) : (
-                `$${formatDollars(metrics.totalRewardsUsd)}`
+                `$${formatValueWithoutDollar(metrics.totalRewardsUsd)}`
               )}
             </div>
           </div>
         </div>
-        
+
         <div className="dashboard-stat-card">
           <div className="stat-icon">
             <FaCoins />
@@ -519,7 +590,7 @@ function PortfolioDashboard({ metrics }: { metrics: PortfolioMetrics }) {
             </div>
           </div>
         </div>
-        
+
         <div className="dashboard-stat-card">
           <div className="stat-icon">
             <FaPercentage />
@@ -536,31 +607,36 @@ function PortfolioDashboard({ metrics }: { metrics: PortfolioMetrics }) {
           </div>
         </div>
       </div>
-      
+
       {/* Protocol Distribution Section */}
-      {Object.keys(metrics.protocolBreakdown).length > 0 && !metrics.loading && (
-        <div className="protocol-breakdown">
-          <h3>Protocol Distribution</h3>
-          <div className="protocol-distribution-chart">
-            {Object.entries(metrics.protocolBreakdown)
-              .sort(([, valueA], [, valueB]) => valueB - valueA)
-              .map(([protocol, value]) => (
-                <div key={protocol} className="protocol-bar-container">
-                  <div className="protocol-label">{protocol}</div>
-                  <div className="protocol-bar-wrapper">
-                    <div 
-                      className={`protocol-bar ${normalizeProtocolName(protocol)}`}
-                      style={{ 
-                        width: `${(value / metrics.totalValueUsd) * 100}%`,
-                      }}
-                    ></div>
+      {Object.keys(metrics.protocolBreakdown).length > 0 &&
+        !metrics.loading && (
+          <div className="protocol-breakdown">
+            <h3>Protocol Distribution</h3>
+            <div className="protocol-distribution-chart">
+              {Object.entries(metrics.protocolBreakdown)
+                .sort(([, valueA], [, valueB]) => valueB - valueA)
+                .map(([protocol, value]) => (
+                  <div key={protocol} className="protocol-bar-container">
+                    <div className="protocol-label">{protocol}</div>
+                    <div className="protocol-bar-wrapper">
+                      <div
+                        className={`protocol-bar ${normalizeProtocolName(
+                          protocol
+                        )}`}
+                        style={{
+                          width: `${(value / metrics.totalValueUsd) * 100}%`,
+                        }}
+                      ></div>
+                    </div>
+                    <div className="protocol-value">
+                      ${formatValueWithoutDollar(value)}
+                    </div>
                   </div>
-                  <div className="protocol-value">${formatDollars(value)}</div>
-                </div>
-              ))}
+                ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
@@ -781,7 +857,7 @@ function Positions() {
   const [withdrawingPool, setWithdrawingPool] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState<Record<string, boolean>>({});
   const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
-  
+
   // Portfolio metrics for the dashboard
   const [portfolioMetrics, setPortfolioMetrics] = useState<PortfolioMetrics>({
     totalValueUsd: 0,
@@ -789,7 +865,7 @@ function Positions() {
     totalPositionsCount: 0,
     avgApr: 0,
     loading: true,
-    protocolBreakdown: {}
+    protocolBreakdown: {},
   });
 
   // Transaction notification state
@@ -874,32 +950,32 @@ function Positions() {
       let aprSum = 0;
       let validAprCount = 0;
       const protocolBreakdown: Record<string, number> = {};
-      
+
       // Calculate metrics from poolPositions
-      pools.forEach(pool => {
+      pools.forEach((pool) => {
         // Add to total value
         totalValue += pool.totalValueUsd || 0;
-        
+
         // Track protocol-specific values
         const protocol = pool.protocol;
         if (!protocolBreakdown[protocol]) {
           protocolBreakdown[protocol] = 0;
         }
         protocolBreakdown[protocol] += pool.totalValueUsd || 0;
-        
+
         // Count positions
         totalPositions += pool.positions.length;
-        
+
         // Add to APR for averaging
         if (pool.apr && !isNaN(pool.apr) && pool.apr > 0) {
           aprSum += pool.apr;
           validAprCount++;
         }
-        
+
         // Sum up rewards
-        pool.positions.forEach(position => {
+        pool.positions.forEach((position) => {
           if (position.rewards && position.rewards.length > 0) {
-            position.rewards.forEach(reward => {
+            position.rewards.forEach((reward) => {
               if (reward && reward.valueUsd) {
                 totalRewards += reward.valueUsd;
               }
@@ -907,59 +983,57 @@ function Positions() {
           }
         });
       });
-      
+
       // Add Scallop data if available
       if (scallopData) {
         // Add supply value
         if (scallopData.totalSupplyValue) {
           totalValue += scallopData.totalSupplyValue;
-          
+
           // Add to protocol breakdown
           if (!protocolBreakdown["Scallop"]) {
             protocolBreakdown["Scallop"] = 0;
           }
           protocolBreakdown["Scallop"] += scallopData.totalSupplyValue;
-          
+
           // Count each lending as a position
           if (scallopData.lendings && scallopData.lendings.length > 0) {
             totalPositions += scallopData.lendings.length;
           }
         }
-        
+
         // Add collateral value if not already counted in supply
         if (scallopData.totalCollateralValue && !scallopData.totalSupplyValue) {
           totalValue += scallopData.totalCollateralValue;
-          
+
           // Add to protocol breakdown
           if (!protocolBreakdown["Scallop"]) {
             protocolBreakdown["Scallop"] = 0;
           }
           protocolBreakdown["Scallop"] += scallopData.totalCollateralValue;
         }
-        
+
         // Count borrowings as positions
         if (scallopData.borrowings && scallopData.borrowings.length > 0) {
           totalPositions += scallopData.borrowings.reduce(
-            (count: number, obligation: any) => 
+            (count: number, obligation: any) =>
               count + (obligation.borrowedPools?.length || 0),
             0
           );
         }
-        
+
         // Add Scallop pending rewards
         if (
           scallopData.pendingRewards &&
           scallopData.pendingRewards.borrowIncentives
         ) {
-          scallopData.pendingRewards.borrowIncentives.forEach(
-            (reward: any) => {
-              if (reward && reward.pendingRewardInUsd) {
-                totalRewards += reward.pendingRewardInUsd;
-              }
+          scallopData.pendingRewards.borrowIncentives.forEach((reward: any) => {
+            if (reward && reward.pendingRewardInUsd) {
+              totalRewards += reward.pendingRewardInUsd;
             }
-          );
+          });
         }
-        
+
         // Add Scallop APRs to average
         if (scallopData.lendings && scallopData.lendings.length > 0) {
           scallopData.lendings.forEach((lending: any) => {
@@ -970,17 +1044,17 @@ function Positions() {
           });
         }
       }
-      
+
       // Calculate average APR
       const avgApr = validAprCount > 0 ? aprSum / validAprCount : 0;
-      
+
       return {
         totalValueUsd: totalValue,
         totalRewardsUsd: totalRewards,
         totalPositionsCount: totalPositions,
         avgApr,
         loading: false,
-        protocolBreakdown
+        protocolBreakdown,
       };
     },
     []
@@ -1082,9 +1156,12 @@ function Positions() {
 
         // Update the positions with the metadata
         setPoolPositions(transformedPositions);
-        
+
         // Calculate portfolio metrics for the dashboard
-        const metrics = calculatePortfolioMetrics(transformedPositions, scallopData);
+        const metrics = calculatePortfolioMetrics(
+          transformedPositions,
+          scallopData
+        );
         setPortfolioMetrics(metrics);
       } catch (err) {
         console.error("Failed to load positions:", err);
@@ -1093,7 +1170,14 @@ function Positions() {
         setLoading(false);
       }
     }
-  }, [connected, account, fetchTokenMetadata, getAddressBySymbol, calculatePortfolioMetrics, scallopData]);
+  }, [
+    connected,
+    account,
+    fetchTokenMetadata,
+    getAddressBySymbol,
+    calculatePortfolioMetrics,
+    scallopData,
+  ]);
 
   // Update portfolio metrics when positions or scallop data changes
   useEffect(() => {
@@ -1161,7 +1245,276 @@ function Positions() {
   };
 
   /**
-   * Handle claiming rewards using Cetus service
+   * Handle Bluefin withdraw operation
+   */
+  const handleBluefinWithdraw = async (options: {
+    poolAddress: string;
+    positionIds: string[];
+    withdrawPercent: number;
+    collectFees: boolean;
+    closePosition: boolean;
+    slippage: number;
+  }) => {
+    const {
+      poolAddress,
+      positionIds,
+      withdrawPercent,
+      collectFees,
+      closePosition,
+    } = options;
+    const digests: string[] = [];
+
+    try {
+      if (!account?.address) {
+        throw new Error("Wallet address not available");
+      }
+
+      // Process each position individually (Bluefin operations are typically per position)
+      for (const positionId of positionIds) {
+        console.log(
+          `Processing Bluefin position ${positionId} in pool ${poolAddress}`
+        );
+
+        // Full withdrawal with explicit close position request
+        if (withdrawPercent === 100 && closePosition) {
+          // Use closePosition for a complete withdrawal + claim
+          console.log(`Closing Bluefin position ${positionId}`);
+
+          const response = await fetch(
+            "/api/bluefin/create-close-position-tx",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                poolId: poolAddress,
+                positionId,
+                walletAddress: account.address,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to create close position transaction: ${await response.text()}`
+            );
+          }
+
+          const { txb64 } = await response.json();
+
+          const result = await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: txb64,
+          });
+
+          if (result.digest) {
+            digests.push(result.digest);
+          }
+        } else {
+          // Partial withdrawal or full withdrawal without explicit close
+          console.log(
+            `Removing ${withdrawPercent}% liquidity from Bluefin position ${positionId}`
+          );
+
+          // Create and submit transaction to remove liquidity
+          const removeResponse = await fetch(
+            "/api/bluefin/create-withdraw-tx",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                poolId: poolAddress,
+                positionId,
+                percent: withdrawPercent,
+                walletAddress: account.address,
+              }),
+            }
+          );
+
+          if (!removeResponse.ok) {
+            throw new Error(
+              `Failed to create remove liquidity transaction: ${await removeResponse.text()}`
+            );
+          }
+
+          const { txb64: removeTx } = await removeResponse.json();
+
+          const removeResult = await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: removeTx,
+          });
+
+          if (removeResult.digest) {
+            digests.push(removeResult.digest);
+          }
+
+          // If user wants to collect fees (and it's not a 100% withdrawal which auto-collects)
+          if (collectFees && withdrawPercent < 100) {
+            console.log(`Collecting fees from Bluefin position ${positionId}`);
+
+            // Collect fees
+            const feesResponse = await fetch(
+              "/api/bluefin/create-collect-fees-tx",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  poolId: poolAddress,
+                  positionId,
+                  walletAddress: account.address,
+                }),
+              }
+            );
+
+            if (!feesResponse.ok) {
+              throw new Error(
+                `Failed to create collect fees transaction: ${await feesResponse.text()}`
+              );
+            }
+
+            const { txb64: feesTx } = await feesResponse.json();
+
+            const feesResult = await wallet.signAndExecuteTransactionBlock({
+              transactionBlock: feesTx,
+            });
+
+            if (feesResult.digest) {
+              digests.push(feesResult.digest);
+            }
+
+            // Collect rewards
+            const rewardsResponse = await fetch(
+              "/api/bluefin/create-collect-rewards-tx",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  poolId: poolAddress,
+                  positionId,
+                  walletAddress: account.address,
+                }),
+              }
+            );
+
+            if (!rewardsResponse.ok) {
+              throw new Error(
+                `Failed to create collect rewards transaction: ${await rewardsResponse.text()}`
+              );
+            }
+
+            const { txb64: rewardsTx } = await rewardsResponse.json();
+
+            const rewardsResult = await wallet.signAndExecuteTransactionBlock({
+              transactionBlock: rewardsTx,
+            });
+
+            if (rewardsResult.digest) {
+              digests.push(rewardsResult.digest);
+            }
+          }
+        }
+      }
+
+      return {
+        success: true,
+        digests,
+      };
+    } catch (error) {
+      console.error("Bluefin withdrawal failed:", error);
+      throw error;
+    }
+  };
+
+  /**
+   * Handle claiming rewards from Bluefin pools
+   */
+  const handleBluefinClaimRewards = async (
+    poolAddress: string,
+    positionIds: string[]
+  ) => {
+    const digests: string[] = [];
+
+    try {
+      if (!account?.address) {
+        throw new Error("Wallet address not available");
+      }
+
+      // Process each position individually
+      for (const positionId of positionIds) {
+        console.log(
+          `Claiming rewards from Bluefin position ${positionId} in pool ${poolAddress}`
+        );
+
+        // Collect fees
+        const feesResponse = await fetch(
+          "/api/bluefin/create-collect-fees-tx",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              poolId: poolAddress,
+              positionId,
+              walletAddress: account.address,
+            }),
+          }
+        );
+
+        if (!feesResponse.ok) {
+          throw new Error(
+            `Failed to create collect fees transaction: ${await feesResponse.text()}`
+          );
+        }
+
+        const { txb64: feesTx } = await feesResponse.json();
+
+        const feesResult = await wallet.signAndExecuteTransactionBlock({
+          transactionBlock: feesTx,
+        });
+
+        if (feesResult.digest) {
+          digests.push(feesResult.digest);
+        }
+
+        // Collect rewards
+        const rewardsResponse = await fetch(
+          "/api/bluefin/create-collect-rewards-tx",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              poolId: poolAddress,
+              positionId,
+              walletAddress: account.address,
+            }),
+          }
+        );
+
+        if (!rewardsResponse.ok) {
+          throw new Error(
+            `Failed to create collect rewards transaction: ${await rewardsResponse.text()}`
+          );
+        }
+
+        const { txb64: rewardsTx } = await rewardsResponse.json();
+
+        const rewardsResult = await wallet.signAndExecuteTransactionBlock({
+          transactionBlock: rewardsTx,
+        });
+
+        if (rewardsResult.digest) {
+          digests.push(rewardsResult.digest);
+        }
+      }
+
+      return {
+        success: true,
+        digests,
+      };
+    } catch (error) {
+      console.error("Bluefin claim rewards failed:", error);
+      throw error;
+    }
+  };
+
+  /**
+   * Handle claiming rewards using appropriate service based on pool type
    */
   const handleClaim = async (poolAddress: string, positionIds: string[]) => {
     if (!wallet.connected || positionIds.length === 0) {
@@ -1172,13 +1525,6 @@ function Positions() {
     setClaimingPool(poolAddress);
 
     try {
-      // Use one position as representative for the claim
-      const positionId = positionIds[0];
-
-      console.log(
-        `Claiming rewards for position: ${positionId} in pool: ${poolAddress}`
-      );
-
       // Get pool info for display
       const poolInfo = poolPositions.find((p) => p.poolAddress === poolAddress);
       const pairName = poolInfo
@@ -1187,33 +1533,69 @@ function Positions() {
           }`
         : "";
 
-      // Call service function to collect rewards
-      const result = await cetusService.collectRewards(
-        wallet,
-        poolAddress,
-        positionId
-      );
+      // Check if this is a Bluefin pool
+      const isBluefin = poolInfo ? isBluefinPool(poolInfo) : false;
 
-      console.log("Claim transaction completed:", result);
+      let result;
 
-      // Only show success with transaction if we got a digest back
-      if (result.digest) {
-        setNotification({
-          visible: true,
-          message: "Rewards Claimed Successfully!",
-          txDigest: result.digest,
-          isSuccess: true,
-          asModal: true, // Show as modal
-          poolInfo: pairName,
-        });
+      if (isBluefin) {
+        // Use Bluefin service for claiming from Bluefin pools
+        console.log(`Claiming rewards from Bluefin pool: ${poolAddress}`);
+        result = await handleBluefinClaimRewards(poolAddress, positionIds);
+
+        if (result.digests.length > 0) {
+          const protocolName = poolInfo
+            ? getProtocolDisplayName(poolInfo)
+            : "Bluefin";
+          setNotification({
+            visible: true,
+            message: "Rewards Claimed Successfully!",
+            txDigest:
+              result.digests.length === 1 ? result.digests[0] : undefined,
+            isSuccess: true,
+            asModal: true,
+            poolInfo: `${pairName} (${protocolName})`,
+          });
+          setTxDigests(result.digests);
+        } else {
+          setNotification({
+            visible: true,
+            message: "No rewards available to claim from Bluefin at this time.",
+            isSuccess: true,
+            asModal: true,
+          });
+        }
       } else {
-        // No rewards to claim case
-        setNotification({
-          visible: true,
-          message: "No rewards available to claim at this time.",
-          isSuccess: true,
-          asModal: true, // Also show as modal
-        });
+        // Use Cetus service for claiming from Cetus pools (existing behavior)
+        console.log(`Claiming rewards from Cetus pool: ${poolAddress}`);
+
+        // Use one position as representative for the claim
+        const positionId = positionIds[0];
+        result = await cetusService.collectRewards(
+          wallet,
+          poolAddress,
+          positionId
+        );
+
+        // Only show success with transaction if we got a digest back
+        if (result.digest) {
+          setNotification({
+            visible: true,
+            message: "Rewards Claimed Successfully!",
+            txDigest: result.digest,
+            isSuccess: true,
+            asModal: true,
+            poolInfo: pairName,
+          });
+        } else {
+          // No rewards to claim case
+          setNotification({
+            visible: true,
+            message: "No rewards available to claim at this time.",
+            isSuccess: true,
+            asModal: true,
+          });
+        }
       }
 
       // Refresh position data
@@ -1234,7 +1616,7 @@ function Positions() {
   };
 
   /**
-   * Handle collecting fees using Cetus service
+   * Handle collecting fees using appropriate service based on pool type
    */
   const handleCollectFees = async (poolAddress: string, positionId: string) => {
     if (!wallet.connected) {
@@ -1243,10 +1625,6 @@ function Positions() {
     }
 
     try {
-      console.log(
-        `Collecting fees for position: ${positionId} in pool: ${poolAddress}`
-      );
-
       // Get pool info for display
       const poolInfo = poolPositions.find((p) => p.poolAddress === poolAddress);
       const pairName = poolInfo
@@ -1255,23 +1633,74 @@ function Positions() {
           }`
         : "";
 
-      // Call service function to collect fees
-      const result = await cetusService.collectFees(
-        wallet,
-        poolAddress,
-        positionId
-      );
+      // Check if this is a Bluefin pool
+      const isBluefin = poolInfo ? isBluefinPool(poolInfo) : false;
 
-      console.log("Fee collection transaction completed:", result);
+      let result;
 
-      setNotification({
-        visible: true,
-        message: "Fees Collected Successfully!",
-        txDigest: result.digest,
-        isSuccess: true,
-        asModal: true, // Show as modal
-        poolInfo: pairName,
-      });
+      if (isBluefin) {
+        // Use Bluefin service for collecting fees from Bluefin pools
+        console.log(`Collecting fees from Bluefin position: ${positionId}`);
+
+        if (!account?.address) {
+          throw new Error("Wallet address not available");
+        }
+
+        // Create and submit transaction to collect fees
+        const feesResponse = await fetch(
+          "/api/bluefin/create-collect-fees-tx",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              poolId: poolAddress,
+              positionId,
+              walletAddress: account.address,
+            }),
+          }
+        );
+
+        if (!feesResponse.ok) {
+          throw new Error(
+            `Failed to create collect fees transaction: ${await feesResponse.text()}`
+          );
+        }
+
+        const { txb64 } = await feesResponse.json();
+
+        result = await wallet.signAndExecuteTransactionBlock({
+          transactionBlock: txb64,
+        });
+
+        const protocolName = poolInfo
+          ? getProtocolDisplayName(poolInfo)
+          : "Bluefin";
+        setNotification({
+          visible: true,
+          message: "Fees Collected Successfully!",
+          txDigest: result.digest,
+          isSuccess: true,
+          asModal: true,
+          poolInfo: `${pairName} (${protocolName})`,
+        });
+      } else {
+        // Use Cetus service for collecting fees from Cetus pools (existing behavior)
+        console.log(`Collecting fees from Cetus position: ${positionId}`);
+        result = await cetusService.collectFees(
+          wallet,
+          poolAddress,
+          positionId
+        );
+
+        setNotification({
+          visible: true,
+          message: "Fees Collected Successfully!",
+          txDigest: result.digest,
+          isSuccess: true,
+          asModal: true,
+          poolInfo: pairName,
+        });
+      }
 
       // Refresh position data
       await loadPositions();
@@ -1289,7 +1718,7 @@ function Positions() {
   };
 
   /**
-   * Handle withdrawing liquidity using the new unified withdraw function
+   * Handle withdrawing liquidity using the appropriate service based on pool type
    */
   const handleWithdrawConfirm = async (options: {
     withdrawPercent: number;
@@ -1316,29 +1745,50 @@ function Positions() {
           }`
         : "";
 
-      // Use the new unified withdraw function from cetusService
-      const result = await cetusService.withdraw(wallet, {
-        poolId: poolAddress,
-        positionIds: positionIds,
-        withdrawPercent,
-        collectFees,
-        closePosition,
-        slippage,
-      });
+      // Check if this is a Bluefin pool
+      const isBluefin = poolInfo ? isBluefinPool(poolInfo) : false;
 
-      console.log("Withdrawal completed:", result);
+      let result;
+
+      if (isBluefin) {
+        // Use Bluefin service for Bluefin pools
+        result = await handleBluefinWithdraw({
+          poolAddress,
+          positionIds,
+          withdrawPercent,
+          collectFees,
+          closePosition,
+          slippage,
+        });
+      } else {
+        // Use Cetus service for other pools (default behavior)
+        result = await cetusService.withdraw(wallet, {
+          poolId: poolAddress,
+          positionIds: positionIds,
+          withdrawPercent,
+          collectFees,
+          closePosition,
+          slippage,
+        });
+      }
+
+      console.log(
+        `${isBluefin ? "Bluefin" : "Cetus"} withdrawal completed:`,
+        result
+      );
 
       if (result.success) {
         // Show notification with transaction digests
+        const protocolName = poolInfo ? getProtocolDisplayName(poolInfo) : "";
         setNotification({
           visible: true,
           message: closePosition ? "Close Successful!" : "Withdraw Successful!",
           txDigest: result.digests.length === 1 ? result.digests[0] : undefined,
           isSuccess: true,
           asModal: true, // Show as modal
-          poolInfo: closePosition
-            ? `Closed position for ${pairName}`
-            : `Withdrew ${withdrawPercent}% from ${pairName}`,
+          poolInfo: `${
+            closePosition ? "Closed" : `Withdrew ${withdrawPercent}%`
+          } ${protocolName ? `(${protocolName})` : ""} from ${pairName}`,
         });
 
         // Store all digests for multiple transactions
@@ -1353,7 +1803,7 @@ function Positions() {
         // Return success with digests for the WithdrawModal
         return { success: true, digests: result.digests };
       } else {
-        throw new Error("Withdrawal failed");
+        throw new Error(`${isBluefin ? "Bluefin" : "Cetus"} withdrawal failed`);
       }
     } catch (err) {
       console.error("Withdraw failed:", err);
@@ -1443,14 +1893,14 @@ function Positions() {
     });
     return totalValue;
   };
-<div>
+
   return (
-    < className="positions-page">
+    <div className="positions-page">
       {/* Add glow elements for consistent styling with other pages */}
       <div className="glow-1"></div>
       <div className="glow-2"></div>
       <div className="glow-3"></div>
-      
+
       <div className="content-container">
         {/* Updated navigation to match the Pools.tsx format */}
         <div className="main-navigation">
@@ -1522,7 +1972,7 @@ function Positions() {
           <>
             {/* Add Portfolio Dashboard at the top */}
             <PortfolioDashboard metrics={portfolioMetrics} />
-            
+
             {/* Type filter tabs */}
             <div className="position-type-tabs">
               <button
@@ -1595,6 +2045,8 @@ function Positions() {
                               isVaultPool(poolPosition) ? "vault-row" : "lp-row"
                             } ${
                               isScallopPool(poolPosition) ? "scallop-row" : ""
+                            } ${
+                              isBluefinPool(poolPosition) ? "bluefin-row" : ""
                             }`}
                             onClick={() =>
                               toggleDetails(poolPosition.poolAddress)
@@ -1681,6 +2133,14 @@ function Positions() {
                                     ? "Collateral"
                                     : "Borrow"}
                                 </span>
+                              ) : isBluefinPool(poolPosition) ? (
+                                <span className="status-badge bluefin">
+                                  {poolPosition.positions.some(
+                                    (pos) => pos.isOutOfRange
+                                  )
+                                    ? "Partially Out of Range"
+                                    : "In Range"}
+                                </span>
                               ) : poolPosition.positions.some(
                                   (pos) => pos.isOutOfRange
                                 ) ? (
@@ -1732,8 +2192,6 @@ function Positions() {
                                       Withdrawing
                                     </span>
                                   ) : isVaultPool(poolPosition) ? (
-                                    "Withdraw from Vault"
-                                                  ) : isVaultPool(poolPosition) ? (
                                     "Withdraw from Vault"
                                   ) : poolPosition.protocol === "SuiLend" &&
                                     poolPosition.poolName?.includes(
@@ -1884,6 +2342,20 @@ function Positions() {
                                                         )
                                                       ? "Collateral"
                                                       : "Borrow"}
+                                                  </span>
+                                                ) : isBluefinPool(
+                                                    poolPosition
+                                                  ) ? (
+                                                  <span
+                                                    className={`status-badge ${
+                                                      position.isOutOfRange
+                                                        ? "warning"
+                                                        : "bluefin"
+                                                    }`}
+                                                  >
+                                                    {position.isOutOfRange
+                                                      ? "Out of Range"
+                                                      : "In Range"}
                                                   </span>
                                                 ) : position.isOutOfRange ? (
                                                   <span className="status-badge warning">
@@ -2111,418 +2583,29 @@ function Positions() {
         )}
       </div>
 
-
       <style jsx>{`
-        .position-type-badge {
-          display: inline-block;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-size: 0.8em;
-          margin-left: 5px;
-          background-color: rgba(0, 170, 255, 0.1);
-          color: #00aaff;
+        /* Add Bluefin styling */
+        .position-type-badge.bluefin-badge {
+          background-color: rgba(6, 134, 74, 0.1);
+          color: #06864a;
         }
 
-        .position-type-badge.vault-badge {
-          background-color: rgba(92, 67, 232, 0.1);
-          color: #5c43e8;
+        .bluefin-row {
+          background-color: rgba(6, 134, 74, 0.05);
         }
 
-        .position-type-badge.scallop-badge {
-          background-color: rgba(235, 102, 98, 0.1);
-          color: #eb6662;
+        .status-badge.bluefin {
+          background-color: rgba(6, 134, 74, 0.1);
+          color: #06864a;
+          border: 1px solid rgba(6, 134, 74, 0.3);
         }
 
-        /* Position type tabs */
-        .position-type-tabs {
-          display: flex;
-          margin-bottom: 16px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .position-type-tab {
-          padding: 10px 16px;
-          background: none;
-          border: none;
-          color: #a1a1a1;
-          cursor: pointer;
-          font-size: 14px;
-          position: relative;
-          transition: color 0.2s;
-        }
-
-        .position-type-tab:hover {
-          color: white;
-        }
-
-        .position-type-tab.active {
-          color: white;
-          font-weight: 500;
-        }
-
-        .position-type-tab.active:after {
-          content: "";
-          position: absolute;
-          bottom: -1px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background-color: #5c43e8;
-        }
-
-        /* Vault styling */
-        .vault-row {
-          background-color: rgba(92, 67, 232, 0.05);
-        }
-
-        .status-badge.vault {
-          background-color: rgba(92, 67, 232, 0.1);
-          color: #5c43e8;
-        }
-
-        /* Scallop styling */
-        .scallop-row {
-          background-color: rgba(235, 102, 98, 0.05);
-        }
-
-        .status-badge.scallop {
-          background-color: rgba(235, 102, 98, 0.1);
-          color: #eb6662;
-        }
-
-        /* Token styling */
-        .token-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          overflow: hidden;
-          background-color: #1a1f2e; /* Darker background for the token icons */
-          position: relative;
-          box-shadow: 0 0 8px rgba(0, 225, 255, 0.2); /* Neon glow effect */
-          transition: all 0.2s ease-in-out;
-        }
-
-        .token-icon-sm {
-          width: 24px;
-          height: 24px;
-          min-width: 24px;
-        }
-
-        .token-icon-md {
-          width: 32px;
-          height: 32px;
-          min-width: 32px;
-        }
-
-        .token-icon-lg {
-          width: 48px;
-          height: 48px;
-          min-width: 48px;
-        }
-
-        .token-icon img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .token-fallback {
-          background: linear-gradient(135deg, #2a3042, #1e2433);
-          border: 1px solid #304050;
-        }
-
-        .token-fallback-letter {
-          font-weight: bold;
-          font-size: 12px;
-          color: #fff;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-        }
-
-        /* Token icons in pairs */
-        .token-icons {
-          display: flex;
-          align-items: center;
-          margin-right: 8px;
-        }
-
-        .token-icons .token-icon:nth-child(2) {
-          margin-left: -8px;
-          z-index: 1;
-          border: 1px solid #1a1f2e;
-        }
-
-        .pool-pair {
-          display: flex;
-          align-items: center;
-        }
-
-        .pair-name {
-          font-weight: 500;
-          margin-left: 4px;
-        }
-
-        /* Custom token styling for special tokens */
-        .sui-token {
-          background: linear-gradient(135deg, #4bc1d2, #2b6eff);
-          box-shadow: 0 0 10px rgba(0, 174, 240, 0.7);
-        }
-
-        .wal-token {
-          background: linear-gradient(135deg, #94f9f0, #a770ef);
-          box-shadow: 0 0 10px rgba(167, 112, 239, 0.7);
-        }
-
-        .hasui-token {
-          background: linear-gradient(135deg, #ffd966, #ff6b6b);
-          box-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
-        }
-
-        .scallop-token {
-          background: linear-gradient(135deg, #eb6662, #ff9c97);
-          box-shadow: 0 0 10px rgba(235, 102, 98, 0.7);
-        }
-
-        /* Rewards styling */
-        .rewards-cell {
-          position: relative;
-        }
-
-        .rewards-value {
-          color: #00c48c;
-          font-weight: 500;
-        }
-
-        .no-rewards {
-          color: rgba(255, 255, 255, 0.4);
-        }
-
-        /* Scallop Summary Styles */
-        .scallop-summary-container {
-          background: rgba(20, 30, 48, 0.6);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 20px;
-          margin-bottom: 24px;
-        }
-
-        .scallop-header {
-          display: flex;
-          align-items: center;
-          margin-bottom: 16px;
-        }
-
-        .protocol-icon {
-          margin-right: 12px;
-        }
-
-        .scallop-stats {
-          display: flex;
-          gap: 20px;
-          margin-bottom: 16px;
-          flex-wrap: wrap;
-        }
-
-        .stat-item {
-          display: flex;
-          flex-direction: column;
-          min-width: 150px;
-        }
-
-        .stat-label {
-          font-size: 14px;
-          color: #a0a7b8;
-          margin-bottom: 4px;
-        }
-
-        .stat-value {
-          font-size: 18px;
-          font-weight: 500;
-        }
-
-        .scallop-rewards {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 8px;
-          padding: 12px;
-          margin-bottom: 16px;
-        }
-
-        .scallop-rewards h4 {
-          margin-bottom: 8px;
-          color: #eb6662;
-        }
-
-        .rewards-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-        }
-
-        .reward-item {
-          display: flex;
-          align-items: center;
-          background: rgba(0, 0, 0, 0.2);
-          padding: 8px;
-          border-radius: 6px;
-        }
-
-        .reward-item .token-icon {
-          margin-right: 8px;
-        }
-
-        .reward-amount {
-          font-weight: 500;
-          margin-right: 8px;
-        }
-
-        .reward-value {
-          color: #a0a7b8;
-          font-size: 12px;
-        }
-
-        .scallop-positions {
-          margin-top: 16px;
-        }
-
-        .position-section h4 {
-          padding-bottom: 8px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          margin-bottom: 12px;
-        }
-
-        .positions-list {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 12px;
-        }
-
-        .position-item {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 8px;
-          padding: 12px;
-          display: flex;
-          align-items: center;
-        }
-
-        .position-token {
-          display: flex;
-          align-items: center;
-          margin-right: 12px;
-          min-width: 80px;
-        }
-
-        .position-token .token-icon {
-          margin-right: 8px;
-        }
-
-        .position-details {
-          flex: 1;
-        }
-
-        .position-amount {
-          font-weight: 500;
-        }
-
-        .position-value {
-          color: #a0a7b8;
-          font-size: 12px;
-        }
-
-        .position-apy {
-          color: #00c48c;
-          font-size: 12px;
-          font-weight: 500;
-        }
-
-        .obligation-item {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 8px;
-          padding: 16px;
-          margin-bottom: 16px;
-        }
-
-        .obligation-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-
-        .obligation-id {
-          font-weight: 500;
-        }
-
-        .risk-level {
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 12px;
-          background: rgba(0, 0, 0, 0.2);
-        }
-
-        .collateral-list h5,
-        .borrowed-list h5 {
-          margin-bottom: 8px;
-          font-size: 14px;
-          color: #a0a7b8;
-        }
-
-        .collateral-item,
-        .borrow-item {
-          display: flex;
-          align-items: center;
-          margin-bottom: 8px;
-          padding: 8px;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 6px;
-        }
-
-        .collateral-item .token-icon,
-        .borrow-item .token-icon {
-          margin-right: 8px;
-        }
-
-        .item-value {
-          margin-left: auto;
-          font-weight: 500;
-        }
-
-        .borrow-rate {
-          margin-left: 10px;
-          color: #ff5252;
-          font-size: 12px;
-        }
-
-        .borrowed-list {
-          margin-top: 16px;
-        }
-
-        /* Transaction digests list styling */
-        .tx-list {
-          margin: 10px 0;
-          padding: 0;
-          list-style: none;
-        }
-
-        .tx-list li {
-          margin-bottom: 8px;
-        }
-
-        .tx-list a {
-          color: #5c43e8;
-          text-decoration: none;
-          background: rgba(92, 67, 232, 0.1);
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-family: monospace;
-          transition: all 0.2s ease;
-        }
-
-        .tx-list a:hover {
-          background: rgba(92, 67, 232, 0.2);
-          text-decoration: underline;
+        .protocol-bar.bluefin {
+          background: linear-gradient(90deg, #06864a, rgba(6, 134, 74, 0.7));
         }
       `}</style>
     </div>
+  );
 }
 
 export default Positions;
