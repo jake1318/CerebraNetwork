@@ -1,5 +1,5 @@
 // routes/bluefin.js
-// Updated: 2025-05-14 18:02:26 UTC by jake1318
+// Updated: 2025-07-15 17:27:44 UTC by jake1318
 
 import express from "express";
 import * as bluefinService from "../services/bluefinService.js";
@@ -9,6 +9,7 @@ import {
   buildCollectFeesTx,
   buildCollectRewardsTx,
   buildClosePositionTx,
+  buildCollectFeesAndRewardsTx,
 } from "../services/bluefinTxBuilder.js";
 import {
   BLUEFIN_PACKAGE_ID,
@@ -220,6 +221,35 @@ router.post("/get-collect-rewards-params", async (req, res) => {
   }
 });
 
+router.post("/get-collect-fees-and-rewards-params", async (req, res) => {
+  try {
+    const { poolId, positionId } = req.body;
+    if (!poolId || !positionId) {
+      return jsonError(res, 400, "Missing required parameters");
+    }
+
+    // Get pool details
+    const pool = await bluefinService.getPoolDetails(poolId);
+    const coinTypeA = pool.parsed?.coinTypeA || "0x2::sui::SUI";
+    const coinTypeB =
+      pool.parsed?.coinTypeB ||
+      "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN";
+
+    // Return parameters
+    res.json({
+      success: true,
+      packageId: BLUEFIN_PACKAGE_ID,
+      globalConfigId: GLOBAL_CONFIG_ID,
+      clockObjectId: SUI_CLOCK_OBJECT_ID,
+      coinTypeA,
+      coinTypeB,
+    });
+  } catch (error) {
+    console.error("Error getting collect fees and rewards parameters:", error);
+    jsonError(res, 500, error.message);
+  }
+});
+
 router.post("/get-close-position-params", async (req, res) => {
   try {
     const { poolId, positionId } = req.body;
@@ -254,12 +284,15 @@ router.post("/get-close-position-params", async (req, res) => {
 });
 
 /* ──────────────────────────────────────────────────────────
- *  BUILD + SERIALISE (all return { txb64 })
+ *  BUILD + SERIALISE (all return { txb64 }) - SIMPLIFIED
  * ──────────────────────────────────────────────────────────*/
+
+// Modified to return just the txb64 without the success wrapper
 const buildAndReturn = (builder) => async (req, res, next) => {
   try {
     const txb64 = await builder(req.body);
-    res.json({ success: true, txb64 });
+    // Simplified response: just return txb64
+    res.json({ txb64 });
   } catch (e) {
     console.error("Builder error:", e);
     jsonError(res, 500, e.message);
@@ -311,6 +344,13 @@ router.post(
   "/create-collect-rewards-tx",
   buildAndReturn(({ poolId, positionId, walletAddress }) =>
     buildCollectRewardsTx({ poolId, positionId, walletAddress })
+  )
+);
+
+router.post(
+  "/create-collect-fees-and-rewards-tx",
+  buildAndReturn(({ poolId, positionId, walletAddress }) =>
+    buildCollectFeesAndRewardsTx({ poolId, positionId, walletAddress })
   )
 );
 
