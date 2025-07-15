@@ -555,33 +555,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
         )}
       </div>
 
-      <style jsx>{`
-        .bluefin-badge {
-          background-color: rgba(6, 134, 74, 0.1);
-          color: #06864a;
-        }
-
-        .bluefin-text {
-          color: #06864a;
-          font-weight: 500;
-        }
-
-        .protocol-badge {
-          margin-left: 10px;
-          padding: 4px 8px;
-          font-size: 12px;
-          border-radius: 4px;
-          font-weight: 500;
-        }
-
-        .bluefin-button {
-          background: linear-gradient(45deg, #06864a, #08a258);
-        }
-
-        .bluefin-button:hover {
-          background: linear-gradient(45deg, #057941, #079a52);
-        }
-      `}</style>
+      <style jsx>{``}</style>
     </div>
   );
 };
