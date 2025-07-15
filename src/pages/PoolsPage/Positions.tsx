@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Positions.tsx
-// Last Updated: 2025-07-15 05:10:24 UTC by jake1318
+// Last Updated: 2025-07-15 17:29:49 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -15,6 +15,7 @@ import {
 import * as cetusService from "../../services/cetusService";
 import * as birdeyeService from "../../services/birdeyeService";
 import * as bluefinService from "../../services/bluefinService";
+import { signAndExecuteBase64 } from "../../utils/sui";
 
 // Import the TokenIcon component
 import TokenIcon from "../../components/TokenIcon";
@@ -119,6 +120,7 @@ const HARDCODED_LOGOS: Record<string, string> = {
   SSCA: "https://raw.githubusercontent.com/scallop-io/sui-scallop-branding-assets/main/token-icons/scallop-sca.svg",
   SCALLOP:
     "https://raw.githubusercontent.com/scallop-io/sui-scallop-branding-assets/main/logo/scallop_logo_light.svg",
+  BLUE: "https://s3.coinmarketcap.com/static/img/portraits/62da2117926800bf9b93fa2d.png",
 };
 
 // Token metadata cache to prevent repeated API calls
@@ -387,6 +389,8 @@ function EnhancedTokenIcon({
     tokenClass = "usdc-token";
   } else if (normalizedSymbol === "SSUI" || normalizedSymbol === "SSCA") {
     tokenClass = "scallop-token";
+  } else if (normalizedSymbol === "BLUE") {
+    tokenClass = "blue-token";
   }
 
   return (
@@ -1245,7 +1249,7 @@ function Positions() {
   };
 
   /**
-   * Handle Bluefin withdraw operation
+   * Handle Bluefin withdraw operation - Updated to use signAndExecuteBase64
    */
   const handleBluefinWithdraw = async (options: {
     poolAddress: string;
@@ -1301,8 +1305,9 @@ function Positions() {
 
           const { txb64 } = await response.json();
 
-          const result = await wallet.signAndExecuteTransactionBlock({
-            transactionBlock: txb64,
+          // Use our utility function to properly handle the base64 conversion
+          const result = await signAndExecuteBase64(wallet, txb64, {
+            showEffects: true,
           });
 
           if (result.digest) {
@@ -1316,7 +1321,7 @@ function Positions() {
 
           // Create and submit transaction to remove liquidity
           const removeResponse = await fetch(
-            "/api/bluefin/create-withdraw-tx",
+            "/api/bluefin/create-remove-liquidity-tx",
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1337,8 +1342,9 @@ function Positions() {
 
           const { txb64: removeTx } = await removeResponse.json();
 
-          const removeResult = await wallet.signAndExecuteTransactionBlock({
-            transactionBlock: removeTx,
+          // Use our utility function
+          const removeResult = await signAndExecuteBase64(wallet, removeTx, {
+            showEffects: true,
           });
 
           if (removeResult.digest) {
@@ -1347,11 +1353,13 @@ function Positions() {
 
           // If user wants to collect fees (and it's not a 100% withdrawal which auto-collects)
           if (collectFees && withdrawPercent < 100) {
-            console.log(`Collecting fees from Bluefin position ${positionId}`);
+            console.log(
+              `Collecting fees and rewards from Bluefin position ${positionId}`
+            );
 
-            // Collect fees
-            const feesResponse = await fetch(
-              "/api/bluefin/create-collect-fees-tx",
+            // Use the combined fees and rewards collection endpoint
+            const combinedResponse = await fetch(
+              "/api/bluefin/create-collect-fees-and-rewards-tx",
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1363,50 +1371,25 @@ function Positions() {
               }
             );
 
-            if (!feesResponse.ok) {
+            if (!combinedResponse.ok) {
               throw new Error(
-                `Failed to create collect fees transaction: ${await feesResponse.text()}`
+                `Failed to create collect fees and rewards transaction: ${await combinedResponse.text()}`
               );
             }
 
-            const { txb64: feesTx } = await feesResponse.json();
+            const { txb64: combinedTx } = await combinedResponse.json();
 
-            const feesResult = await wallet.signAndExecuteTransactionBlock({
-              transactionBlock: feesTx,
-            });
-
-            if (feesResult.digest) {
-              digests.push(feesResult.digest);
-            }
-
-            // Collect rewards
-            const rewardsResponse = await fetch(
-              "/api/bluefin/create-collect-rewards-tx",
+            // Use our utility function
+            const combinedResult = await signAndExecuteBase64(
+              wallet,
+              combinedTx,
               {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  poolId: poolAddress,
-                  positionId,
-                  walletAddress: account.address,
-                }),
+                showEffects: true,
               }
             );
 
-            if (!rewardsResponse.ok) {
-              throw new Error(
-                `Failed to create collect rewards transaction: ${await rewardsResponse.text()}`
-              );
-            }
-
-            const { txb64: rewardsTx } = await rewardsResponse.json();
-
-            const rewardsResult = await wallet.signAndExecuteTransactionBlock({
-              transactionBlock: rewardsTx,
-            });
-
-            if (rewardsResult.digest) {
-              digests.push(rewardsResult.digest);
+            if (combinedResult.digest) {
+              digests.push(combinedResult.digest);
             }
           }
         }
@@ -1423,7 +1406,7 @@ function Positions() {
   };
 
   /**
-   * Handle claiming rewards from Bluefin pools
+   * Handle claiming rewards from Bluefin pools - Updated to use signAndExecuteBase64
    */
   const handleBluefinClaimRewards = async (
     poolAddress: string,
@@ -1442,9 +1425,9 @@ function Positions() {
           `Claiming rewards from Bluefin position ${positionId} in pool ${poolAddress}`
         );
 
-        // Collect fees
-        const feesResponse = await fetch(
-          "/api/bluefin/create-collect-fees-tx",
+        // Use the combined fees and rewards collection endpoint
+        const combinedResponse = await fetch(
+          "/api/bluefin/create-collect-fees-and-rewards-tx",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1456,50 +1439,21 @@ function Positions() {
           }
         );
 
-        if (!feesResponse.ok) {
+        if (!combinedResponse.ok) {
           throw new Error(
-            `Failed to create collect fees transaction: ${await feesResponse.text()}`
+            `Failed to create collect fees and rewards transaction: ${await combinedResponse.text()}`
           );
         }
 
-        const { txb64: feesTx } = await feesResponse.json();
+        const { txb64 } = await combinedResponse.json();
 
-        const feesResult = await wallet.signAndExecuteTransactionBlock({
-          transactionBlock: feesTx,
+        // Use our utility function
+        const result = await signAndExecuteBase64(wallet, txb64, {
+          showEffects: true,
         });
 
-        if (feesResult.digest) {
-          digests.push(feesResult.digest);
-        }
-
-        // Collect rewards
-        const rewardsResponse = await fetch(
-          "/api/bluefin/create-collect-rewards-tx",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              poolId: poolAddress,
-              positionId,
-              walletAddress: account.address,
-            }),
-          }
-        );
-
-        if (!rewardsResponse.ok) {
-          throw new Error(
-            `Failed to create collect rewards transaction: ${await rewardsResponse.text()}`
-          );
-        }
-
-        const { txb64: rewardsTx } = await rewardsResponse.json();
-
-        const rewardsResult = await wallet.signAndExecuteTransactionBlock({
-          transactionBlock: rewardsTx,
-        });
-
-        if (rewardsResult.digest) {
-          digests.push(rewardsResult.digest);
+        if (result.digest) {
+          digests.push(result.digest);
         }
       }
 
@@ -1617,6 +1571,7 @@ function Positions() {
 
   /**
    * Handle collecting fees using appropriate service based on pool type
+   * Updated to use signAndExecuteBase64 for Bluefin
    */
   const handleCollectFees = async (poolAddress: string, positionId: string) => {
     if (!wallet.connected) {
@@ -1668,8 +1623,9 @@ function Positions() {
 
         const { txb64 } = await feesResponse.json();
 
-        result = await wallet.signAndExecuteTransactionBlock({
-          transactionBlock: txb64,
+        // Use our utility function
+        result = await signAndExecuteBase64(wallet, txb64, {
+          showEffects: true,
         });
 
         const protocolName = poolInfo
@@ -2602,6 +2558,11 @@ function Positions() {
 
         .protocol-bar.bluefin {
           background: linear-gradient(90deg, #06864a, rgba(6, 134, 74, 0.7));
+        }
+
+        .blue-token {
+          background: linear-gradient(135deg, #1e88e5, #039be5);
+          box-shadow: 0 0 10px rgba(3, 155, 229, 0.7);
         }
       `}</style>
     </div>
