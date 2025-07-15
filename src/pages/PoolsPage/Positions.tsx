@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Positions.tsx
-// Last Updated: 2025-06-30 17:31:39 UTC by jake1318
+// Last Updated: 2025-07-15 02:36:41 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -33,6 +33,7 @@ import { formatLargeNumber, formatDollars } from "../../utils/formatters";
 
 import "../../styles/pages/Positions.scss";
 import "../../pages/PoolsPage/protocolBadges.scss";
+import { FaChartLine, FaExchangeAlt, FaCoins, FaPercentage } from "react-icons/fa";
 
 interface WithdrawModalState {
   isOpen: boolean;
@@ -65,6 +66,16 @@ interface ExtendedPosition extends NormalizedPosition {
   tokenBDecimals?: number;
   formattedAmountA?: string;
   formattedAmountB?: string;
+}
+
+// Interface for portfolio dashboard metrics
+interface PortfolioMetrics {
+  totalValueUsd: number;
+  totalRewardsUsd: number;
+  totalPositionsCount: number;
+  avgApr: number;
+  loading: boolean;
+  protocolBreakdown: Record<string, number>; // Protocol name -> USD value
 }
 
 // Default token icon for fallbacks
@@ -455,6 +466,105 @@ function PoolPair({
   );
 }
 
+// New Portfolio Dashboard Component
+function PortfolioDashboard({ metrics }: { metrics: PortfolioMetrics }) {
+  return (
+    <div className="portfolio-dashboard">
+      <h2 className="dashboard-title">Portfolio Overview</h2>
+      <div className="dashboard-stats-grid">
+        <div className="dashboard-stat-card">
+          <div className="stat-icon">
+            <FaChartLine />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">Total Value</div>
+            <div className="stat-value">
+              {metrics.loading ? (
+                <div className="stat-loading"></div>
+              ) : (
+                `$${formatDollars(metrics.totalValueUsd)}`
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="dashboard-stat-card">
+          <div className="stat-icon">
+            <FaExchangeAlt />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">Total Rewards</div>
+            <div className="stat-value">
+              {metrics.loading ? (
+                <div className="stat-loading"></div>
+              ) : (
+                `$${formatDollars(metrics.totalRewardsUsd)}`
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="dashboard-stat-card">
+          <div className="stat-icon">
+            <FaCoins />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">Active Positions</div>
+            <div className="stat-value">
+              {metrics.loading ? (
+                <div className="stat-loading"></div>
+              ) : (
+                metrics.totalPositionsCount
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="dashboard-stat-card">
+          <div className="stat-icon">
+            <FaPercentage />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">Average APR</div>
+            <div className="stat-value">
+              {metrics.loading ? (
+                <div className="stat-loading"></div>
+              ) : (
+                `${metrics.avgApr.toFixed(2)}%`
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Protocol Distribution Section */}
+      {Object.keys(metrics.protocolBreakdown).length > 0 && !metrics.loading && (
+        <div className="protocol-breakdown">
+          <h3>Protocol Distribution</h3>
+          <div className="protocol-distribution-chart">
+            {Object.entries(metrics.protocolBreakdown)
+              .sort(([, valueA], [, valueB]) => valueB - valueA)
+              .map(([protocol, value]) => (
+                <div key={protocol} className="protocol-bar-container">
+                  <div className="protocol-label">{protocol}</div>
+                  <div className="protocol-bar-wrapper">
+                    <div 
+                      className={`protocol-bar ${normalizeProtocolName(protocol)}`}
+                      style={{ 
+                        width: `${(value / metrics.totalValueUsd) * 100}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <div className="protocol-value">${formatDollars(value)}</div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Scallop Summary Component
 function ScallopSummary({ scallopData }: { scallopData: any }) {
   if (!scallopData) return null;
@@ -671,6 +781,16 @@ function Positions() {
   const [withdrawingPool, setWithdrawingPool] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState<Record<string, boolean>>({});
   const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
+  
+  // Portfolio metrics for the dashboard
+  const [portfolioMetrics, setPortfolioMetrics] = useState<PortfolioMetrics>({
+    totalValueUsd: 0,
+    totalRewardsUsd: 0,
+    totalPositionsCount: 0,
+    avgApr: 0,
+    loading: true,
+    protocolBreakdown: {}
+  });
 
   // Transaction notification state
   const [notification, setNotification] =
@@ -741,6 +861,127 @@ function Positions() {
       if (!symbol) return undefined;
       const upperSymbol = normalizeSymbol(symbol);
       return TOKEN_ADDRESSES[upperSymbol];
+    },
+    []
+  );
+
+  // Calculate portfolio metrics
+  const calculatePortfolioMetrics = useCallback(
+    (pools: PoolGroup[], scallopData: any) => {
+      let totalValue = 0;
+      let totalRewards = 0;
+      let totalPositions = 0;
+      let aprSum = 0;
+      let validAprCount = 0;
+      const protocolBreakdown: Record<string, number> = {};
+      
+      // Calculate metrics from poolPositions
+      pools.forEach(pool => {
+        // Add to total value
+        totalValue += pool.totalValueUsd || 0;
+        
+        // Track protocol-specific values
+        const protocol = pool.protocol;
+        if (!protocolBreakdown[protocol]) {
+          protocolBreakdown[protocol] = 0;
+        }
+        protocolBreakdown[protocol] += pool.totalValueUsd || 0;
+        
+        // Count positions
+        totalPositions += pool.positions.length;
+        
+        // Add to APR for averaging
+        if (pool.apr && !isNaN(pool.apr) && pool.apr > 0) {
+          aprSum += pool.apr;
+          validAprCount++;
+        }
+        
+        // Sum up rewards
+        pool.positions.forEach(position => {
+          if (position.rewards && position.rewards.length > 0) {
+            position.rewards.forEach(reward => {
+              if (reward && reward.valueUsd) {
+                totalRewards += reward.valueUsd;
+              }
+            });
+          }
+        });
+      });
+      
+      // Add Scallop data if available
+      if (scallopData) {
+        // Add supply value
+        if (scallopData.totalSupplyValue) {
+          totalValue += scallopData.totalSupplyValue;
+          
+          // Add to protocol breakdown
+          if (!protocolBreakdown["Scallop"]) {
+            protocolBreakdown["Scallop"] = 0;
+          }
+          protocolBreakdown["Scallop"] += scallopData.totalSupplyValue;
+          
+          // Count each lending as a position
+          if (scallopData.lendings && scallopData.lendings.length > 0) {
+            totalPositions += scallopData.lendings.length;
+          }
+        }
+        
+        // Add collateral value if not already counted in supply
+        if (scallopData.totalCollateralValue && !scallopData.totalSupplyValue) {
+          totalValue += scallopData.totalCollateralValue;
+          
+          // Add to protocol breakdown
+          if (!protocolBreakdown["Scallop"]) {
+            protocolBreakdown["Scallop"] = 0;
+          }
+          protocolBreakdown["Scallop"] += scallopData.totalCollateralValue;
+        }
+        
+        // Count borrowings as positions
+        if (scallopData.borrowings && scallopData.borrowings.length > 0) {
+          totalPositions += scallopData.borrowings.reduce(
+            (count: number, obligation: any) => 
+              count + (obligation.borrowedPools?.length || 0),
+            0
+          );
+        }
+        
+        // Add Scallop pending rewards
+        if (
+          scallopData.pendingRewards &&
+          scallopData.pendingRewards.borrowIncentives
+        ) {
+          scallopData.pendingRewards.borrowIncentives.forEach(
+            (reward: any) => {
+              if (reward && reward.pendingRewardInUsd) {
+                totalRewards += reward.pendingRewardInUsd;
+              }
+            }
+          );
+        }
+        
+        // Add Scallop APRs to average
+        if (scallopData.lendings && scallopData.lendings.length > 0) {
+          scallopData.lendings.forEach((lending: any) => {
+            if (lending.supplyApy) {
+              aprSum += lending.supplyApy * 100;
+              validAprCount++;
+            }
+          });
+        }
+      }
+      
+      // Calculate average APR
+      const avgApr = validAprCount > 0 ? aprSum / validAprCount : 0;
+      
+      return {
+        totalValueUsd: totalValue,
+        totalRewardsUsd: totalRewards,
+        totalPositionsCount: totalPositions,
+        avgApr,
+        loading: false,
+        protocolBreakdown
+      };
     },
     []
   );
@@ -841,6 +1082,10 @@ function Positions() {
 
         // Update the positions with the metadata
         setPoolPositions(transformedPositions);
+        
+        // Calculate portfolio metrics for the dashboard
+        const metrics = calculatePortfolioMetrics(transformedPositions, scallopData);
+        setPortfolioMetrics(metrics);
       } catch (err) {
         console.error("Failed to load positions:", err);
         setError("Failed to load your positions. Please try again.");
@@ -848,7 +1093,15 @@ function Positions() {
         setLoading(false);
       }
     }
-  }, [connected, account, fetchTokenMetadata, getAddressBySymbol]);
+  }, [connected, account, fetchTokenMetadata, getAddressBySymbol, calculatePortfolioMetrics, scallopData]);
+
+  // Update portfolio metrics when positions or scallop data changes
+  useEffect(() => {
+    if (poolPositions.length > 0 || scallopData) {
+      const metrics = calculatePortfolioMetrics(poolPositions, scallopData);
+      setPortfolioMetrics(metrics);
+    }
+  }, [poolPositions, scallopData, calculatePortfolioMetrics]);
 
   // Load user positions when wallet connects
   useEffect(() => {
@@ -1176,19 +1429,36 @@ function Positions() {
     );
   };
 
+  // Helper function to calculate total rewards value for a pool
+  const calculateTotalRewardsValue = (poolGroup: PoolGroup): number => {
+    let totalValue = 0;
+    poolGroup.positions.forEach((position) => {
+      if (position.rewards && position.rewards.length > 0) {
+        position.rewards.forEach((reward) => {
+          if (reward && reward.valueUsd) {
+            totalValue += reward.valueUsd;
+          }
+        });
+      }
+    });
+    return totalValue;
+  };
+<div>
   return (
-    <div className="positions-page">
+    < className="positions-page">
+      {/* Add glow elements for consistent styling with other pages */}
+      <div className="glow-1"></div>
+      <div className="glow-2"></div>
+      <div className="glow-3"></div>
+      
       <div className="content-container">
-        {/* Updated navigation tabs styling to match the header look and include Vaults */}
+        {/* Updated navigation to match the Pools.tsx format */}
         <div className="main-navigation">
           <Link to="/pools" className="nav-link">
             Pools
           </Link>
           <Link to="/positions" className="nav-link active">
             My Positions
-          </Link>
-          <Link to="/portfolio" className="nav-link">
-            Portfolio
           </Link>
           <Link to="/pools?tab=vaults" className="nav-link">
             Vaults
@@ -1250,6 +1520,9 @@ function Positions() {
           </div>
         ) : (
           <>
+            {/* Add Portfolio Dashboard at the top */}
+            <PortfolioDashboard metrics={portfolioMetrics} />
+            
             {/* Type filter tabs */}
             <div className="position-type-tabs">
               <button
@@ -1301,8 +1574,8 @@ function Positions() {
                     <tr>
                       <th>Pool</th>
                       <th>DEX</th>
-                      <th className="align-right">Your Liquidity</th>
                       <th className="align-right">Value (USD)</th>
+                      <th className="align-right">Rewards</th>
                       <th className="align-right">APR</th>
                       <th className="align-center">Status</th>
                       <th className="actions-column">Actions</th>
@@ -1366,11 +1639,23 @@ function Positions() {
                                 isVault={isVaultPool(poolPosition)}
                               />
                             </td>
-                            <td className="align-right liquidity-cell">
-                              {formatLargeNumber(poolPosition.totalLiquidity)}
-                            </td>
                             <td className="align-right">
                               {formatDollars(poolPosition.totalValueUsd)}
+                            </td>
+                            <td className="align-right rewards-cell">
+                              {poolPosition.positions.some(
+                                (pos) =>
+                                  pos.rewards &&
+                                  pos.rewards.some((r) => (r.valueUsd || 0) > 0)
+                              ) ? (
+                                <span className="rewards-value">
+                                  {formatDollars(
+                                    calculateTotalRewardsValue(poolPosition)
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="no-rewards">--</span>
+                              )}
                             </td>
                             <td className="align-right">
                               <span
@@ -1447,6 +1732,8 @@ function Positions() {
                                       Withdrawing
                                     </span>
                                   ) : isVaultPool(poolPosition) ? (
+                                    "Withdraw from Vault"
+                                                  ) : isVaultPool(poolPosition) ? (
                                     "Withdraw from Vault"
                                   ) : poolPosition.protocol === "SuiLend" &&
                                     poolPosition.poolName?.includes(
@@ -1723,6 +2010,7 @@ function Positions() {
                                                     reward.decimals || 0
                                                   )
                                                 ).toFixed(reward.decimals || 0);
+
                                                 acc[key].valueUsd =
                                                   (acc[key].valueUsd || 0) +
                                                   (reward.valueUsd || 0);
@@ -1822,6 +2110,8 @@ function Positions() {
           />
         )}
       </div>
+
+
       <style jsx>{`
         .position-type-badge {
           display: inline-block;
@@ -1991,6 +2281,20 @@ function Positions() {
         .scallop-token {
           background: linear-gradient(135deg, #eb6662, #ff9c97);
           box-shadow: 0 0 10px rgba(235, 102, 98, 0.7);
+        }
+
+        /* Rewards styling */
+        .rewards-cell {
+          position: relative;
+        }
+
+        .rewards-value {
+          color: #00c48c;
+          font-weight: 500;
+        }
+
+        .no-rewards {
+          color: rgba(255, 255, 255, 0.4);
         }
 
         /* Scallop Summary Styles */
@@ -2219,7 +2523,6 @@ function Positions() {
         }
       `}</style>
     </div>
-  );
 }
 
 export default Positions;
