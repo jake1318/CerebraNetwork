@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-15 05:34:21 UTC by jake1318
+// Updated: 2025-07-15 05:57:57 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -1463,7 +1463,89 @@ export async function buildCollectRewardsTx({
 }
 
 /**
+ * Builds a transaction for collecting both fees and rewards in one step
+ */
+export async function buildCollectFeesAndRewardsTx({
+  poolId,
+  positionId,
+  walletAddress,
+}) {
+  if (!positionId || !walletAddress) {
+    throw new Error(
+      "Missing required parameters: positionId and walletAddress"
+    );
+  }
+
+  const suiClient = await getSuiClient();
+
+  // Get the latest Bluefin package ID
+  const packageId = await getBluefinPackageId();
+  const configId = await getBluefinConfigObjectId();
+
+  try {
+    console.log("Building collect fees and rewards transaction:", {
+      positionId,
+    });
+
+    // Get pool details using the helper
+    const pool = await getPoolDetails(poolId);
+    const { coinTypeA, coinTypeB } = pool.parsed;
+
+    // Create the transaction block
+    const txb = new TransactionBlock();
+    txb.setSender(walletAddress);
+    txb.setGasBudget(30_000_000);
+
+    // Get object references
+    const clockObj = txb.object(SUI_CLOCK_OBJECT_ID);
+
+    // Call the combined collect fee and rewards function
+    const collectedCoins = txb.moveCall({
+      target: `${packageId}::gateway::collect_fee_and_rewards`,
+      arguments: [
+        clockObj, // Clock
+        txb.object(configId), // Config
+        txb.object(poolId), // Pool
+        txb.object(positionId), // Position
+      ],
+      typeArguments: [coinTypeA, coinTypeB],
+    });
+
+    // Transfer collected coins back to user
+    txb.transferObjects([collectedCoins], txb.pure(walletAddress));
+
+    // Serialize the transaction to bytes and encode as base64
+    const txBytes = await txb.build({ client: suiClient });
+    const base64Tx = Buffer.from(txBytes).toString("base64");
+
+    console.log("Collect fees and rewards transaction built successfully");
+    return base64Tx; // Return base64 encoded string
+  } catch (error) {
+    console.error(
+      "Error building collect fees and rewards transaction:",
+      error
+    );
+
+    // Check for Bluefin-specific errors
+    const bluefinError = extractBluefinError(error);
+    if (bluefinError) {
+      // Throw a more user-friendly error
+      const enhancedError = new Error(bluefinError.message);
+      enhancedError.code = bluefinError.code;
+      enhancedError.type = "bluefin";
+      enhancedError.originalError = error;
+      throw enhancedError;
+    }
+
+    // Otherwise throw the original error
+    throw error;
+  }
+}
+
+/**
  * Builds a transaction for closing a position
+ * Updated to match the new Bluefin Move function signature
+ * that now expects five arguments: Pool, Position, Position_NFT, Position_Config, Clock
  */
 export async function buildClosePositionTx({
   poolId,
@@ -1490,26 +1572,9 @@ export async function buildClosePositionTx({
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
 
-    // Get position details
-    const positionResponse = await suiClient.getObject({
-      id: positionId,
-      options: { showContent: true },
-    });
-
-    if (!positionResponse.data) {
-      throw new Error(`Failed to retrieve position data for ${positionId}`);
-    }
-
-    const positionContent = positionResponse.data.content;
-    const positionFields = positionContent.fields;
-
-    // Check if position has any liquidity
-    const currentLiquidity = BigInt(positionFields.liquidity || "0");
-
     console.log("Building close position transaction:", {
       poolId,
       positionId,
-      currentLiquidity: currentLiquidity.toString(),
     });
 
     // Create the transaction block
@@ -1517,55 +1582,22 @@ export async function buildClosePositionTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // If there's liquidity, remove it first
-    if (currentLiquidity > 0n) {
-      // First remove all liquidity with updated package ID
-      const removedCoins = txb.moveCall({
-        target: `${packageId}::gateway::remove_liquidity`,
-        arguments: [
-          txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-          txb.object(configId), // Use the current config object
-          txb.object(poolId), // Pool
-          txb.object(positionId), // Position
-          txb.pure(currentLiquidity.toString(), "u64"),
-        ],
-        typeArguments: [coinTypeA, coinTypeB],
-      });
+    // Get transaction object references
+    const poolObj = txb.object(poolId);
+    const positionObj = txb.object(positionId);
+    const positionNFT = txb.object(positionId); // NFT has same ID as position
+    const positionConfig = txb.object(configId);
+    const clockObj = txb.object(SUI_CLOCK_OBJECT_ID); // 0x6 on mainnet
 
-      // Transfer removed liquidity coins back to user
-      txb.transferObjects([removedCoins], txb.pure(walletAddress));
-    }
-
-    // Try to collect fees if any (this is optional)
-    try {
-      const feeCoins = txb.moveCall({
-        target: `${packageId}::gateway::collect_fee`,
-        arguments: [
-          txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-          txb.object(configId), // Use the current config object
-          txb.object(poolId), // Pool
-          txb.object(positionId), // Position
-        ],
-        typeArguments: [coinTypeA, coinTypeB],
-      });
-
-      // Transfer collected fee coins back to user
-      txb.transferObjects([feeCoins], txb.pure(walletAddress));
-    } catch (feeError) {
-      console.warn(
-        "Could not add fee collection to transaction, continuing:",
-        feeError.message
-      );
-    }
-
-    // Finally close the position with updated package ID
+    // Close the position with the updated 5-argument signature
     txb.moveCall({
       target: `${packageId}::gateway::close_position`,
       arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(configId), // Use the current config object
-        txb.object(poolId), // Pool
-        txb.object(positionId), // Position
+        poolObj, // Pool
+        positionObj, // Position
+        positionNFT, // Position_NFT
+        positionConfig, // Position_Config
+        clockObj, // Clock
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
