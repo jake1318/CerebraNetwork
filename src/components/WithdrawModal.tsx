@@ -1,5 +1,5 @@
 // src/components/WithdrawModal.tsx
-// Last Updated: 2025-06-30 00:43:16 UTC by jake1318
+// Last Updated: 2025-07-15 05:20:12 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -30,6 +30,12 @@ interface WithdrawModalProps {
   onClose: () => void;
 }
 
+// Helper function to check if a pool address is from Bluefin
+function isBluefinPool(poolAddress: string): boolean {
+  // Check if the pool address contains 'bluefin' identifier or matches known Bluefin package patterns
+  return poolAddress.toLowerCase().includes("bluefin");
+}
+
 const WithdrawModal: React.FC<WithdrawModalProps> = ({
   isOpen = true,
   poolAddress,
@@ -53,13 +59,22 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
   } | null>(null);
   const [txDigests, setTxDigests] = useState<string[]>([]);
 
+  // Check if this is a Bluefin pool
+  const isBluefin = useMemo(() => isBluefinPool(poolAddress), [poolAddress]);
+
   // Compute pair name once
   const pairNameMemo = useMemo(() => {
     return "USDC/SUI"; // Replace with actual dynamic pair name if available
   }, []);
 
-  // Initialize SDK once and cache it
+  // Initialize SDK once and cache it - only for non-Bluefin pools
   const sdk = useMemo(() => {
+    // Skip SDK initialization for Bluefin pools
+    if (isBluefin) {
+      console.log("Bluefin pool detected, skipping Cetus SDK initialization");
+      return null;
+    }
+
     try {
       console.log(
         "Initializing Cetus SDK with address:",
@@ -76,15 +91,15 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
       console.error("Failed to initialize Cetus SDK:", error);
       return null;
     }
-  }, [wallet.account?.address]);
+  }, [wallet.account?.address, isBluefin]);
 
-  // Update sender address when wallet changes
+  // Update sender address when wallet changes - only for non-Bluefin pools
   useEffect(() => {
-    if (sdk && wallet.account?.address) {
+    if (sdk && wallet.account?.address && !isBluefin) {
       console.log("Setting sender address:", wallet.account.address);
       sdk.setSenderAddress(wallet.account.address);
     }
-  }, [wallet.account?.address, sdk]);
+  }, [wallet.account?.address, sdk, isBluefin]);
 
   // Handle percentage select buttons
   const handlePercentSelect = (percent: number) => {
@@ -107,10 +122,8 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Use the new unified withdraw helper function
-      const result = await sdkWithdraw(wallet, {
-        poolId: poolAddress,
-        positionIds,
+      // Use the onConfirm callback which now handles both Bluefin and Cetus
+      const result = await onConfirm({
         withdrawPercent,
         collectFees,
         closePosition,
@@ -167,6 +180,9 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
               : closePosition && withdrawPercent === 100
               ? "Close Position"
               : "Withdraw Liquidity"}
+            {isBluefin && (
+              <span className="protocol-badge bluefin-badge">Bluefin</span>
+            )}
           </h3>
           <button
             className="close-button"
@@ -222,6 +238,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
                     positionIds.length > 1 ? "s" : ""
                   } for ${pairNameMemo}`
                 : `Withdrew ${withdrawPercent}% from ${pairNameMemo}`}
+              {isBluefin && " (Bluefin)"}
             </p>
 
             {/* Transaction ID - Matching the deposit modal */}
@@ -273,7 +290,13 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
               <div className="position-header">
                 <div className="token-pair">
                   <span className="token-name">{pairNameMemo}</span>
-                  <span className="range-badge in-range">Pool Position</span>
+                  <span
+                    className={`range-badge ${
+                      isBluefin ? "bluefin-badge" : "in-range"
+                    }`}
+                  >
+                    {isBluefin ? "Bluefin" : "Pool"} Position
+                  </span>
                 </div>
                 <div className="position-value">
                   <span className="label">Value:</span>
@@ -354,7 +377,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
                     onChange={(e) => setCollectFees(e.target.checked)}
                   />
                   <span className="checkmark"></span>
-                  Collect fees
+                  Collect {isBluefin ? "fees and rewards" : "fees"}
                 </label>
               </div>
 
@@ -426,6 +449,14 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
                     {withdrawPercent === 100 && closePosition
                       ? "Close Position" + (positionIds.length > 1 ? "s" : "")
                       : `Withdraw ${withdrawPercent}% Liquidity`}
+                  </span>
+                </div>
+                <div className="transaction-item">
+                  <span className="item-label">Protocol:</span>
+                  <span
+                    className={`item-value ${isBluefin ? "bluefin-text" : ""}`}
+                  >
+                    {isBluefin ? "Bluefin" : "Cetus"}
                   </span>
                 </div>
                 <div className="transaction-item">
@@ -512,7 +543,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
               Cancel
             </button>
             <button
-              className="btn-primary"
+              className={`btn-primary ${isBluefin ? "bluefin-button" : ""}`}
               onClick={handleSubmit}
               disabled={isSubmitting}
             >
@@ -523,6 +554,34 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
           </div>
         )}
       </div>
+
+      <style jsx>{`
+        .bluefin-badge {
+          background-color: rgba(6, 134, 74, 0.1);
+          color: #06864a;
+        }
+
+        .bluefin-text {
+          color: #06864a;
+          font-weight: 500;
+        }
+
+        .protocol-badge {
+          margin-left: 10px;
+          padding: 4px 8px;
+          font-size: 12px;
+          border-radius: 4px;
+          font-weight: 500;
+        }
+
+        .bluefin-button {
+          background: linear-gradient(45deg, #06864a, #08a258);
+        }
+
+        .bluefin-button:hover {
+          background: linear-gradient(45deg, #057941, #079a52);
+        }
+      `}</style>
     </div>
   );
 };
