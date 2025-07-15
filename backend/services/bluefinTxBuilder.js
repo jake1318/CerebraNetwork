@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-10 22:50:06 UTC by jake1318
+// Updated: 2025-07-15 05:34:21 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -1408,7 +1408,7 @@ export async function buildCollectRewardsTx({
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
 
-    // Default reward coin type
+    // Default reward coin type for Bluefin (BLUE token)
     const rewardCoinType =
       "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::blue::BLUE";
 
@@ -1504,7 +1504,7 @@ export async function buildClosePositionTx({
     const positionFields = positionContent.fields;
 
     // Check if position has any liquidity
-    const currentLiquidity = BigInt(positionFields.liquidity);
+    const currentLiquidity = BigInt(positionFields.liquidity || "0");
 
     console.log("Building close position transaction:", {
       poolId,
@@ -1534,8 +1534,10 @@ export async function buildClosePositionTx({
 
       // Transfer removed liquidity coins back to user
       txb.transferObjects([removedCoins], txb.pure(walletAddress));
+    }
 
-      // Then collect all fees with updated package ID
+    // Try to collect fees if any (this is optional)
+    try {
       const feeCoins = txb.moveCall({
         target: `${packageId}::gateway::collect_fee`,
         arguments: [
@@ -1549,6 +1551,11 @@ export async function buildClosePositionTx({
 
       // Transfer collected fee coins back to user
       txb.transferObjects([feeCoins], txb.pure(walletAddress));
+    } catch (feeError) {
+      console.warn(
+        "Could not add fee collection to transaction, continuing:",
+        feeError.message
+      );
     }
 
     // Finally close the position with updated package ID
