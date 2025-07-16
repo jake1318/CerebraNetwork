@@ -1,5 +1,5 @@
 // routes/bluefin.js
-// Updated: 2025-07-15 17:27:44 UTC by jake1318
+// Updated: 2025-07-16 02:11:24 UTC by jake1318
 
 import express from "express";
 import * as bluefinService from "../services/bluefinService.js";
@@ -287,12 +287,12 @@ router.post("/get-close-position-params", async (req, res) => {
  *  BUILD + SERIALISE (all return { txb64 }) - SIMPLIFIED
  * ──────────────────────────────────────────────────────────*/
 
-// Modified to return just the txb64 without the success wrapper
+// Modified to return a proper JSON response with txBytes field
 const buildAndReturn = (builder) => async (req, res, next) => {
   try {
     const txb64 = await builder(req.body);
-    // Simplified response: just return txb64
-    res.json({ txb64 });
+    // CHANGED: Return JSON object with txBytes field instead of raw string
+    res.json({ success: true, txBytes: txb64 });
   } catch (e) {
     console.error("Builder error:", e);
     jsonError(res, 500, e.message);
