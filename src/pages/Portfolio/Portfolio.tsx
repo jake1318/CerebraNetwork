@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-11 07:17:06 UTC by jake1318
+// Last Updated: 2025-07-12 20:23:34 UTC by jake1318
 
 import React, {
   useState,
@@ -46,6 +46,7 @@ import {
   FaFilter,
   FaCalendarAlt,
   FaSortAmountDown,
+  FaNewspaper,
 } from "react-icons/fa";
 import { getSwapHistory } from "@7kprotocol/sdk-ts";
 
@@ -56,6 +57,7 @@ import blockvisionService, {
 } from "../../services/blockvisionService";
 import * as birdeyeService from "../../services/birdeyeService";
 import MarketDashboard from "./MarketDashboard";
+import MarketNews from "../../components/portfolio/MarketNews";
 
 // Import components
 import ProtocolBadge from "../PoolsPage/ProtocolBadge";
@@ -159,14 +161,14 @@ function Sidebar({
                 </button>
                 <button
                   className={`nav-link ${
-                    activeView === "activity" ? "active" : ""
+                    activeView === "market_news" ? "active" : ""
                   }`}
-                  onClick={() => setActiveView("activity")}
+                  onClick={() => setActiveView("market_news")}
                 >
                   <span className="nav-icon">
-                    <FaRegClock />
+                    <FaNewspaper />
                   </span>
-                  <span className="nav-label">Activity</span>
+                  <span className="nav-label">Market News</span>
                 </button>
               </div>
             </div>
@@ -653,7 +655,7 @@ function PortfolioValueCard({
 
           <div className="metric">
             <div className="metric-label">Assets</div>
-            <div className="metric-value">5 Tokens / 3 Positions</div>
+            <div className="metric-value">7 Tokens / 13 Positions</div>
           </div>
 
           <div className="metric">
@@ -665,7 +667,7 @@ function PortfolioValueCard({
                 textShadow: "0 0 10px rgba(30, 215, 96, 0.5)",
               }}
             >
-              24.8%
+              64.8%
             </div>
           </div>
         </div>
@@ -1710,8 +1712,6 @@ function Portfolio() {
                     positionType: "scallop-borrow",
                   },
                 ],
-                // Last Updated: 2025-07-11 07:22:44 UTC by jake1318
-
                 totalLiquidity: borrow.borrowedCoin,
                 totalValueUsd: borrow.borrowedValueInUsd,
                 apr: borrow.borrowApy * 100,
@@ -2268,8 +2268,8 @@ function Portfolio() {
     switch (activeView) {
       case "dashboard":
         return <MarketDashboard />;
-      case "activity":
-        return <ActivityView wallet={wallet} />;
+      case "market_news": // Changed from "activity" to "market_news"
+        return <MarketNews defaultQuery="CRYPTO" />;
       case "portfolio":
       default:
         return renderPortfolioView();

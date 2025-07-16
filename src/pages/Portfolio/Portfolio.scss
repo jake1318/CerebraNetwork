@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.scss
-// Last Updated: 2025-07-14 05:19:32 UTC by jake1318
+// Last Updated: 2025-07-16 01:03:16 UTC by jake1318
 
 // Variables for consistent colors - matching Home.scss
 $background-dark: #020314;
@@ -235,26 +235,47 @@ html {
   color: $text-primary;
   font-family: "Inter", sans-serif;
 
-  // Add cyberpunk-style grid background to match homepage
-  &::before {
-    content: "";
+  // Add the glow elements for blue, green, and magenta
+  .glow-1 {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-        90deg,
-        rgba($neon-blue, 0.05) 1px,
-        transparent 1px
-      ),
-      linear-gradient(180deg, rgba($neon-blue, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba($neon-blue, 0.05) 1px, transparent 1px),
-      linear-gradient(180deg, rgba($neon-blue, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
-    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
-    pointer-events: none;
+    width: 300px;
+    height: 300px;
+    background: rgba(30, 144, 255, 0.12); // Neon blue
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -100px;
+    left: 10%;
     z-index: 0;
+    animation: pulsate 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(196, 92, 242, 0.12); // Purple
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: 10%;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    pointer-events: none;
+  }
+
+  .glow-3 {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba(0, 255, 128, 0.12); // Green
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 60%;
+    left: 70%;
+    z-index: 0;
+    animation: pulsate 9s ease-in-out infinite;
+    pointer-events: none;
   }
 
   // Dashboard grid layout

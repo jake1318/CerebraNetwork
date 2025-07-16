@@ -36,18 +36,54 @@ $radius: 12px;
     linear-gradient(180deg, $bg-surface 0%, $bg-deep 100%);
   isolation: isolate; /* so child pseudo‑els don't leak */
 
-  /* fine grid lines */
-  &::before {
-    content: "";
-    inset: 0;
+  /* Removed the grid background as requested */
+
+  /* Add glow elements to match other pages */
+  .glow-1 {
     position: absolute;
-    background: linear-gradient(90deg, $grid-line 1px, transparent 1px),
-      linear-gradient(0deg, $grid-line 1px, transparent 1px);
-    background-size: 40px 40px;
-    mix-blend-mode: overlay;
-    pointer-events: none;
+    width: 300px;
+    height: 300px;
+    background: rgba($neon-blue, 0.12);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -100px;
+    left: 10%;
     z-index: 0;
+    animation: pulsate 8s ease-in-out infinite alternate;
+    pointer-events: none;
   }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba($neon-pink, 0.12);
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: 10%;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    pointer-events: none;
+  }
+
+  .glow-3 {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba($neon-green, 0.12);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 60%;
+    left: 70%;
+    z-index: 0;
+    animation: pulsate 9s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  /* Removed horizontal scanning line */
+
+  /* Removed vertical scanning line */
 
   .container {
     width: 95%;
@@ -61,6 +97,12 @@ $radius: 12px;
       color: $txt-primary;
       margin-bottom: 1.5rem;
       font-weight: 600;
+      /* Add gradient text to match other pages */
+      background: linear-gradient(90deg, $neon-blue, $neon-pink);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba($neon-blue, 0.2);
     }
   }
 }
@@ -233,6 +275,17 @@ $radius: 12px;
   padding: 0.25rem; /* space for glow */
   position: relative;
   margin-bottom: 2rem;
+
+  /* Hide scrollbars but keep functionality */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+
+  /* Hide scrollbars for Chrome, Safari and Opera */
+  &::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 
   /* glow ring */
   &::before {
@@ -573,6 +626,20 @@ $radius: 12px;
   }
 }
 
+/* Additional animations for the new glowing elements */
+@keyframes pulsate {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+/* Removed these animations as we removed the scanning lines */
+
 /* Responsive adjustments */
 @media (max-width: 1200px) {
   .token-table {
@@ -615,4 +682,56 @@ $radius: 12px;
       gap: 0.75rem;
     }
   }
+}
+
+/* Loading indicator for lazy loading */
+.loading-more {
+  text-align: center;
+  padding: 1rem;
+  color: $txt-muted;
+  font-size: 0.9rem;
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: calc(50% - 10px);
+    top: -5px;
+    width: 20px;
+    height: 2px;
+    background: linear-gradient(90deg, $neon-blue, $neon-pink);
+    animation: loading-pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes loading-pulse {
+  0% {
+    opacity: 0.3;
+    transform: scaleX(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1.2);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scaleX(0.7);
+  }
+}
+
+/* Hide all scrollbars globally - added to hide component scrollbars as shown in the screenshot */
+::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: none;
+}
+
+/* For IE/Edge */
+* {
+  -ms-overflow-style: none;
 }

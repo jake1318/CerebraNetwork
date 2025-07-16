@@ -1,5 +1,5 @@
 // src/pages/Portfolio/MarketDashboard.tsx
-// Last Updated: 2025-07-12 22:55:45 UTC by jake1318
+// Last Updated: 2025-07-15 17:41:57 UTC by jake1318
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -27,6 +27,11 @@ import {
 
 import "./MarketDashboard.scss";
 
+// Define SUI address constants to use consistently across the codebase
+const FULL_SUI_ADDRESS =
+  "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+const SHORT_SUI_ADDRESS = "0x2::sui::SUI";
+
 // Token interface to represent the combined data from both APIs
 interface TokenData {
   rank: number;
@@ -42,6 +47,8 @@ interface TokenData {
   fdv: number;
   circulatingSupply: number;
   totalSupply: number;
+  // Add a status field to track token loading state
+  status: "loading" | "loaded" | "error";
 }
 
 // Enum for sorting columns
@@ -60,6 +67,17 @@ enum SortColumn {
 
 // Sort direction type
 type SortDirection = "asc" | "desc";
+
+// Helper function to normalize addresses (especially SUI)
+const normalizeAddress = (address: string): string => {
+  if (!address) return address;
+
+  // If this is the abbreviated SUI address, replace with full version
+  if (address === SHORT_SUI_ADDRESS) {
+    return FULL_SUI_ADDRESS;
+  }
+  return address;
+};
 
 // Helper function to safely parse numeric values
 function safeParseFloat(value: any): number {
@@ -158,11 +176,64 @@ const SkeletonRow: React.FC = () => (
   </tr>
 );
 
+// Loading state row to use when just a specific token's data is loading
+const LoadingRow: React.FC<{ token: TokenData }> = ({ token }) => (
+  <tr key={token.address}>
+    <td className="rank-col">{token.rank}</td>
+    <td className="name-col">
+      <img
+        src={token.logoURI || "/assets/images/unknown-token.png"}
+        alt={token.symbol}
+        className="token-logo"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          if (token.symbol === "HASUI" || token.address === HASUI_ADDRESS) {
+            target.src = "/haSui.webp";
+          } else {
+            target.src = "/assets/images/unknown-token.png";
+          }
+        }}
+      />
+      <div className="token-info">
+        <div className="token-name">{token.name}</div>
+        <div className="token-symbol">{token.symbol}</div>
+      </div>
+    </td>
+    <td className="price-col">
+      <div className="sk-box medium" />
+    </td>
+    <td className="change-col">
+      <div className="sk-box medium" />
+    </td>
+    <td className="volume-col">
+      <div className="sk-box medium" />
+    </td>
+    <td className="market-cap-col">
+      <div className="sk-box medium" />
+    </td>
+    <td className="liquidity-col">
+      <div className="sk-box medium" />
+    </td>
+    <td className="fdv-col">
+      <div className="sk-box medium" />
+    </td>
+    <td className="supply-col">
+      <div className="sk-box medium" />
+    </td>
+    <td className="supply-col">
+      <div className="sk-box medium" />
+    </td>
+  </tr>
+);
+
+// Number of tokens to load initially for better initial performance
+const INITIAL_LOAD_COUNT = 20;
+
 // Main component for the Market Dashboard
 function MarketDashboard() {
   const [tokens, setTokens] = useState<TokenData[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<TokenData[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortColumn, setSortColumn] = useState<SortColumn>(
@@ -172,22 +243,27 @@ function MarketDashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
+  // Track how many tokens have been loaded with market data
+  const [loadedCount, setLoadedCount] = useState<number>(0);
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_LOAD_COUNT);
+
   // Ref to track if component is mounted
   const isMounted = useRef<boolean>(true);
+
+  // Ref to the table container for intersection observer
+  const tableEndRef = useRef<HTMLDivElement>(null);
 
   // Ref to prevent overlapping refreshes (mutex)
   const inFlight = useRef<boolean>(false);
 
-  // Function to load tokens data using our service directly
-  const loadTokensData = useCallback(async () => {
+  // Initial load of token list from Birdeye
+  const loadTokenList = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
     setRefreshing(true);
+    setInitialLoading(true);
 
     try {
-      console.log("Fetching token market data...");
-
-      /* 1 ─ Birdeye list */
       console.log("Fetching token list from Birdeye API...");
       const birdeyeTokens = await birdeyeService.getTokenList(
         "sui",
@@ -195,82 +271,179 @@ function MarketDashboard() {
         0,
         500_000
       );
-      const tokenIds = birdeyeTokens.map((t) => t.address);
 
-      console.log(
-        `Successfully fetched ${birdeyeTokens.length} tokens from Birdeye`
-      );
-
-      /* 2 ─ BlockVision (all tokens with concurrency) */
-      console.log(
-        `Fetching BlockVision market/pro (${tokenIds.length} tokens with 8-way concurrency)...`
-      );
-      // pro plan – fetch all tokens (≈50) with 8‑way concurrency
-      const bv = await blockvisionService.getCoinMarketDataBatch(tokenIds, 8);
-
-      /* 3 ─ merge */
-      const rows: TokenData[] = birdeyeTokens.map((t, i) => {
-        const m = bv[t.address]; // undefined if not fetched
-        const px = safeParseFloat(m?.priceInUsd ?? t.price);
-        const circ = safeParseFloat(m?.circulating);
-        const mc = m ? safeParseFloat(m.marketCap) : px * circ;
-
+      // Initialize tokens with loading state
+      const initialTokens: TokenData[] = birdeyeTokens.map((t, i) => {
         // Check for haSui and use local logo
         let logoURI = t.logoURI;
         if (t.symbol === "HASUI" || t.address === HASUI_ADDRESS) {
-          logoURI = "/haSui.webp"; // Use our local logo
+          logoURI = "/haSui.webp";
           console.log("Using local logo for haSui token");
         }
 
+        // Normalize SUI address
+        const address = normalizeAddress(t.address);
+
         return {
           rank: i + 1,
-          address: t.address,
+          address: address,
           name: t.name ?? "Unknown",
           symbol: t.symbol ?? "UNKNOWN",
           logoURI: logoURI ?? "",
-          price: px,
-          priceChange24h: safeParseFloat(m?.market?.hour24?.priceChange ?? 0),
-          volume24h: safeParseFloat(m?.volume24H ?? t.v24hUSD),
-          marketCap: mc,
-          liquidity: safeParseFloat(m?.liquidityInUsd ?? t.liquidity),
-          fdv: safeParseFloat(m?.fdvInUsd),
-          circulatingSupply: circ,
-          totalSupply: safeParseFloat(m?.supply),
+          price: t.price || 0,
+          priceChange24h: 0,
+          volume24h: t.v24hUSD || 0,
+          marketCap: 0,
+          liquidity: t.liquidity || 0,
+          fdv: 0,
+          circulatingSupply: 0,
+          totalSupply: 0,
+          status: "loading",
         };
       });
 
-      rows.sort((a, b) => b.marketCap - a.marketCap);
-      rows.forEach((r, idx) => (r.rank = idx + 1));
+      // Sort by market cap (using Birdeye's data initially)
+      initialTokens.sort((a, b) => b.marketCap - a.marketCap);
+      initialTokens.forEach((t, idx) => (t.rank = idx + 1));
 
-      console.log(`Merged ${rows.length} tokens – dashboard ready`);
+      setTokens(initialTokens);
+      setFilteredTokens(initialTokens);
 
-      setTokens(rows);
-      setFilteredTokens(rows);
+      // Load the first batch of token data immediately
+      const initialBatch = initialTokens
+        .slice(0, INITIAL_LOAD_COUNT)
+        .map((t) => t.address);
+      await loadTokensData(initialBatch);
+
+      setInitialLoading(false);
       setLastUpdated(new Date().toLocaleTimeString());
-      setError(null);
+
+      // Load the rest of the tokens in the background
+      const remainingBatch = initialTokens
+        .slice(INITIAL_LOAD_COUNT)
+        .map((t) => t.address);
+      loadTokensData(remainingBatch);
     } catch (e: any) {
-      console.error("Failed to load market data:", e);
-      setError(e.message ?? "Failed to load market data");
+      console.error("Failed to load token list:", e);
+      setError(e.message ?? "Failed to load token list");
+      setInitialLoading(false);
     } finally {
       setRefreshing(false);
       inFlight.current = false;
     }
   }, []);
 
+  // Function to load tokens market data using our service
+  const loadTokensData = useCallback(async (tokenIds: string[]) => {
+    if (!tokenIds.length) return;
+
+    try {
+      console.log(`Fetching market data for ${tokenIds.length} tokens...`);
+
+      // Use the hybrid approach for fetching market data
+      const marketData = await blockvisionService.getCoinMarketDataHybrid(
+        tokenIds,
+        2
+      );
+
+      // Update the tokens with the fetched market data
+      setTokens((prev) => {
+        const updatedTokens = [...prev];
+
+        tokenIds.forEach((id) => {
+          const normalizedId = normalizeAddress(id);
+          const tokenIndex = updatedTokens.findIndex(
+            (t) => t.address === normalizedId || t.address === id
+          );
+          if (tokenIndex === -1) return;
+
+          const data = marketData[normalizedId] || marketData[id];
+          if (!data) {
+            // Mark as error if no data was found
+            updatedTokens[tokenIndex].status = "error";
+            return;
+          }
+
+          const token = updatedTokens[tokenIndex];
+          token.price = safeParseFloat(data.priceInUsd);
+          token.priceChange24h = safeParseFloat(
+            data.market?.hour24?.priceChange ?? 0
+          );
+          token.volume24h = safeParseFloat(data.volume24H);
+          token.marketCap = safeParseFloat(data.marketCap);
+          token.liquidity = safeParseFloat(data.liquidityInUsd);
+          token.fdv = safeParseFloat(data.fdvInUsd);
+          token.circulatingSupply = safeParseFloat(data.circulating);
+          token.totalSupply = safeParseFloat(data.supply);
+          token.status = "loaded";
+        });
+
+        // Resort by market cap after updating
+        const sorted = [...updatedTokens].sort(
+          (a, b) => b.marketCap - a.marketCap
+        );
+        sorted.forEach((t, idx) => (t.rank = idx + 1));
+
+        // Count how many tokens have loaded data
+        const loaded = sorted.filter((t) => t.status === "loaded").length;
+        setLoadedCount(loaded);
+
+        return sorted;
+      });
+
+      console.log(`Updated market data for ${tokenIds.length} tokens`);
+    } catch (e: any) {
+      console.error("Failed to load market data:", e);
+      // Don't set global error for background loads, just mark the tokens as error
+      setTokens((prev) => {
+        const updatedTokens = [...prev];
+        tokenIds.forEach((id) => {
+          const normalizedId = normalizeAddress(id);
+          const tokenIndex = updatedTokens.findIndex(
+            (t) => t.address === normalizedId || t.address === id
+          );
+          if (tokenIndex !== -1) {
+            updatedTokens[tokenIndex].status = "error";
+          }
+        });
+        return updatedTokens;
+      });
+    }
+  }, []);
+
   // Initial data load
   useEffect(() => {
-    setLoading(true);
-    loadTokensData().finally(() => setLoading(false));
+    loadTokenList();
 
     // Clean up effect
     return () => {
       isMounted.current = false;
     };
-  }, [loadTokensData]);
+  }, [loadTokenList]);
+
+  // Set up intersection observer for infinite scrolling
+  useEffect(() => {
+    if (!tableEndRef.current || initialLoading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleCount < filteredTokens.length) {
+          // Load more rows when the user scrolls to the bottom
+          setVisibleCount((prev) => Math.min(prev + 10, filteredTokens.length));
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(tableEndRef.current);
+    return () => observer.disconnect();
+  }, [initialLoading, visibleCount, filteredTokens.length]);
 
   // Filter tokens on search
   useEffect(() => {
     setFilteredTokens(filterTokens(tokens, searchTerm));
+    // Reset visible count when search changes
+    setVisibleCount(INITIAL_LOAD_COUNT);
   }, [tokens, searchTerm]);
 
   // Handle sort column change
@@ -318,28 +491,30 @@ function MarketDashboard() {
     }
   };
 
-  // Calculate market summary stats
+  // Calculate market summary stats based on loaded tokens only
+  const loadedTokens = tokens.filter((t) => t.status === "loaded");
   const marketStats = {
-    totalMarketCap: filteredTokens.reduce(
+    totalMarketCap: loadedTokens.reduce(
       (sum, token) => sum + token.marketCap,
       0
     ),
-    totalVolume24h: filteredTokens.reduce(
+    totalVolume24h: loadedTokens.reduce(
       (sum, token) => sum + token.volume24h,
       0
     ),
-    totalTokens: filteredTokens.length,
+    totalTokens: tokens.length,
+    loadedTokens: loadedCount,
     averagePriceChange:
-      filteredTokens.length > 0
-        ? filteredTokens.reduce((sum, token) => sum + token.priceChange24h, 0) /
-          filteredTokens.length
+      loadedTokens.length > 0
+        ? loadedTokens.reduce((sum, token) => sum + token.priceChange24h, 0) /
+          loadedTokens.length
         : 0,
   };
 
   // Handle refresh click
   const handleRefresh = () => {
     if (!refreshing) {
-      loadTokensData();
+      loadTokenList();
     }
   };
 
@@ -350,6 +525,9 @@ function MarketDashboard() {
     }
     return token.logoURI;
   };
+
+  // Visible tokens for lazy loading
+  const visibleTokens = filteredTokens.slice(0, visibleCount);
 
   return (
     <div className="market-dashboard">
@@ -365,7 +543,7 @@ function MarketDashboard() {
                 marketStats.totalMarketCap > 0 ? "positive" : ""
               }`}
             >
-              {loading ? (
+              {initialLoading ? (
                 <span className="sk-box long" style={{ height: "18px" }} />
               ) : (
                 formatDollarValue(marketStats.totalMarketCap)
@@ -375,7 +553,7 @@ function MarketDashboard() {
           <div className="summary-stat">
             <div className="stat-label">24h Volume</div>
             <div className="stat-value">
-              {loading ? (
+              {initialLoading ? (
                 <span className="sk-box long" style={{ height: "18px" }} />
               ) : (
                 formatDollarValue(marketStats.totalVolume24h)
@@ -385,10 +563,11 @@ function MarketDashboard() {
           <div className="summary-stat">
             <div className="stat-label">Tokens</div>
             <div className="stat-value">
-              {loading ? (
+              {initialLoading ? (
                 <span className="sk-box long" style={{ height: "18px" }} />
               ) : (
-                marketStats.totalTokens
+                // Replace "40/40 loaded" with "The Sui 40"
+                "The Sui 40"
               )}
             </div>
           </div>
@@ -399,7 +578,7 @@ function MarketDashboard() {
                 marketStats.averagePriceChange >= 0 ? "positive" : "negative"
               }`}
             >
-              {loading ? (
+              {initialLoading ? (
                 <span className="sk-box long" style={{ height: "18px" }} />
               ) : (
                 `${
@@ -431,7 +610,7 @@ function MarketDashboard() {
               <FaSync className={`refresh-icon ${refreshing ? "spin" : ""}`} />
               {refreshing ? "REFRESHING..." : "REFRESH"}
             </button>
-            {!loading && (
+            {!initialLoading && (
               <span className="last-updated">
                 Updated {lastUpdated || "Never"}
               </span>
@@ -521,8 +700,8 @@ function MarketDashboard() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                /* ⇢  Show 8 shimmering rows while we're fetching  */
+              {initialLoading ? (
+                /* ⇢  Show 8 shimmering rows while we're initially loading  */
                 Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
               ) : filteredTokens.length === 0 ? (
                 <tr>
@@ -531,75 +710,91 @@ function MarketDashboard() {
                   </td>
                 </tr>
               ) : (
-                filteredTokens.map((token) => (
-                  <tr key={token.address}>
-                    <td className="rank-col">{token.rank}</td>
-                    <td className="name-col">
-                      <img
-                        src={getTokenLogo(token)}
-                        alt={token.symbol}
-                        className="token-logo"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          console.log(
-                            `Failed to load logo for ${token.symbol}, using fallback`
-                          );
-                          // Try a second time with haSui local logo if applicable
-                          if (
-                            token.symbol === "HASUI" ||
-                            token.address === HASUI_ADDRESS
-                          ) {
-                            target.src = "/haSui.webp";
-                          } else {
-                            target.src = "/assets/images/unknown-token.png";
-                          }
-                        }}
-                      />
-                      <div className="token-info">
-                        <div className="token-name">{token.name}</div>
-                        <div className="token-symbol">{token.symbol}</div>
-                      </div>
-                    </td>
-                    <td className="price-col">{formatPrice(token.price)}</td>
-                    <td
-                      className={`change-col ${
-                        token.priceChange24h >= 0 ? "positive" : "negative"
-                      }`}
-                    >
-                      {token.priceChange24h >= 0 ? (
-                        <FaCaretUp />
-                      ) : (
-                        <FaCaretDown />
-                      )}
-                      {formatPercentage(Math.abs(token.priceChange24h))}
-                    </td>
-                    <td className="volume-col">
-                      {formatDollarValue(token.volume24h)}
-                    </td>
-                    <td className="market-cap-col">
-                      {formatDollarValue(token.marketCap)}
-                    </td>
-                    <td className="liquidity-col">
-                      {formatDollarValue(token.liquidity)}
-                    </td>
-                    <td className="fdv-col">
-                      {token.fdv ? formatDollarValue(token.fdv) : "N/A"}
-                    </td>
-                    <td className="supply-col">
-                      {token.circulatingSupply
-                        ? formatNumber(token.circulatingSupply)
-                        : "N/A"}
-                    </td>
-                    <td className="supply-col">
-                      {token.totalSupply
-                        ? formatNumber(token.totalSupply)
-                        : "N/A"}
-                    </td>
-                  </tr>
-                ))
+                visibleTokens.map((token) => {
+                  // If token data is still loading, show loading row
+                  if (token.status === "loading") {
+                    return <LoadingRow key={token.address} token={token} />;
+                  }
+
+                  // Otherwise show the token data
+                  return (
+                    <tr key={token.address}>
+                      <td className="rank-col">{token.rank}</td>
+                      <td className="name-col">
+                        <img
+                          src={getTokenLogo(token)}
+                          alt={token.symbol}
+                          className="token-logo"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            console.log(
+                              `Failed to load logo for ${token.symbol}, using fallback`
+                            );
+                            // Try a second time with haSui local logo if applicable
+                            if (
+                              token.symbol === "HASUI" ||
+                              token.address === HASUI_ADDRESS
+                            ) {
+                              target.src = "/haSui.webp";
+                            } else {
+                              target.src = "/assets/images/unknown-token.png";
+                            }
+                          }}
+                        />
+                        <div className="token-info">
+                          <div className="token-name">{token.name}</div>
+                          <div className="token-symbol">{token.symbol}</div>
+                        </div>
+                      </td>
+                      <td className="price-col">{formatPrice(token.price)}</td>
+                      <td
+                        className={`change-col ${
+                          token.priceChange24h >= 0 ? "positive" : "negative"
+                        }`}
+                      >
+                        {token.priceChange24h >= 0 ? (
+                          <FaCaretUp />
+                        ) : (
+                          <FaCaretDown />
+                        )}
+                        {formatPercentage(Math.abs(token.priceChange24h))}
+                      </td>
+                      <td className="volume-col">
+                        {formatDollarValue(token.volume24h)}
+                      </td>
+                      <td className="market-cap-col">
+                        {formatDollarValue(token.marketCap)}
+                      </td>
+                      <td className="liquidity-col">
+                        {formatDollarValue(token.liquidity)}
+                      </td>
+                      <td className="fdv-col">
+                        {token.fdv ? formatDollarValue(token.fdv) : "N/A"}
+                      </td>
+                      <td className="supply-col">
+                        {token.circulatingSupply
+                          ? formatNumber(token.circulatingSupply)
+                          : "N/A"}
+                      </td>
+                      <td className="supply-col">
+                        {token.totalSupply
+                          ? formatNumber(token.totalSupply)
+                          : "N/A"}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
+
+          {/* Invisible div for intersection observer to detect scroll */}
+          <div ref={tableEndRef} style={{ height: "1px" }} />
+
+          {/* Loading indicator for lazy loading */}
+          {!initialLoading && visibleCount < filteredTokens.length && (
+            <div className="loading-more">Loading more tokens...</div>
+          )}
         </div>
 
         {/* Footer with info */}
