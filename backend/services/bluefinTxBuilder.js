@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-16 00:12:15 UTC by jake1318
+// Updated: 2025-07-16 02:15:42 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -114,6 +114,47 @@ function toSignedI32(u) {
  */
 function pureBool(txb, value) {
   return txb.pure(value ? 1 : 0, "bool");
+}
+
+/**
+ * Function to get the correct tick spacing based on pool fields
+ * @param {Object} poolFields - Pool fields from the on-chain object
+ * @returns {number} The correct tick spacing value
+ */
+function getCorrectTickSpacing(poolFields) {
+  // Try to extract tick spacing from the pool fields
+  let tickSpacing;
+  if (typeof poolFields.ticks_manager?.fields?.tick_spacing === "number") {
+    tickSpacing = poolFields.ticks_manager.fields.tick_spacing;
+  } else if (
+    typeof poolFields.ticks_manager?.fields?.tick_spacing === "string"
+  ) {
+    tickSpacing = Number(poolFields.ticks_manager.fields.tick_spacing);
+  } else {
+    // If we can't get the tick spacing properly, try to determine from the fee
+    const poolFee = poolFields.fee_rate?.fields?.value;
+    if (poolFee === "3000") {
+      // 0.3% fee (expressed in basis points)
+      tickSpacing = 60;
+    } else if (poolFee === "500") {
+      // 0.05% fee
+      tickSpacing = 10;
+    } else if (poolFee === "100") {
+      // 0.01% fee
+      tickSpacing = 1;
+    } else {
+      // Default to 60 which is the most common spacing
+      tickSpacing = 60;
+    }
+  }
+
+  // If we got a suspicious value (like 1), default to 60
+  if (tickSpacing === 1 && poolFields.fee_rate?.fields?.value !== "100") {
+    console.warn("Got suspicious tick spacing of 1, defaulting to 60");
+    tickSpacing = 60;
+  }
+
+  return tickSpacing;
 }
 
 /**
@@ -280,7 +321,7 @@ function chooseFixedSide(
 
 /**
  * Prepares a coin object with sufficient balance for a transaction
- * Merges multiple coin objects if needed and splits to get the exact amount
+ * Merges multiple coin objects if needed and returns the coin directly without splitting
  *
  * @param {object} txb - Transaction block instance
  * @param {Array} coinObjects - Array of coin objects from getCoins()
@@ -313,7 +354,6 @@ function prepareCoinWithSufficientBalance(
   }
 
   // For non-SUI tokens, sort coins by balance (largest first)
-  // FIX: Use proper BigInt comparison instead of subtraction to avoid "Cannot convert BigInt to number" error
   const sortedCoins = [...coinObjects].sort((a, b) => {
     const aBal = BigInt(a.balance);
     const bBal = BigInt(b.balance);
@@ -341,9 +381,10 @@ function prepareCoinWithSufficientBalance(
   );
 
   if (sufficientCoin) {
-    // If we have a single coin with sufficient balance, just split from it
-    const coinObj = txb.object(sufficientCoin.coinObjectId);
-    return txb.splitCoins(coinObj, [txb.pure(requiredBigInt.toString())]);
+    // CHANGED: If we have a single coin with sufficient balance,
+    // just return the coin object directly instead of splitting
+    // The contract will use only what's needed and return any excess
+    return txb.object(sufficientCoin.coinObjectId);
   }
 
   // Otherwise, we need to merge coins until we have enough
@@ -363,8 +404,9 @@ function prepareCoinWithSufficientBalance(
     coinIndex++;
   }
 
-  // Now split the exact amount needed from the merged coin
-  return txb.splitCoins(primaryCoin, [txb.pure(requiredBigInt.toString())]);
+  // CHANGED: Don't split, just return the merged coin
+  // The contract will use the max amount specified and return any excess
+  return primaryCoin;
 }
 
 /**
@@ -540,10 +582,9 @@ export async function buildDepositTx({
     // Extract pool parameters
     const poolFields = poolResponse.data.content.fields;
 
-    // Extract tick-spacing from the TickManager
-    const tickSpacing = Number(
-      poolFields.ticks_manager?.fields?.tick_spacing ?? 60 // sensible default
-    );
+    // CHANGED: Use the helper function to get correct tick spacing
+    const tickSpacing = getCorrectTickSpacing(poolFields);
+    console.log(`Using tick spacing: ${tickSpacing} for pool ${poolId}`);
 
     // Convert the unsigned 32-bit tick index to signed int (from `bits`)
     const bits = poolFields.current_tick_index?.fields?.bits;
@@ -784,20 +825,43 @@ export async function buildDepositTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // =========== STEP 1: Create the Position ============
-    // First, we create the position - NOW WITH UPDATED PACKAGE ID AND CONFIG ID
+    // =========== STEP 1: Get shared object references ============
+    // CHANGED: Get the initial shared version for both pool and config
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
+
+    console.log(
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
+    );
+
+    // CHANGED: Create proper shared object references for both pool and config
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
+
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
+    });
+
+    // =========== STEP 2: Create the Position ============
+    // First, we create the position - CHANGED: use shared references
     const position = txb.moveCall({
       target: `${packageId}::pool::open_position`,
       arguments: [
-        txb.object(configId), // Use the current config object
-        txb.object(poolId),
+        configRef, // CHANGED: Use shared config ref
+        poolRef, // CHANGED: Use shared pool ref
         txb.pure(toU32(lowerTickSnapped), "u32"),
         txb.pure(toU32(upperTickSnapped), "u32"),
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // =========== STEP 2: Prepare Coins ================
+    // =========== STEP 3: Prepare Coins ================
+    // CHANGED: Use updated prepareCoinWithSufficientBalance that doesn't split unnecessarily
     // Prepare coinA with sufficient balance
     let coinA = prepareCoinWithSufficientBalance(
       txb,
@@ -818,7 +882,7 @@ export async function buildDepositTx({
       coinA (${isCoinA_SUI ? "SUI" : coinTypeA}): ${amountAOnChain}
       coinB (${isCoinB_SUI ? "SUI" : coinTypeB}): ${amountBOnChain}`);
 
-    // =========== STEP 3: Add Liquidity to Position ============
+    // =========== STEP 4: Add Liquidity to Position ============
     // Get the arguments in the correct order with slippage buffer for min amount
     // Pass RAW amounts to the helper, NOT transaction arguments
     const liquidityArgs = buildLiquidityArgs(
@@ -841,19 +905,6 @@ export async function buildDepositTx({
       })`
     );
 
-    // Get the correct initial shared version of the pool
-    const initialSharedVersion = await getInitialVersion(poolId);
-    console.log(
-      `Using initial shared version for pool: ${initialSharedVersion}`
-    );
-
-    // Create a pool ref with the correct initial version and mutable=true
-    const poolRef = txb.sharedObjectRef({
-      objectId: poolId,
-      initialSharedVersion: initialSharedVersion,
-      mutable: true, // Pool must be mutable
-    });
-
     // Add liquidity to the created position
     // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
     // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
@@ -863,7 +914,7 @@ export async function buildDepositTx({
       target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
-        txb.object(configId),
+        configRef, // CHANGED: Use shared config ref
         poolRef, // &mut Pool (shared, mutable)
         position, // &mut Position - mutated, not consumed
         ...liquidityArgs,
@@ -879,7 +930,7 @@ export async function buildDepositTx({
     // Finally return the mutated position to the user
     txb.transferObjects([position], txb.pure(walletAddress));
 
-    // =========== STEP 4: Build and Return Transaction ============
+    // =========== STEP 5: Build and Return Transaction ============
     // This is the simplest transaction that should work
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
@@ -1173,7 +1224,30 @@ export async function buildAddLiquidityTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // =========== STEP 1: Prepare Coins ================
+    // =========== STEP 1: Get shared object references ============
+    // CHANGED: Get the correct initial shared version for both pool and config
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
+
+    console.log(
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
+    );
+
+    // CHANGED: Create proper shared object references for both pool and config
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
+
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
+    });
+
+    // =========== STEP 2: Prepare Coins ================
+    // CHANGED: Use updated prepareCoinWithSufficientBalance that doesn't split unnecessarily
     // Prepare coinA with sufficient balance
     let coinA = prepareCoinWithSufficientBalance(
       txb,
@@ -1194,7 +1268,7 @@ export async function buildAddLiquidityTx({
       coinA (${isCoinA_SUI ? "SUI" : coinTypeA}): ${amountAOnChain}
       coinB (${isCoinB_SUI ? "SUI" : coinTypeB}): ${amountBOnChain}`);
 
-    // =========== STEP 2: Add Liquidity to Position ============
+    // =========== STEP 3: Add Liquidity to Position ============
     // Get the arguments in the correct order with slippage buffer for min amount
     const liquidityArgs = buildLiquidityArgs(
       aIsFixed,
@@ -1216,19 +1290,6 @@ export async function buildAddLiquidityTx({
       })`
     );
 
-    // Get the correct initial shared version of the pool
-    const initialSharedVersion = await getInitialVersion(poolId);
-    console.log(
-      `Using initial shared version for pool: ${initialSharedVersion}`
-    );
-
-    // Create a pool ref with the correct initial version and mutable=true
-    const poolRef = txb.sharedObjectRef({
-      objectId: poolId,
-      initialSharedVersion: initialSharedVersion,
-      mutable: true, // Pool must be mutable
-    });
-
     // Call the provide liquidity function
     // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
     // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
@@ -1238,8 +1299,8 @@ export async function buildAddLiquidityTx({
       target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
-        txb.object(configId),
-        poolRef, // &mut Pool (shared, mutable)
+        configRef, // CHANGED: Use shared config ref
+        poolRef, // CHANGED: Use shared pool ref
         txb.object(positionId), // &mut Position - mutated, not consumed
         ...liquidityArgs,
         aIsFixedArg,
@@ -1254,7 +1315,7 @@ export async function buildAddLiquidityTx({
     // We don't need to transfer positionId back since it was mutated in place
     // and the user already owns it
 
-    // =========== STEP 3: Build and Return Transaction ============
+    // =========== STEP 4: Build and Return Transaction ============
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
@@ -1349,17 +1410,25 @@ export async function buildRemoveLiquidityTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the CORRECT initial shared version from the owner field
-    const initialSharedVersion = await getInitialVersion(poolId);
+    // CHANGED: Get the correct initial shared version for pool and config
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
+
     console.log(
-      `Using initial shared version for pool: ${initialSharedVersion}`
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create a pool ref with the correct initial version and mutable=true
+    // CHANGED: Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
-      initialSharedVersion: initialSharedVersion,
-      mutable: true, // Pool must be mutable
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
+
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
     });
 
     // FIXED: Updated argument order AND added destination parameter
@@ -1368,8 +1437,8 @@ export async function buildRemoveLiquidityTx({
       target: `${packageId}::gateway::remove_liquidity`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        txb.object(configId), // &mut Config (owned)
-        poolRef, // &mut Pool (shared, mutable)
+        configRef, // CHANGED: Use shared config ref
+        poolRef, // CHANGED: Use shared pool ref
         txb.object(positionId), // &mut Position (owned)
         txb.pure(liquidityToRemove.toString(), "u128"), // liquidity amount
         txb.pure("0", "u64"), // min_amount_a (0 for no slippage check)
@@ -1444,17 +1513,25 @@ export async function buildCollectFeesTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the CORRECT initial shared version from the owner field
-    const initialSharedVersion = await getInitialVersion(poolId);
+    // CHANGED: Get the correct initial shared version for pool and config
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
+
     console.log(
-      `Using initial shared version for pool: ${initialSharedVersion}`
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create a pool ref with the correct initial version and mutable=true
+    // CHANGED: Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
-      initialSharedVersion: initialSharedVersion,
-      mutable: true, // Pool must be mutable
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
+
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
     });
 
     // Clock → Config → Pool → Position
@@ -1463,8 +1540,8 @@ export async function buildCollectFeesTx({
       target: `${packageId}::gateway::collect_fee`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        txb.object(configId), // &mut Config (owned)
-        poolRef, // &mut Pool (shared, mutable)
+        configRef, // CHANGED: Use shared config ref
+        poolRef, // CHANGED: Use shared pool ref
         txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB],
@@ -1539,17 +1616,25 @@ export async function buildCollectRewardsTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the CORRECT initial shared version from the owner field
-    const initialSharedVersion = await getInitialVersion(poolId);
+    // CHANGED: Get the correct initial shared version for pool and config
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
+
     console.log(
-      `Using initial shared version for pool: ${initialSharedVersion}`
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create a pool ref with the correct initial version and mutable=true
+    // CHANGED: Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
-      initialSharedVersion: initialSharedVersion,
-      mutable: true, // Pool must be mutable
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
+
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
     });
 
     // Clock → Config → Pool → Position
@@ -1558,21 +1643,8 @@ export async function buildCollectRewardsTx({
       target: `${packageId}::gateway::collect_reward`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        txb.object(configId), // &mut Config (owned)
-        poolRef, // &mut Pool (shared, mutable)
-        txb.object(positionId), // &mut Position (owned)
-      ],
-      typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
-    });
-
-    // Clock → Config → Pool → Position
-    // Note: Bluefin moves rewards directly to the transaction signer
-    txb.moveCall({
-      target: `${packageId}::gateway::collect_reward`,
-      arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        txb.object(configId), // &mut Config (owned)
-        poolRef, // &mut Pool (shared, mutable)
+        configRef, // CHANGED: Use shared config ref
+        poolRef, // CHANGED: Use shared pool ref
         txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
@@ -1639,17 +1711,25 @@ export async function buildCollectFeesAndRewardsTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the CORRECT initial shared version from the owner field
-    const initialSharedVersion = await getInitialVersion(poolId);
+    // CHANGED: Get the correct initial shared version for pool and config
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
+
     console.log(
-      `Using initial shared version for pool: ${initialSharedVersion}`
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create a pool ref with the correct initial version and mutable=true
+    // CHANGED: Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
-      initialSharedVersion: initialSharedVersion,
-      mutable: true, // Pool must be mutable
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
+
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
     });
 
     // Clock → Config → Pool → Position
@@ -1658,8 +1738,8 @@ export async function buildCollectFeesAndRewardsTx({
       target: `${packageId}::gateway::collect_fee_and_rewards`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        txb.object(configId), // &mut Config (owned)
-        poolRef, // &mut Pool (shared, mutable)
+        configRef, // CHANGED: Use shared config ref
+        poolRef, // CHANGED: Use shared pool ref
         txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB],
@@ -1733,17 +1813,25 @@ export async function buildClosePositionTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the CORRECT initial shared version from the owner field
-    const initialSharedVersion = await getInitialVersion(poolId);
+    // CHANGED: Get the correct initial shared version for pool and config
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
+
     console.log(
-      `Using initial shared version for pool: ${initialSharedVersion}`
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create a pool ref with the correct initial version and mutable=true
+    // CHANGED: Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
-      initialSharedVersion: initialSharedVersion,
-      mutable: true, // Pool must be mutable
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
+
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
     });
 
     // FIXED: Updated argument order AND added destination parameter
@@ -1752,8 +1840,8 @@ export async function buildClosePositionTx({
       target: `${packageId}::gateway::close_position`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        txb.object(configId), // &mut Config (owned)
-        poolRef, // &mut Pool (shared, mutable)
+        configRef, // CHANGED: Use shared config ref
+        poolRef, // CHANGED: Use shared pool ref
         txb.object(positionId), // Position (owned by value)
         txb.pure(walletAddress, "address"), // destination address for withdrawn assets
       ],
