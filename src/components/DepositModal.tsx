@@ -1,5 +1,5 @@
 // src/components/DepositModal.tsx
-// Last Updated: 2025-07-10 06:38:33 UTC by jake1318great
+// Last Updated: 2025-07-14 02:35:52 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { PoolInfo } from "../services/coinGeckoService";
@@ -79,6 +79,9 @@ const DepositModal: React.FC<DepositModalProps> = ({
     isSuccess: boolean;
     txDigest?: string;
   } | null>(null);
+
+  // State to track if we're showing the success overlay
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState<boolean>(false);
 
   // State to store token metadata for logos
   const [tokenMetadata, setTokenMetadata] = useState<{
@@ -161,6 +164,15 @@ const DepositModal: React.FC<DepositModalProps> = ({
       pool.tokenB.toUpperCase().includes("SUI")
     );
   }, [pool?.tokenA, pool?.tokenB, vault?.symbolA, vault?.symbolB]);
+
+  // Effect to show success overlay when transaction is successful
+  useEffect(() => {
+    if (txNotification?.txDigest && txNotification.isSuccess) {
+      setShowSuccessOverlay(true);
+    } else {
+      setShowSuccessOverlay(false);
+    }
+  }, [txNotification]);
 
   // Token logo handling - fetch metadata when the modal opens - with reduced logging
   useEffect(() => {
@@ -300,6 +312,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
       setUseOneSide(false);
       setEstimations({});
       setTxNotification(null);
+      setShowSuccessOverlay(false);
     }
   }, [isOpen]);
 
@@ -431,6 +444,9 @@ const DepositModal: React.FC<DepositModalProps> = ({
           // For SUI pairs or when flag is disabled, use original flow
           fetchPoolData();
         }
+
+        // Set full range ticks immediately when modal opens
+        setFullRange();
       }
     }
   }, [isOpen, account?.address, isSuiPair, pool]);
@@ -594,8 +610,8 @@ const DepositModal: React.FC<DepositModalProps> = ({
         setCurrentPrice(priceRatio);
         setPriceSource("birdeye");
 
-        // Since we have the price, we can initialize the liquidity range
-        initializeLiquidityRange(priceRatio);
+        // Always set full range when we get prices
+        setFullRange();
         setPoolLoaded(true);
 
         // Also fetch the pool data for tick spacing and other non-price info
@@ -718,7 +734,8 @@ const DepositModal: React.FC<DepositModalProps> = ({
         setCurrentPrice(price);
         setPriceSource("onchain");
 
-        initializeLiquidityRange(price, ct, ts);
+        // Always set to full range
+        setFullRange();
         setPoolLoaded(true);
         return; // ← DONE for Bluefin branch
       }
@@ -794,7 +811,8 @@ const DepositModal: React.FC<DepositModalProps> = ({
       setCurrentPrice(price);
       setPriceSource("onchain");
 
-      initializeLiquidityRange(price, ct, ts);
+      // Always set to full range
+      setFullRange();
       setPoolLoaded(true);
     } catch (e) {
       console.error("fetchPoolData failed:", e);
@@ -840,337 +858,57 @@ const DepositModal: React.FC<DepositModalProps> = ({
     }
   };
 
-  // Initialize liquidity range
-  const initializeLiquidityRange = (
-    price: number,
-    ct?: number,
-    sp?: number
-  ) => {
-    if (!price) return;
+  // Calculate estimated position value
+  const calculateEstimatedPositionValue = (): string => {
+    if (!amountA || !amountB || !pool) return "$0.00";
 
     try {
-      const spacing = sp && !isNaN(sp) && sp > 0 ? sp : DEFAULT_TICK_SPACING;
-      let low: number, high: number;
+      // Try to get USD prices from pool data or cache
+      let tokenAPrice = pool.tokenAUsdPrice;
+      let tokenBPrice = pool.tokenBUsdPrice;
 
-      if (ct !== undefined && !isNaN(ct)) {
-        // Calculate directly from current tick with spacing
-        low = Math.floor((ct - 10 * spacing) / spacing) * spacing;
-        high = Math.ceil((ct + 10 * spacing) / spacing) * spacing;
-
-        console.log(
-          `Calculated tick range from current tick ${ct}: ${low} to ${high}`
-        );
-      } else {
-        // Calculate from price manually
-        const lowP = price * 0.75;
-        const highP = price * 1.25;
-
-        const lowTick = Math.floor(
-          Math.log(lowP * Math.pow(10, tokenBDecimals - tokenADecimals)) /
-            Math.log(1.0001)
-        );
-        const highTick = Math.ceil(
-          Math.log(highP * Math.pow(10, tokenBDecimals - tokenADecimals)) /
-            Math.log(1.0001)
-        );
-
-        low = Math.floor(lowTick / spacing) * spacing;
-        high = Math.ceil(highTick / spacing) * spacing;
-
-        console.log(
-          `Calculated tick range from price ${price}: ${low} to ${high}`
-        );
-      }
-
-      // Ensure minimum spacing and valid values (not NaN)
-      if (isNaN(low) || isNaN(high)) {
-        console.warn("Calculated invalid tick range, using defaults");
-        // Fallback to defaults
-        low = 0;
-        high = spacing * 10;
-      }
-
-      if (high - low < spacing) {
-        high = low + spacing;
-      }
-
-      // Make sure we have integer values for ticks
-      low = Math.floor(low);
-      high = Math.floor(high);
-
-      console.log(`Setting tick range: lower=${low}, upper=${high}`);
-      setTickLower(low);
-      setTickUpper(high);
-
-      // Get USD prices from cache if available
-      let pa, pb;
-      if (pool) {
+      // If no direct USD prices available, try to calculate from other sources
+      if (!tokenAPrice || !tokenBPrice) {
         const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
         const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
+
         if (aAddr && bAddr) {
-          pa = usdPriceCache[aAddr];
-          pb = usdPriceCache[bAddr];
+          tokenAPrice = usdPriceCache[aAddr] || 0;
+          tokenBPrice = usdPriceCache[bAddr] || 0;
         }
       }
 
-      // Calculate prices from the ticks using the corrected price calculation
-      try {
-        const snappedLowPrice = calculateCorrectPrice(
-          low,
-          tokenADecimals,
-          tokenBDecimals,
-          pa,
-          pb
-        );
-        const snappedHighPrice = calculateCorrectPrice(
-          high,
-          tokenADecimals,
-          tokenBDecimals,
-          pa,
-          pb
-        );
-
-        setMinPrice(snappedLowPrice.toFixed(6));
-        setMaxPrice(snappedHighPrice.toFixed(6));
-
-        console.log(
-          `Price range: ${snappedLowPrice.toFixed(
-            6
-          )} - ${snappedHighPrice.toFixed(6)}`
-        );
-      } catch (error) {
-        console.error("Error calculating price from ticks");
-        setMinPrice("0.001000");
-        setMaxPrice("5.000000");
-      }
-    } catch (error) {
-      console.error("Error in initializeLiquidityRange");
-      // Set safe defaults
-      setTickLower(0);
-      setTickUpper(DEFAULT_TICK_SPACING * 10);
-      setMinPrice("0.001000");
-      setMaxPrice("5.000000");
-    }
-  };
-
-  // Handle amount inputs
-  const handleAmountAChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value.replace(/[^0-9.]/g, "");
-    if ((v.match(/\./g) || []).length > 1) return;
-    setAmountA(v);
-
-    if (vault) {
-      setActiveToken("A");
-      if (useOneSide) {
-        setAmountB("");
-      }
-      return;
-    }
-
-    // Pool handling
-    setFixedToken("A");
-
-    // Auto-compute token B amount if price is available
-    if (currentPrice > 0 && v !== "") {
-      // Normal pools: price = tokenB per tokenA
-      setAmountB((Number(v) * currentPrice).toFixed(6));
-      console.log(
-        `Normal calculation: ${v} ${symbolA} → ${
-          Number(v) * currentPrice
-        } ${symbolB}`
-      );
-    } else {
-      setAmountB("");
-    }
-  };
-
-  const handleAmountBChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value.replace(/[^0-9.]/g, "");
-    if ((v.match(/\./g) || []).length > 1) return;
-    setAmountB(v);
-
-    if (vault) {
-      setActiveToken("B");
-      if (useOneSide) {
-        setAmountA("");
-      }
-      return;
-    }
-
-    // Pool handling
-    setFixedToken("B");
-
-    // Auto-compute token A amount if price is available
-    if (currentPrice > 0 && v !== "") {
-      // Normal pools
-      setAmountA((Number(v) / currentPrice).toFixed(6));
-      console.log(
-        `Normal calculation: ${v} ${symbolB} → ${
-          Number(v) / currentPrice
-        } ${symbolA}`
-      );
-    } else {
-      setAmountA("");
-    }
-  };
-
-  const handleMaxAClick = () => {
-    if (!pool) return;
-    const b = balances[pool.tokenA];
-    if (!b) return;
-    const max = (parseInt(b.balance) / 10 ** b.decimals).toString();
-    setAmountA(max);
-    setFixedToken("A");
-
-    // Auto-compute token B amount
-    if (currentPrice > 0) {
-      setAmountB((Number(max) * currentPrice).toFixed(6));
-    }
-  };
-
-  const handleMaxBClick = () => {
-    if (!pool) return;
-    const b = balances[pool.tokenB];
-    if (!b) return;
-    const max = (parseInt(b.balance) / 10 ** b.decimals).toString();
-    setAmountB(max);
-    setFixedToken("B");
-
-    // Auto-compute token A amount
-    if (currentPrice > 0) {
-      setAmountA((Number(max) / currentPrice).toFixed(6));
-    }
-  };
-
-  // Handle one-sided toggle for vaults
-  const handleToggleOneSide = (checked: boolean) => {
-    setUseOneSide(checked);
-
-    // Clear the secondary token field when toggling modes
-    if (checked) {
-      // If toggling on one-sided, keep the active token field and empty the other
-      if (activeToken === "A") setAmountB("");
-      else setAmountA("");
-    }
-  };
-
-  // Price input handlers
-  const onMinPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const v = e.target.value;
-      setMinPrice(v);
-
-      const n = Number(v);
-      if (isNaN(n) || n <= 0) return;
-
-      // Use direct math calculation for reliability
-      const t = Math.floor(
-        Math.log(n * Math.pow(10, tokenBDecimals - tokenADecimals)) /
-          Math.log(1.0001)
-      );
-      const spacing =
-        isNaN(tickSpacing) || tickSpacing <= 0
-          ? DEFAULT_TICK_SPACING
-          : tickSpacing;
-      const s = Math.floor(t / spacing) * spacing;
-
-      if (isNaN(s)) {
-        console.error("Calculated invalid tick value:", s);
-        return;
-      }
-
-      // Check if the new tick is valid compared to upper tick
-      if (!isNaN(tickUpper) && tickUpper > s && tickUpper - s < spacing) return;
-
-      console.log(`Setting lower tick to ${s} from price ${n}`);
-      setTickLower(s);
-
-      // Get USD prices from cache if available
-      let pa, pb;
-      if (pool) {
-        const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
-        const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
-        if (aAddr && bAddr) {
-          pa = usdPriceCache[aAddr];
-          pb = usdPriceCache[bAddr];
+      // If we still don't have prices but have currentPrice, estimate
+      if ((!tokenAPrice || !tokenBPrice) && currentPrice > 0) {
+        // Assume one token price if we know the ratio (currentPrice)
+        if (tokenAPrice) {
+          tokenBPrice = tokenAPrice / currentPrice;
+        } else if (tokenBPrice) {
+          tokenAPrice = tokenBPrice * currentPrice;
+        } else {
+          // Make a rough estimate based on typical token values
+          tokenAPrice = 1; // Assume $1 as base
+          tokenBPrice = currentPrice;
         }
       }
 
-      // Update display price to match the actual tick using corrected calculation
-      const actualPrice = calculateCorrectPrice(
-        s,
-        tokenADecimals,
-        tokenBDecimals,
-        pa,
-        pb
-      );
-      if (!isNaN(actualPrice)) {
-        setMinPrice(actualPrice.toFixed(6));
-      }
+      // Default to 1 if we still have no price data
+      tokenAPrice = tokenAPrice || 1;
+      tokenBPrice = tokenBPrice || 1;
+
+      const valueA = Number(amountA) * tokenAPrice;
+      const valueB = Number(amountB) * tokenBPrice;
+      const total = valueA + valueB;
+
+      return formatDollars(total);
     } catch (error) {
-      console.error("Error in min price change");
-    }
-  };
-
-  const onMaxPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const v = e.target.value;
-      setMaxPrice(v);
-
-      const n = Number(v);
-      if (isNaN(n) || n <= 0) return;
-
-      // Use direct math calculation for reliability
-      const t = Math.floor(
-        Math.log(n * Math.pow(10, tokenBDecimals - tokenADecimals)) /
-          Math.log(1.0001)
-      );
-      const spacing =
-        isNaN(tickSpacing) || tickSpacing <= 0
-          ? DEFAULT_TICK_SPACING
-          : tickSpacing;
-      const s = Math.ceil(t / spacing) * spacing;
-
-      if (isNaN(s)) {
-        console.error("Calculated invalid tick value:", s);
-        return;
-      }
-
-      // Check if the new tick is valid compared to lower tick
-      if (!isNaN(tickLower) && s > tickLower && s - tickLower < spacing) return;
-
-      console.log(`Setting upper tick to ${s} from price ${n}`);
-      setTickUpper(s);
-
-      // Get USD prices from cache if available
-      let pa, pb;
-      if (pool) {
-        const aAddr = pool.tokenAAddress || pool.tokenAMetadata?.address;
-        const bAddr = pool.tokenBAddress || pool.tokenBMetadata?.address;
-        if (aAddr && bAddr) {
-          pa = usdPriceCache[aAddr];
-          pb = usdPriceCache[bAddr];
-        }
-      }
-
-      // Update display price to match the actual tick using corrected calculation
-      const actualPrice = calculateCorrectPrice(
-        s,
-        tokenADecimals,
-        tokenBDecimals,
-        pa,
-        pb
-      );
-      if (!isNaN(actualPrice)) {
-        setMaxPrice(actualPrice.toFixed(6));
-      }
-    } catch (error) {
-      console.error("Error in max price change");
+      console.error("Error calculating position value:", error);
+      return "$0.00";
     }
   };
 
   // Set to full range following Cetus documentation guidance
-  const setFullRange = async () => {
+  const setFullRange = () => {
     try {
       // Make sure we have a valid tickSpacing
       const spacing =
@@ -1296,6 +1034,168 @@ const DepositModal: React.FC<DepositModalProps> = ({
     );
   };
 
+  // Handle amount inputs
+  const handleAmountAChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.replace(/[^0-9.]/g, "");
+    if ((v.match(/\./g) || []).length > 1) return;
+    setAmountA(v);
+
+    if (vault) {
+      setActiveToken("A");
+      if (useOneSide) {
+        setAmountB("");
+      }
+      return;
+    }
+
+    // Pool handling
+    setFixedToken("A");
+
+    // Auto-compute token B amount if price is available
+    if (currentPrice > 0 && v !== "") {
+      // Normal pools: price = tokenB per tokenA
+      setAmountB((Number(v) * currentPrice).toFixed(6));
+      console.log(
+        `Normal calculation: ${v} ${symbolA} → ${
+          Number(v) * currentPrice
+        } ${symbolB}`
+      );
+    } else {
+      setAmountB("");
+    }
+  };
+
+  const handleAmountBChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.replace(/[^0-9.]/g, "");
+    if ((v.match(/\./g) || []).length > 1) return;
+    setAmountB(v);
+
+    if (vault) {
+      setActiveToken("B");
+      if (useOneSide) {
+        setAmountA("");
+      }
+      return;
+    }
+
+    // Pool handling
+    setFixedToken("B");
+
+    // Auto-compute token A amount if price is available
+    if (currentPrice > 0 && v !== "") {
+      // Normal pools
+      setAmountA((Number(v) / currentPrice).toFixed(6));
+      console.log(
+        `Normal calculation: ${v} ${symbolB} → ${
+          Number(v) / currentPrice
+        } ${symbolA}`
+      );
+    } else {
+      setAmountA("");
+    }
+  };
+
+  const handleMaxAClick = () => {
+    if (!pool) return;
+    const b = balances[pool.tokenA];
+    if (!b) return;
+    const max = (parseInt(b.balance) / 10 ** b.decimals).toString();
+    setAmountA(max);
+    setFixedToken("A");
+
+    // Auto-compute token B amount
+    if (currentPrice > 0) {
+      setAmountB((Number(max) * currentPrice).toFixed(6));
+    }
+  };
+
+  const handleMaxBClick = () => {
+    if (!pool) return;
+    const b = balances[pool.tokenB];
+    if (!b) return;
+    const max = (parseInt(b.balance) / 10 ** b.decimals).toString();
+    setAmountB(max);
+    setFixedToken("B");
+
+    // Auto-compute token A amount
+    if (currentPrice > 0) {
+      setAmountA((Number(max) / currentPrice).toFixed(6));
+    }
+  };
+
+  // Handle one-sided toggle for vaults
+  const handleToggleOneSide = (checked: boolean) => {
+    setUseOneSide(checked);
+
+    // Clear the secondary token field when toggling modes
+    if (checked) {
+      // If toggling on one-sided, keep the active token field and empty the other
+      if (activeToken === "A") setAmountB("");
+      else setAmountA("");
+    }
+  };
+
+  // Success notification component
+  const SuccessOverlay = () => {
+    if (!txNotification?.txDigest) return null;
+
+    return (
+      <div className="transaction-notification-overlay">
+        <div className="notification success">
+          <div className="success-icon">
+            <svg
+              width="64"
+              height="64"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 12l3 3 5-5" />
+            </svg>
+          </div>
+
+          <h3 className="notification-title success">Transaction Successful</h3>
+
+          <p className="notification-message">{txNotification.message}</p>
+
+          <div className="tx-digest">{txNotification.txDigest}</div>
+
+          <div className="tx-link">
+            <a
+              href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View on SuiVision
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </a>
+          </div>
+
+          <div className="buttons">
+            <button onClick={onClose}>Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Submit handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1341,9 +1241,6 @@ const DepositModal: React.FC<DepositModalProps> = ({
 
         setAmountA("");
         setAmountB("");
-        setTimeout(() => {
-          onClose();
-        }, 3000);
       } catch (err: any) {
         console.error("Vault deposit failed", err);
         setTxNotification({
@@ -1365,7 +1262,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
     // Final validation to ensure we have valid tick values
     if (isNaN(tickLower) || isNaN(tickUpper) || tickUpper <= tickLower) {
       setTxNotification({
-        message: `Invalid price range. Please click "Full Range" and try again.`,
+        message: `Invalid price range. Please refresh the page and try again.`,
         isSuccess: false,
       });
       return;
@@ -1387,18 +1284,20 @@ const DepositModal: React.FC<DepositModalProps> = ({
     // Make sure ticks are within allowed range
     const maxAllowedTick = MAX_TICK;
     if (tickLower < -maxAllowedTick || tickUpper > maxAllowedTick) {
+      setFullRange(); // Set to full range if ticks are out of bounds
       setTxNotification({
-        message: `Selected price range is outside allowed bounds. Please use "Full Range" or select a narrower range.`,
-        isSuccess: false,
+        message: `Setting to full range automatically...`,
+        isSuccess: true,
       });
       return;
     }
 
     // Ensure ticks are multiples of the tick spacing
     if (tickLower % spacing !== 0 || tickUpper % spacing !== 0) {
+      setFullRange(); // Set to full range if ticks aren't valid
       setTxNotification({
-        message: `Invalid ticks. Ticks must be multiples of ${spacing}. Please use "Full Range" or adjust your range.`,
-        isSuccess: false,
+        message: `Setting to full range automatically...`,
+        isSuccess: true,
       });
       return;
     }
@@ -1442,6 +1341,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
           isSuccess: true,
           txDigest: result.digest,
         });
+        setShowSuccessOverlay(true);
         setAmountA("");
         setAmountB("");
       } else {
@@ -1459,8 +1359,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
           msg.includes("position") &&
           msg.includes("5"))
       ) {
-        msg =
-          "Invalid price range. Please try using a narrower range or click 'Full Range' and try again.";
+        msg = "Invalid price range. Please try again with full range.";
       } else if (msg.includes("token_amount_max_exceed")) {
         msg =
           "Token amount exceeds the maximum required. Try reducing your slippage tolerance.";
@@ -1469,7 +1368,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
           "The resulting liquidity would be zero. Try increasing your deposit amounts.";
       } else if (msg.includes("Cannot convert NaN to a BigInt")) {
         msg =
-          "Invalid price range values. Please use the 'Full Range' button or select a valid price range.";
+          "Invalid price range values. Please refresh the page and try again.";
       }
 
       setTxNotification({
@@ -1546,249 +1445,180 @@ const DepositModal: React.FC<DepositModalProps> = ({
             </button>
           </div>
 
-          {txNotification?.txDigest ? (
-            <div className="success-confirmation">
-              <div className="token-pair-icons">
-                <img
-                  src={getTokenLogoUrl(true)}
-                  alt={symbolA}
-                  onError={(e) => {
-                    // Simplified error handling
-                    (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
-                  }}
+          <div className="modal-body">
+            {/* One-sided toggle for vaults */}
+            <div className="toggle-one-side">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={useOneSide}
+                  onChange={(e) => handleToggleOneSide(e.target.checked)}
                 />
-                <img
-                  src={getTokenLogoUrl(false)}
-                  alt={symbolB}
-                  onError={(e) => {
-                    // Simplified error handling
-                    (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
-                  }}
-                />
-              </div>
-              <div className="success-check-icon">
-                <svg
-                  width="80"
-                  height="80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="11"
-                    stroke="#2EC37C"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M7 12L10 15L17 8"
-                    stroke="#2EC37C"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <h2 className="success-title">Vault Deposit Successful!</h2>
-              <p className="success-message">
-                Added to {symbolA}-{symbolB} Vault
-              </p>
-              <p className="transaction-id">
-                Transaction ID: {txNotification.txDigest}
-              </p>
-
-              <div className="success-actions">
-                <a
-                  href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="view-tx-link"
-                >
-                  View on SuiVision
-                </a>
-                <button className="done-button" onClick={onClose}>
-                  Done
-                </button>
+                One-sided deposit
+              </label>
+              <div className="info-text">
+                {useOneSide
+                  ? "Deposit only one token. The vault will handle conversion internally."
+                  : "Balanced deposit using both tokens."}
               </div>
             </div>
-          ) : (
-            <>
-              <div className="modal-body">
-                {/* One-sided toggle for vaults */}
-                <div className="toggle-one-side">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={useOneSide}
-                      onChange={(e) => handleToggleOneSide(e.target.checked)}
-                    />
-                    One-sided deposit
-                  </label>
-                  <div className="info-text">
-                    {useOneSide
-                      ? "Deposit only one token. The vault will handle conversion internally."
-                      : "Balanced deposit using both tokens."}
-                  </div>
-                </div>
 
-                {/* Amount inputs */}
-                <div className="input-group">
-                  <div className="input-label">
-                    <div className="token-with-icon">
-                      <img
-                        className="token-icon"
-                        src={getTokenLogoUrl(true)}
-                        alt={symbolA}
-                        onError={(e) => {
-                          // Simplified error handling
-                          (e.target as HTMLImageElement).src =
-                            TOKEN_PLACEHOLDER;
-                        }}
-                      />
-                      <span>{symbolA}</span>
-                    </div>
-                    <span className="balance">
-                      Balance: {formatBalance(symbolA)}
+            {/* Amount inputs */}
+            <div className="input-group">
+              <div className="input-label">
+                <div className="token-with-icon">
+                  <img
+                    className="token-icon"
+                    src={getTokenLogoUrl(true)}
+                    alt={symbolA}
+                    onError={(e) => {
+                      // Simplified error handling
+                      (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                    }}
+                  />
+                  <span>{symbolA}</span>
+                </div>
+                <span className="balance">
+                  Balance: {formatBalance(symbolA)}
+                </span>
+              </div>
+              <div className="input-wrapper">
+                <input
+                  type="number"
+                  value={amountA}
+                  min="0"
+                  step="0.000001"
+                  placeholder="0.0"
+                  disabled={useOneSide && activeToken !== "A"}
+                  onChange={(e) => handleAmountChange("A", e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="max-button"
+                  onClick={handleMaxAClick}
+                  disabled={!walletConnected}
+                >
+                  MAX
+                </button>
+              </div>
+              {useOneSide && activeToken === "A" && (
+                <span className="badge">Single token mode</span>
+              )}
+            </div>
+
+            <div className="input-group">
+              <div className="input-label">
+                <div className="token-with-icon">
+                  <img
+                    className="token-icon"
+                    src={getTokenLogoUrl(false)}
+                    alt={symbolB}
+                    onError={(e) => {
+                      // Simplified error handling
+                      (e.target as HTMLImageElement).src = TOKEN_PLACEHOLDER;
+                    }}
+                  />
+                  <span>{symbolB}</span>
+                </div>
+                <span className="balance">
+                  Balance: {formatBalance(symbolB)}
+                </span>
+              </div>
+              <div className="input-wrapper">
+                <input
+                  type="number"
+                  value={amountB}
+                  min="0"
+                  step="0.000001"
+                  placeholder="0.0"
+                  disabled={useOneSide && activeToken !== "B"}
+                  onChange={(e) => handleAmountChange("B", e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="max-button"
+                  onClick={handleMaxBClick}
+                  disabled={!walletConnected}
+                >
+                  MAX
+                </button>
+              </div>
+              {useOneSide && activeToken === "B" && (
+                <span className="badge">Single token mode</span>
+              )}
+            </div>
+
+            {Object.keys(estimations).length > 0 && (
+              <div className="estimates-section">
+                <h4>Deposit Summary</h4>
+                <div className="estimate-item">
+                  <span>You'll deposit:</span>
+                  <span>
+                    {activeToken === "A"
+                      ? `${amountA} ${symbolA}`
+                      : `${amountB} ${symbolB}`}
+                  </span>
+                </div>
+                {useOneSide ? (
+                  <div className="estimate-item">
+                    <span>Vault converts to:</span>
+                    <span>
+                      {activeToken === "A"
+                        ? `~ ${estimations.coinB || "0"} ${symbolB}`
+                        : `~ ${estimations.coinA || "0"} ${symbolA}`}
                     </span>
                   </div>
-                  <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={amountA}
-                      min="0"
-                      step="0.000001"
-                      placeholder="0.0"
-                      disabled={useOneSide && activeToken !== "A"}
-                      onChange={(e) => handleAmountChange("A", e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="max-button"
-                      onClick={handleMaxAClick}
-                      disabled={!walletConnected}
-                    >
-                      MAX
-                    </button>
-                  </div>
-                  {useOneSide && activeToken === "A" && (
-                    <span className="badge">Single token mode</span>
-                  )}
-                </div>
-
-                <div className="input-group">
-                  <div className="input-label">
-                    <div className="token-with-icon">
-                      <img
-                        className="token-icon"
-                        src={getTokenLogoUrl(false)}
-                        alt={symbolB}
-                        onError={(e) => {
-                          // Simplified error handling
-                          (e.target as HTMLImageElement).src =
-                            TOKEN_PLACEHOLDER;
-                        }}
-                      />
-                      <span>{symbolB}</span>
-                    </div>
-                    <span className="balance">
-                      Balance: {formatBalance(symbolB)}
-                    </span>
-                  </div>
-                  <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={amountB}
-                      min="0"
-                      step="0.000001"
-                      placeholder="0.0"
-                      disabled={useOneSide && activeToken !== "B"}
-                      onChange={(e) => handleAmountChange("B", e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="max-button"
-                      onClick={handleMaxBClick}
-                      disabled={!walletConnected}
-                    >
-                      MAX
-                    </button>
-                  </div>
-                  {useOneSide && activeToken === "B" && (
-                    <span className="badge">Single token mode</span>
-                  )}
-                </div>
-
-                {Object.keys(estimations).length > 0 && (
-                  <div className="estimates-section">
-                    <h4>Deposit Summary</h4>
+                ) : (
+                  <>
                     <div className="estimate-item">
-                      <span>You'll deposit:</span>
-                      <span>
-                        {activeToken === "A"
-                          ? `${amountA} ${symbolA}`
-                          : `${amountB} ${symbolB}`}
-                      </span>
+                      <span>Required {symbolA}:</span>
+                      <span>{estimations.coinA || "0"}</span>
                     </div>
-                    {useOneSide ? (
-                      <div className="estimate-item">
-                        <span>Vault converts to:</span>
-                        <span>
-                          {activeToken === "A"
-                            ? `~ ${estimations.coinB || "0"} ${symbolB}`
-                            : `~ ${estimations.coinA || "0"} ${symbolA}`}
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="estimate-item">
-                          <span>Required {symbolA}:</span>
-                          <span>{estimations.coinA || "0"}</span>
-                        </div>
-                        <div className="estimate-item">
-                          <span>Required {symbolB}:</span>
-                          <span>{estimations.coinB || "0"}</span>
-                        </div>
-                      </>
-                    )}
                     <div className="estimate-item">
-                      <span>Estimated LP tokens:</span>
-                      <span>{estimations.lpAmount || "0"}</span>
+                      <span>Required {symbolB}:</span>
+                      <span>{estimations.coinB || "0"}</span>
                     </div>
-                  </div>
+                  </>
                 )}
-
-                {txNotification && (
-                  <div
-                    className={`notification ${
-                      txNotification.isSuccess ? "success" : "error"
-                    }`}
-                  >
-                    {txNotification.message}
-                  </div>
-                )}
+                <div className="estimate-item">
+                  <span>Estimated LP tokens:</span>
+                  <span>{estimations.lpAmount || "0"}</span>
+                </div>
               </div>
+            )}
 
-              <div className="modal-footer">
-                {!walletConnected && (
-                  <button disabled className="submit-button">
-                    Connect wallet to deposit
-                  </button>
-                )}
-
-                {walletConnected && (
-                  <button
-                    className="submit-button"
-                    onClick={handleSubmit}
-                    disabled={isSubmitDisabled}
-                  >
-                    {isSubmitting ? "Processing..." : "Deposit to Vault"}
-                  </button>
-                )}
+            {/* Regular notification for non-success or non-tx notifications */}
+            {txNotification && !txNotification.txDigest && (
+              <div
+                className={`notification ${
+                  txNotification.isSuccess ? "success" : "error"
+                }`}
+              >
+                {txNotification.message}
               </div>
-            </>
-          )}
+            )}
+          </div>
+
+          <div className="modal-footer">
+            {!walletConnected && (
+              <button disabled className="submit-button">
+                Connect wallet to deposit
+              </button>
+            )}
+
+            {walletConnected && (
+              <button
+                className="submit-button"
+                onClick={handleSubmit}
+                disabled={isSubmitDisabled}
+              >
+                {isSubmitting ? "Processing..." : "Deposit to Vault"}
+              </button>
+            )}
+          </div>
+
+          {/* Success overlay */}
+          {showSuccessOverlay && <SuccessOverlay />}
         </div>
       </div>
     );
@@ -1832,6 +1662,7 @@ const DepositModal: React.FC<DepositModalProps> = ({
             </svg>
           </button>
         </div>
+
         <div className="modal-body">
           {/* Pool and current price */}
           <div className="current-price">
@@ -1921,89 +1752,13 @@ const DepositModal: React.FC<DepositModalProps> = ({
               </div>
             </div>
 
-            {/* Price range inputs */}
-            <div className="price-range-section">
-              <div className="section-header">
-                <h4>Set Price Range</h4>
-                <button
-                  type="button"
-                  className="full-range-button"
-                  onClick={setFullRange}
-                >
-                  Full Range
-                </button>
-              </div>
-
-              <div className="price-inputs">
-                <div className="input-group">
-                  <label>Min Price</label>
-                  <input
-                    type="text"
-                    value={minPrice}
-                    onChange={onMinPriceChange}
-                    placeholder="0.0"
-                  />
-                  <span className="price-suffix">
-                    <div className="token-mini-icons">
-                      <img
-                        className="token-mini-icon"
-                        src={getTokenLogoUrl(false)}
-                        alt={symbolB}
-                        onError={(e) => {
-                          // Simplified error handling
-                          (e.target as HTMLImageElement).src =
-                            TOKEN_PLACEHOLDER;
-                        }}
-                      />
-                      <img
-                        className="token-mini-icon"
-                        src={getTokenLogoUrl(true)}
-                        alt={symbolA}
-                        onError={(e) => {
-                          // Simplified error handling
-                          (e.target as HTMLImageElement).src =
-                            TOKEN_PLACEHOLDER;
-                        }}
-                      />
-                    </div>
-                    {symbolB} per {symbolA}
-                  </span>
-                </div>
-
-                <div className="input-group">
-                  <label>Max Price</label>
-                  <input
-                    type="text"
-                    value={maxPrice}
-                    onChange={onMaxPriceChange}
-                    placeholder="0.0"
-                  />
-                  <span className="price-suffix">
-                    <div className="token-mini-icons">
-                      <img
-                        className="token-mini-icon"
-                        src={getTokenLogoUrl(false)}
-                        alt={symbolB}
-                        onError={(e) => {
-                          // Simplified error handling
-                          (e.target as HTMLImageElement).src =
-                            TOKEN_PLACEHOLDER;
-                        }}
-                      />
-                      <img
-                        className="token-mini-icon"
-                        src={getTokenLogoUrl(true)}
-                        alt={symbolA}
-                        onError={(e) => {
-                          // Simplified error handling
-                          (e.target as HTMLImageElement).src =
-                            TOKEN_PLACEHOLDER;
-                        }}
-                      />
-                    </div>
-                    {symbolB} per {symbolA}
-                  </span>
-                </div>
+            {/* Price range info */}
+            <div className="full-range-info">
+              <div className="info-content">
+                <div className="info-icon">ℹ️</div>
+                <p>
+                  Deposits are automatically set to full range for maximum yield
+                </p>
               </div>
             </div>
 
@@ -2045,24 +1800,11 @@ const DepositModal: React.FC<DepositModalProps> = ({
               </div>
             </div>
 
-            {/* Estimated position value */}
+            {/* Estimated position value with improved calculation */}
             <div className="position-summary">
               <div className="summary-item">
                 <span>Est. Position Value:</span>
-                <span>
-                  {currentPrice > 0 && amountA && amountB
-                    ? formatDollars(
-                        Number(amountA) * Number(pool?.tokenAUsdPrice || 0) +
-                          Number(amountB) * Number(pool?.tokenBUsdPrice || 0)
-                      )
-                    : "$0.00"}
-                </span>
-              </div>
-              <div className="summary-item tick-values">
-                <span>Tick Range:</span>
-                <span>
-                  {tickLower} to {tickUpper}
-                </span>
+                <span>{calculateEstimatedPositionValue()}</span>
               </div>
             </div>
 
@@ -2085,30 +1827,49 @@ const DepositModal: React.FC<DepositModalProps> = ({
               )}
             </div>
 
-            {/* Notification */}
-            {txNotification && (
+            {/* Show regular notification if exists but doesn't have txDigest */}
+            {txNotification && !txNotification.txDigest && (
               <div
                 className={`notification ${
                   txNotification.isSuccess ? "success" : "error"
                 }`}
               >
                 {txNotification.message}
-                {txNotification.txDigest && (
-                  <div className="tx-link">
-                    <a
-                      href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      View Transaction ↗
-                    </a>
-                  </div>
-                )}
               </div>
             )}
           </form>
         </div>
+
+        {/* Success overlay */}
+        {showSuccessOverlay && <SuccessOverlay />}
       </div>
+
+      {/* Add some custom styles for the full range info box */}
+      <style jsx>{`
+        .full-range-info {
+          background: rgba(30, 144, 255, 0.1);
+          border: 1px solid rgba(30, 144, 255, 0.3);
+          border-radius: 8px;
+          padding: 12px;
+          margin: 16px 0;
+        }
+
+        .info-content {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .info-icon {
+          font-size: 18px;
+        }
+
+        .info-content p {
+          margin: 0;
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.9);
+        }
+      `}</style>
     </div>
   );
 };
