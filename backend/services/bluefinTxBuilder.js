@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-15 05:57:57 UTC by jake1318
+// Updated: 2025-07-16 00:12:15 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -432,6 +432,62 @@ function buildLiquidityArgs(
 }
 
 /**
+ * Helper function to get the initial shared version of a pool object
+ * @param {string} objectId - ID of the object to look up
+ * @returns {Promise<string>} - Initial shared version as a string
+ */
+async function getInitialVersion(objectId) {
+  try {
+    const suiClient = await getSuiClient();
+
+    // Request the object with showOwner option to get the initial_shared_version
+    const object = await suiClient.getObject({
+      id: objectId,
+      options: { showOwner: true },
+    });
+
+    // Extract the initial_shared_version from owner.Shared
+    const initVersionStr = object.data?.owner?.Shared?.initial_shared_version;
+
+    if (initVersionStr) {
+      console.log(
+        `Found initial shared version for ${objectId}: ${initVersionStr}`
+      );
+      return initVersionStr; // Return as string, TransactionBlock will handle conversion
+    }
+
+    // Fallback to default version "1" if not found
+    console.log(
+      `No initial shared version found for ${objectId}, using default "1"`
+    );
+    return "1";
+  } catch (error) {
+    console.error(`Failed to get initial version for ${objectId}:`, error);
+    return "1"; // Default to "1" if we can't get it
+  }
+}
+
+/**
+ * Safely transfers vectors of coins to an address
+ * @param {object} txb - Transaction block instance
+ * @param {TransactionArgument} vec - Vector to transfer
+ * @param {TransactionArgument} addr - Address to transfer to
+ */
+function safeTransferVector(txb, vec, addr) {
+  // Check if the vector is empty first
+  const isEmpty = txb.moveCall({
+    target: "0x2::vector::is_empty",
+    arguments: [vec],
+    typeArguments: ["0x2::coin::Coin"],
+  });
+
+  // If not empty, transfer the coins
+  txb.makeMoveVec({ type: "bool" }, [isEmpty]).whenFalse(() => {
+    txb.transferObjects([vec], addr);
+  });
+}
+
+/**
  * Builds a transaction for opening a position with liquidity in one step
  * with proper handling of SUI whether it's coinTypeA or coinTypeB
  */
@@ -785,6 +841,19 @@ export async function buildDepositTx({
       })`
     );
 
+    // Get the correct initial shared version of the pool
+    const initialSharedVersion = await getInitialVersion(poolId);
+    console.log(
+      `Using initial shared version for pool: ${initialSharedVersion}`
+    );
+
+    // Create a pool ref with the correct initial version and mutable=true
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialSharedVersion,
+      mutable: true, // Pool must be mutable
+    });
+
     // Add liquidity to the created position
     // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
     // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
@@ -795,7 +864,7 @@ export async function buildDepositTx({
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         txb.object(configId),
-        txb.object(poolId),
+        poolRef, // &mut Pool (shared, mutable)
         position, // &mut Position - mutated, not consumed
         ...liquidityArgs,
         aIsFixedArg,
@@ -803,8 +872,11 @@ export async function buildDepositTx({
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // You may ignore the leftover vectors - they can be safely dropped
-    // Return the mutated position to the user
+    // Always transfer any residual coins back to the user; otherwise
+    // the transaction will abort if the vectors are non-empty.
+    txb.transferObjects([leftoverA, leftoverB], txb.pure(walletAddress));
+
+    // Finally return the mutated position to the user
     txb.transferObjects([position], txb.pure(walletAddress));
 
     // =========== STEP 4: Build and Return Transaction ============
@@ -1144,6 +1216,19 @@ export async function buildAddLiquidityTx({
       })`
     );
 
+    // Get the correct initial shared version of the pool
+    const initialSharedVersion = await getInitialVersion(poolId);
+    console.log(
+      `Using initial shared version for pool: ${initialSharedVersion}`
+    );
+
+    // Create a pool ref with the correct initial version and mutable=true
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialSharedVersion,
+      mutable: true, // Pool must be mutable
+    });
+
     // Call the provide liquidity function
     // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
     // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
@@ -1154,7 +1239,7 @@ export async function buildAddLiquidityTx({
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         txb.object(configId),
-        txb.object(poolId),
+        poolRef, // &mut Pool (shared, mutable)
         txb.object(positionId), // &mut Position - mutated, not consumed
         ...liquidityArgs,
         aIsFixedArg,
@@ -1162,7 +1247,10 @@ export async function buildAddLiquidityTx({
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // You may ignore the leftover vectors - they can be safely dropped
+    // Always transfer any residual coins back to the user; otherwise
+    // the transaction will abort if the vectors are non-empty.
+    txb.transferObjects([leftoverA, leftoverB], txb.pure(walletAddress));
+
     // We don't need to transfer positionId back since it was mutated in place
     // and the user already owns it
 
@@ -1261,21 +1349,37 @@ export async function buildRemoveLiquidityTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Call the remove liquidity function with updated package ID
-    const removedCoins = txb.moveCall({
+    // Get the CORRECT initial shared version from the owner field
+    const initialSharedVersion = await getInitialVersion(poolId);
+    console.log(
+      `Using initial shared version for pool: ${initialSharedVersion}`
+    );
+
+    // Create a pool ref with the correct initial version and mutable=true
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialSharedVersion,
+      mutable: true, // Pool must be mutable
+    });
+
+    // FIXED: Updated argument order AND added destination parameter
+    // Clock → Config → Pool → Position → liquidity → min_coins_a → min_coins_b → destination
+    txb.moveCall({
       target: `${packageId}::gateway::remove_liquidity`,
       arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(configId), // Use the current config object
-        txb.object(poolId), // Pool
-        txb.object(positionId), // Position
-        txb.pure(liquidityToRemove.toString(), "u64"),
+        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
+        txb.object(configId), // &mut Config (owned)
+        poolRef, // &mut Pool (shared, mutable)
+        txb.object(positionId), // &mut Position (owned)
+        txb.pure(liquidityToRemove.toString(), "u128"), // liquidity amount
+        txb.pure("0", "u64"), // min_amount_a (0 for no slippage check)
+        txb.pure("0", "u64"), // min_amount_b (0 for no slippage check)
+        txb.pure(walletAddress, "address"), // destination address for withdrawn coins
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Transfer removed coins back to user
-    txb.transferObjects([removedCoins], txb.pure(walletAddress));
+    // No need to manually transfer objects - the Move function sends coins directly to the destination address
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
@@ -1340,20 +1444,33 @@ export async function buildCollectFeesTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Call the collect fees function with updated package ID
-    const feeCoins = txb.moveCall({
+    // Get the CORRECT initial shared version from the owner field
+    const initialSharedVersion = await getInitialVersion(poolId);
+    console.log(
+      `Using initial shared version for pool: ${initialSharedVersion}`
+    );
+
+    // Create a pool ref with the correct initial version and mutable=true
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialSharedVersion,
+      mutable: true, // Pool must be mutable
+    });
+
+    // Clock → Config → Pool → Position
+    // Note: Bluefin moves fees directly to the transaction signer
+    txb.moveCall({
       target: `${packageId}::gateway::collect_fee`,
       arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(configId), // Use the current config object
-        txb.object(poolId), // Pool
-        txb.object(positionId), // Position
+        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
+        txb.object(configId), // &mut Config (owned)
+        poolRef, // &mut Pool (shared, mutable)
+        txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Transfer collected fee coins back to user
-    txb.transferObjects([feeCoins], txb.pure(walletAddress));
+    // No need to capture return or transfer objects - fees are sent directly to wallet
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
@@ -1422,20 +1539,46 @@ export async function buildCollectRewardsTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Call the collect rewards function with updated package ID
-    const rewardCoins = txb.moveCall({
+    // Get the CORRECT initial shared version from the owner field
+    const initialSharedVersion = await getInitialVersion(poolId);
+    console.log(
+      `Using initial shared version for pool: ${initialSharedVersion}`
+    );
+
+    // Create a pool ref with the correct initial version and mutable=true
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialSharedVersion,
+      mutable: true, // Pool must be mutable
+    });
+
+    // Clock → Config → Pool → Position
+    // Note: Bluefin moves rewards directly to the transaction signer
+    txb.moveCall({
       target: `${packageId}::gateway::collect_reward`,
       arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // Clock first
-        txb.object(configId), // Use the current config object
-        txb.object(poolId), // Pool
-        txb.object(positionId), // Position
+        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
+        txb.object(configId), // &mut Config (owned)
+        poolRef, // &mut Pool (shared, mutable)
+        txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
     });
 
-    // Transfer collected reward coins back to user
-    txb.transferObjects([rewardCoins], txb.pure(walletAddress));
+    // Clock → Config → Pool → Position
+    // Note: Bluefin moves rewards directly to the transaction signer
+    txb.moveCall({
+      target: `${packageId}::gateway::collect_reward`,
+      arguments: [
+        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
+        txb.object(configId), // &mut Config (owned)
+        poolRef, // &mut Pool (shared, mutable)
+        txb.object(positionId), // &mut Position (owned)
+      ],
+      typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
+    });
+
+    // No need to capture return or transfer objects - rewards are sent directly to wallet
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
@@ -1496,23 +1639,33 @@ export async function buildCollectFeesAndRewardsTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get object references
-    const clockObj = txb.object(SUI_CLOCK_OBJECT_ID);
+    // Get the CORRECT initial shared version from the owner field
+    const initialSharedVersion = await getInitialVersion(poolId);
+    console.log(
+      `Using initial shared version for pool: ${initialSharedVersion}`
+    );
 
-    // Call the combined collect fee and rewards function
-    const collectedCoins = txb.moveCall({
+    // Create a pool ref with the correct initial version and mutable=true
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialSharedVersion,
+      mutable: true, // Pool must be mutable
+    });
+
+    // Clock → Config → Pool → Position
+    // Note: Bluefin moves fees and rewards directly to the transaction signer
+    txb.moveCall({
       target: `${packageId}::gateway::collect_fee_and_rewards`,
       arguments: [
-        clockObj, // Clock
-        txb.object(configId), // Config
-        txb.object(poolId), // Pool
-        txb.object(positionId), // Position
+        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
+        txb.object(configId), // &mut Config (owned)
+        poolRef, // &mut Pool (shared, mutable)
+        txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Transfer collected coins back to user
-    txb.transferObjects([collectedCoins], txb.pure(walletAddress));
+    // No need to capture return or transfer objects - fees and rewards are sent directly to wallet
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
@@ -1544,8 +1697,6 @@ export async function buildCollectFeesAndRewardsTx({
 
 /**
  * Builds a transaction for closing a position
- * Updated to match the new Bluefin Move function signature
- * that now expects five arguments: Pool, Position, Position_NFT, Position_Config, Clock
  */
 export async function buildClosePositionTx({
   poolId,
@@ -1582,25 +1733,34 @@ export async function buildClosePositionTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get transaction object references
-    const poolObj = txb.object(poolId);
-    const positionObj = txb.object(positionId);
-    const positionNFT = txb.object(positionId); // NFT has same ID as position
-    const positionConfig = txb.object(configId);
-    const clockObj = txb.object(SUI_CLOCK_OBJECT_ID); // 0x6 on mainnet
+    // Get the CORRECT initial shared version from the owner field
+    const initialSharedVersion = await getInitialVersion(poolId);
+    console.log(
+      `Using initial shared version for pool: ${initialSharedVersion}`
+    );
 
-    // Close the position with the updated 5-argument signature
+    // Create a pool ref with the correct initial version and mutable=true
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialSharedVersion,
+      mutable: true, // Pool must be mutable
+    });
+
+    // FIXED: Updated argument order AND added destination parameter
+    // Clock → Config → Pool → Position → destination
     txb.moveCall({
       target: `${packageId}::gateway::close_position`,
       arguments: [
-        poolObj, // Pool
-        positionObj, // Position
-        positionNFT, // Position_NFT
-        positionConfig, // Position_Config
-        clockObj, // Clock
+        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
+        txb.object(configId), // &mut Config (owned)
+        poolRef, // &mut Pool (shared, mutable)
+        txb.object(positionId), // Position (owned by value)
+        txb.pure(walletAddress, "address"), // destination address for withdrawn assets
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
+
+    // No need to manually transfer objects - the Move function sends coins directly to the destination address
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
