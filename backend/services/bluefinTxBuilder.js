@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-16 20:10:34 UTC by jake1318
+// Updated: 2025-07-17 01:22:17 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -22,6 +22,8 @@ const BLUEFIN_ABORTS = {
   1003: "Selected price range is no longer valid",
   1004: "Required token amount exceeds your maximum",
   1005: "Slippage tolerance exceeded",
+  1018: "Position cannot be closed yet (cooldown period)",
+  1029: "Position has no liquidity to remove",
 };
 
 // Helper to extract error information from SUI transaction failures
@@ -1834,6 +1836,191 @@ export async function buildClosePositionTx({
     return base64Tx; // Return base64 encoded string
   } catch (error) {
     console.error("Error building close position transaction:", error);
+
+    // Check for Bluefin-specific errors
+    const bluefinError = extractBluefinError(error);
+    if (bluefinError) {
+      // Throw a more user-friendly error
+      const enhancedError = new Error(bluefinError.message);
+      enhancedError.code = bluefinError.code;
+      enhancedError.type = "bluefin";
+      enhancedError.originalError = error;
+      throw enhancedError;
+    }
+
+    // Otherwise throw the original error
+    throw error;
+  }
+}
+
+/**
+ * Builds a transaction to force close a position using the Bluefin SDK directly
+ * This is a more direct approach for positions that can't be closed through the standard gateway
+ *
+ * @param {Object} options - The parameters for the force close operation
+ * @param {string} options.poolId - The pool ID
+ * @param {string} options.positionId - The position ID to close
+ * @param {string} options.walletAddress - The wallet address of the user
+ * @param {boolean} options.force - Whether to force close the position
+ * @returns {Promise<string>} - Base64 encoded transaction bytes
+ */
+export async function buildForceClosePositionTx({
+  poolId,
+  positionId,
+  walletAddress,
+  force = true,
+}) {
+  if (!poolId || !positionId || !walletAddress) {
+    throw new Error(
+      "Missing required parameters: poolId, positionId, and walletAddress"
+    );
+  }
+
+  console.log(`Building FORCE CLOSE position transaction for ${positionId}`);
+
+  const suiClient = await getSuiClient();
+
+  try {
+    // Get pool details using the helper
+    const pool = await getPoolDetails(poolId);
+    if (!pool) {
+      throw new Error(`Pool ${poolId} not found`);
+    }
+    const { coinTypeA, coinTypeB } = pool.parsed;
+
+    console.log(`Pool details loaded for ${poolId}: ${coinTypeA}/${coinTypeB}`);
+
+    // Check the position exists
+    const positionResponse = await suiClient.getObject({
+      id: positionId,
+      options: { showContent: true, showDisplay: true },
+    });
+
+    if (!positionResponse.data) {
+      throw new Error(`Position ${positionId} not found`);
+    }
+
+    console.log(
+      "Position details loaded:",
+      positionResponse.data.display?.data
+    );
+
+    // Create the transaction block
+    const txb = new TransactionBlock();
+    txb.setSender(walletAddress);
+    txb.setGasBudget(50_000_000); // Use higher gas budget for force operations
+
+    // Approach 1: Try using direct Bluefin SDK via dynamic import
+    try {
+      console.log("Attempting to use Bluefin SDK for direct position closure");
+
+      // Dynamically import the required modules from Bluefin's SDK
+      const { OnChainCalls, QueryChain } = await import(
+        "@firefly-exchange/library-sui/dist/src/spot"
+      );
+      const { Ed25519Keypair } = await import("@firefly-exchange/library-sui");
+
+      // Import mainnet config from our app's config directory
+      const { mainnet } = await import("../config/bluefin.js");
+
+      // Get the admin private key from environment
+      const adminPrivateKey = process.env.BLUEFIN_ADMIN_PRIVATE_KEY;
+      if (!adminPrivateKey) {
+        throw new Error("Missing Bluefin admin credentials");
+      }
+
+      // Initialize the SDK components
+      const keyPair = Ed25519Keypair.fromSecretKey(
+        Buffer.from(adminPrivateKey, "hex")
+      );
+      const onChainCalls = new OnChainCalls(suiClient, mainnet, {
+        signer: keyPair,
+      });
+      const queryChain = new QueryChain(suiClient);
+
+      console.log("SDK initialized, querying detailed position and pool data");
+
+      // Get detailed position and pool data from Bluefin's SDK
+      const positionDetails = await queryChain.getPositionDetails(positionId);
+      if (!positionDetails) {
+        throw new Error("Failed to get position details from Bluefin SDK");
+      }
+
+      const poolDetails = await queryChain.getPool(pool.id);
+      if (!poolDetails) {
+        throw new Error("Failed to get pool details from Bluefin SDK");
+      }
+
+      console.log("Creating close position transaction using Bluefin SDK");
+
+      // Use Bluefin SDK to create the close position transaction
+      const tx = await onChainCalls.createClosePositionTx(
+        poolDetails,
+        positionId,
+        {
+          forceClose: force,
+        }
+      );
+
+      console.log(
+        "Force close transaction created successfully using Bluefin SDK"
+      );
+      return tx.txBytes;
+    } catch (sdkError) {
+      console.error(
+        "Error using Bluefin SDK for direct position closure:",
+        sdkError
+      );
+      console.log("Falling back to standard close position approach");
+
+      // Approach 2: Fall back to our standard close position implementation
+      // Get the latest Bluefin package ID and config object ID
+      const packageId = await getBluefinPackageId();
+      const configId = await getBluefinConfigObjectId();
+
+      console.log(
+        `Using fallback approach with package ID: ${packageId}, config ID: ${configId}`
+      );
+
+      // Get the initial shared versions
+      const initialPoolVersion = await getInitialVersion(poolId);
+      const initialConfigVersion = await getInitialVersion(configId);
+
+      // Create shared object references
+      const poolRef = txb.sharedObjectRef({
+        objectId: poolId,
+        initialSharedVersion: initialPoolVersion,
+        mutable: true,
+      });
+
+      const configRef = txb.sharedObjectRef({
+        objectId: configId,
+        initialSharedVersion: initialConfigVersion,
+        mutable: true,
+      });
+
+      // Try using a modified close_position call with higher gas limits
+      txb.moveCall({
+        target: `${packageId}::gateway::close_position`,
+        arguments: [
+          txb.object(SUI_CLOCK_OBJECT_ID),
+          configRef,
+          poolRef,
+          txb.object(positionId),
+          txb.pure(walletAddress, "address"),
+        ],
+        typeArguments: [coinTypeA, coinTypeB],
+      });
+
+      // Serialize the transaction to bytes and encode as base64
+      const txBytes = await txb.build({ client: suiClient });
+      const base64Tx = Buffer.from(txBytes).toString("base64");
+
+      console.log("Fallback close position transaction built successfully");
+      return base64Tx;
+    }
+  } catch (error) {
+    console.error("Error building force close position transaction:", error);
 
     // Check for Bluefin-specific errors
     const bluefinError = extractBluefinError(error);

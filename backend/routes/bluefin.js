@@ -1,5 +1,5 @@
 // routes/bluefin.js
-// Updated: 2025-07-16 02:11:24 UTC by jake1318
+// Updated: 2025-07-17 01:12:04 UTC by jake1318
 
 import express from "express";
 import * as bluefinService from "../services/bluefinService.js";
@@ -10,6 +10,7 @@ import {
   buildCollectRewardsTx,
   buildClosePositionTx,
   buildCollectFeesAndRewardsTx,
+  buildForceClosePositionTx, // Added new builder
 } from "../services/bluefinTxBuilder.js";
 import {
   BLUEFIN_PACKAGE_ID,
@@ -283,6 +284,35 @@ router.post("/get-close-position-params", async (req, res) => {
   }
 });
 
+router.post("/get-force-close-params", async (req, res) => {
+  try {
+    const { poolId, positionId } = req.body;
+    if (!poolId || !positionId) {
+      return jsonError(res, 400, "Missing required parameters");
+    }
+
+    // Get pool details
+    const pool = await bluefinService.getPoolDetails(poolId);
+    const coinTypeA = pool.parsed?.coinTypeA || "0x2::sui::SUI";
+    const coinTypeB =
+      pool.parsed?.coinTypeB ||
+      "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN";
+
+    // Return parameters
+    res.json({
+      success: true,
+      packageId: BLUEFIN_PACKAGE_ID,
+      globalConfigId: GLOBAL_CONFIG_ID,
+      clockObjectId: SUI_CLOCK_OBJECT_ID,
+      coinTypeA,
+      coinTypeB,
+    });
+  } catch (error) {
+    console.error("Error getting force close parameters:", error);
+    jsonError(res, 500, error.message);
+  }
+});
+
 /* ──────────────────────────────────────────────────────────
  *  BUILD + SERIALISE (all return { txb64 }) - SIMPLIFIED
  * ──────────────────────────────────────────────────────────*/
@@ -358,6 +388,19 @@ router.post(
   "/create-close-position-tx",
   buildAndReturn(({ poolId, positionId, walletAddress }) =>
     buildClosePositionTx({ poolId, positionId, walletAddress })
+  )
+);
+
+// New endpoint for force-closing positions
+router.post(
+  "/force-close-position-tx",
+  buildAndReturn(({ poolId, positionId, walletAddress, force }) =>
+    buildForceClosePositionTx({
+      poolId,
+      positionId,
+      walletAddress,
+      force: force !== undefined ? force : true,
+    })
   )
 );
 
