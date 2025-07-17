@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-17 01:22:17 UTC by jake1318
+// Updated: 2025-07-17 04:01:40 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -420,7 +420,7 @@ function prepareCoinWithSufficientBalance(
 }
 
 /**
- * Helper function to build the correct argument list for provide_liquidity_with_fixed_amount
+ * Helper function to build the correct argument list for provideLiquidityWithFixedAmount
  * based on the Bluefin contract's expected parameter order
  *
  * @param {boolean} aIsFixed - Whether coin A is the fixed side (based on coinTypeA, coinTypeB order)
@@ -472,7 +472,7 @@ function buildLiquidityArgs(
     coin_a_max: ${coinAMax.toString()}
     coin_b_max: ${coinBMax.toString()}`);
 
-  // Return arguments for provide_liquidity_with_fixed_amount
+  // Return arguments for provideLiquidityWithFixedAmount
   // NOTE: Coin order MUST be [coinA, coinB] regardless of which is fixed
   // This ensures type parameters align correctly with the Move function
   return [
@@ -837,12 +837,12 @@ export async function buildDepositTx({
     });
 
     // =========== STEP 2: Create the Position ============
-    // First, we create the position - CHANGED: use shared references
+    // First, we create the position - UPDATED: use camelCase function name
     const position = txb.moveCall({
-      target: `${packageId}::pool::open_position`,
+      target: `${packageId}::pool::openPosition`,
       arguments: [
-        configRef, // CHANGED: Use shared config ref
-        poolRef, // CHANGED: Use shared pool ref
+        configRef,
+        poolRef,
         txb.pure(toU32(lowerTickSnapped), "u32"),
         txb.pure(toU32(upperTickSnapped), "u32"),
       ],
@@ -894,16 +894,16 @@ export async function buildDepositTx({
       })`
     );
 
-    // Add liquidity to the created position
-    // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
+    // Add liquidity to the created position - UPDATED: use camelCase function name
+    // IMPORTANT: gateway::provideLiquidityWithFixedAmount returns TWO values:
     // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
     // 1 -> leftover_b: vector<Coin<CoinTypeB>> (may be empty vector)
     // The position is mutated in-place (&mut), it is NOT returned
     txb.moveCall({
-      target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
+      target: `${packageId}::gateway::provideLiquidityWithFixedAmount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
-        configRef, // CHANGED: Use shared config ref
+        configRef,
         poolRef, // &mut Pool (shared, mutable)
         position, // &mut Position - mutated, not consumed
         ...liquidityArgs,
@@ -1279,9 +1279,10 @@ export async function buildAddLiquidityTx({
       })`
     );
 
+    // UPDATED: use camelCase function name
     // Call the provide liquidity function without trying to handle leftover vectors
     txb.moveCall({
-      target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
+      target: `${packageId}::gateway::provideLiquidityWithFixedAmount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
@@ -1409,10 +1410,10 @@ export async function buildRemoveLiquidityTx({
       mutable: true,
     });
 
-    // FIXED: Updated argument order AND added destination parameter
+    // UPDATED: use camelCase function name + updated argument order AND added destination parameter
     // Clock → Config → Pool → Position → liquidity → min_coins_a → min_coins_b → destination
     txb.moveCall({
-      target: `${packageId}::gateway::remove_liquidity`,
+      target: `${packageId}::gateway::removeLiquidity`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
         configRef, // CHANGED: Use shared config ref
@@ -1512,10 +1513,11 @@ export async function buildCollectFeesTx({
       mutable: true,
     });
 
+    // UPDATED: use camelCase function name
     // Clock → Config → Pool → Position
     // Note: Bluefin moves fees directly to the transaction signer
     txb.moveCall({
-      target: `${packageId}::gateway::collect_fee`,
+      target: `${packageId}::gateway::collectFee`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
         configRef, // CHANGED: Use shared config ref
@@ -1559,6 +1561,9 @@ export async function buildCollectRewardsTx({
   poolId,
   positionId,
   walletAddress,
+  rewardCoinTypes = [
+    "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::blue::BLUE",
+  ],
 }) {
   if (!poolId || !positionId || !walletAddress) {
     throw new Error(
@@ -1615,10 +1620,11 @@ export async function buildCollectRewardsTx({
       mutable: true,
     });
 
+    // UPDATED: use camelCase function name
     // Clock → Config → Pool → Position
     // Note: Bluefin moves rewards directly to the transaction signer
     txb.moveCall({
-      target: `${packageId}::gateway::collect_reward`,
+      target: `${packageId}::gateway::collectReward`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
         configRef, // CHANGED: Use shared config ref
@@ -1657,6 +1663,7 @@ export async function buildCollectRewardsTx({
 
 /**
  * Builds a transaction for collecting both fees and rewards in one step
+ * by using both collectFee and collectReward in a single transaction
  */
 export async function buildCollectFeesAndRewardsTx({
   poolId,
@@ -1678,18 +1685,23 @@ export async function buildCollectFeesAndRewardsTx({
   try {
     console.log("Building collect fees and rewards transaction:", {
       positionId,
+      poolId,
     });
 
     // Get pool details using the helper
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
 
+    // Default reward coin type for Bluefin (BLUE token)
+    const rewardCoinType =
+      "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::blue::BLUE";
+
     // Create the transaction block
     const txb = new TransactionBlock();
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // CHANGED: Get the correct initial shared version for pool and config
+    // Get the correct initial shared version for pool and config
     const initialPoolVersion = await getInitialVersion(poolId);
     const initialConfigVersion = await getInitialVersion(configId);
 
@@ -1697,7 +1709,7 @@ export async function buildCollectFeesAndRewardsTx({
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // CHANGED: Create proper shared object references for both pool and config
+    // Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1710,20 +1722,32 @@ export async function buildCollectFeesAndRewardsTx({
       mutable: true,
     });
 
-    // Clock → Config → Pool → Position
-    // Note: Bluefin moves fees and rewards directly to the transaction signer
+    // APPROACH: Call collectFee and collectReward separately in one transaction
+    console.log("Using separate collectFee and collectReward calls");
+
+    // First collect fees
     txb.moveCall({
-      target: `${packageId}::gateway::collect_fee_and_rewards`,
+      target: `${packageId}::gateway::collectFee`,
       arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        configRef, // CHANGED: Use shared config ref
-        poolRef, // CHANGED: Use shared pool ref
-        txb.object(positionId), // &mut Position (owned)
+        txb.object(SUI_CLOCK_OBJECT_ID),
+        configRef,
+        poolRef,
+        txb.object(positionId),
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // No need to capture return or transfer objects - fees and rewards are sent directly to wallet
+    // Then collect rewards
+    txb.moveCall({
+      target: `${packageId}::gateway::collectReward`,
+      arguments: [
+        txb.object(SUI_CLOCK_OBJECT_ID),
+        configRef,
+        poolRef,
+        txb.object(positionId),
+      ],
+      typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
+    });
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
@@ -1812,10 +1836,10 @@ export async function buildClosePositionTx({
       mutable: true,
     });
 
-    // FIXED: Updated argument order AND added destination parameter
+    // UPDATED: use camelCase function name - updated argument order AND added destination parameter
     // Clock → Config → Pool → Position → destination
     txb.moveCall({
-      target: `${packageId}::gateway::close_position`,
+      target: `${packageId}::gateway::closePosition`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
         configRef, // CHANGED: Use shared config ref
@@ -1999,9 +2023,9 @@ export async function buildForceClosePositionTx({
         mutable: true,
       });
 
-      // Try using a modified close_position call with higher gas limits
+      // UPDATED: use camelCase function name - try using a modified close_position call with higher gas limits
       txb.moveCall({
-        target: `${packageId}::gateway::close_position`,
+        target: `${packageId}::gateway::closePosition`,
         arguments: [
           txb.object(SUI_CLOCK_OBJECT_ID),
           configRef,
