@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Positions.tsx
-// Last Updated: 2025-07-17 00:46:18 UTC by jake1318
+// Updated: 2025-07-17 01:58:12 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -1202,17 +1202,41 @@ function Positions() {
     fetchScallopData();
   }, [fetchScallopData]);
 
-  // Filter pool positions based on the positionType state
+  // Helper function to check if a position has zero liquidity
+  const hasZeroLiquidity = (position: NormalizedPosition): boolean => {
+    // Check if balance values are zero or very small
+    const balanceA = parseInt(position.balanceA || "0");
+    const balanceB = parseInt(position.balanceB || "0");
+    return balanceA <= 1 && balanceB <= 1;
+  };
+
+  // Helper function to check if a pool has positions that have zero liquidity
+  const hasPositionsWithZeroLiquidity = (poolGroup: PoolGroup): boolean => {
+    return poolGroup.positions.some(hasZeroLiquidity);
+  };
+
+  // Filter pool positions based on the positionType state and hide empty positions
   const filteredPoolPositions = useMemo(() => {
+    // First, filter out any pools that only have positions with zero liquidity
+    const nonEmptyPools = poolPositions.filter((pool) => {
+      // Check if this pool has at least one position with non-zero liquidity
+      return pool.positions.some((position) => {
+        const balanceA = parseInt(position.balanceA || "0");
+        const balanceB = parseInt(position.balanceB || "0");
+        return balanceA > 1 || balanceB > 1; // Consider position non-empty if either token has balance > 1
+      });
+    });
+
+    // Then apply the regular filters
     if (positionType === "all") {
-      return poolPositions;
+      return nonEmptyPools;
     } else if (positionType === "vault") {
-      return poolPositions.filter((pool) => isVaultPool(pool));
+      return nonEmptyPools.filter((pool) => isVaultPool(pool));
     } else if (positionType === "scallop") {
       // Just return empty array since we'll display Scallop data separately
       return [];
     } else {
-      return poolPositions.filter(
+      return nonEmptyPools.filter(
         (pool) => !isVaultPool(pool) && pool.protocol !== "Scallop"
       );
     }
@@ -1247,6 +1271,107 @@ function Positions() {
       totalRewards: pool.positions.flatMap((pos) => pos.rewards || []),
     });
     setClaimingPool(pool.poolAddress);
+  };
+
+  /**
+   * Handle claiming rewards from Bluefin pools - Use the combined fees and rewards collector
+   */
+  const handleBluefinClaimRewards = async (
+    poolAddress: string,
+    positionIds: string[]
+  ) => {
+    const digests: string[] = [];
+    const successfulClaims: string[] = [];
+    const failedClaims: string[] = [];
+
+    try {
+      if (!account?.address) {
+        throw new Error("Wallet address not available");
+      }
+
+      // Process each position individually
+      for (const positionId of positionIds) {
+        console.log(
+          `Claiming rewards from Bluefin position ${positionId} in pool ${poolAddress}`
+        );
+
+        try {
+          // Use the combined fees and rewards collection endpoint
+          const combinedResponse = await fetch(
+            "/api/bluefin/create-collect-fees-and-rewards-tx",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                poolId: poolAddress,
+                positionId,
+                walletAddress: account.address,
+              }),
+            }
+          );
+
+          // Enhanced error handling
+          if (!combinedResponse.ok) {
+            const errorText = await combinedResponse.text();
+            console.error("API Error Response:", errorText);
+            failedClaims.push(`${positionId.substring(0, 8)}: ${errorText}`);
+            continue;
+          }
+
+          const responseData = await combinedResponse.json();
+
+          // Make sure we got transaction bytes - CHECK FOR EITHER txb64 OR txBytes
+          const txBase64 = responseData.txb64 || responseData.txBytes;
+          if (!responseData || !txBase64) {
+            console.error("API returned invalid response:", responseData);
+            failedClaims.push(
+              `${positionId.substring(0, 8)}: Invalid response data`
+            );
+            continue;
+          }
+
+          // Use our utility function to execute the transaction
+          const result = await signAndExecuteBase64(wallet, txBase64, {
+            showEffects: true,
+            requestType: "WaitForLocalExecution",
+          });
+
+          if (result.digest && !result.effects?.status?.error) {
+            digests.push(result.digest);
+            successfulClaims.push(positionId.substring(0, 8));
+            console.log(
+              `Successfully claimed rewards for position ${positionId}`
+            );
+          } else {
+            // Parse the error to give more specific feedback
+            const errorDetails =
+              result.effects?.status?.error || "Unknown error";
+            console.error("Claim rewards error details:", errorDetails);
+            failedClaims.push(`${positionId.substring(0, 8)}: ${errorDetails}`);
+          }
+        } catch (error) {
+          console.error(
+            `Error claiming rewards for position ${positionId}:`,
+            error
+          );
+          failedClaims.push(
+            `${positionId.substring(0, 8)}: ${error.message || "Unknown error"}`
+          );
+        }
+      }
+
+      return {
+        success: successfulClaims.length > 0,
+        digests,
+        successCount: successfulClaims.length,
+        failureCount: failedClaims.length,
+        successPositions: successfulClaims,
+        failureDetails: failedClaims,
+      };
+    } catch (error) {
+      console.error("Bluefin claim rewards failed:", error);
+      throw error;
+    }
   };
 
   /**
@@ -1707,79 +1832,6 @@ function Positions() {
   };
 
   /**
-   * Handle claiming rewards from Bluefin pools - Updated to use signAndExecuteBase64
-   */
-  const handleBluefinClaimRewards = async (
-    poolAddress: string,
-    positionIds: string[]
-  ) => {
-    const digests: string[] = [];
-
-    try {
-      if (!account?.address) {
-        throw new Error("Wallet address not available");
-      }
-
-      // Process each position individually
-      for (const positionId of positionIds) {
-        console.log(
-          `Claiming rewards from Bluefin position ${positionId} in pool ${poolAddress}`
-        );
-
-        // Use the combined fees and rewards collection endpoint
-        const combinedResponse = await fetch(
-          "/api/bluefin/create-collect-fees-and-rewards-tx",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              poolId: poolAddress,
-              positionId,
-              walletAddress: account.address,
-            }),
-          }
-        );
-
-        // Enhanced error handling
-        if (!combinedResponse.ok) {
-          const errorText = await combinedResponse.text();
-          console.error("API Error Response:", errorText);
-          throw new Error(
-            `Failed to create collect fees and rewards transaction: ${errorText}`
-          );
-        }
-
-        const responseData = await combinedResponse.json();
-        console.log("API Response for collect rewards:", responseData);
-
-        // Make sure we got transaction bytes - CHECK FOR EITHER txb64 OR txBytes
-        const txBase64 = responseData.txb64 || responseData.txBytes;
-        if (!responseData || !txBase64) {
-          console.error("API returned invalid response:", responseData);
-          throw new Error("Server returned empty or invalid transaction data");
-        }
-
-        // Use our utility function
-        const result = await signAndExecuteBase64(wallet, txBase64, {
-          showEffects: true,
-        });
-
-        if (result.digest) {
-          digests.push(result.digest);
-        }
-      }
-
-      return {
-        success: true,
-        digests,
-      };
-    } catch (error) {
-      console.error("Bluefin claim rewards failed:", error);
-      throw error;
-    }
-  };
-
-  /**
    * Handle claiming rewards using appropriate service based on pool type
    */
   const handleClaim = async (poolAddress: string, positionIds: string[]) => {
@@ -1809,26 +1861,38 @@ function Positions() {
         console.log(`Claiming rewards from Bluefin pool: ${poolAddress}`);
         result = await handleBluefinClaimRewards(poolAddress, positionIds);
 
-        if (result.digests.length > 0) {
+        if (result.success) {
           const protocolName = poolInfo
             ? getProtocolDisplayName(poolInfo)
             : "Bluefin";
+
+          let message = "Rewards and Fees Claimed Successfully!";
+
+          // Add details about partial success if applicable
+          if (result.failureCount > 0) {
+            message += ` (${result.successCount} successful, ${result.failureCount} failed)`;
+          }
+
           setNotification({
             visible: true,
-            message: "Rewards Claimed Successfully!",
+            message: message,
             txDigest:
               result.digests.length === 1 ? result.digests[0] : undefined,
             isSuccess: true,
             asModal: true,
             poolInfo: `${pairName} (${protocolName})`,
           });
-          setTxDigests(result.digests);
+
+          // If multiple digests, store them for reference
+          if (result.digests.length > 1) {
+            setTxDigests(result.digests);
+          }
         } else {
           setNotification({
             visible: true,
-            message: "No rewards available to claim from Bluefin at this time.",
-            isSuccess: true,
-            asModal: true,
+            message: "Failed to claim rewards from Bluefin positions.",
+            isSuccess: false,
+            asModal: false,
           });
         }
       } else {
@@ -2187,19 +2251,6 @@ function Positions() {
     return totalValue;
   };
 
-  // Helper function to check if a position has zero liquidity but is still displayed
-  const hasZeroLiquidity = (position: NormalizedPosition): boolean => {
-    // Check if balance values are zero or very small
-    const balanceA = parseInt(position.balanceA || "0");
-    const balanceB = parseInt(position.balanceB || "0");
-    return balanceA <= 1 && balanceB <= 1;
-  };
-
-  // Helper function to check if a pool has positions that have zero liquidity
-  const hasPositionsWithZeroLiquidity = (poolGroup: PoolGroup): boolean => {
-    return poolGroup.positions.some(hasZeroLiquidity);
-  };
-
   return (
     <div className="positions-page">
       {/* Add glow elements for consistent styling with other pages */}
@@ -2252,7 +2303,7 @@ function Positions() {
             <div className="spinner"></div>
             <div className="loading-text">Loading positions...</div>
           </div>
-        ) : poolPositions.length === 0 && !hasScallopPositions ? (
+        ) : filteredPoolPositions.length === 0 && !hasScallopPositions ? (
           <div className="empty-state">
             <div className="empty-icon">💧</div>
             <h3>No Positions Found</h3>
@@ -2287,7 +2338,7 @@ function Positions() {
                 }`}
                 onClick={() => setPositionType("all")}
               >
-                All Positions ({poolPositions.length + scallopCount})
+                All Positions ({filteredPoolPositions.length + scallopCount})
               </button>
               <button
                 className={`position-type-tab ${
@@ -2512,41 +2563,6 @@ function Positions() {
                                     "Withdraw"
                                   )}
                                 </button>
-
-                                {/* Force Close Button for Bluefin Positions */}
-                                {isBluefinPool(poolPosition) &&
-                                  hasPositionsWithZeroLiquidity(
-                                    poolPosition
-                                  ) && (
-                                    <button
-                                      className="btn btn--warning btn--sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleCloseBluefinPosition(
-                                          poolPosition.poolAddress,
-                                          poolPosition.positions
-                                            .filter(hasZeroLiquidity)
-                                            .map((p) => p.id)
-                                        );
-                                      }}
-                                      disabled={
-                                        closingPool ===
-                                          poolPosition.poolAddress ||
-                                        withdrawingPool ===
-                                          poolPosition.poolAddress
-                                      }
-                                    >
-                                      {closingPool ===
-                                      poolPosition.poolAddress ? (
-                                        <span className="loading-text">
-                                          <span className="dot-loader"></span>
-                                          Closing
-                                        </span>
-                                      ) : (
-                                        "Force Close"
-                                      )}
-                                    </button>
-                                  )}
 
                                 {/* Claim Button */}
                                 {poolPosition.positions.some(
