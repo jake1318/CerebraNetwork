@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Positions.tsx
-// Last Updated: 2025-07-15 17:29:49 UTC by jake1318
+// Last Updated: 2025-07-17 00:46:18 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -859,6 +859,7 @@ function Positions() {
   });
   const [claimingPool, setClaimingPool] = useState<string | null>(null);
   const [withdrawingPool, setWithdrawingPool] = useState<string | null>(null);
+  const [closingPool, setClosingPool] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState<Record<string, boolean>>({});
   const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
 
@@ -1249,7 +1250,169 @@ function Positions() {
   };
 
   /**
-   * Handle Bluefin withdraw operation - Updated to use signAndExecuteBase64
+   * Special function that uses the direct Bluefin SDK approach to force close positions
+   * This is the last resort for positions that couldn't be closed through regular means
+   */
+  const handleCloseBluefinPosition = async (
+    poolAddress: string,
+    positionIds: string[]
+  ) => {
+    const digests: string[] = [];
+    const successfulCloses: string[] = [];
+    const failedCloses: string[] = [];
+
+    if (!connected || !account?.address) {
+      throw new Error("Wallet not connected");
+    }
+
+    try {
+      setClosingPool(poolAddress);
+
+      // Process each position
+      for (const positionId of positionIds) {
+        console.log(
+          `Force closing Bluefin position ${positionId} in pool ${poolAddress}`
+        );
+
+        try {
+          // Use our new specialized force-close endpoint
+          const closeResponse = await fetch(
+            "/api/bluefin/force-close-position-tx",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                poolId: poolAddress,
+                positionId,
+                walletAddress: account.address,
+                // Add a force flag to indicate this is a forced close
+                force: true,
+              }),
+            }
+          );
+
+          if (!closeResponse.ok) {
+            const errorText = await closeResponse.text();
+            console.warn(`Force close position API error: ${errorText}`);
+            failedCloses.push(`${positionId.substring(0, 8)}: API error`);
+            continue;
+          }
+
+          const responseData = await closeResponse.json();
+          const txBase64 = responseData.txb64 || responseData.txBytes;
+
+          if (!responseData || !txBase64) {
+            failedCloses.push(
+              `${positionId.substring(0, 8)}: Empty transaction data`
+            );
+            continue;
+          }
+
+          console.log("Received force close transaction data:", responseData);
+
+          // Try to execute with a longer timeout
+          const result = await signAndExecuteBase64(wallet, txBase64, {
+            showEffects: true,
+            requestType: "WaitForLocalExecution",
+          });
+
+          console.log("Force close position execution result:", result);
+
+          // Check if the transaction was truly successful
+          if (result.digest && !result.effects?.status?.error) {
+            digests.push(result.digest);
+            successfulCloses.push(positionId.substring(0, 8));
+            console.log(`Successfully force closed position ${positionId}`);
+          } else {
+            // Parse the error to give more specific feedback
+            const errorDetails =
+              result.effects?.status?.error || "Unknown error";
+            console.error("Force close error details:", errorDetails);
+            failedCloses.push(`${positionId.substring(0, 8)}: ${errorDetails}`);
+          }
+        } catch (error) {
+          console.error(`Error force closing position ${positionId}:`, error);
+          failedCloses.push(
+            `${positionId.substring(0, 8)}: ${error.message || "Unknown error"}`
+          );
+        }
+      }
+
+      // Display notification with results
+      if (successfulCloses.length > 0) {
+        // Find pool info for display
+        const poolInfo = poolPositions.find(
+          (p) => p.poolAddress === poolAddress
+        );
+        const pairName = poolInfo
+          ? `${poolInfo.tokenASymbol}${
+              poolInfo.tokenBSymbol ? "/" + poolInfo.tokenBSymbol : ""
+            }`
+          : "";
+
+        let message = `Successfully closed ${successfulCloses.length} position(s)`;
+        if (failedCloses.length > 0) {
+          message += `, ${failedCloses.length} failed`;
+        }
+
+        setNotification({
+          visible: true,
+          message: message,
+          txDigest: digests.length === 1 ? digests[0] : undefined,
+          isSuccess: true,
+          asModal: true,
+          poolInfo: `${pairName} (Position IDs: ${successfulCloses.join(
+            ", "
+          )})`,
+        });
+
+        // Store digests
+        setTxDigests(digests);
+
+        // Refresh positions
+        await loadPositions();
+      } else if (failedCloses.length > 0) {
+        // Only failures
+        setNotification({
+          visible: true,
+          message: `Failed to close ${
+            failedCloses.length
+          } position(s). Details: ${failedCloses.join(", ")}`,
+          isSuccess: false,
+          asModal: true,
+        });
+      }
+
+      return {
+        success: successfulCloses.length > 0,
+        successCount: successfulCloses.length,
+        failureCount: failedCloses.length,
+        digests,
+      };
+    } catch (error) {
+      console.error("Error in handleCloseBluefinPosition:", error);
+      setNotification({
+        visible: true,
+        message: `Failed to close positions: ${
+          error.message || "Unknown error"
+        }`,
+        isSuccess: false,
+        asModal: false,
+      });
+      return {
+        success: false,
+        successCount: 0,
+        failureCount: positionIds.length,
+        digests: [],
+      };
+    } finally {
+      setClosingPool(null);
+    }
+  };
+
+  /**
+   * Handle Bluefin withdraw operation - Updated to focus on successful liquidity removal
+   * and handle position closure errors gracefully
    */
   const handleBluefinWithdraw = async (options: {
     poolAddress: string;
@@ -1267,97 +1430,28 @@ function Positions() {
       closePosition,
     } = options;
     const digests: string[] = [];
+    const successfulOperations: string[] = [];
+    const failedOperations: string[] = [];
 
     try {
       if (!account?.address) {
         throw new Error("Wallet address not available");
       }
 
-      // Process each position individually (Bluefin operations are typically per position)
+      // Process each position individually
       for (const positionId of positionIds) {
         console.log(
           `Processing Bluefin position ${positionId} in pool ${poolAddress}`
         );
 
-        // Full withdrawal with explicit close position request
-        if (withdrawPercent === 100 && closePosition) {
-          // Use closePosition for a complete withdrawal + claim
-          console.log(`Closing Bluefin position ${positionId}`);
+        let hasRemainingLiquidity = true; // Assume position has liquidity initially
 
-          const response = await fetch(
-            "/api/bluefin/create-close-position-tx",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                poolId: poolAddress,
-                positionId,
-                walletAddress: account.address,
-              }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error(
-              `Failed to create close position transaction: ${await response.text()}`
-            );
-          }
-
-          const { txb64 } = await response.json();
-
-          // Use our utility function to properly handle the base64 conversion
-          const result = await signAndExecuteBase64(wallet, txb64, {
-            showEffects: true,
-          });
-
-          if (result.digest) {
-            digests.push(result.digest);
-          }
-        } else {
-          // Partial withdrawal or full withdrawal without explicit close
-          console.log(
-            `Removing ${withdrawPercent}% liquidity from Bluefin position ${positionId}`
-          );
-
-          // Create and submit transaction to remove liquidity
-          const removeResponse = await fetch(
-            "/api/bluefin/create-remove-liquidity-tx",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                poolId: poolAddress,
-                positionId,
-                percent: withdrawPercent,
-                walletAddress: account.address,
-              }),
-            }
-          );
-
-          if (!removeResponse.ok) {
-            throw new Error(
-              `Failed to create remove liquidity transaction: ${await removeResponse.text()}`
-            );
-          }
-
-          const { txb64: removeTx } = await removeResponse.json();
-
-          // Use our utility function
-          const removeResult = await signAndExecuteBase64(wallet, removeTx, {
-            showEffects: true,
-          });
-
-          if (removeResult.digest) {
-            digests.push(removeResult.digest);
-          }
-
-          // If user wants to collect fees (and it's not a 100% withdrawal which auto-collects)
-          if (collectFees && withdrawPercent < 100) {
+        // STEP 1: For any withdrawal, first try to collect fees and rewards
+        if (collectFees) {
+          try {
             console.log(
               `Collecting fees and rewards from Bluefin position ${positionId}`
             );
-
-            // Use the combined fees and rewards collection endpoint
             const combinedResponse = await fetch(
               "/api/bluefin/create-collect-fees-and-rewards-tx",
               {
@@ -1371,33 +1465,240 @@ function Positions() {
               }
             );
 
-            if (!combinedResponse.ok) {
-              throw new Error(
-                `Failed to create collect fees and rewards transaction: ${await combinedResponse.text()}`
-              );
+            if (combinedResponse.ok) {
+              const responseData = await combinedResponse.json();
+              const txBase64 = responseData.txb64 || responseData.txBytes;
+
+              if (responseData && txBase64) {
+                try {
+                  const combinedResult = await signAndExecuteBase64(
+                    wallet,
+                    txBase64,
+                    { showEffects: true }
+                  );
+
+                  // Check if transaction was actually successful by examining effects
+                  if (
+                    combinedResult.digest &&
+                    !combinedResult.effects?.status?.error
+                  ) {
+                    digests.push(combinedResult.digest);
+                    successfulOperations.push("Collected fees and rewards");
+                  } else if (combinedResult.effects?.status?.error) {
+                    // Log the specific error
+                    const errorMsg = combinedResult.effects.status.error;
+                    console.warn(`Collect fees failed: ${errorMsg}`);
+                    failedOperations.push(
+                      `Failed to collect fees: ${errorMsg}`
+                    );
+                  }
+                } catch (txError) {
+                  console.warn("Transaction execution failed:", txError);
+                  failedOperations.push("Failed to collect fees and rewards");
+                }
+              }
             }
+          } catch (error) {
+            console.warn(
+              "Failed to collect fees and rewards, continuing with withdrawal:",
+              error
+            );
+            failedOperations.push("Failed to collect fees and rewards");
+          }
+        }
 
-            const { txb64: combinedTx } = await combinedResponse.json();
+        // STEP 2: Remove liquidity if the position has any
+        if (withdrawPercent > 0) {
+          try {
+            console.log(
+              `Removing ${withdrawPercent}% liquidity from Bluefin position ${positionId}`
+            );
 
-            // Use our utility function
-            const combinedResult = await signAndExecuteBase64(
-              wallet,
-              combinedTx,
+            const removeResponse = await fetch(
+              "/api/bluefin/create-remove-liquidity-tx",
               {
-                showEffects: true,
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  poolId: poolAddress,
+                  positionId,
+                  percent: withdrawPercent,
+                  walletAddress: account.address,
+                }),
               }
             );
 
-            if (combinedResult.digest) {
-              digests.push(combinedResult.digest);
+            if (!removeResponse.ok) {
+              const errorText = await removeResponse.text();
+              console.warn(`Remove liquidity API error: ${errorText}`);
+              failedOperations.push(
+                `Failed to create remove liquidity transaction: ${errorText}`
+              );
+              // If we can't even create the transaction, the position may not have liquidity
+              hasRemainingLiquidity = false;
+            } else {
+              const responseData = await removeResponse.json();
+              const txBase64 = responseData.txb64 || responseData.txBytes;
+
+              if (!responseData || !txBase64) {
+                throw new Error(
+                  "Server returned empty or invalid transaction data"
+                );
+              }
+
+              // Execute the liquidity removal transaction
+              try {
+                const removeResult = await signAndExecuteBase64(
+                  wallet,
+                  txBase64,
+                  {
+                    showEffects: true,
+                  }
+                );
+
+                console.log("Remove liquidity execution result:", removeResult);
+
+                // Check if transaction actually succeeded
+                if (
+                  removeResult.digest &&
+                  !removeResult.effects?.status?.error
+                ) {
+                  digests.push(removeResult.digest);
+                  successfulOperations.push(
+                    `Removed ${withdrawPercent}% liquidity`
+                  );
+                } else if (removeResult.effects?.status?.error) {
+                  // Check for specific error codes
+                  const errorDetails = removeResult.effects.status.error;
+                  console.warn(`Remove liquidity failed: ${errorDetails}`);
+
+                  // Check if this is a "no liquidity" error (code 1029)
+                  if (errorDetails.includes("1029")) {
+                    console.log("Position has no liquidity to remove");
+                    hasRemainingLiquidity = false;
+                    failedOperations.push(
+                      "Position has no liquidity to remove"
+                    );
+                  } else {
+                    failedOperations.push(
+                      `Failed to remove liquidity: ${errorDetails}`
+                    );
+                  }
+                }
+              } catch (txError) {
+                console.warn("Transaction execution failed:", txError);
+                failedOperations.push("Failed to remove liquidity");
+                // We don't know for sure if there's liquidity, so keep the flag true
+              }
             }
+
+            // STEP 3: If user wants to close and we successfully removed liquidity (or no liquidity to remove)
+            if (
+              (withdrawPercent === 100 && closePosition) ||
+              !hasRemainingLiquidity
+            ) {
+              // Wait longer between removing liquidity and closing position
+              await new Promise((resolve) => setTimeout(resolve, 10000)); // 10-second delay
+
+              try {
+                console.log(
+                  `Attempting to close Bluefin position ${positionId}`
+                );
+
+                // Use the force-close endpoint for a more direct approach
+                const closeResponse = await fetch(
+                  "/api/bluefin/force-close-position-tx",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      poolId: poolAddress,
+                      positionId,
+                      walletAddress: account.address,
+                      force: true, // Try to force close
+                    }),
+                  }
+                );
+
+                if (!closeResponse.ok) {
+                  const errorText = await closeResponse.text();
+                  console.warn(`Close position API error: ${errorText}`);
+                  failedOperations.push(
+                    `Failed to create close position transaction: ${errorText}`
+                  );
+                } else {
+                  const responseData = await closeResponse.json();
+                  const txBase64 = responseData.txb64 || responseData.txBytes;
+
+                  if (responseData && txBase64) {
+                    try {
+                      const result = await signAndExecuteBase64(
+                        wallet,
+                        txBase64,
+                        {
+                          showEffects: true,
+                          requestType: "WaitForLocalExecution",
+                        }
+                      );
+
+                      // Check if transaction actually succeeded
+                      if (result.digest && !result.effects?.status?.error) {
+                        digests.push(result.digest);
+                        successfulOperations.push("Closed position");
+                      } else if (result.effects?.status?.error) {
+                        // Check for specific error codes
+                        const errorDetails = result.effects.status.error;
+                        console.warn(`Close position failed: ${errorDetails}`);
+
+                        // Check if this is the specific "can't close" error (code 1018)
+                        if (errorDetails.includes("1018")) {
+                          failedOperations.push(
+                            "Position cannot be closed yet (protocol cooldown period)"
+                          );
+
+                          // Try to give user a helpful message
+                          console.log(
+                            "The position needs time before it can be closed. The funds have been withdrawn but the position will remain visible until it can be closed."
+                          );
+                        } else {
+                          failedOperations.push(
+                            `Failed to close position: ${errorDetails}`
+                          );
+                        }
+                      }
+                    } catch (closeError) {
+                      console.warn(
+                        "Position close transaction failed:",
+                        closeError
+                      );
+                      failedOperations.push(
+                        "Failed to execute close position transaction"
+                      );
+                    }
+                  }
+                }
+              } catch (closeError) {
+                console.warn("Failed to close position:", closeError);
+                failedOperations.push("Failed to close position");
+              }
+            }
+          } catch (error) {
+            console.error("Error removing liquidity:", error);
+            failedOperations.push(
+              `Failed to remove liquidity: ${error.message}`
+            );
+            // Don't throw yet - consider this critical but proceed to next position
           }
         }
       }
 
+      // Return success as long as we have at least one successful transaction
+      // And include information about both successful and failed operations
       return {
-        success: true,
+        success: digests.length > 0,
         digests,
+        operations: successfulOperations,
+        failures: failedOperations,
       };
     } catch (error) {
       console.error("Bluefin withdrawal failed:", error);
@@ -1439,16 +1740,27 @@ function Positions() {
           }
         );
 
+        // Enhanced error handling
         if (!combinedResponse.ok) {
+          const errorText = await combinedResponse.text();
+          console.error("API Error Response:", errorText);
           throw new Error(
-            `Failed to create collect fees and rewards transaction: ${await combinedResponse.text()}`
+            `Failed to create collect fees and rewards transaction: ${errorText}`
           );
         }
 
-        const { txb64 } = await combinedResponse.json();
+        const responseData = await combinedResponse.json();
+        console.log("API Response for collect rewards:", responseData);
+
+        // Make sure we got transaction bytes - CHECK FOR EITHER txb64 OR txBytes
+        const txBase64 = responseData.txb64 || responseData.txBytes;
+        if (!responseData || !txBase64) {
+          console.error("API returned invalid response:", responseData);
+          throw new Error("Server returned empty or invalid transaction data");
+        }
 
         // Use our utility function
-        const result = await signAndExecuteBase64(wallet, txb64, {
+        const result = await signAndExecuteBase64(wallet, txBase64, {
           showEffects: true,
         });
 
@@ -1615,16 +1927,27 @@ function Positions() {
           }
         );
 
+        // Enhanced error handling
         if (!feesResponse.ok) {
+          const errorText = await feesResponse.text();
+          console.error("API Error Response:", errorText);
           throw new Error(
-            `Failed to create collect fees transaction: ${await feesResponse.text()}`
+            `Failed to create collect fees transaction: ${errorText}`
           );
         }
 
-        const { txb64 } = await feesResponse.json();
+        const responseData = await feesResponse.json();
+        console.log("API Response for collect fees:", responseData);
+
+        // Make sure we got transaction bytes - CHECK FOR EITHER txb64 OR txBytes
+        const txBase64 = responseData.txb64 || responseData.txBytes;
+        if (!responseData || !txBase64) {
+          console.error("API returned invalid response:", responseData);
+          throw new Error("Server returned empty or invalid transaction data");
+        }
 
         // Use our utility function
-        result = await signAndExecuteBase64(wallet, txb64, {
+        result = await signAndExecuteBase64(wallet, txBase64, {
           showEffects: true,
         });
 
@@ -1736,9 +2059,23 @@ function Positions() {
       if (result.success) {
         // Show notification with transaction digests
         const protocolName = poolInfo ? getProtocolDisplayName(poolInfo) : "";
+
+        // Create a message that includes both successes and failures
+        let message = closePosition
+          ? "Close Successful!"
+          : "Withdraw Successful!";
+
+        // If we have Bluefin failures, add them to the message
+        if (isBluefin && result.failures && result.failures.length > 0) {
+          // Special handling for the "cooldown period" message
+          if (result.failures.some((f) => f.includes("cooldown period"))) {
+            message += " Position will remain visible until it can be closed.";
+          }
+        }
+
         setNotification({
           visible: true,
-          message: closePosition ? "Close Successful!" : "Withdraw Successful!",
+          message: message,
           txDigest: result.digests.length === 1 ? result.digests[0] : undefined,
           isSuccess: true,
           asModal: true, // Show as modal
@@ -1848,6 +2185,19 @@ function Positions() {
       }
     });
     return totalValue;
+  };
+
+  // Helper function to check if a position has zero liquidity but is still displayed
+  const hasZeroLiquidity = (position: NormalizedPosition): boolean => {
+    // Check if balance values are zero or very small
+    const balanceA = parseInt(position.balanceA || "0");
+    const balanceB = parseInt(position.balanceB || "0");
+    return balanceA <= 1 && balanceB <= 1;
+  };
+
+  // Helper function to check if a pool has positions that have zero liquidity
+  const hasPositionsWithZeroLiquidity = (poolGroup: PoolGroup): boolean => {
+    return poolGroup.positions.some(hasZeroLiquidity);
   };
 
   return (
@@ -2126,6 +2476,8 @@ function Positions() {
                                     ? "Hide"
                                     : "Details"}
                                 </button>
+
+                                {/* Standard Withdraw Button */}
                                 <button
                                   className="btn btn--primary btn--sm"
                                   onClick={(e) => {
@@ -2160,6 +2512,43 @@ function Positions() {
                                     "Withdraw"
                                   )}
                                 </button>
+
+                                {/* Force Close Button for Bluefin Positions */}
+                                {isBluefinPool(poolPosition) &&
+                                  hasPositionsWithZeroLiquidity(
+                                    poolPosition
+                                  ) && (
+                                    <button
+                                      className="btn btn--warning btn--sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCloseBluefinPosition(
+                                          poolPosition.poolAddress,
+                                          poolPosition.positions
+                                            .filter(hasZeroLiquidity)
+                                            .map((p) => p.id)
+                                        );
+                                      }}
+                                      disabled={
+                                        closingPool ===
+                                          poolPosition.poolAddress ||
+                                        withdrawingPool ===
+                                          poolPosition.poolAddress
+                                      }
+                                    >
+                                      {closingPool ===
+                                      poolPosition.poolAddress ? (
+                                        <span className="loading-text">
+                                          <span className="dot-loader"></span>
+                                          Closing
+                                        </span>
+                                      ) : (
+                                        "Force Close"
+                                      )}
+                                    </button>
+                                  )}
+
+                                {/* Claim Button */}
                                 {poolPosition.positions.some(
                                   (pos) =>
                                     pos.rewards &&
@@ -2306,11 +2695,19 @@ function Positions() {
                                                     className={`status-badge ${
                                                       position.isOutOfRange
                                                         ? "warning"
+                                                        : hasZeroLiquidity(
+                                                            position
+                                                          )
+                                                        ? "pending"
                                                         : "bluefin"
                                                     }`}
                                                   >
                                                     {position.isOutOfRange
                                                       ? "Out of Range"
+                                                      : hasZeroLiquidity(
+                                                          position
+                                                        )
+                                                      ? "No Liquidity"
                                                       : "In Range"}
                                                   </span>
                                                 ) : position.isOutOfRange ? (
@@ -2349,45 +2746,83 @@ function Positions() {
                                                         Collect Fees
                                                       </button>
                                                     )}
-                                                  <button
-                                                    className="btn btn--primary btn--sm"
-                                                    onClick={() =>
-                                                      handleWithdraw(
-                                                        poolPosition.poolAddress,
-                                                        [position.id],
-                                                        parseInt(
-                                                          position.balanceA ||
-                                                            "0"
-                                                        ),
-                                                        position.valueUsd
-                                                      )
-                                                    }
-                                                    disabled={
-                                                      withdrawingPool ===
-                                                      poolPosition.poolAddress
-                                                    }
-                                                  >
-                                                    {isVaultPosition(position)
-                                                      ? "Withdraw from Vault"
-                                                      : isScallopPosition(
-                                                          position
+
+                                                  {/* Regular withdrawal button for positions */}
+                                                  {!hasZeroLiquidity(
+                                                    position
+                                                  ) && (
+                                                    <button
+                                                      className="btn btn--primary btn--sm"
+                                                      onClick={() =>
+                                                        handleWithdraw(
+                                                          poolPosition.poolAddress,
+                                                          [position.id],
+                                                          parseInt(
+                                                            position.balanceA ||
+                                                              "0"
+                                                          ),
+                                                          position.valueUsd
                                                         )
-                                                      ? position.positionType?.includes(
-                                                          "supply"
-                                                        ) ||
-                                                        position.positionType?.includes(
-                                                          "collateral"
-                                                        )
-                                                        ? "Withdraw"
-                                                        : "Repay"
-                                                      : poolPosition.protocol ===
-                                                        "SuiLend"
-                                                      ? position.positionType ===
-                                                        "suilend-deposit"
-                                                        ? "Withdraw"
-                                                        : "Repay"
-                                                      : "Close"}
-                                                  </button>
+                                                      }
+                                                      disabled={
+                                                        withdrawingPool ===
+                                                        poolPosition.poolAddress
+                                                      }
+                                                    >
+                                                      {isVaultPosition(position)
+                                                        ? "Withdraw from Vault"
+                                                        : isScallopPosition(
+                                                            position
+                                                          )
+                                                        ? position.positionType?.includes(
+                                                            "supply"
+                                                          ) ||
+                                                          position.positionType?.includes(
+                                                            "collateral"
+                                                          )
+                                                          ? "Withdraw"
+                                                          : "Repay"
+                                                        : poolPosition.protocol ===
+                                                          "SuiLend"
+                                                        ? position.positionType ===
+                                                          "suilend-deposit"
+                                                          ? "Withdraw"
+                                                          : "Repay"
+                                                        : "Close"}
+                                                    </button>
+                                                  )}
+
+                                                  {/* Force Close button for positions with no liquidity */}
+                                                  {isBluefinPool(
+                                                    poolPosition
+                                                  ) &&
+                                                    hasZeroLiquidity(
+                                                      position
+                                                    ) && (
+                                                      <button
+                                                        className="btn btn--warning btn--sm"
+                                                        onClick={() =>
+                                                          handleCloseBluefinPosition(
+                                                            poolPosition.poolAddress,
+                                                            [position.id]
+                                                          )
+                                                        }
+                                                        disabled={
+                                                          closingPool ===
+                                                          poolPosition.poolAddress
+                                                        }
+                                                      >
+                                                        {closingPool ===
+                                                        poolPosition.poolAddress ? (
+                                                          <span className="loading-text">
+                                                            <span className="dot-loader"></span>
+                                                            Closing
+                                                          </span>
+                                                        ) : (
+                                                          "Force Close"
+                                                        )}
+                                                      </button>
+                                                    )}
                                                 </div>
                                               </td>
                                             </tr>
@@ -2556,6 +2991,12 @@ function Positions() {
           border: 1px solid rgba(6, 134, 74, 0.3);
         }
 
+        .status-badge.pending {
+          background-color: rgba(255, 152, 0, 0.1);
+          color: #ff9800;
+          border: 1px solid rgba(255, 152, 0, 0.3);
+        }
+
         .protocol-bar.bluefin {
           background: linear-gradient(90deg, #06864a, rgba(6, 134, 74, 0.7));
         }
@@ -2563,6 +3004,22 @@ function Positions() {
         .blue-token {
           background: linear-gradient(135deg, #1e88e5, #039be5);
           box-shadow: 0 0 10px rgba(3, 155, 229, 0.7);
+        }
+
+        /* Button styling for Force Close */
+        .btn--warning {
+          background-color: #ff9800;
+          border-color: #f57c00;
+          color: white;
+        }
+
+        .btn--warning:hover {
+          background-color: #f57c00;
+        }
+
+        .btn--warning:disabled {
+          background-color: rgba(255, 152, 0, 0.6);
+          border-color: rgba(245, 124, 0, 0.6);
         }
       `}</style>
     </div>
