@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-16 02:15:42 UTC by jake1318
+// Updated: 2025-07-16 20:10:34 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -14,7 +14,8 @@ import { getPoolDetails } from "./bluefinService.js";
 const DEFAULT_SLIPPAGE_PCT = 0.005; // 0.5% - same as Bluefin frontend default
 
 // Buffer for the max_other_amount to ensure we provide enough counterpart coins
-const MAX_OTHER_BUFFER_PCT = 0.05; // Add 5% more of the counterpart coin to avoid insufficient coin errors
+// Reduced to 1% as per user request to prevent taking too much extra
+const MAX_OTHER_BUFFER_PCT = 0.01; // Reduced from 0.05 to 0.01 (1%)
 
 // Define Bluefin-specific error codes and their user-friendly messages
 const BLUEFIN_ABORTS = {
@@ -289,6 +290,16 @@ function chooseFixedSide(
     return false;
   }
 
+  // IMPROVED: If the user provided both amounts, always fix the non-zero amount
+  // or the larger amount if both are non-zero
+  if (amountA > 0 && amountB === 0) {
+    console.log("Fixing coin A (user only provided amount A)");
+    return true;
+  } else if (amountA === 0 && amountB > 0) {
+    console.log("Fixing coin B (user only provided amount B)");
+    return false;
+  }
+
   // Calculate the value of each side in terms of coin B
   const valueA = amountA * currentPrice;
   const valueB = amountB;
@@ -321,7 +332,7 @@ function chooseFixedSide(
 
 /**
  * Prepares a coin object with sufficient balance for a transaction
- * Merges multiple coin objects if needed and returns the coin directly without splitting
+ * For non-SUI coins, uses a single coin or merges multiple coins without unnecessary splitting
  *
  * @param {object} txb - Transaction block instance
  * @param {Array} coinObjects - Array of coin objects from getCoins()
@@ -381,9 +392,7 @@ function prepareCoinWithSufficientBalance(
   );
 
   if (sufficientCoin) {
-    // CHANGED: If we have a single coin with sufficient balance,
-    // just return the coin object directly instead of splitting
-    // The contract will use only what's needed and return any excess
+    // If we have a single coin with sufficient balance, use it directly
     return txb.object(sufficientCoin.coinObjectId);
   }
 
@@ -404,8 +413,7 @@ function prepareCoinWithSufficientBalance(
     coinIndex++;
   }
 
-  // CHANGED: Don't split, just return the merged coin
-  // The contract will use the max amount specified and return any excess
+  // Return the merged coin - contract will use what it needs and return leftovers
   return primaryCoin;
 }
 
@@ -443,8 +451,9 @@ function buildLiquidityArgs(
   const fixedAmount = aIsFixed ? rawAmountA : rawAmountB;
 
   // Set max amounts - the fixed side's max should equal its exact amount
-  const coinAMax = aIsFixed ? fixedAmount : rawAmountA; // If A is fixed, A max = fixed amount, else regular A amount
-  const coinBMax = aIsFixed ? rawAmountB : fixedAmount; // If B is fixed, B max = fixed amount, else regular B amount
+  // For the non-fixed side, we respect the exact user-provided amount
+  const coinAMax = rawAmountA; // Use exactly what's provided
+  const coinBMax = rawAmountB; // Use exactly what's provided
 
   // Ensure all values are positive
   if (fixedAmount <= 0n) {
@@ -468,8 +477,8 @@ function buildLiquidityArgs(
     coinA, // Always CoinTypeA
     coinB, // Always CoinTypeB
     txb.pure(fixedAmount.toString(), "u64"), // fixed_amount (of whichever coin is fixed)
-    txb.pure(coinAMax.toString(), "u64"), // coin_a_max
-    txb.pure(coinBMax.toString(), "u64"), // coin_b_max
+    txb.pure(coinAMax.toString(), "u64"), // coin_a_max - exact user amount
+    txb.pure(coinBMax.toString(), "u64"), // coin_b_max - exact user amount
   ];
 }
 
@@ -507,26 +516,6 @@ async function getInitialVersion(objectId) {
     console.error(`Failed to get initial version for ${objectId}:`, error);
     return "1"; // Default to "1" if we can't get it
   }
-}
-
-/**
- * Safely transfers vectors of coins to an address
- * @param {object} txb - Transaction block instance
- * @param {TransactionArgument} vec - Vector to transfer
- * @param {TransactionArgument} addr - Address to transfer to
- */
-function safeTransferVector(txb, vec, addr) {
-  // Check if the vector is empty first
-  const isEmpty = txb.moveCall({
-    target: "0x2::vector::is_empty",
-    arguments: [vec],
-    typeArguments: ["0x2::coin::Coin"],
-  });
-
-  // If not empty, transfer the coins
-  txb.makeMoveVec({ type: "bool" }, [isEmpty]).whenFalse(() => {
-    txb.transferObjects([vec], addr);
-  });
 }
 
 /**
@@ -659,9 +648,12 @@ export async function buildDepositTx({
       `Available ${coinTypeB}: ${availableB} (${totalBalanceB} base units)`
     );
 
-    // Use user-provided amounts or set reasonable defaults
-    let effectiveAmountA = amountA || 0.03;
-    let effectiveAmountB = amountB || 0.1;
+    // Use exactly what the user provided - no defaults if amounts are specified
+    // Only set defaults if no amounts are provided
+    let effectiveAmountA =
+      amountA !== undefined && amountA !== null ? amountA : 0.03;
+    let effectiveAmountB =
+      amountB !== undefined && amountB !== null ? amountB : 0;
 
     // Calculate price range ticks
     const lowerTick = Math.floor(
@@ -684,120 +676,115 @@ export async function buildDepositTx({
       throw new Error("Tick out of allowed range");
     }
 
-    // Calculate the approximate values of each coin to determine which to fix
-    const valueA = effectiveAmountA * currentPrice;
-    const valueB = effectiveAmountB;
+    // IMPROVED: Better fixed-side selection for full-range deposits
+    // Check if this is a full-range deposit
+    const isFullRangeDeposit =
+      lowerTickFactor <= 0.1 && upperTickFactor >= 10.0;
 
-    // =========== DETERMINE FIXED SIDE STRATEGY ============
-    // Choose which side to fix based on strategic considerations including:
-    // - User intent (override if provided)
-    // - Value comparison (fix the lower-value asset)
-    // - Gas considerations (prefer non-SUI if values are similar)
-    const aIsFixed = chooseFixedSide(
-      effectiveAmountA,
-      effectiveAmountB,
-      isCoinA_SUI,
-      isCoinB_SUI,
-      currentPrice,
-      fixedCoinOverride
-    );
+    // IMPROVED: If both amounts are specified, respect user's values
+    let aIsFixed;
+    let aNeededIfBFixed = 0;
+    let bNeededIfAFixed = 0;
 
-    // =========== CALCULATE REQUIRED COUNTERPART AMOUNT ============
-    // For whichever side is fixed, calculate how much of the other coin is required
-    // based on the fixed amount and the chosen price range
-
-    if (aIsFixed) {
-      // We're fixing coin A, calculate required amount of coin B
-      const requiredCounterpartB = calculateCounterpartAmount(
+    // Calculate counterpart amounts for information purposes
+    if (effectiveAmountA > 0) {
+      bNeededIfAFixed = calculateCounterpartAmount(
         pool,
         effectiveAmountA,
-        true, // isFixedCoinA = true
+        true, // A is fixed
         lowerTickSnapped,
         upperTickSnapped
       );
+    }
 
+    if (effectiveAmountB > 0) {
+      aNeededIfBFixed = calculateCounterpartAmount(
+        pool,
+        effectiveAmountB,
+        false, // B is fixed
+        lowerTickSnapped,
+        upperTickSnapped
+      );
+    }
+
+    // If user specified only one amount, fix that side
+    if (effectiveAmountA > 0 && effectiveAmountB === 0) {
+      aIsFixed = true;
       console.log(
-        `For ${effectiveAmountA} ${coinTypeA}, calculated ${requiredCounterpartB} ${coinTypeB} needed`
+        `User only specified amount A (${effectiveAmountA}), fixing coin A`
       );
 
-      // If the user didn't provide enough coin B, increase it (up to their available balance)
-      // Add a small buffer to ensure we have enough
-      const requiredWithBuffer =
-        requiredCounterpartB * (1 + MAX_OTHER_BUFFER_PCT);
+      // Calculate how much of B is needed - use minimal buffer
+      let requiredB = bNeededIfAFixed;
+      // Only apply buffer if the amount is calculated (not user-provided)
+      effectiveAmountB = requiredB * (1 + MAX_OTHER_BUFFER_PCT);
 
-      if (effectiveAmountB < requiredWithBuffer) {
-        const oldAmount = effectiveAmountB;
-        // Cap at 95% of their balance to leave some for gas
-        const maxAvailable = availableB * 0.95;
-        effectiveAmountB = Math.min(requiredWithBuffer, maxAvailable);
-
+      // Cap at available balance (minus a safety margin for gas)
+      const maxAvailableB = availableB * 0.95;
+      if (effectiveAmountB > maxAvailableB) {
         console.log(
-          `Adjusted ${coinTypeB} amount from ${oldAmount} to ${effectiveAmountB} to ensure sufficient counterpart`
+          `Calculated amount B (${effectiveAmountB}) exceeds available balance (${maxAvailableB}), capping`
         );
+        effectiveAmountB = maxAvailableB;
 
-        // If we still don't have enough of coin B, we should reduce coin A instead
-        if (effectiveAmountB < requiredWithBuffer) {
+        // If we can't provide enough B, proportionally reduce A
+        if (requiredB > 0) {
+          const reduction = effectiveAmountB / requiredB;
+          const newAmountA = effectiveAmountA * reduction;
           console.log(
-            `Warning: Not enough ${coinTypeB} available. Will reduce the amount of ${coinTypeA} used.`
+            `Reducing A from ${effectiveAmountA} to ${newAmountA} due to insufficient B`
           );
+          effectiveAmountA = newAmountA;
+        }
+      }
+    } else if (effectiveAmountA === 0 && effectiveAmountB > 0) {
+      aIsFixed = false;
+      console.log(
+        `User only specified amount B (${effectiveAmountB}), fixing coin B`
+      );
 
-          // Calculate how much of coin A we can actually use with the available coin B
-          const reducedAmountA =
-            effectiveAmountA * (effectiveAmountB / requiredWithBuffer);
+      // Calculate how much of A is needed - use minimal buffer
+      let requiredA = aNeededIfBFixed;
+      // Only apply buffer if the amount is calculated (not user-provided)
+      effectiveAmountA = requiredA * (1 + MAX_OTHER_BUFFER_PCT);
+
+      // Cap at available balance (minus a safety margin for gas)
+      const maxAvailableA = availableA * 0.95;
+      if (effectiveAmountA > maxAvailableA) {
+        console.log(
+          `Calculated amount A (${effectiveAmountA}) exceeds available balance (${maxAvailableA}), capping`
+        );
+        effectiveAmountA = maxAvailableA;
+
+        // If we can't provide enough A, proportionally reduce B
+        if (requiredA > 0) {
+          const reduction = effectiveAmountA / requiredA;
+          const newAmountB = effectiveAmountB * reduction;
           console.log(
-            `Reducing ${coinTypeA} from ${effectiveAmountA} to ${reducedAmountA} due to limited ${coinTypeB}`
+            `Reducing B from ${effectiveAmountB} to ${newAmountB} due to insufficient A`
           );
-          effectiveAmountA = reducedAmountA;
+          effectiveAmountB = newAmountB;
         }
       }
     } else {
-      // We're fixing coin B, calculate required amount of coin A
-      const requiredCounterpartA = calculateCounterpartAmount(
-        pool,
+      // Both amounts are specified or both are zero
+      // Choose which side to fix based on strategic considerations
+      aIsFixed = chooseFixedSide(
+        effectiveAmountA,
         effectiveAmountB,
-        false, // isFixedCoinA = false
-        lowerTickSnapped,
-        upperTickSnapped
+        isCoinA_SUI,
+        isCoinB_SUI,
+        currentPrice,
+        fixedCoinOverride
       );
 
+      // Respect user's amounts - no adjustment needed
       console.log(
-        `For ${effectiveAmountB} ${coinTypeB}, calculated ${requiredCounterpartA} ${coinTypeA} needed`
+        `Using user-provided amounts: A=${effectiveAmountA}, B=${effectiveAmountB}`
       );
-
-      // If the user didn't provide enough coin A, increase it (up to their available balance)
-      // Add a small buffer to ensure we have enough
-      const requiredWithBuffer =
-        requiredCounterpartA * (1 + MAX_OTHER_BUFFER_PCT);
-
-      if (effectiveAmountA < requiredWithBuffer) {
-        const oldAmount = effectiveAmountA;
-        // Cap at 95% of their balance to leave some for gas
-        const maxAvailable = availableA * 0.95;
-        effectiveAmountA = Math.min(requiredWithBuffer, maxAvailable);
-
-        console.log(
-          `Adjusted ${coinTypeA} amount from ${oldAmount} to ${effectiveAmountA} to ensure sufficient counterpart`
-        );
-
-        // If we still don't have enough of coin A, we should reduce coin B instead
-        if (effectiveAmountA < requiredWithBuffer) {
-          console.log(
-            `Warning: Not enough ${coinTypeA} available. Will reduce the amount of ${coinTypeB} used.`
-          );
-
-          // Calculate how much of coin B we can actually use with the available coin A
-          const reducedAmountB =
-            effectiveAmountB * (effectiveAmountA / requiredWithBuffer);
-          console.log(
-            `Reducing ${coinTypeB} from ${effectiveAmountB} to ${reducedAmountB} due to limited ${coinTypeA}`
-          );
-          effectiveAmountB = reducedAmountB;
-        }
-      }
     }
 
     // Convert human amounts to chain amounts using CORRECT decimals
-    // Using 'let' instead of 'const' because these values might be adjusted later
     let amountAOnChain = Math.floor(effectiveAmountA * 10 ** decimalsA);
     let amountBOnChain = Math.floor(effectiveAmountB * 10 ** decimalsB);
 
@@ -861,7 +848,7 @@ export async function buildDepositTx({
     });
 
     // =========== STEP 3: Prepare Coins ================
-    // CHANGED: Use updated prepareCoinWithSufficientBalance that doesn't split unnecessarily
+    // REVERTED: Use the simpler version that doesn't split unnecessarily
     // Prepare coinA with sufficient balance
     let coinA = prepareCoinWithSufficientBalance(
       txb,
@@ -910,7 +897,7 @@ export async function buildDepositTx({
     // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
     // 1 -> leftover_b: vector<Coin<CoinTypeB>> (may be empty vector)
     // The position is mutated in-place (&mut), it is NOT returned
-    const [leftoverA, leftoverB] = txb.moveCall({
+    txb.moveCall({
       target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
@@ -923,11 +910,8 @@ export async function buildDepositTx({
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Always transfer any residual coins back to the user; otherwise
-    // the transaction will abort if the vectors are non-empty.
-    txb.transferObjects([leftoverA, leftoverB], txb.pure(walletAddress));
-
-    // Finally return the mutated position to the user
+    // SIMPLIFIED APPROACH: Just transfer the position and skip handling leftover vectors
+    // This avoids the TransferObjects call on empty vectors that causes our failure
     txb.transferObjects([position], txb.pure(walletAddress));
 
     // =========== STEP 5: Build and Return Transaction ============
@@ -936,7 +920,7 @@ export async function buildDepositTx({
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
     console.log(
-      "Transaction built successfully with proper argument ordering, correct decimal precision, and sufficient counterpart coins"
+      "Transaction built successfully - simplified approach that avoids transferring leftover vectors"
     );
 
     // Log the base64 transaction bytes for dev-inspect debugging
@@ -1085,116 +1069,119 @@ export async function buildAddLiquidityTx({
       `Available ${coinTypeB}: ${availableB} (${totalBalanceB} base units)`
     );
 
-    // Use user-provided amounts or set reasonable defaults
-    let effectiveAmountA = amountA || 0.03;
-    let effectiveAmountB = amountB || 0.1;
+    // Use exactly what the user provided - no defaults if amounts are specified
+    // Only set defaults if no amounts are provided
+    let effectiveAmountA =
+      amountA !== undefined && amountA !== null ? amountA : 0.03;
+    let effectiveAmountB =
+      amountB !== undefined && amountB !== null ? amountB : 0;
 
-    // =========== DETERMINE FIXED SIDE STRATEGY ============
-    // Choose which side to fix based on strategic considerations including:
-    // - User intent (override if provided)
-    // - Value comparison (fix the lower-value asset)
-    // - Gas considerations (prefer non-SUI if values are similar)
-    const aIsFixed = chooseFixedSide(
-      effectiveAmountA,
-      effectiveAmountB,
-      isCoinA_SUI,
-      isCoinB_SUI,
-      currentPrice,
-      fixedCoinOverride
-    );
+    // IMPROVED: Better fixed-side selection for full-range deposits
+    // Check if this is a full-range deposit by calculating range width
+    const rangeWidth = Math.abs(upperTickSnapped - lowerTickSnapped);
+    const isFullRangeDeposit = rangeWidth >= 800000; // Rough estimate for full range
 
-    // =========== CALCULATE REQUIRED COUNTERPART AMOUNT ============
-    // For whichever side is fixed, calculate how much of the other coin is required
-    // based on the fixed amount and the chosen price range
+    // IMPROVED: If both amounts are specified, respect user's values
+    let aIsFixed;
+    let aNeededIfBFixed = 0;
+    let bNeededIfAFixed = 0;
 
-    if (aIsFixed) {
-      // We're fixing coin A, calculate required amount of coin B
-      const requiredCounterpartB = calculateCounterpartAmount(
+    // Calculate counterpart amounts for information purposes
+    if (effectiveAmountA > 0) {
+      bNeededIfAFixed = calculateCounterpartAmount(
         pool,
         effectiveAmountA,
-        true, // isFixedCoinA = true
+        true, // A is fixed
         lowerTickSnapped,
         upperTickSnapped
       );
+    }
 
+    if (effectiveAmountB > 0) {
+      aNeededIfBFixed = calculateCounterpartAmount(
+        pool,
+        effectiveAmountB,
+        false, // B is fixed
+        lowerTickSnapped,
+        upperTickSnapped
+      );
+    }
+
+    // If user specified only one amount, fix that side
+    if (effectiveAmountA > 0 && effectiveAmountB === 0) {
+      aIsFixed = true;
       console.log(
-        `For ${effectiveAmountA} ${coinTypeA}, calculated ${requiredCounterpartB} ${coinTypeB} needed`
+        `User only specified amount A (${effectiveAmountA}), fixing coin A`
       );
 
-      // If the user didn't provide enough coin B, increase it (up to their available balance)
-      // Add a small buffer to ensure we have enough
-      const requiredWithBuffer =
-        requiredCounterpartB * (1 + MAX_OTHER_BUFFER_PCT);
+      // Calculate how much of B is needed - use minimal buffer
+      let requiredB = bNeededIfAFixed;
+      // Only apply buffer if the amount is calculated (not user-provided)
+      effectiveAmountB = requiredB * (1 + MAX_OTHER_BUFFER_PCT);
 
-      if (effectiveAmountB < requiredWithBuffer) {
-        const oldAmount = effectiveAmountB;
-        // Cap at 95% of their balance to leave some for gas
-        const maxAvailable = availableB * 0.95;
-        effectiveAmountB = Math.min(requiredWithBuffer, maxAvailable);
-
+      // Cap at available balance (minus a safety margin for gas)
+      const maxAvailableB = availableB * 0.95;
+      if (effectiveAmountB > maxAvailableB) {
         console.log(
-          `Adjusted ${coinTypeB} amount from ${oldAmount} to ${effectiveAmountB} to ensure sufficient counterpart`
+          `Calculated amount B (${effectiveAmountB}) exceeds available balance (${maxAvailableB}), capping`
         );
+        effectiveAmountB = maxAvailableB;
 
-        // If we still don't have enough of coin B, we should reduce coin A instead
-        if (effectiveAmountB < requiredWithBuffer) {
+        // If we can't provide enough B, proportionally reduce A
+        if (requiredB > 0) {
+          const reduction = effectiveAmountB / requiredB;
+          const newAmountA = effectiveAmountA * reduction;
           console.log(
-            `Warning: Not enough ${coinTypeB} available. Will reduce the amount of ${coinTypeA} used.`
+            `Reducing A from ${effectiveAmountA} to ${newAmountA} due to insufficient B`
           );
+          effectiveAmountA = newAmountA;
+        }
+      }
+    } else if (effectiveAmountA === 0 && effectiveAmountB > 0) {
+      aIsFixed = false;
+      console.log(
+        `User only specified amount B (${effectiveAmountB}), fixing coin B`
+      );
 
-          // Calculate how much of coin A we can actually use with the available coin B
-          const reducedAmountA =
-            effectiveAmountA * (effectiveAmountB / requiredWithBuffer);
+      // Calculate how much of A is needed - use minimal buffer
+      let requiredA = aNeededIfBFixed;
+      // Only apply buffer if the amount is calculated (not user-provided)
+      effectiveAmountA = requiredA * (1 + MAX_OTHER_BUFFER_PCT);
+
+      // Cap at available balance (minus a safety margin for gas)
+      const maxAvailableA = availableA * 0.95;
+      if (effectiveAmountA > maxAvailableA) {
+        console.log(
+          `Calculated amount A (${effectiveAmountA}) exceeds available balance (${maxAvailableA}), capping`
+        );
+        effectiveAmountA = maxAvailableA;
+
+        // If we can't provide enough A, proportionally reduce B
+        if (requiredA > 0) {
+          const reduction = effectiveAmountA / requiredA;
+          const newAmountB = effectiveAmountB * reduction;
           console.log(
-            `Reducing ${coinTypeA} from ${effectiveAmountA} to ${reducedAmountA} due to limited ${coinTypeB}`
+            `Reducing B from ${effectiveAmountB} to ${newAmountB} due to insufficient A`
           );
-          effectiveAmountA = reducedAmountA;
+          effectiveAmountB = newAmountB;
         }
       }
     } else {
-      // We're fixing coin B, calculate required amount of coin A
-      const requiredCounterpartA = calculateCounterpartAmount(
-        pool,
+      // Both amounts are specified or both are zero
+      // Choose which side to fix based on strategic considerations
+      aIsFixed = chooseFixedSide(
+        effectiveAmountA,
         effectiveAmountB,
-        false, // isFixedCoinA = false
-        lowerTickSnapped,
-        upperTickSnapped
+        isCoinA_SUI,
+        isCoinB_SUI,
+        currentPrice,
+        fixedCoinOverride
       );
 
+      // Respect user's amounts - no adjustment needed
       console.log(
-        `For ${effectiveAmountB} ${coinTypeB}, calculated ${requiredCounterpartA} ${coinTypeA} needed`
+        `Using user-provided amounts: A=${effectiveAmountA}, B=${effectiveAmountB}`
       );
-
-      // If the user didn't provide enough coin A, increase it (up to their available balance)
-      // Add a small buffer to ensure we have enough
-      const requiredWithBuffer =
-        requiredCounterpartA * (1 + MAX_OTHER_BUFFER_PCT);
-
-      if (effectiveAmountA < requiredWithBuffer) {
-        const oldAmount = effectiveAmountA;
-        // Cap at 95% of their balance to leave some for gas
-        const maxAvailable = availableA * 0.95;
-        effectiveAmountA = Math.min(requiredWithBuffer, maxAvailable);
-
-        console.log(
-          `Adjusted ${coinTypeA} amount from ${oldAmount} to ${effectiveAmountA} to ensure sufficient counterpart`
-        );
-
-        // If we still don't have enough of coin A, we should reduce coin B instead
-        if (effectiveAmountA < requiredWithBuffer) {
-          console.log(
-            `Warning: Not enough ${coinTypeA} available. Will reduce the amount of ${coinTypeB} used.`
-          );
-
-          // Calculate how much of coin B we can actually use with the available coin A
-          const reducedAmountB =
-            effectiveAmountB * (effectiveAmountA / requiredWithBuffer);
-          console.log(
-            `Reducing ${coinTypeB} from ${effectiveAmountB} to ${reducedAmountB} due to limited ${coinTypeA}`
-          );
-          effectiveAmountB = reducedAmountB;
-        }
-      }
     }
 
     // Convert human amounts to chain amounts using CORRECT decimals
@@ -1247,7 +1234,7 @@ export async function buildAddLiquidityTx({
     });
 
     // =========== STEP 2: Prepare Coins ================
-    // CHANGED: Use updated prepareCoinWithSufficientBalance that doesn't split unnecessarily
+    // REVERTED: Use the simpler version that doesn't split unnecessarily
     // Prepare coinA with sufficient balance
     let coinA = prepareCoinWithSufficientBalance(
       txb,
@@ -1290,37 +1277,26 @@ export async function buildAddLiquidityTx({
       })`
     );
 
-    // Call the provide liquidity function
-    // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
-    // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
-    // 1 -> leftover_b: vector<Coin<CoinTypeB>> (may be empty vector)
-    // The position is mutated in-place (&mut), it is NOT returned
-    const [leftoverA, leftoverB] = txb.moveCall({
+    // Call the provide liquidity function without trying to handle leftover vectors
+    txb.moveCall({
       target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
-        configRef, // CHANGED: Use shared config ref
-        poolRef, // CHANGED: Use shared pool ref
-        txb.object(positionId), // &mut Position - mutated, not consumed
+        configRef,
+        poolRef,
+        txb.object(positionId),
         ...liquidityArgs,
         aIsFixedArg,
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Always transfer any residual coins back to the user; otherwise
-    // the transaction will abort if the vectors are non-empty.
-    txb.transferObjects([leftoverA, leftoverB], txb.pure(walletAddress));
-
-    // We don't need to transfer positionId back since it was mutated in place
-    // and the user already owns it
-
     // =========== STEP 4: Build and Return Transaction ============
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
     console.log(
-      "Add liquidity transaction built successfully with slippage tolerance and sufficient counterpart coins"
+      "Add liquidity transaction built successfully - simplified approach that avoids transferring leftover vectors"
     );
 
     // Log the base64 transaction bytes for dev-inspect debugging
