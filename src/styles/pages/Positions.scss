@@ -1,5 +1,5 @@
 // src/styles/pages/Positions.scss
-// Last Updated: 2025-05-07 20:55:13 UTC by jake1318
+// Last Updated: 2025-07-15 04:26:45 UTC by jake1318
 
 .positions-page {
   width: 100%;
@@ -8,38 +8,62 @@
   position: relative;
   color: #fff;
 
-  // Add cyberpunk-style gradient background with grid overlay to match homepage
+  // Updated cyberpunk-style gradient background with neon blue (removed grid overlay)
   background: radial-gradient(
       circle at top left,
-      rgba(0, 255, 255, 0.15),
+      rgba(30, 144, 255, 0.15),
+      // Changed to neon blue
       rgba(5, 15, 30, 0.3) 40%
     ),
     radial-gradient(
       circle at bottom right,
-      rgba(255, 0, 255, 0.15),
+      rgba(196, 92, 242, 0.15),
+      // Changed to match purple
       rgba(5, 15, 30, 0.3) 40%
     ),
     #0f1624;
 
-  &::before {
-    content: "";
+  // Add the glows from other pages
+  .glow-1 {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.05) 1px,
-        transparent 1px
-      ),
-      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
-    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
-    pointer-events: none;
+    width: 300px;
+    height: 300px;
+    background: rgba(30, 144, 255, 0.12); // Neon blue
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -100px;
+    left: 10%;
     z-index: 0;
+    animation: pulsate 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(196, 92, 242, 0.12); // Purple
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: 10%;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    pointer-events: none;
+  }
+
+  .glow-3 {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba(0, 255, 128, 0.12); // Green
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 60%;
+    left: 70%;
+    z-index: 0;
+    animation: pulsate 9s ease-in-out infinite;
+    pointer-events: none;
   }
 
   .content-container {
@@ -49,7 +73,7 @@
     margin: 0 auto;
   }
 
-  // New main navigation styling with gradient text
+  // New main navigation styling with gradient text using neon blue
   .main-navigation {
     display: flex;
     margin-bottom: 2.5rem;
@@ -85,7 +109,11 @@
 
       &.active {
         color: transparent;
-        background: linear-gradient(90deg, #00e7ff, #a15ffe);
+        background: linear-gradient(
+          90deg,
+          #1e90ff,
+          #c45cf2
+        ); // Changed to neon blue and purple
         -webkit-background-clip: text;
         background-clip: text;
         opacity: 1;
@@ -97,10 +125,15 @@
           left: 0;
           width: 100%;
           height: 3px;
-          background: linear-gradient(90deg, #00e7ff, #a15ffe);
+          background: linear-gradient(
+            90deg,
+            #1e90ff,
+            #c45cf2
+          ); // Changed to neon blue and purple
           border-radius: 3px;
-          box-shadow: 0 0 10px rgba(0, 231, 255, 0.5),
-            0 0 10px rgba(161, 95, 254, 0.5);
+          box-shadow: 0 0 10px rgba(30, 144, 255, 0.5),
+            // Changed to neon blue
+            0 0 10px rgba(196, 92, 242, 0.5);
           z-index: 2;
         }
       }
@@ -120,15 +153,17 @@
     border: 1px solid;
     border-image: linear-gradient(
         45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
+        rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.2) // Changed to match purple
       )
       1;
     overflow: hidden;
     margin-bottom: 2rem;
     backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
-      0 8px 32px rgba(255, 0, 255, 0.05);
+    box-shadow: 0 8px 32px rgba(30, 144, 255, 0.05),
+      // Changed to neon blue
+      0 8px 32px rgba(196, 92, 242, 0.05); // Changed to match purple
 
     table {
       width: 100%;
@@ -209,7 +244,7 @@
     }
   }
 
-  // Loading state
+  // Loading state updated with neon blue
   .loading-state {
     display: flex;
     flex-direction: column;
@@ -221,9 +256,9 @@
       width: 3rem;
       height: 3rem;
       border-radius: 50%;
-      border: 3px solid rgba(0, 255, 255, 0.15);
-      border-top-color: #00ffff;
-      border-right-color: #ff00ff;
+      border: 3px solid rgba(30, 144, 255, 0.15); // Changed to neon blue
+      border-top-color: #1e90ff; // Changed to neon blue
+      border-right-color: #c45cf2; // Changed to match purple
       animation: spin 1.2s linear infinite;
       margin-bottom: 1.5rem;
     }
@@ -259,6 +294,60 @@
     }
   }
 
+  // Updated token icon styles for uniform sizing
+  .token-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: #1a1f2e;
+    position: relative;
+    box-shadow: 0 0 8px rgba(0, 225, 255, 0.2);
+    transition: all 0.2s ease-in-out;
+    flex-shrink: 0; // Prevent icon from shrinking
+  }
+
+  .token-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  // Standardize token icon sizes
+  .token-icon-sm {
+    width: 28px;
+    height: 28px;
+    min-width: 28px; // Set minimum width to maintain consistency
+    min-height: 28px; // Set minimum height to maintain consistency
+  }
+
+  .token-icon-md {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .token-icon-lg {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .token-fallback {
+    background: linear-gradient(135deg, #2a3042, #1e2433);
+    border: 1px solid #304050;
+  }
+
+  .token-fallback-letter {
+    font-weight: bold;
+    font-size: 12px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
   // Pool pair styling
   .pool-pair {
     display: flex;
@@ -268,36 +357,14 @@
     .token-icons {
       display: flex;
       position: relative;
+      height: 28px; // Ensure container height is consistent
+    }
 
-      .token-logo-sm {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: #1e293b;
-        border: 2px solid #0f172a;
-        position: relative;
-        overflow: hidden;
-        font-weight: bold;
-        color: white;
-        font-size: 0.75rem;
-
-        &:nth-child(2) {
-          margin-left: -12px;
-        }
-
-        img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-        }
-
-        &.token-fallback {
-          background: linear-gradient(135deg, #1e293b, #1f2937);
-        }
-      }
+    // Updated token positioning in pairs
+    .token-icon:nth-child(2) {
+      margin-left: -10px;
+      z-index: 1;
+      border: 1px solid #1a1f2e;
     }
 
     .pair-name {
@@ -305,43 +372,67 @@
     }
   }
 
-  // DEX badge
+  // Special token styling
+  .hasui-token {
+    background: linear-gradient(135deg, #ffd966, #ff6b6b);
+    box-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
+
+    img {
+      content: url("/public/haSui.webp"); // Use local haSui image
+    }
+  }
+
+  .sui-token {
+    background: linear-gradient(135deg, #4bc1d2, #2b6eff);
+    box-shadow: 0 0 10px rgba(0, 174, 240, 0.7);
+
+    img {
+      content: url("/public/sui.png"); // Use local SUI image
+    }
+  }
+
+  .usdc-token {
+    background: linear-gradient(135deg, #2775ca, #2775ca);
+    box-shadow: 0 0 10px rgba(39, 117, 202, 0.7);
+  }
+
+  // DEX badge updated with neon blue
   .dex-badge {
     display: inline-block;
     font-size: 0.8rem;
     padding: 0.25rem 0.75rem;
-    background: rgba(0, 255, 255, 0.1);
-    border: 1px solid rgba(0, 255, 255, 0.2);
+    background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+    border: 1px solid rgba(30, 144, 255, 0.2); // Changed to neon blue
     border-radius: 99px;
-    color: #00ffff;
+    color: #1e90ff; // Changed to neon blue
     text-transform: capitalize;
 
     &.cetus {
-      background: rgba(0, 255, 255, 0.1);
-      color: #00ffff;
+      background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+      color: #1e90ff; // Changed to neon blue
     }
 
     &.bluefin {
-      background: rgba(255, 0, 255, 0.1);
-      color: #ff00ff;
+      background: rgba(196, 92, 242, 0.1); // Changed to match purple
+      color: #c45cf2; // Changed to match purple
     }
   }
 
-  // APR values
+  // APR values updated with neon blue and consistent colors
   .apr-value {
     font-weight: 700;
     font-size: 1.05rem;
 
     &.high {
-      color: #10f0b0;
+      color: #00ff80; // Green from other pages
     }
 
     &.medium {
-      color: #00ffff;
+      color: #1e90ff; // Changed to neon blue
     }
 
     &.low {
-      color: #ff00ff;
+      color: #c45cf2; // Changed to match purple
     }
   }
 
@@ -354,9 +445,9 @@
     font-weight: 600;
 
     &.success {
-      background: rgba(16, 240, 176, 0.1);
-      color: #10f0b0;
-      border: 1px solid rgba(16, 240, 176, 0.3);
+      background: rgba(0, 255, 128, 0.1); // Changed to green
+      color: #00ff80; // Changed to green
+      border: 1px solid rgba(0, 255, 128, 0.3); // Changed to green
     }
 
     &.warning {
@@ -373,6 +464,7 @@
     justify-content: flex-end;
   }
 
+  // Button styling updated with neon blue
   .btn {
     display: inline-block;
     padding: 0.6rem 1.2rem;
@@ -384,16 +476,22 @@
     border: none;
 
     &--primary {
-      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      background: linear-gradient(
+        45deg,
+        #1e90ff,
+        #c45cf2
+      ); // Changed to neon blue and purple
       color: #000;
       border: none;
-      box-shadow: 0 0 15px rgba(0, 255, 255, 0.2),
-        0 0 15px rgba(255, 0, 255, 0.2);
+      box-shadow: 0 0 15px rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        0 0 15px rgba(196, 92, 242, 0.2); // Changed to match purple
 
       &:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3),
-          0 5px 20px rgba(255, 0, 255, 0.3);
+        box-shadow: 0 5px 20px rgba(30, 144, 255, 0.3),
+          // Changed to neon blue
+          0 5px 20px rgba(196, 92, 242, 0.3); // Changed to match purple
       }
     }
 
@@ -402,8 +500,9 @@
       border: 1px solid;
       border-image: linear-gradient(
           45deg,
-          rgba(0, 255, 255, 0.6),
-          rgba(255, 0, 255, 0.6)
+          rgba(30, 144, 255, 0.6),
+          // Changed to neon blue
+          rgba(196, 92, 242, 0.6) // Changed to match purple
         )
         1;
       color: #fff;
@@ -411,21 +510,28 @@
       &:hover:not(:disabled) {
         background: rgba(25, 35, 50, 0.8);
         transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 255, 255, 0.1),
-          0 5px 15px rgba(255, 0, 255, 0.1);
+        box-shadow: 0 5px 15px rgba(30, 144, 255, 0.1),
+          // Changed to neon blue
+          0 5px 15px rgba(196, 92, 242, 0.1); // Changed to match purple
       }
     }
 
     &--accent {
-      background: linear-gradient(45deg, #00ffff, #a15ffe);
+      background: linear-gradient(
+        45deg,
+        #1e90ff,
+        #c45cf2
+      ); // Changed to neon blue and purple
       color: #000;
-      box-shadow: 0 0 15px rgba(0, 231, 255, 0.2),
-        0 0 15px rgba(161, 95, 254, 0.2);
+      box-shadow: 0 0 15px rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        0 0 15px rgba(196, 92, 242, 0.2); // Changed to match purple
 
       &:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(0, 231, 255, 0.3),
-          0 5px 20px rgba(161, 95, 254, 0.3);
+        box-shadow: 0 5px 20px rgba(30, 144, 255, 0.3),
+          // Changed to neon blue
+          0 5px 20px rgba(196, 92, 242, 0.3); // Changed to match purple
       }
     }
 
@@ -549,6 +655,18 @@
     }
   }
 
+  // Animation for glow effects
+  @keyframes pulsate {
+    0% {
+      opacity: 0.5;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.8;
+      transform: scale(1.2);
+    }
+  }
+
   // Spinner animations
   @keyframes spin {
     to {
@@ -575,4 +693,336 @@
     bottom: 2rem;
     z-index: 100;
   }
+
+  // Portfolio Dashboard styles - added to match the Market Overview in Pools page
+  .portfolio-dashboard {
+    background: rgba(10, 10, 20, 0.4);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(30, 144, 255, 0.08),
+      0 8px 32px rgba(196, 92, 242, 0.08);
+    position: relative;
+    overflow: hidden;
+
+    &:hover {
+      box-shadow: 0 8px 32px rgba(30, 144, 255, 0.12),
+        0 8px 32px rgba(196, 92, 242, 0.12);
+    }
+
+    &::after,
+    &::before {
+      display: none !important;
+      content: none !important;
+      animation: none !important;
+    }
+
+    .dashboard-title {
+      font-size: 20px;
+      margin-bottom: 16px;
+      color: #fff;
+      font-weight: 600;
+      background: linear-gradient(90deg, #1e90ff, #c45cf2);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+      position: relative;
+      z-index: 5;
+    }
+
+    .dashboard-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      position: relative;
+      z-index: 5;
+
+      @media (max-width: 992px) {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dashboard-stat-card {
+      display: flex;
+      align-items: center;
+      background: rgba(20, 20, 30, 0.6);
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+      &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+    }
+
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      margin-right: 15px;
+      font-size: 18px;
+
+      &:nth-child(4n + 1) {
+        background: rgba(30, 144, 255, 0.15);
+        color: #1e90ff;
+      }
+
+      &:nth-child(4n + 2) {
+        background: rgba(196, 92, 242, 0.15);
+        color: #c45cf2;
+      }
+
+      &:nth-child(4n + 3) {
+        background: rgba(0, 255, 128, 0.15);
+        color: #00ff80;
+      }
+
+      &:nth-child(4n + 4) {
+        background: rgba(255, 184, 0, 0.15);
+        color: #ffb800;
+      }
+    }
+
+    .stat-content {
+      flex-grow: 1;
+    }
+
+    .stat-label {
+      color: #b1a5c8;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    /* Special styling to fix the multiple $ issue */
+    .stat-value {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 600;
+      font-family: "Orbitron", monospace;
+      position: relative;
+    }
+
+    /* Override the $ in the React component for numerical values */
+    .stat-content:has(.stat-label:contains("Total Value")) .stat-value,
+    .stat-content:has(.stat-label:contains("Total Rewards")) .stat-value {
+      color: rgba(0, 0, 0, 0); /* Make the original text transparent */
+
+      &::before {
+        content: "$";
+        position: absolute;
+        left: 0;
+        color: white;
+      }
+
+      &::after {
+        content: attr(data-clean-value);
+        position: absolute;
+        left: 12px; /* Space for the $ sign */
+        color: white;
+      }
+    }
+
+    /* Remove $ signs via JS */
+    /* This script should be added to run when the component mounts */
+    /* 
+    document.querySelectorAll('.stat-content .stat-value').forEach(el => {
+      if (el.textContent.includes('$')) {
+        // Extract numeric part
+        const cleanValue = el.textContent.replace(/\$/g, '').trim();
+        el.setAttribute('data-clean-value', cleanValue);
+      }
+    });
+    */
+
+    .stat-loading {
+      height: 20px;
+      width: 80px;
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 25%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 75%
+      );
+      background-size: 200% 100%;
+      border-radius: 4px;
+      animation: loading 1.5s infinite;
+    }
+
+    // Protocol distribution chart styles
+    .protocol-breakdown {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+      h3 {
+        font-size: 16px;
+        margin-bottom: 16px;
+        color: #b1a5c8;
+        font-weight: 500;
+      }
+
+      .protocol-distribution-chart {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .protocol-bar-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        .protocol-label {
+          width: 80px;
+          font-size: 14px;
+          color: #b1a5c8;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .protocol-bar-wrapper {
+          flex-grow: 1;
+          height: 8px;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 4px;
+          overflow: hidden;
+        }
+
+        .protocol-bar {
+          height: 100%;
+          border-radius: 4px;
+          background: linear-gradient(
+            90deg,
+            rgba(30, 144, 255, 0.8),
+            rgba(30, 144, 255, 0.4)
+          );
+
+          &.cetus {
+            background: linear-gradient(90deg, #4650a8, rgba(70, 80, 168, 0.7));
+          }
+
+          &.bluefin {
+            background: linear-gradient(
+              90deg,
+              #2c78b2,
+              rgba(44, 120, 178, 0.7)
+            );
+          }
+
+          &.turbos {
+            background: linear-gradient(
+              90deg,
+              #20c4bc,
+              rgba(32, 196, 188, 0.7)
+            );
+          }
+
+          &.kriya {
+            background: linear-gradient(
+              90deg,
+              #8155ff,
+              rgba(129, 85, 255, 0.7)
+            );
+          }
+
+          &.scallop {
+            background: linear-gradient(
+              90deg,
+              #ff6b6b,
+              rgba(255, 107, 107, 0.7)
+            );
+          }
+
+          &.suilend {
+            background: linear-gradient(
+              90deg,
+              #ff9f1c,
+              rgba(255, 159, 28, 0.7)
+            );
+          }
+        }
+
+        .protocol-value {
+          width: 80px;
+          text-align: right;
+          font-size: 14px;
+          font-weight: 500;
+          color: #fff;
+        }
+      }
+    }
+  }
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+// Position type tabs
+.position-type-tabs {
+  display: flex;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.position-type-tab {
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: #a1a1a1;
+  cursor: pointer;
+  font-size: 14px;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.position-type-tab:hover {
+  color: white;
+}
+
+.position-type-tab.active {
+  color: white;
+  font-weight: 500;
+}
+
+.position-type-tab.active:after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #5c43e8;
+}
+.positions-page {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.positions-table-container {
+  max-height: calc(100vh - 300px); // Adjust based on layout
+  overflow-y: auto;
+  overflow-x: auto;
 }
