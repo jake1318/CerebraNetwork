@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-17 04:01:40 UTC by jake1318
+// Updated: 2025-07-18 00:12:12 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -17,11 +17,16 @@ const DEFAULT_SLIPPAGE_PCT = 0.005; // 0.5% - same as Bluefin frontend default
 // Reduced to 1% as per user request to prevent taking too much extra
 const MAX_OTHER_BUFFER_PCT = 0.01; // Reduced from 0.05 to 0.01 (1%)
 
+// Define the default BLUE token address - updated with the correct one from transaction
+const DEFAULT_BLUE_TOKEN =
+  "0xe1b45a0e641b9955a20aa0ad1c1f4ad86aad8afb07296d4085e349a50e90bdca::blue::BLUE";
+
 // Define Bluefin-specific error codes and their user-friendly messages
 const BLUEFIN_ABORTS = {
   1003: "Selected price range is no longer valid",
   1004: "Required token amount exceeds your maximum",
   1005: "Slippage tolerance exceeded",
+  1010: "Invalid tick range for position",
   1018: "Position cannot be closed yet (cooldown period)",
   1029: "Position has no liquidity to remove",
 };
@@ -54,6 +59,152 @@ function extractBluefinError(error) {
   } catch (e) {
     console.error("Failed to parse error", e);
     return null;
+  }
+}
+
+/**
+ * Gets all available reward token types for a specific position using the Blockvision API
+ *
+ * @param {string} walletAddress - The wallet address of the user
+ * @param {string} positionId - The position ID to get rewards for
+ * @returns {Promise<{rewardTokens: string[], hasRewards: boolean, rewardData: Object}>} - Object with reward tokens, boolean if any rewards exist, and reward data
+ */
+export async function getRewardTokensForPosition(walletAddress, positionId) {
+  try {
+    // Get the API key from environment variables
+    const API_KEY = process.env.BLOCKVISION_API_KEY;
+
+    if (!API_KEY) {
+      console.warn("Blockvision API key not found in environment variables");
+      return {
+        rewardTokens: [DEFAULT_BLUE_TOKEN],
+        hasRewards: false,
+        rewardData: null,
+      };
+    }
+
+    const response = await fetch(
+      `https://api.blockvision.org/v2/sui/account/defiPortfolio?address=${walletAddress}&protocol=bluefin`,
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          "x-api-key": API_KEY,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.code !== 200 || !data.result || !data.result.bluefin) {
+      console.warn("Failed to get Bluefin portfolio from Blockvision:", data);
+      return {
+        rewardTokens: [DEFAULT_BLUE_TOKEN],
+        hasRewards: false,
+        rewardData: null,
+      };
+    }
+
+    // Find the position in the API response
+    const positions = data.result.bluefin.lps || [];
+    const position = positions.find((p) => p.positionId === positionId);
+
+    if (!position || !position.reward || !position.reward.rewards) {
+      console.warn(
+        `Position ${positionId} not found in Blockvision data or has no rewards`
+      );
+      return {
+        rewardTokens: [DEFAULT_BLUE_TOKEN],
+        hasRewards: false,
+        rewardData: null,
+      };
+    }
+
+    // Check if there are any fees to collect
+    const hasFees =
+      position.reward.fee &&
+      (parseFloat(position.reward.fee.coinA) > 0 ||
+        parseFloat(position.reward.fee.coinB) > 0);
+
+    // Extract reward token types and filter out empty rewards
+    const rewardTokensWithAmounts = position.reward.rewards
+      .filter(
+        (reward) => reward.coinAmount && parseFloat(reward.coinAmount) > 0
+      )
+      .map((reward) => ({
+        type: reward.coinType,
+        amount: parseFloat(reward.coinAmount),
+      }));
+
+    const hasRewards = rewardTokensWithAmounts.length > 0 || hasFees;
+
+    // If no tokens with non-zero balance found, return default token
+    if (rewardTokensWithAmounts.length === 0) {
+      console.log(
+        `No tokens with claimable rewards found for position ${positionId}, using default`
+      );
+      return {
+        rewardTokens: [DEFAULT_BLUE_TOKEN],
+        hasRewards: hasFees,
+        rewardData: position.reward,
+      };
+    }
+
+    const rewardTokens = rewardTokensWithAmounts.map((r) => r.type);
+
+    console.log(
+      `Found ${rewardTokens.length} reward tokens for position ${positionId}:`,
+      rewardTokens
+    );
+    return {
+      rewardTokens,
+      hasRewards,
+      rewardData: position.reward,
+    };
+  } catch (error) {
+    console.error("Error fetching reward tokens from Blockvision:", error);
+    // Return default token on error
+    return {
+      rewardTokens: [DEFAULT_BLUE_TOKEN],
+      hasRewards: false,
+      rewardData: null,
+    };
+  }
+}
+
+/**
+ * Checks if a position has any liquidity
+ *
+ * @param {string} positionId - The position ID to check
+ * @returns {Promise<boolean>} - Whether the position has liquidity
+ */
+export async function positionHasLiquidity(positionId) {
+  try {
+    const suiClient = await getSuiClient();
+
+    // Get position details
+    const positionResponse = await suiClient.getObject({
+      id: positionId,
+      options: { showContent: true },
+    });
+
+    if (!positionResponse.data) {
+      console.warn(`Failed to retrieve position data for ${positionId}`);
+      return false;
+    }
+
+    const positionContent = positionResponse.data.content;
+    const positionFields = positionContent.fields;
+
+    // Check if the position has any liquidity
+    const liquidity = BigInt(positionFields.liquidity || "0");
+    return liquidity > 0n;
+  } catch (error) {
+    console.error(
+      `Error checking if position ${positionId} has liquidity:`,
+      error
+    );
+    return false;
   }
 }
 
@@ -420,7 +571,7 @@ function prepareCoinWithSufficientBalance(
 }
 
 /**
- * Helper function to build the correct argument list for provideLiquidityWithFixedAmount
+ * Helper function to build the correct argument list for provide_liquidity_with_fixed_amount
  * based on the Bluefin contract's expected parameter order
  *
  * @param {boolean} aIsFixed - Whether coin A is the fixed side (based on coinTypeA, coinTypeB order)
@@ -472,15 +623,15 @@ function buildLiquidityArgs(
     coin_a_max: ${coinAMax.toString()}
     coin_b_max: ${coinBMax.toString()}`);
 
-  // Return arguments for provideLiquidityWithFixedAmount
+  // Return arguments for provide_liquidity_with_fixed_amount
   // NOTE: Coin order MUST be [coinA, coinB] regardless of which is fixed
   // This ensures type parameters align correctly with the Move function
   return [
     coinA, // Always CoinTypeA
     coinB, // Always CoinTypeB
-    txb.pure(fixedAmount.toString(), "u64"), // fixed_amount (of whichever coin is fixed)
-    txb.pure(coinAMax.toString(), "u64"), // coin_a_max - exact user amount
-    txb.pure(coinBMax.toString(), "u64"), // coin_b_max - exact user amount
+    txb.pure(fixedAmount.toString()), // fixed_amount (of whichever coin is fixed)
+    txb.pure(coinAMax.toString()), // coin_a_max - exact user amount
+    txb.pure(coinBMax.toString()), // coin_b_max - exact user amount
   ];
 }
 
@@ -530,7 +681,10 @@ export async function buildDepositTx({
   amountB = 0,
   lowerTickFactor = 0.5,
   upperTickFactor = 2.0,
-  slippagePct = DEFAULT_SLIPPAGE_PCT, // Allow UI to pass this
+  lowerTick, // Add direct tick inputs
+  upperTick, // Add direct tick inputs
+  isFullRange = false, // Add explicit full range flag
+  slippagePct = DEFAULT_SLIPPAGE_PCT,
   walletAddress,
   // Allow optionally overriding which coin is fixed
   fixedCoinOverride = null, // "A", "B", or null (for auto-determine)
@@ -573,7 +727,7 @@ export async function buildDepositTx({
     // Extract pool parameters
     const poolFields = poolResponse.data.content.fields;
 
-    // CHANGED: Use the helper function to get correct tick spacing
+    // Get correct tick spacing
     const tickSpacing = getCorrectTickSpacing(poolFields);
     console.log(`Using tick spacing: ${tickSpacing} for pool ${poolId}`);
 
@@ -587,6 +741,57 @@ export async function buildDepositTx({
     }
 
     const currentTick = toSignedI32(Number(bits));
+
+    // Calculate or use provided ticks
+    let lowerTickSnapped, upperTickSnapped;
+
+    if (isFullRange) {
+      // For full range positions, use the max range supported by Bluefin
+      // The max range is typically around ±443636, but we snap to the tick spacing
+      const maxTick = 443636;
+      // Floor for lower tick, ceiling for upper tick to ensure we get the max range
+      lowerTickSnapped = Math.floor(-maxTick / tickSpacing) * tickSpacing;
+      upperTickSnapped = Math.ceil(maxTick / tickSpacing) * tickSpacing;
+
+      console.log(
+        `Setting FULL RANGE ticks: ${lowerTickSnapped} to ${upperTickSnapped}`
+      );
+    } else if (lowerTick !== undefined && upperTick !== undefined) {
+      // If explicit ticks are provided, use them directly
+      lowerTickSnapped = lowerTick;
+      upperTickSnapped = upperTick;
+      console.log(
+        `Using explicit ticks: ${lowerTickSnapped} to ${upperTickSnapped}`
+      );
+    } else {
+      // Calculate price range ticks from factors
+      const lowerTick = Math.floor(
+        currentTick - Math.log(1 / lowerTickFactor) / Math.log(1.0001)
+      );
+      const upperTick = Math.ceil(
+        currentTick + Math.log(upperTickFactor) / Math.log(1.0001)
+      );
+
+      // Snap to initializable grid
+      const snap = (t) => Math.round(t / tickSpacing) * tickSpacing;
+      lowerTickSnapped = snap(lowerTick);
+      upperTickSnapped = snap(upperTick);
+
+      console.log(
+        `Calculated ticks from factors: ${lowerTickSnapped} to ${upperTickSnapped}`
+      );
+    }
+
+    // Safety check: ensure ticks are within allowed range
+    const MAX_TICK = 443636;
+    if (
+      Math.abs(lowerTickSnapped) > MAX_TICK ||
+      Math.abs(upperTickSnapped) > MAX_TICK
+    ) {
+      throw new Error(
+        `Tick out of allowed range: ${lowerTickSnapped} to ${upperTickSnapped}`
+      );
+    }
 
     // Determine if either coin is SUI
     const SUI_TYPE = "0x2::sui::SUI";
@@ -656,32 +861,6 @@ export async function buildDepositTx({
       amountA !== undefined && amountA !== null ? amountA : 0.03;
     let effectiveAmountB =
       amountB !== undefined && amountB !== null ? amountB : 0;
-
-    // Calculate price range ticks
-    const lowerTick = Math.floor(
-      currentTick - Math.log(1 / lowerTickFactor) / Math.log(1.0001)
-    );
-    const upperTick = Math.ceil(
-      currentTick + Math.log(upperTickFactor) / Math.log(1.0001)
-    );
-
-    // Snap to initializable grid - we still need *signed* ticks for our logic
-    const snap = (t) => Math.round(t / tickSpacing) * tickSpacing;
-    const lowerTickSnapped = snap(lowerTick);
-    const upperTickSnapped = snap(upperTick);
-
-    // Safety check: ensure ticks are within allowed range
-    if (
-      Math.abs(lowerTickSnapped) > 443636 ||
-      Math.abs(upperTickSnapped) > 443636
-    ) {
-      throw new Error("Tick out of allowed range");
-    }
-
-    // IMPROVED: Better fixed-side selection for full-range deposits
-    // Check if this is a full-range deposit
-    const isFullRangeDeposit =
-      lowerTickFactor <= 0.1 && upperTickFactor >= 10.0;
 
     // IMPROVED: If both amounts are specified, respect user's values
     let aIsFixed;
@@ -837,14 +1016,14 @@ export async function buildDepositTx({
     });
 
     // =========== STEP 2: Create the Position ============
-    // First, we create the position - UPDATED: use camelCase function name
+    // First, we create the position - REVERTED: use snake_case function name
     const position = txb.moveCall({
-      target: `${packageId}::pool::openPosition`,
+      target: `${packageId}::pool::open_position`,
       arguments: [
         configRef,
         poolRef,
-        txb.pure(toU32(lowerTickSnapped), "u32"),
-        txb.pure(toU32(upperTickSnapped), "u32"),
+        txb.pure(toU32(lowerTickSnapped)),
+        txb.pure(toU32(upperTickSnapped)),
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
@@ -894,13 +1073,13 @@ export async function buildDepositTx({
       })`
     );
 
-    // Add liquidity to the created position - UPDATED: use camelCase function name
-    // IMPORTANT: gateway::provideLiquidityWithFixedAmount returns TWO values:
+    // Add liquidity to the created position - REVERTED: use snake_case function name
+    // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
     // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
     // 1 -> leftover_b: vector<Coin<CoinTypeB>> (may be empty vector)
     // The position is mutated in-place (&mut), it is NOT returned
     txb.moveCall({
-      target: `${packageId}::gateway::provideLiquidityWithFixedAmount`,
+      target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
@@ -1279,10 +1458,10 @@ export async function buildAddLiquidityTx({
       })`
     );
 
-    // UPDATED: use camelCase function name
+    // REVERTED: use snake_case function name
     // Call the provide liquidity function without trying to handle leftover vectors
     txb.moveCall({
-      target: `${packageId}::gateway::provideLiquidityWithFixedAmount`,
+      target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
@@ -1332,6 +1511,10 @@ export async function buildAddLiquidityTx({
 
 /**
  * Builds a transaction for removing liquidity from a position
+ * Checks if the position has any liquidity before building the transaction
+ *
+ * @param {object} options - Options for building the transaction
+ * @returns {Promise<{tx: string|null, hasLiquidity: boolean}>} - Transaction bytes and whether position has liquidity
  */
 export async function buildRemoveLiquidityTx({
   poolId,
@@ -1345,16 +1528,26 @@ export async function buildRemoveLiquidityTx({
     );
   }
 
-  const suiClient = await getSuiClient();
-
-  // Get the latest Bluefin package ID and config object ID
-  const packageId = await getBluefinPackageId();
-  const configId = await getBluefinConfigObjectId();
-  console.log(
-    `Using Bluefin package ID: ${packageId}, config object ID: ${configId}`
-  );
-
   try {
+    // First check if the position has any liquidity
+    const hasLiquidity = await positionHasLiquidity(positionId);
+
+    if (!hasLiquidity) {
+      console.log(
+        `Position ${positionId} has no liquidity to remove, skipping`
+      );
+      return { tx: null, hasLiquidity: false };
+    }
+
+    const suiClient = await getSuiClient();
+
+    // Get the latest Bluefin package ID and config object ID
+    const packageId = await getBluefinPackageId();
+    const configId = await getBluefinConfigObjectId();
+    console.log(
+      `Using Bluefin package ID: ${packageId}, config object ID: ${configId}`
+    );
+
     // Get pool details using the helper
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
@@ -1389,7 +1582,7 @@ export async function buildRemoveLiquidityTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // CHANGED: Get the correct initial shared version for pool and config
+    // Get the initial shared version for pool and config
     const initialPoolVersion = await getInitialVersion(poolId);
     const initialConfigVersion = await getInitialVersion(configId);
 
@@ -1397,7 +1590,7 @@ export async function buildRemoveLiquidityTx({
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // CHANGED: Create proper shared object references for both pool and config
+    // Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1410,31 +1603,30 @@ export async function buildRemoveLiquidityTx({
       mutable: true,
     });
 
-    // UPDATED: use camelCase function name + updated argument order AND added destination parameter
-    // Clock → Config → Pool → Position → liquidity → min_coins_a → min_coins_b → destination
-    txb.moveCall({
-      target: `${packageId}::gateway::removeLiquidity`,
+    // FIXED: Removed type annotations that were causing "Incorrect number of arguments" error
+    const [tokenA, tokenB] = txb.moveCall({
+      target: `${packageId}::gateway::remove_liquidity`,
       arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        configRef, // CHANGED: Use shared config ref
-        poolRef, // CHANGED: Use shared pool ref
-        txb.object(positionId), // &mut Position (owned)
-        txb.pure(liquidityToRemove.toString(), "u128"), // liquidity amount
-        txb.pure("0", "u64"), // min_amount_a (0 for no slippage check)
-        txb.pure("0", "u64"), // min_amount_b (0 for no slippage check)
-        txb.pure(walletAddress, "address"), // destination address for withdrawn coins
+        txb.object(SUI_CLOCK_OBJECT_ID),
+        configRef,
+        poolRef,
+        txb.object(positionId),
+        txb.pure(liquidityToRemove.toString()), // Remove type annotation
+        txb.pure("0"), // min_amount_a - removed type annotation
+        txb.pure("0"), // min_amount_b - removed type annotation
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // No need to manually transfer objects - the Move function sends coins directly to the destination address
+    // Transfer the token results to the user's wallet
+    txb.transferObjects([tokenA, tokenB], txb.pure(walletAddress));
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
     console.log("Remove liquidity transaction built successfully");
-    return base64Tx; // Return base64 encoded string
+    return { tx: base64Tx, hasLiquidity: true };
   } catch (error) {
     console.error("Error building remove liquidity transaction:", error);
 
@@ -1513,11 +1705,11 @@ export async function buildCollectFeesTx({
       mutable: true,
     });
 
-    // UPDATED: use camelCase function name
+    // REVERTED: use snake_case function name
     // Clock → Config → Pool → Position
     // Note: Bluefin moves fees directly to the transaction signer
     txb.moveCall({
-      target: `${packageId}::gateway::collectFee`,
+      target: `${packageId}::gateway::collect_fee`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
         configRef, // CHANGED: Use shared config ref
@@ -1561,9 +1753,7 @@ export async function buildCollectRewardsTx({
   poolId,
   positionId,
   walletAddress,
-  rewardCoinTypes = [
-    "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::blue::BLUE",
-  ],
+  rewardCoinType = DEFAULT_BLUE_TOKEN,
 }) {
   if (!poolId || !positionId || !walletAddress) {
     throw new Error(
@@ -1585,13 +1775,10 @@ export async function buildCollectRewardsTx({
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
 
-    // Default reward coin type for Bluefin (BLUE token)
-    const rewardCoinType =
-      "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::blue::BLUE";
-
     console.log("Building collect rewards transaction:", {
       poolId,
       positionId,
+      rewardCoinType,
     });
 
     // Create the transaction block
@@ -1620,11 +1807,11 @@ export async function buildCollectRewardsTx({
       mutable: true,
     });
 
-    // UPDATED: use camelCase function name
+    // REVERTED: use snake_case function name
     // Clock → Config → Pool → Position
     // Note: Bluefin moves rewards directly to the transaction signer
     txb.moveCall({
-      target: `${packageId}::gateway::collectReward`,
+      target: `${packageId}::gateway::collect_reward`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
         configRef, // CHANGED: Use shared config ref
@@ -1663,12 +1850,14 @@ export async function buildCollectRewardsTx({
 
 /**
  * Builds a transaction for collecting both fees and rewards in one step
- * by using both collectFee and collectReward in a single transaction
+ * by using separate collect_fee and collect_reward calls in a single transaction
+ * Dynamically determines reward tokens using Blockvision API
  */
 export async function buildCollectFeesAndRewardsTx({
   poolId,
   positionId,
   walletAddress,
+  rewardCoinTypes, // Optional: can be provided or will be fetched from API
 }) {
   if (!positionId || !walletAddress) {
     throw new Error(
@@ -1683,18 +1872,29 @@ export async function buildCollectFeesAndRewardsTx({
   const configId = await getBluefinConfigObjectId();
 
   try {
+    // If reward coin types aren't provided, fetch them from the API
+    if (
+      !rewardCoinTypes ||
+      !Array.isArray(rewardCoinTypes) ||
+      rewardCoinTypes.length === 0
+    ) {
+      console.log(`Fetching reward tokens for position ${positionId}...`);
+      const { rewardTokens } = await getRewardTokensForPosition(
+        walletAddress,
+        positionId
+      );
+      rewardCoinTypes = rewardTokens;
+    }
+
     console.log("Building collect fees and rewards transaction:", {
       positionId,
       poolId,
+      rewardCoinTypes,
     });
 
     // Get pool details using the helper
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
-
-    // Default reward coin type for Bluefin (BLUE token)
-    const rewardCoinType =
-      "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::blue::BLUE";
 
     // Create the transaction block
     const txb = new TransactionBlock();
@@ -1722,12 +1922,12 @@ export async function buildCollectFeesAndRewardsTx({
       mutable: true,
     });
 
-    // APPROACH: Call collectFee and collectReward separately in one transaction
-    console.log("Using separate collectFee and collectReward calls");
+    // APPROACH: Call collect_fee and collect_reward separately in one transaction
+    console.log("Using separate collect_fee and collect_reward calls");
 
     // First collect fees
     txb.moveCall({
-      target: `${packageId}::gateway::collectFee`,
+      target: `${packageId}::gateway::collect_fee`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
@@ -1737,17 +1937,20 @@ export async function buildCollectFeesAndRewardsTx({
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Then collect rewards
-    txb.moveCall({
-      target: `${packageId}::gateway::collectReward`,
-      arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID),
-        configRef,
-        poolRef,
-        txb.object(positionId),
-      ],
-      typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
-    });
+    // Then collect rewards for each reward type
+    for (const rewardCoinType of rewardCoinTypes) {
+      console.log(`Adding collect_reward call for ${rewardCoinType}`);
+      txb.moveCall({
+        target: `${packageId}::gateway::collect_reward`,
+        arguments: [
+          txb.object(SUI_CLOCK_OBJECT_ID),
+          configRef,
+          poolRef,
+          txb.object(positionId),
+        ],
+        typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
+      });
+    }
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
@@ -1815,7 +2018,7 @@ export async function buildClosePositionTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // CHANGED: Get the correct initial shared version for pool and config
+    // Get the correct initial shared version for pool and config
     const initialPoolVersion = await getInitialVersion(poolId);
     const initialConfigVersion = await getInitialVersion(configId);
 
@@ -1823,7 +2026,7 @@ export async function buildClosePositionTx({
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // CHANGED: Create proper shared object references for both pool and config
+    // Create proper shared object references for both pool and config
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1836,21 +2039,20 @@ export async function buildClosePositionTx({
       mutable: true,
     });
 
-    // UPDATED: use camelCase function name - updated argument order AND added destination parameter
-    // Clock → Config → Pool → Position → destination
-    txb.moveCall({
-      target: `${packageId}::gateway::closePosition`,
+    // FIXED: Removed type annotations that were causing "Incorrect number of arguments" error
+    const [tokenA, tokenB, feeA, feeB] = txb.moveCall({
+      target: `${packageId}::gateway::close_position`,
       arguments: [
-        txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        configRef, // CHANGED: Use shared config ref
-        poolRef, // CHANGED: Use shared pool ref
-        txb.object(positionId), // Position (owned by value)
-        txb.pure(walletAddress, "address"), // destination address for withdrawn assets
+        txb.object(SUI_CLOCK_OBJECT_ID),
+        configRef,
+        poolRef,
+        txb.object(positionId),
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // No need to manually transfer objects - the Move function sends coins directly to the destination address
+    // Transfer all coin results to the user's wallet
+    txb.transferObjects([tokenA, tokenB, feeA, feeB], txb.pure(walletAddress));
 
     // Serialize the transaction to bytes and encode as base64
     const txBytes = await txb.build({ client: suiClient });
@@ -1878,8 +2080,8 @@ export async function buildClosePositionTx({
 }
 
 /**
- * Builds a transaction to force close a position using the Bluefin SDK directly
- * This is a more direct approach for positions that can't be closed through the standard gateway
+ * Builds a transaction to force close a position
+ * This is a simplified version that doesn't rely on the Bluefin SDK
  *
  * @param {Object} options - The parameters for the force close operation
  * @param {string} options.poolId - The pool ID
@@ -1929,120 +2131,60 @@ export async function buildForceClosePositionTx({
       positionResponse.data.display?.data
     );
 
+    // Skip the Bluefin SDK dynamic import since it's causing issues
+    // Instead, use our own implementation directly
+
+    // Get the latest Bluefin package ID and config object ID
+    const packageId = await getBluefinPackageId();
+    const configId = await getBluefinConfigObjectId();
+
+    console.log(
+      `Using standard close position approach with package ID: ${packageId}, config ID: ${configId}`
+    );
+
     // Create the transaction block
     const txb = new TransactionBlock();
     txb.setSender(walletAddress);
     txb.setGasBudget(50_000_000); // Use higher gas budget for force operations
 
-    // Approach 1: Try using direct Bluefin SDK via dynamic import
-    try {
-      console.log("Attempting to use Bluefin SDK for direct position closure");
+    // Get the initial shared versions
+    const initialPoolVersion = await getInitialVersion(poolId);
+    const initialConfigVersion = await getInitialVersion(configId);
 
-      // Dynamically import the required modules from Bluefin's SDK
-      const { OnChainCalls, QueryChain } = await import(
-        "@firefly-exchange/library-sui/dist/src/spot"
-      );
-      const { Ed25519Keypair } = await import("@firefly-exchange/library-sui");
+    // Create shared object references
+    const poolRef = txb.sharedObjectRef({
+      objectId: poolId,
+      initialSharedVersion: initialPoolVersion,
+      mutable: true,
+    });
 
-      // Import mainnet config from our app's config directory
-      const { mainnet } = await import("../config/bluefin.js");
+    const configRef = txb.sharedObjectRef({
+      objectId: configId,
+      initialSharedVersion: initialConfigVersion,
+      mutable: true,
+    });
 
-      // Get the admin private key from environment
-      const adminPrivateKey = process.env.BLUEFIN_ADMIN_PRIVATE_KEY;
-      if (!adminPrivateKey) {
-        throw new Error("Missing Bluefin admin credentials");
-      }
+    // FIXED: Removed type annotations that were causing "Incorrect number of arguments" error
+    const [tokenA, tokenB, feeA, feeB] = txb.moveCall({
+      target: `${packageId}::gateway::close_position`,
+      arguments: [
+        txb.object(SUI_CLOCK_OBJECT_ID),
+        configRef,
+        poolRef,
+        txb.object(positionId),
+      ],
+      typeArguments: [coinTypeA, coinTypeB],
+    });
 
-      // Initialize the SDK components
-      const keyPair = Ed25519Keypair.fromSecretKey(
-        Buffer.from(adminPrivateKey, "hex")
-      );
-      const onChainCalls = new OnChainCalls(suiClient, mainnet, {
-        signer: keyPair,
-      });
-      const queryChain = new QueryChain(suiClient);
+    // Transfer all coin results to the user's wallet
+    txb.transferObjects([tokenA, tokenB, feeA, feeB], txb.pure(walletAddress));
 
-      console.log("SDK initialized, querying detailed position and pool data");
+    // Serialize the transaction to bytes and encode as base64
+    const txBytes = await txb.build({ client: suiClient });
+    const base64Tx = Buffer.from(txBytes).toString("base64");
 
-      // Get detailed position and pool data from Bluefin's SDK
-      const positionDetails = await queryChain.getPositionDetails(positionId);
-      if (!positionDetails) {
-        throw new Error("Failed to get position details from Bluefin SDK");
-      }
-
-      const poolDetails = await queryChain.getPool(pool.id);
-      if (!poolDetails) {
-        throw new Error("Failed to get pool details from Bluefin SDK");
-      }
-
-      console.log("Creating close position transaction using Bluefin SDK");
-
-      // Use Bluefin SDK to create the close position transaction
-      const tx = await onChainCalls.createClosePositionTx(
-        poolDetails,
-        positionId,
-        {
-          forceClose: force,
-        }
-      );
-
-      console.log(
-        "Force close transaction created successfully using Bluefin SDK"
-      );
-      return tx.txBytes;
-    } catch (sdkError) {
-      console.error(
-        "Error using Bluefin SDK for direct position closure:",
-        sdkError
-      );
-      console.log("Falling back to standard close position approach");
-
-      // Approach 2: Fall back to our standard close position implementation
-      // Get the latest Bluefin package ID and config object ID
-      const packageId = await getBluefinPackageId();
-      const configId = await getBluefinConfigObjectId();
-
-      console.log(
-        `Using fallback approach with package ID: ${packageId}, config ID: ${configId}`
-      );
-
-      // Get the initial shared versions
-      const initialPoolVersion = await getInitialVersion(poolId);
-      const initialConfigVersion = await getInitialVersion(configId);
-
-      // Create shared object references
-      const poolRef = txb.sharedObjectRef({
-        objectId: poolId,
-        initialSharedVersion: initialPoolVersion,
-        mutable: true,
-      });
-
-      const configRef = txb.sharedObjectRef({
-        objectId: configId,
-        initialSharedVersion: initialConfigVersion,
-        mutable: true,
-      });
-
-      // UPDATED: use camelCase function name - try using a modified close_position call with higher gas limits
-      txb.moveCall({
-        target: `${packageId}::gateway::closePosition`,
-        arguments: [
-          txb.object(SUI_CLOCK_OBJECT_ID),
-          configRef,
-          poolRef,
-          txb.object(positionId),
-          txb.pure(walletAddress, "address"),
-        ],
-        typeArguments: [coinTypeA, coinTypeB],
-      });
-
-      // Serialize the transaction to bytes and encode as base64
-      const txBytes = await txb.build({ client: suiClient });
-      const base64Tx = Buffer.from(txBytes).toString("base64");
-
-      console.log("Fallback close position transaction built successfully");
-      return base64Tx;
-    }
+    console.log("Close position transaction built successfully");
+    return base64Tx;
   } catch (error) {
     console.error("Error building force close position transaction:", error);
 
