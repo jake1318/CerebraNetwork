@@ -1,83 +1,22 @@
 // src/styles/pages/Positions.scss
-// Last Updated: 2025-07-19 00:07:51 UTC by jake1318
+// Last Updated: 2025-07-19 02:35:15 UTC by jake1318
 
 .positions-page {
-  // Change these properties to ensure proper scrolling
+  // Base layout properties with scrolling fixes
   width: 100%;
-  min-height: calc(100vh - var(--navbar-h)); // Adjust for navbar height
+  min-height: calc(100vh - var(--navbar-h));
   padding: 2rem;
-  padding-top: calc(2rem + var(--navbar-h)); // Add navbar height to top padding
-  margin-top: 0; // Remove any top margin
+  padding-top: calc(2rem + var(--navbar-h));
+  margin-top: 0;
   position: relative;
   color: #fff;
-  overflow-y: visible; // Allow content to scroll naturally
+  overflow-y: visible;
+  overflow-x: hidden; // Prevent horizontal overflow
 
-  // Fix the background to be relative to the viewport
-  &::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(
-        circle at top left,
-        rgba(30, 144, 255, 0.15),
-        rgba(5, 15, 30, 0.3) 40%
-      ),
-      radial-gradient(
-        circle at bottom right,
-        rgba(196, 92, 242, 0.15),
-        rgba(5, 15, 30, 0.3) 40%
-      ),
-      #0f1624;
-    z-index: -2; // Behind content
-    pointer-events: none;
-  }
+  // Match the dark blue background from the Pools page
+  background-color: #030618;
 
-  // Add the glows from other pages as fixed elements
-  .glow-1 {
-    position: fixed; // Change to fixed positioning
-    width: 300px;
-    height: 300px;
-    background: rgba(30, 144, 255, 0.12); // Neon blue
-    border-radius: 50%;
-    filter: blur(70px);
-    top: -100px;
-    left: 10%;
-    z-index: -1; // Behind content but above background
-    animation: pulsate 8s ease-in-out infinite alternate;
-    pointer-events: none;
-  }
-
-  .glow-2 {
-    position: fixed; // Change to fixed positioning
-    width: 300px;
-    height: 300px;
-    background: rgba(196, 92, 242, 0.12); // Purple
-    border-radius: 50%;
-    filter: blur(80px);
-    bottom: -100px;
-    right: 10%;
-    z-index: -1; // Behind content but above background
-    animation: pulsate 10s ease-in-out infinite alternate-reverse;
-    pointer-events: none;
-  }
-
-  .glow-3 {
-    position: fixed; // Change to fixed positioning
-    width: 250px;
-    height: 250px;
-    background: rgba(0, 255, 128, 0.12); // Green
-    border-radius: 50%;
-    filter: blur(70px);
-    top: 60%;
-    left: 70%;
-    z-index: -1; // Behind content but above background
-    animation: pulsate 9s ease-in-out infinite;
-    pointer-events: none;
-  }
-
+  // Content container with proper z-index
   .content-container {
     position: relative;
     z-index: 1;
@@ -85,149 +24,253 @@
     margin: 0 auto;
   }
 
-  // New main navigation styling with gradient text using neon blue
+  // Main navigation styling
   .main-navigation {
     display: flex;
-    margin-bottom: 2.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 2rem;
     position: relative;
-    z-index: 5; // Ensure navigation stays above other elements
-
-    &::after {
-      content: "";
-      position: absolute;
-      bottom: -10px;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: rgba(75, 85, 99, 0.2);
-    }
 
     .nav-link {
-      padding: 0.5rem 1.5rem;
-      font-size: 1.25rem;
-      font-weight: 700;
+      padding: 1rem 2rem;
+      padding-left: 0;
+      padding-right: 2rem;
+      color: rgba(255, 255, 255, 0.7);
       text-decoration: none;
-      color: #ffffff;
       position: relative;
-      transition: all 0.2s ease;
-      opacity: 0.7;
-
-      &:first-child {
-        padding-left: 0;
-      }
+      font-size: 16px;
+      font-family: "Inter", sans-serif;
+      font-weight: 400;
+      transition: color 0.2s ease;
 
       &:hover {
-        opacity: 1;
+        color: rgba(255, 255, 255, 0.9);
       }
 
       &.active {
-        color: transparent;
-        background: linear-gradient(
-          90deg,
-          #1e90ff,
-          #c45cf2
-        ); // Changed to neon blue and purple
-        -webkit-background-clip: text;
-        background-clip: text;
-        opacity: 1;
+        color: #4dabf7; // Light blue color
 
         &::after {
           content: "";
           position: absolute;
-          bottom: -12px;
+          bottom: -1px;
           left: 0;
           width: 100%;
-          height: 3px;
-          background: linear-gradient(
-            90deg,
-            #1e90ff,
-            #c45cf2
-          ); // Changed to neon blue and purple
-          border-radius: 3px;
-          box-shadow: 0 0 10px rgba(30, 144, 255, 0.5),
-            // Changed to neon blue
-            0 0 10px rgba(196, 92, 242, 0.5);
-          z-index: 2;
+          height: 2px;
+          background: #4dabf7; // Light blue underline
         }
       }
     }
   }
 
-  // Hide the old page header and tabs-navigation
+  // Hide old page header and tabs
   .page-header,
   .tabs-navigation {
     display: none;
   }
 
-  // Table styling with improved overflow handling
-  .positions-table-container {
-    background: rgba(15, 25, 40, 0.5);
-    border-radius: 12px;
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(30, 144, 255, 0.2),
-        // Changed to neon blue
-        rgba(196, 92, 242, 0.2) // Changed to match purple
-      )
-      1;
-    overflow: hidden;
-    margin-bottom: 2rem;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(30, 144, 255, 0.05),
-      // Changed to neon blue
-      0 8px 32px rgba(196, 92, 242, 0.05); // Changed to match purple
-    overflow-x: auto; // Allow horizontal scrolling for tables
+  // Portfolio overview styling
+  .portfolio-dashboard {
+    margin-bottom: 24px;
 
-    table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      min-width: 900px; // Ensure minimum width for readability
+    .dashboard-title {
+      font-size: 18px;
+      color: #4dabf7; // Light blue color
+      margin-bottom: 16px;
+      font-weight: 500;
+      font-family: "Inter", sans-serif;
+    }
 
-      thead {
-        background: rgba(10, 20, 35, 0.8);
-        position: sticky; // Make headers sticky
-        top: 0;
-        z-index: 5;
+    .dashboard-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
 
-        th {
-          padding: 1.25rem 1rem;
-          font-size: 0.85rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: rgba(255, 255, 255, 0.7);
-          text-align: left;
-          border-bottom: 1px solid rgba(75, 85, 99, 0.3);
-          position: relative;
+      @media (max-width: 992px) {
+        grid-template-columns: repeat(2, 1fr);
+      }
 
-          &.align-right {
-            text-align: right;
+      @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-stat-card {
+        display: flex;
+        align-items: center;
+        background: #0d1321; // Dark navy
+        border-radius: 10px;
+        padding: 16px;
+        overflow: hidden;
+
+        .stat-icon {
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          color: #4dabf7; // Light blue
+          margin-right: 15px;
+        }
+
+        .stat-content {
+          flex-grow: 1;
+
+          .stat-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            margin-bottom: 2px;
+            font-weight: 400;
           }
 
-          &.align-center {
-            text-align: center;
-          }
-
-          &.actions-column {
-            text-align: right;
+          .stat-value {
+            color: #fff;
+            font-size: 18px;
+            font-family: "Orbitron", "Roboto Mono", monospace;
+            font-weight: 500;
           }
         }
       }
+    }
 
-      tbody {
-        tr.position-row {
-          cursor: pointer;
-          transition: all 0.2s ease;
+    // Protocol distribution section
+    .protocol-breakdown {
+      margin-top: 20px;
 
-          &:hover {
-            background: rgba(30, 40, 55, 0.4);
+      h3 {
+        font-size: 16px;
+        color: rgba(255, 255, 255, 0.6);
+        font-weight: 400;
+        margin-bottom: 12px;
+      }
+
+      .protocol-distribution-chart {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+
+        .protocol-bar-container {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+
+          .protocol-label {
+            width: 80px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
           }
 
-          td {
-            padding: 1.25rem 1rem;
-            border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+          .protocol-bar-wrapper {
+            flex-grow: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+
+            .protocol-bar {
+              height: 100%;
+              border-radius: 0;
+
+              &.bluefin {
+                background: linear-gradient(
+                  90deg,
+                  #06864a,
+                  rgba(6, 134, 74, 0.7)
+                );
+              }
+
+              &.aftermath {
+                background: #00e1f0; // Cyan
+              }
+
+              &.haedal {
+                background: #00e1f0; // Cyan
+              }
+
+              &.turbos {
+                background: #00e1f0; // Cyan
+              }
+
+              &.suistake {
+                background: #00e1f0; // Cyan
+              }
+
+              &.scallop {
+                background: #f472b6; // Pink
+              }
+            }
+          }
+
+          .protocol-value {
+            width: 80px;
+            text-align: right;
+            font-size: 14px;
+            color: #fff;
+          }
+        }
+      }
+    }
+  }
+
+  // Position type tabs
+  .position-type-tabs {
+    display: flex;
+    margin-bottom: 16px;
+    position: relative;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0;
+
+    .position-type-tab {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+      padding: 12px 0;
+      margin-right: 24px;
+      cursor: pointer;
+      position: relative;
+
+      &:hover {
+        color: rgba(255, 255, 255, 0.9);
+      }
+
+      &.active {
+        color: #00e1f0; // Cyan color for active tab
+
+        &::after {
+          content: "";
+          position: absolute;
+          bottom: -1px;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background: #00e1f0; // Cyan underline
+        }
+      }
+    }
+  }
+
+  // Positions table styling
+  .positions-table-container {
+    margin-top: 20px;
+    overflow-x: auto;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+
+      thead {
+        tr {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+          th {
+            text-align: left;
+            padding: 16px 8px;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 500;
+            font-size: 14px;
+            text-transform: uppercase;
 
             &.align-right {
               text-align: right;
@@ -237,8 +280,33 @@
               text-align: center;
             }
 
-            &.pool-cell {
-              min-width: 220px;
+            &.actions-column {
+              text-align: right;
+            }
+          }
+        }
+      }
+
+      tbody {
+        tr.position-row {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          transition: background-color 0.2s;
+
+          &:hover {
+            background: rgba(30, 40, 60, 0.3);
+          }
+
+          td {
+            padding: 16px 8px;
+            color: #fff;
+            font-size: 14px;
+
+            &.align-right {
+              text-align: right;
+            }
+
+            &.align-center {
+              text-align: center;
             }
 
             &.actions-cell {
@@ -248,14 +316,13 @@
         }
 
         tr.details-row {
-          background-color: rgba(20, 30, 45, 0.5);
+          background: rgba(30, 40, 60, 0.2);
 
           td {
             padding: 0;
 
             .position-details-container {
-              padding: 1.5rem;
-              overflow-x: auto; // Handle overflow in detail sections
+              padding: 16px;
             }
           }
         }
@@ -263,321 +330,316 @@
     }
   }
 
-  // Loading state updated with neon blue
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-
-    .spinner {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 50%;
-      border: 3px solid rgba(30, 144, 255, 0.15); // Changed to neon blue
-      border-top-color: #1e90ff; // Changed to neon blue
-      border-right-color: #c45cf2; // Changed to match purple
-      animation: spin 1.2s linear infinite;
-      margin-bottom: 1.5rem;
-    }
-
-    .loading-text {
-      font-size: 1.1rem;
-      color: rgba(255, 255, 255, 0.7);
-    }
-  }
-
-  // Empty state
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-    text-align: center;
-
-    .empty-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-    }
-
-    h3 {
-      font-size: 1.5rem;
-      margin-bottom: 1rem;
-    }
-
-    p {
-      color: rgba(255, 255, 255, 0.7);
-      margin-bottom: 2rem;
-    }
-  }
-
-  // Updated token icon styles for uniform sizing
-  .token-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    overflow: hidden;
-    background-color: #1a1f2e;
-    position: relative;
-    box-shadow: 0 0 8px rgba(0, 225, 255, 0.2);
-    transition: all 0.2s ease-in-out;
-    flex-shrink: 0; // Prevent icon from shrinking
-  }
-
-  .token-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
-  // Standardize token icon sizes
-  .token-icon-sm {
-    width: 28px;
-    height: 28px;
-    min-width: 28px; // Set minimum width to maintain consistency
-    min-height: 28px; // Set minimum height to maintain consistency
-  }
-
-  .token-icon-md {
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    min-height: 36px;
-  }
-
-  .token-icon-lg {
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-    min-height: 48px;
-  }
-
-  .token-fallback {
-    background: linear-gradient(135deg, #2a3042, #1e2433);
-    border: 1px solid #304050;
-  }
-
-  .token-fallback-letter {
-    font-weight: bold;
-    font-size: 12px;
-    color: #fff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  }
-
-  // Pool pair styling
-  .pool-pair {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-
-    .token-icons {
-      display: flex;
-      position: relative;
-      height: 28px; // Ensure container height is consistent
-    }
-
-    // Updated token positioning in pairs
-    .token-icon:nth-child(2) {
-      margin-left: -10px;
-      z-index: 1;
-      border: 1px solid #1a1f2e;
-    }
-
-    .pair-name {
-      font-weight: 600;
-    }
-  }
-
-  // Special token styling
-  .hasui-token {
-    background: linear-gradient(135deg, #ffd966, #ff6b6b);
-    box-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
-
-    img {
-      content: url("/public/haSui.webp"); // Use local haSui image
-    }
-  }
-
-  .sui-token {
-    background: linear-gradient(135deg, #4bc1d2, #2b6eff);
-    box-shadow: 0 0 10px rgba(0, 174, 240, 0.7);
-
-    img {
-      content: url("/public/sui.png"); // Use local SUI image
-    }
-  }
-
-  .usdc-token {
-    background: linear-gradient(135deg, #2775ca, #2775ca);
-    box-shadow: 0 0 10px rgba(39, 117, 202, 0.7);
-  }
-
-  // DEX badge updated with neon blue
-  .dex-badge {
-    display: inline-block;
-    font-size: 0.8rem;
-    padding: 0.25rem 0.75rem;
-    background: rgba(30, 144, 255, 0.1); // Changed to neon blue
-    border: 1px solid rgba(30, 144, 255, 0.2); // Changed to neon blue
-    border-radius: 99px;
-    color: #1e90ff; // Changed to neon blue
-    text-transform: capitalize;
-
-    &.cetus {
-      background: rgba(30, 144, 255, 0.1); // Changed to neon blue
-      color: #1e90ff; // Changed to neon blue
-    }
-
-    &.bluefin {
-      background: rgba(196, 92, 242, 0.1); // Changed to match purple
-      color: #c45cf2; // Changed to match purple
-    }
-  }
-
-  // APR values updated with neon blue and consistent colors
+  // APR values styling
   .apr-value {
-    font-weight: 700;
-    font-size: 1.05rem;
+    font-weight: 600;
 
     &.high {
-      color: #00ff80; // Green from other pages
+      color: #10b981; // Green color
     }
 
     &.medium {
-      color: #1e90ff; // Changed to neon blue
+      color: #4dabf7; // Blue color
     }
 
     &.low {
-      color: #c45cf2; // Changed to match purple
+      color: #9ca3af; // Gray color
     }
   }
 
-  // Status badges
+  // Status badges styling
   .status-badge {
     display: inline-block;
-    font-size: 0.8rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 99px;
-    font-weight: 600;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
 
     &.success {
-      background: rgba(0, 255, 128, 0.1); // Changed to green
-      color: #00ff80; // Changed to green
-      border: 1px solid rgba(0, 255, 128, 0.3); // Changed to green
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981; // Green
     }
 
     &.warning {
-      background: rgba(255, 165, 0, 0.1);
-      color: #ffa500;
-      border: 1px solid rgba(255, 165, 0, 0.3);
+      background: rgba(245, 158, 11, 0.1);
+      color: #f59e0b; // Amber
+    }
+
+    &.vault {
+      background: rgba(76, 170, 247, 0.1);
+      color: #4dabf7; // Blue
+    }
+
+    &.bluefin {
+      background-color: rgba(6, 134, 74, 0.1);
+      color: #06864a; // Green
+      border: 1px solid rgba(6, 134, 74, 0.3);
+    }
+
+    &.pending {
+      background-color: rgba(255, 152, 0, 0.1);
+      color: #ff9800; // Orange
+      border: 1px solid rgba(255, 152, 0, 0.3);
+    }
+
+    &.scallop {
+      background: rgba(236, 72, 153, 0.1);
+      color: #ec4899; // Pink
+      border: 1px solid rgba(236, 72, 153, 0.3);
     }
   }
 
-  // Action buttons
+  // Action buttons styling
   .action-buttons {
     display: flex;
-    gap: 0.5rem;
+    gap: 8px;
     justify-content: flex-end;
   }
 
-  // Button styling updated with neon blue
+  // Button styling
   .btn {
     display: inline-block;
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.9rem;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
-    border: none;
+    transition: all 0.2s;
 
     &--primary {
-      background: linear-gradient(
-        45deg,
-        #1e90ff,
-        #c45cf2
-      ); // Changed to neon blue and purple
-      color: #000;
+      background: #4dabf7; // Blue button
+      color: #0a0e17;
       border: none;
-      box-shadow: 0 0 15px rgba(30, 144, 255, 0.2),
-        // Changed to neon blue
-        0 0 15px rgba(196, 92, 242, 0.2); // Changed to match purple
+      padding: 8px 16px;
 
       &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(30, 144, 255, 0.3),
-          // Changed to neon blue
-          0 5px 20px rgba(196, 92, 242, 0.3); // Changed to match purple
+        background: #3b99e0;
       }
     }
 
     &--secondary {
-      background: rgba(15, 25, 40, 0.7);
-      border: 1px solid;
-      border-image: linear-gradient(
-          45deg,
-          rgba(30, 144, 255, 0.6),
-          // Changed to neon blue
-          rgba(196, 92, 242, 0.6) // Changed to match purple
-        )
-        1;
-      color: #fff;
+      background: transparent;
+      border: 1px solid rgba(77, 171, 247, 0.5);
+      color: #4dabf7;
+      padding: 7px 15px;
 
       &:hover:not(:disabled) {
-        background: rgba(25, 35, 50, 0.8);
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(30, 144, 255, 0.1),
-          // Changed to neon blue
-          0 5px 15px rgba(196, 92, 242, 0.1); // Changed to match purple
+        border-color: rgba(77, 171, 247, 0.8);
+        background: rgba(77, 171, 247, 0.1);
       }
     }
 
     &--accent {
-      background: linear-gradient(
-        45deg,
-        #1e90ff,
-        #c45cf2
-      ); // Changed to neon blue and purple
-      color: #000;
-      box-shadow: 0 0 15px rgba(30, 144, 255, 0.2),
-        // Changed to neon blue
-        0 0 15px rgba(196, 92, 242, 0.2); // Changed to match purple
+      background: #10b981; // Green button
+      color: #0a0e17;
+      border: none;
+      padding: 8px 16px;
 
       &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(30, 144, 255, 0.3),
-          // Changed to neon blue
-          0 5px 20px rgba(196, 92, 242, 0.3); // Changed to match purple
+        background: #0ea271;
       }
     }
 
     &--sm {
-      padding: 0.4rem 0.8rem;
-      font-size: 0.8rem;
+      padding: 6px 12px;
+      font-size: 13px;
     }
 
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
-      transform: none !important;
-      box-shadow: none !important;
+    }
+
+    // Warning button for force close
+    &--warning {
+      background-color: #ff9800;
+      color: #0a0e17;
+      border: none;
+      padding: 8px 16px;
+
+      &:hover:not(:disabled) {
+        background-color: #f57c00;
+      }
+
+      &:disabled {
+        background-color: rgba(255, 152, 0, 0.6);
+        border-color: rgba(245, 124, 0, 0.6);
+      }
     }
   }
 
-  .loading-text {
+  // Updated Pool pair styling with non-overlapping token icons
+  .pool-pair {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 10px;
 
-    .dot-loader {
-      width: 8px;
-      height: 8px;
+    .token-icons {
+      position: relative;
+      display: flex;
+      align-items: center;
+      // Adjust width to accommodate both icons side by side without overlap
+      width: 56px;
+      height: 28px;
+
+      .token-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        overflow: hidden;
+        background-color: #2d3748;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0; // Prevent icons from shrinking
+
+        &:nth-child(1) {
+          margin-right: 0; // No margin to keep them close
+        }
+
+        &:nth-child(2) {
+          margin-left: 0; // No overlap
+        }
+
+        img {
+          width: 70%;
+          height: 70%;
+          object-fit: contain;
+        }
+      }
+    }
+
+    .pair-name {
+      font-weight: 500;
+    }
+  }
+
+  // DEX badge styling
+  .dex-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    background: rgba(77, 171, 247, 0.1);
+    border: 1px solid rgba(77, 171, 247, 0.2);
+    border-radius: 16px;
+    color: #4dabf7;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  // Loading state styling
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 0;
+
+    .spinner {
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background-color: currentColor;
-      animation: dotPulse 1.4s infinite ease-in-out;
+      border: 3px solid rgba(77, 171, 247, 0.15);
+      border-top-color: #4dabf7;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    .loading-text {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 16px;
+    }
+  }
+
+  // Empty state styling
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 0;
+    text-align: center;
+
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    p {
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 1.5rem;
+      max-width: 400px;
+    }
+  }
+
+  // Transaction notification container
+  .notification-container {
+    position: fixed;
+    right: 2rem;
+    bottom: 2rem;
+    z-index: 1000;
+  }
+
+  // Transaction notification styling
+  .transaction-notification {
+    background: #0d1321;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid rgba(77, 171, 247, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    max-width: 400px;
+    display: flex;
+    align-items: flex-start;
+
+    .notification-icon {
+      margin-right: 12px;
+      font-size: 18px;
+
+      &.success {
+        color: #10b981;
+      }
+
+      &.error {
+        color: #ef4444;
+      }
+    }
+
+    .notification-content {
+      flex: 1;
+
+      .notification-message {
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+
+      .notification-tx {
+        font-family: monospace;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+        word-break: break-all;
+      }
+    }
+
+    .notification-close {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+      margin-left: 8px;
+
+      &:hover {
+        color: #fff;
+      }
     }
   }
 
@@ -587,40 +649,36 @@
       margin-bottom: 1rem;
 
       h4 {
-        font-size: 1.1rem;
+        font-size: 16px;
         font-weight: 600;
       }
     }
 
     .positions-detail-table {
       margin-bottom: 1.5rem;
+      overflow-x: auto;
 
       table {
         width: 100%;
         border-collapse: collapse;
-        background: rgba(10, 20, 35, 0.7);
-        border-radius: 8px;
-        overflow: hidden;
 
         th {
-          background: rgba(5, 10, 20, 0.8);
-          padding: 0.75rem 1rem;
+          background: rgba(30, 40, 60, 0.5);
+          padding: 8px 12px;
           text-align: left;
-          font-size: 0.8rem;
+          font-size: 13px;
+          font-weight: 500;
           color: rgba(255, 255, 255, 0.7);
-          position: sticky; // Make headers sticky
-          top: 0;
-          z-index: 5;
         }
 
         td {
-          padding: 0.75rem 1rem;
-          border-bottom: 1px solid rgba(75, 85, 99, 0.2);
-          font-size: 0.9rem;
+          padding: 8px 12px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          font-size: 14px;
 
           &.monospace {
-            font-family: monospace;
-            font-size: 0.85rem;
+            font-family: "Roboto Mono", monospace;
+            font-size: 12px;
           }
         }
 
@@ -631,29 +689,30 @@
     }
 
     .rewards-section {
-      background: rgba(10, 20, 35, 0.7);
+      background: rgba(30, 40, 60, 0.3);
       border-radius: 8px;
       padding: 1rem;
 
       h4 {
-        font-size: 1rem;
+        font-size: 16px;
+        font-weight: 600;
         margin-bottom: 1rem;
       }
 
       .rewards-list {
         display: flex;
         flex-wrap: wrap;
-        gap: 1rem;
+        gap: 0.75rem;
         margin-bottom: 1rem;
 
         .reward-item {
-          background: rgba(5, 10, 20, 0.8);
-          padding: 0.5rem 1rem;
+          background: rgba(30, 40, 60, 0.5);
+          padding: 8px 12px;
           border-radius: 6px;
-          font-size: 0.9rem;
+          font-size: 13px;
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 8px;
 
           .reward-token {
             color: rgba(255, 255, 255, 0.7);
@@ -664,8 +723,8 @@
           }
 
           .reward-value {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
           }
         }
       }
@@ -677,355 +736,155 @@
     }
   }
 
-  // Make sure notification container doesn't interfere with scrolling
-  .notification-container {
-    position: fixed; // Keep fixed but don't block scrolling
-    right: 2rem;
-    bottom: 2rem;
-    z-index: 1000; // Ensure notifications appear on top
-  }
+  // Token fallback and special token styles
+  .token-fallback {
+    background: #2d3748;
 
-  // Animation for glow effects
-  @keyframes pulsate {
-    0% {
-      opacity: 0.5;
-      transform: scale(0.8);
-    }
-    100% {
-      opacity: 0.8;
-      transform: scale(1.2);
-    }
-  }
-
-  // Spinner animations
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes dotPulse {
-    0%,
-    100% {
-      transform: scale(0.2);
-      opacity: 0.6;
-    }
-    50% {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-
-  // Portfolio Dashboard styles - added to match the Market Overview in Pools page
-  .portfolio-dashboard {
-    background: rgba(10, 10, 20, 0.4);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(30, 144, 255, 0.08),
-      0 8px 32px rgba(196, 92, 242, 0.08);
-    position: relative;
-    overflow: visible; // Ensure content flows properly
-    z-index: 5; // Ensure it displays properly
-
-    &:hover {
-      box-shadow: 0 8px 32px rgba(30, 144, 255, 0.12),
-        0 8px 32px rgba(196, 92, 242, 0.12);
-    }
-
-    &::after,
-    &::before {
-      display: none !important;
-      content: none !important;
-      animation: none !important;
-    }
-
-    .dashboard-title {
-      font-size: 20px;
-      margin-bottom: 16px;
+    .token-fallback-letter {
+      font-weight: bold;
+      font-size: 12px;
       color: #fff;
-      font-weight: 600;
-      background: linear-gradient(90deg, #1e90ff, #c45cf2);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      display: inline-block;
-      position: relative;
-      z-index: 5;
     }
+  }
 
-    .dashboard-stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-      position: relative;
-      z-index: 5;
+  // Updated token styles with local paths for SUI and haSUI
+  .hasui-token {
+    background: linear-gradient(135deg, #ffd966, #ff6b6b);
+    box-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
 
-      @media (max-width: 992px) {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      @media (max-width: 576px) {
-        grid-template-columns: 1fr;
-      }
+    img {
+      content: url("/haSui.webp"); // Use local haSUI image
     }
+  }
 
-    .dashboard-stat-card {
-      display: flex;
-      align-items: center;
-      background: rgba(20, 20, 30, 0.6);
-      border-radius: 10px;
-      padding: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
+  .sui-token {
+    background: linear-gradient(135deg, #4bc1d2, #2b6eff);
+    box-shadow: 0 0 10px rgba(0, 174, 240, 0.7);
 
-      &:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-      }
+    img {
+      content: url("/sui.png"); // Use local SUI image
     }
+  }
 
-    .stat-icon {
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+  .usdc-token {
+    background: linear-gradient(135deg, #2775ca, #2775ca);
+    box-shadow: 0 0 10px rgba(39, 117, 202, 0.7);
+  }
+
+  .scallop-token {
+    background: #ec4899;
+  }
+
+  .blue-token {
+    background: linear-gradient(135deg, #1e88e5, #039be5);
+    box-shadow: 0 0 10px rgba(3, 155, 229, 0.7);
+  }
+
+  // Loading text with dot loader
+  .loading-text {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .dot-loader {
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      margin-right: 15px;
-      font-size: 18px;
-
-      &:nth-child(4n + 1) {
-        background: rgba(30, 144, 255, 0.15);
-        color: #1e90ff;
-      }
-
-      &:nth-child(4n + 2) {
-        background: rgba(196, 92, 242, 0.15);
-        color: #c45cf2;
-      }
-
-      &:nth-child(4n + 3) {
-        background: rgba(0, 255, 128, 0.15);
-        color: #00ff80;
-      }
-
-      &:nth-child(4n + 4) {
-        background: rgba(255, 184, 0, 0.15);
-        color: #ffb800;
-      }
+      background-color: currentColor;
+      animation: dotPulse 1.4s infinite ease-in-out;
     }
+  }
 
-    .stat-content {
-      flex-grow: 1;
-    }
+  // Scallop summary styling
+  .scallop-summary-container {
+    background: rgba(30, 40, 60, 0.3);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
 
-    .stat-label {
-      color: #b1a5c8;
-      font-size: 14px;
-      margin-bottom: 4px;
-    }
+    .scallop-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1.5rem;
 
-    /* Special styling to fix the multiple $ issue */
-    .stat-value {
-      color: #fff;
-      font-size: 20px;
-      font-weight: 600;
-      font-family: "Orbitron", monospace;
-      position: relative;
-    }
-
-    /* Override the $ in the React component for numerical values */
-    .stat-content:has(.stat-label:contains("Total Value")) .stat-value,
-    .stat-content:has(.stat-label:contains("Total Rewards")) .stat-value {
-      color: rgba(0, 0, 0, 0); /* Make the original text transparent */
-
-      &::before {
-        content: "$";
-        position: absolute;
-        left: 0;
-        color: white;
+      .protocol-icon {
+        margin-right: 1rem;
       }
-
-      &::after {
-        content: attr(data-clean-value);
-        position: absolute;
-        left: 12px; /* Space for the $ sign */
-        color: white;
-      }
-    }
-
-    .stat-loading {
-      height: 20px;
-      width: 80px;
-      background: linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.05) 25%,
-        rgba(255, 255, 255, 0.1) 50%,
-        rgba(255, 255, 255, 0.05) 75%
-      );
-      background-size: 200% 100%;
-      border-radius: 4px;
-      animation: loading 1.5s infinite;
-    }
-
-    // Protocol distribution chart styles with overflow fix
-    .protocol-breakdown {
-      margin-top: 24px;
-      padding-top: 20px;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      overflow-x: visible; // Fix overflow issues
 
       h3 {
-        font-size: 16px;
-        margin-bottom: 16px;
-        color: #b1a5c8;
-        font-weight: 500;
+        font-size: 18px;
+        font-weight: 600;
+        color: #ec4899;
+        margin: 0;
+      }
+    }
+
+    .scallop-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
       }
 
-      .protocol-distribution-chart {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        min-width: 0; // Allow chart to shrink if needed
-      }
+      .stat-item {
+        background: rgba(30, 40, 60, 0.5);
+        padding: 1rem;
+        border-radius: 6px;
 
-      .protocol-bar-container {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-
-        .protocol-label {
-          width: 80px;
+        .stat-label {
+          color: rgba(255, 255, 255, 0.7);
           font-size: 14px;
-          color: #b1a5c8;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          margin-bottom: 4px;
         }
 
-        .protocol-bar-wrapper {
-          flex-grow: 1;
-          height: 8px;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .protocol-bar {
-          height: 100%;
-          border-radius: 4px;
-          background: linear-gradient(
-            90deg,
-            rgba(30, 144, 255, 0.8),
-            rgba(30, 144, 255, 0.4)
-          );
-
-          &.cetus {
-            background: linear-gradient(90deg, #4650a8, rgba(70, 80, 168, 0.7));
-          }
-
-          &.bluefin {
-            background: linear-gradient(
-              90deg,
-              #2c78b2,
-              rgba(44, 120, 178, 0.7)
-            );
-          }
-
-          &.turbos {
-            background: linear-gradient(
-              90deg,
-              #20c4bc,
-              rgba(32, 196, 188, 0.7)
-            );
-          }
-
-          &.kriya {
-            background: linear-gradient(
-              90deg,
-              #8155ff,
-              rgba(129, 85, 255, 0.7)
-            );
-          }
-
-          &.scallop {
-            background: linear-gradient(
-              90deg,
-              #ff6b6b,
-              rgba(255, 107, 107, 0.7)
-            );
-          }
-
-          &.suilend {
-            background: linear-gradient(
-              90deg,
-              #ff9f1c,
-              rgba(255, 159, 28, 0.7)
-            );
-          }
-        }
-
-        .protocol-value {
-          width: 80px;
-          text-align: right;
-          font-size: 14px;
-          font-weight: 500;
+        .stat-value {
+          font-size: 16px;
+          font-weight: 600;
           color: #fff;
         }
       }
     }
+
+    .scallop-positions {
+      h4 {
+        font-size: 16px;
+        margin-bottom: 1rem;
+        color: #ec4899;
+      }
+    }
+  }
+
+  // Bluefin styling
+  .position-type-badge.bluefin-badge {
+    background-color: rgba(6, 134, 74, 0.1);
+    color: #06864a;
+  }
+
+  .bluefin-row {
+    background-color: rgba(6, 134, 74, 0.05);
   }
 }
 
-// Fix position type tabs to stay in place
-.position-type-tabs {
-  display: flex;
-  margin-bottom: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  position: sticky; // Make tabs stick to their position while scrolling
-  top: var(--navbar-h); // Position them below navbar
-  background-color: rgba(15, 22, 36, 0.7); // Semi-transparent background
-  backdrop-filter: blur(10px);
-  z-index: 10; // Above content, below navbar
-  padding-top: 1rem;
-  margin-top: -1rem; // Offset the padding
+// Animation keyframes
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.position-type-tab {
-  padding: 10px 16px;
-  background: none;
-  border: none;
-  color: #a1a1a1;
-  cursor: pointer;
-  font-size: 14px;
-  position: relative;
-  transition: color 0.2s;
-}
-
-.position-type-tab:hover {
-  color: #ffffff;
-}
-
-.position-type-tab.active {
-  color: #1e90ff;
-  font-weight: 600;
-}
-
-.position-type-tab.active:after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #1e90ff 0%, #c45cf2 100%);
-  border-radius: 3px 3px 0 0;
+@keyframes dotPulse {
+  0%,
+  100% {
+    transform: scale(0.2);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes loading {
@@ -1037,182 +896,33 @@
   }
 }
 
-// Scallop summary component styles
-.scallop-summary-container {
-  background: rgba(15, 25, 40, 0.5);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  border: 1px solid;
-  border-image: linear-gradient(
-      45deg,
-      rgba(255, 107, 107, 0.2),
-      rgba(255, 217, 102, 0.2)
-    )
-    1;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(255, 107, 107, 0.05),
-    0 8px 32px rgba(255, 217, 102, 0.05);
+// Media queries
+@media (max-width: 768px) {
+  .positions-page {
+    padding: 1rem;
+    padding-top: calc(1rem + var(--navbar-h));
 
-  .scallop-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 1.5rem;
-
-    .protocol-icon {
-      margin-right: 1rem;
-
-      .token-icon {
-        width: 40px;
-        height: 40px;
-      }
-    }
-
-    h3 {
-      font-size: 1.3rem;
-      font-weight: 600;
-      color: #ff6b6b;
-      margin: 0;
-    }
-  }
-
-  .scallop-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-
-    @media (max-width: 768px) {
+    .portfolio-dashboard .dashboard-stats-grid {
       grid-template-columns: 1fr;
     }
 
-    .stat-item {
-      background: rgba(10, 20, 35, 0.7);
-      padding: 1rem;
-      border-radius: 8px;
+    .position-type-tabs {
+      overflow-x: auto;
 
-      .stat-label {
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
-      }
-
-      .stat-value {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #fff;
-      }
-    }
-  }
-
-  .scallop-positions {
-    h4 {
-      font-size: 1.1rem;
-      margin-bottom: 1rem;
-      color: #ff6b6b;
-    }
-
-    .position-section {
-      margin-bottom: 1.5rem;
-    }
-
-    .positions-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 1rem;
-
-      .position-item {
-        background: rgba(10, 20, 35, 0.7);
-        padding: 1rem;
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-
-        .position-token {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          margin-bottom: 0.75rem;
-
-          span {
-            font-weight: 600;
-          }
-        }
-
-        .position-details {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 0.5rem;
-
-          .position-amount {
-            font-weight: 600;
-          }
-
-          .position-value {
-            color: rgba(255, 255, 255, 0.7);
-          }
-
-          .position-apy {
-            color: #00ff80;
-            font-weight: 600;
-            text-align: right;
-          }
-        }
+      .position-type-tab {
+        white-space: nowrap;
+        padding-left: 10px;
+        padding-right: 10px;
       }
     }
 
-    .obligation-item {
-      background: rgba(10, 20, 35, 0.7);
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-
-      .obligation-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 1rem;
-
-        .obligation-id {
-          font-weight: 600;
-        }
-      }
-
-      h5 {
-        font-size: 0.9rem;
-        margin-bottom: 0.75rem;
-        color: rgba(255, 255, 255, 0.7);
-      }
-
-      .collateral-list,
-      .borrowed-list {
-        margin-bottom: 1rem;
-      }
-
-      .collateral-item,
-      .borrow-item {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.5rem;
-        background: rgba(5, 10, 20, 0.8);
-        border-radius: 6px;
-        margin-bottom: 0.5rem;
-
-        .item-value {
-          margin-left: auto;
-          color: rgba(255, 255, 255, 0.7);
-        }
-
-        .borrow-rate {
-          color: #ff5252;
-        }
-      }
+    .main-navigation .nav-link {
+      padding-right: 1rem;
+      font-size: 14px;
     }
   }
 }
 
-// Special media query to handle really small screens
 @media (max-width: 480px) {
   .positions-page {
     padding: 1rem;
