@@ -90,15 +90,7 @@ const DEFAULT_TOKEN_ICON = "/assets/token-placeholder.png";
 
 // Map of token addresses for well-known tokens (Sui mainnet)
 const TOKEN_ADDRESSES: Record<string, string> = {
-  SUI: "0x2::sui::SUI",
-  USDC: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
-  USDT: "0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN",
-  WAL: "0x1e8b532cca6569cab9f9b9ebc73f8c13885012ade714729aa3b450e0339ac766::coin::COIN",
-  HASUI:
-    "0x680eb4a8e1074d7e15186c40dcf8d3b749f1ddba4c60478c367fc9c24a5a5a29::hasui::HASUI",
-  // Add Scallop tokens
-  SSUI: "0xaafc4f740de0dd0dde642a31148fb94517087052f19afb0f7bed1dc41a50c77b::scallop_sui::SCALLOP_SUI",
-  SSCA: "0x5ca17430c1d046fae9edeaa8fd76c7b4193a00d764a0ecfa9418d733ad27bc1e::scallop_sca::SCALLOP_SCA",
+  SUI: "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
 };
 
 // Hardcoded token logos for fallbacks
@@ -108,8 +100,9 @@ const HARDCODED_LOGOS: Record<string, string> = {
   USDC: "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png",
   USDT: "https://assets.coingecko.com/coins/images/325/thumb/Tether.png",
 
-  HASUI: "https://archive.cetus.zone/assets/image/sui/hasui.png",
-  "HA-SUI": "https://archive.cetus.zone/assets/image/sui/hasui.png",
+  HASUI: "/haSui.webp",
+  "HA-SUI": "/haSui.webp",
+
   SLOVE:
     "https://coin-images.coingecko.com/coins/images/54967/small/logo_square_color.png",
   BLUB: "https://coin-images.coingecko.com/coins/images/39356/small/Frame_38.png",
@@ -2254,9 +2247,6 @@ function Positions() {
   return (
     <div className="positions-page">
       {/* Add glow elements for consistent styling with other pages */}
-      <div className="glow-1"></div>
-      <div className="glow-2"></div>
-      <div className="glow-3"></div>
 
       <div className="content-container">
         {/* Updated navigation to match the Pools.tsx format */}
@@ -2989,55 +2979,6 @@ function Positions() {
           />
         )}
       </div>
-
-      <style jsx>{`
-        /* Add Bluefin styling */
-        .position-type-badge.bluefin-badge {
-          background-color: rgba(6, 134, 74, 0.1);
-          color: #06864a;
-        }
-
-        .bluefin-row {
-          background-color: rgba(6, 134, 74, 0.05);
-        }
-
-        .status-badge.bluefin {
-          background-color: rgba(6, 134, 74, 0.1);
-          color: #06864a;
-          border: 1px solid rgba(6, 134, 74, 0.3);
-        }
-
-        .status-badge.pending {
-          background-color: rgba(255, 152, 0, 0.1);
-          color: #ff9800;
-          border: 1px solid rgba(255, 152, 0, 0.3);
-        }
-
-        .protocol-bar.bluefin {
-          background: linear-gradient(90deg, #06864a, rgba(6, 134, 74, 0.7));
-        }
-
-        .blue-token {
-          background: linear-gradient(135deg, #1e88e5, #039be5);
-          box-shadow: 0 0 10px rgba(3, 155, 229, 0.7);
-        }
-
-        /* Button styling for Force Close */
-        .btn--warning {
-          background-color: #ff9800;
-          border-color: #f57c00;
-          color: white;
-        }
-
-        .btn--warning:hover {
-          background-color: #f57c00;
-        }
-
-        .btn--warning:disabled {
-          background-color: rgba(255, 152, 0, 0.6);
-          border-color: rgba(245, 124, 0, 0.6);
-        }
-      `}</style>
     </div>
   );
 }
