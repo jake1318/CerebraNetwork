@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Pools.tsx
-// Last Updated: 2025-07-10 02:37:25 UTC by jake1318
+// Last Updated: 2025-07-15 02:13:01 UTC by jake1318
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -7,7 +7,6 @@ import { useWallet } from "@suiet/wallet-kit";
 import DepositModal from "../../components/DepositModal";
 import TurbosDepositModal from "../../components/TurbosDepositModal";
 import KriyaDepositModal from "../../components/KriyaDepositModal";
-import TransactionNotification from "../../components/TransactionNotification";
 import EnhancedTokenIcon from "../../components/EnhancedTokenIcon";
 import ProtocolBadge from "./ProtocolBadge";
 import { VaultSection } from "../../components/VaultSection";
@@ -27,6 +26,14 @@ import {
 } from "../../services/cetusVaultService";
 import "../../styles/pages/Pools.scss";
 import "./protocolBadges.scss";
+// Import the copy icon
+import {
+  FaCopy,
+  FaChartLine,
+  FaExchangeAlt,
+  FaCoins,
+  FaPercentage,
+} from "react-icons/fa";
 
 // Define all supported DEXes from CoinGecko
 interface DexInfo {
@@ -42,9 +49,9 @@ const SUPPORTED_DEXES: DexInfo[] = [
   { id: "bluefin", name: "Bluefin" },
 
   // Coming soon
-  { id: "turbos-finance", name: "Turbos (Coming Soon)" },
-  { id: "flow-x", name: "FlowX (Coming Soon)" },
-  { id: "aftermath", name: "Aftermath (Coming Soon)" },
+  { id: "turbos-finance", name: "Turbos" },
+  { id: "flow-x", name: "FlowX" },
+  { id: "aftermath", name: "Aftermath" },
 
   // Removed protocols - commented out as per requirements
   // { id: "kriya-dex", name: "KriyaDEX" },
@@ -71,6 +78,16 @@ enum TabType {
   VAULTS = "vaults",
 }
 
+// Interface for market dashboard metrics
+interface MarketMetrics {
+  totalTVL: number;
+  total24hVolume: number;
+  totalPools: number;
+  averageAPR: number;
+  topAPR: number;
+  loading: boolean;
+}
+
 const Pools: React.FC = () => {
   const wallet = useWallet();
   const { connected, account } = wallet;
@@ -89,17 +106,33 @@ const Pools: React.FC = () => {
   >("apr");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  // State for market dashboard
+  const [marketMetrics, setMarketMetrics] = useState<MarketMetrics>({
+    totalTVL: 0,
+    total24hVolume: 0,
+    totalPools: 0,
+    averageAPR: 0,
+    topAPR: 0,
+    loading: true,
+  });
+
+  // State to store the global market metrics (across all DEXes)
+  const [globalMarketMetrics, setGlobalMarketMetrics] = useState<MarketMetrics>(
+    {
+      totalTVL: 0,
+      total24hVolume: 0,
+      totalPools: 0,
+      averageAPR: 0,
+      topAPR: 0,
+      loading: true,
+    }
+  );
+
   // State for deposit modals - separate state for each modal type
   const [isDepositModalOpen, setIsDepositModalOpen] = useState<boolean>(false);
   const [isTurbosModalOpen, setIsTurbosModalOpen] = useState<boolean>(false);
   const [isKriyaModalOpen, setIsKriyaModalOpen] = useState<boolean>(false);
   const [selectedPool, setSelectedPool] = useState<PoolInfo | null>(null);
-
-  const [notification, setNotification] = useState<{
-    message: string;
-    isSuccess: boolean;
-    txDigest?: string;
-  } | null>(null);
 
   // State for token balances to pass to deposit modals
   const [tokenABalance, setTokenABalance] = useState<string>("0");
@@ -114,18 +147,26 @@ const Pools: React.FC = () => {
   // Cache BirdEye metadata for all token addresses
   const [tokenMetadata, setTokenMetadata] = useState<Record<string, any>>({});
 
+  // Track which pool ID was copied (for showing the "Copied!" message)
+  const [copiedPoolId, setCopiedPoolId] = useState<string | null>(null);
+
   // Currently supported DEXes for deposit
-  const supportedDexes = [
-    "cetus",
-    "bluefin",
-    "turbos-finance",
-    "turbos",
-    "kriya-dex",
-    "kriya",
-  ];
+  const supportedDexes = ["cetus", "bluefin"];
 
   // Set maximum number of pools to show in results
   const MAX_POOLS_TO_DISPLAY = 20;
+
+  // Function to handle copying pool ID to clipboard
+  const handleCopyPoolId = (poolId: string) => {
+    navigator.clipboard.writeText(poolId).then(() => {
+      setCopiedPoolId(poolId);
+
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedPoolId(null);
+      }, 2000);
+    });
+  };
 
   // Setup SDK sender address when wallet connects
   useEffect(() => {
@@ -147,11 +188,67 @@ const Pools: React.FC = () => {
     } else if (tab === TabType.PORTFOLIO) {
       navigate("/portfolio");
     } else if (tab === TabType.VAULTS) {
-      setActiveTab(TabType.VAULTS);
+      // Don't navigate - vaults tab is unclickable
+      return;
     } else {
       setActiveTab(TabType.POOLS);
     }
   };
+
+  // Calculate market metrics from pool data
+  const calculateMarketMetrics = useCallback((pools: PoolInfo[]) => {
+    if (!pools || pools.length === 0) {
+      return {
+        totalTVL: 0,
+        total24hVolume: 0,
+        totalPools: 0,
+        averageAPR: 0,
+        topAPR: 0,
+        loading: false,
+      };
+    }
+
+    let totalTVL = 0;
+    let total24hVolume = 0;
+    let totalAPR = 0;
+    let validAPRCount = 0;
+    let topAPR = 0;
+
+    pools.forEach((pool) => {
+      // Sum TVL
+      if (pool.liquidityUSD && !isNaN(pool.liquidityUSD)) {
+        totalTVL += pool.liquidityUSD;
+      }
+
+      // Sum 24h Volume
+      if (pool.volumeUSD && !isNaN(pool.volumeUSD)) {
+        total24hVolume += pool.volumeUSD;
+      }
+
+      // Calculate average and top APR
+      if (pool.apr && !isNaN(pool.apr) && pool.apr > 0) {
+        totalAPR += pool.apr;
+        validAPRCount++;
+
+        // Update top APR if this is higher
+        if (pool.apr > topAPR) {
+          topAPR = pool.apr;
+        }
+      }
+    });
+
+    // Calculate average APR (if there are valid APRs)
+    const averageAPR = validAPRCount > 0 ? totalAPR / validAPRCount : 0;
+
+    return {
+      totalTVL,
+      total24hVolume,
+      totalPools: pools.length,
+      averageAPR,
+      topAPR,
+      loading: false,
+    };
+  }, []);
 
   /** ------------------------------------------------------------
    * Fetch pools from CoinGecko + enrich with BirdEye logos + merge with Kriya pools
@@ -159,7 +256,7 @@ const Pools: React.FC = () => {
   const fetchPools = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Get CoinGecko pools
+      // 1. Get CoinGecko pools - this will get the top pools across all DEXes
       const poolsFromCoingecko = await coinGeckoService.getDefaultPools();
       console.log(`Fetched ${poolsFromCoingecko.length} pools from CoinGecko`);
 
@@ -212,7 +309,14 @@ const Pools: React.FC = () => {
       const poolsWithVaults = processPoolsWithVaults(mergedPools, allVaults);
       console.log(`Processed ${poolsWithVaults.length} pools with vault data`);
 
-      // 7. Save to state and sort by APR by default
+      // 7. Calculate market metrics for all DEXes combined
+      const metrics = calculateMarketMetrics(poolsWithVaults);
+      setMarketMetrics(metrics);
+      setGlobalMarketMetrics(metrics); // Store the global metrics for future reference
+
+      console.log("Market overview metrics calculated:", metrics);
+
+      // 8. Save to state and sort by APR by default
       setOriginalPools(poolsWithVaults);
       setPools(poolsWithVaults);
 
@@ -223,7 +327,7 @@ const Pools: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [calculateMarketMetrics]);
 
   // Initial data fetch
   useEffect(() => {
@@ -256,6 +360,11 @@ const Pools: React.FC = () => {
           // Update state
           setPools(sortedPools);
           setFilteredPools(sortedPools.slice(0, MAX_POOLS_TO_DISPLAY));
+
+          // Calculate metrics for this specific DEX but keep showing global metrics in the dashboard
+          const dexMetrics = calculateMarketMetrics(sortedPools);
+          setMarketMetrics(dexMetrics);
+
           setLoading(false);
           return;
         }
@@ -308,6 +417,10 @@ const Pools: React.FC = () => {
           `Processed ${poolsWithVaults.length} pools with vault data for DEX filter`
         );
 
+        // Calculate market metrics for the filtered pools but continue to show global metrics
+        const dexMetrics = calculateMarketMetrics(poolsWithVaults);
+        setMarketMetrics(dexMetrics);
+
         setPools(poolsWithVaults);
         setFilteredPools(poolsWithVaults.slice(0, MAX_POOLS_TO_DISPLAY));
       } catch (error) {
@@ -318,11 +431,15 @@ const Pools: React.FC = () => {
         );
         setPools(dexPools);
         setFilteredPools(dexPools.slice(0, MAX_POOLS_TO_DISPLAY));
+
+        // Calculate market metrics for the fallback pools but continue to show global metrics
+        const dexMetrics = calculateMarketMetrics(dexPools);
+        setMarketMetrics(dexMetrics);
       } finally {
         setLoading(false);
       }
     },
-    [originalPools]
+    [originalPools, calculateMarketMetrics]
   );
 
   /**
@@ -465,6 +582,10 @@ const Pools: React.FC = () => {
           return va < vb ? 1 : -1;
         });
 
+        // Calculate market metrics for search results but continue to show global metrics
+        const searchMetrics = calculateMarketMetrics(result);
+        setMarketMetrics(searchMetrics);
+
         setFilteredPools(result.slice(0, MAX_POOLS_TO_DISPLAY));
       } catch (error) {
         console.error("Error during search:", error);
@@ -484,12 +605,17 @@ const Pools: React.FC = () => {
             (p) => p.dex.toLowerCase() === selectedDex.toLowerCase()
           );
         }
+
+        // Calculate market metrics for fallback search results but continue to show global metrics
+        const searchMetrics = calculateMarketMetrics(result);
+        setMarketMetrics(searchMetrics);
+
         setFilteredPools(result.slice(0, MAX_POOLS_TO_DISPLAY));
       } finally {
         setLoading(false);
       }
     },
-    [pools, selectedDex, sortColumn, sortOrder]
+    [pools, selectedDex, sortColumn, sortOrder, calculateMarketMetrics]
   );
 
   // Debounced search handler
@@ -511,19 +637,23 @@ const Pools: React.FC = () => {
     [searchTimer]
   );
 
-  // Reset filters
+  // Reset filters and show global market metrics
   const handleReset = useCallback(() => {
     setSearch("");
     setSelectedDex(null);
     setSortColumn("apr");
     setSortOrder("desc");
     setPools(originalPools);
+
+    // Reset to global market metrics (all DEXes)
+    setMarketMetrics(globalMarketMetrics);
+
     setFilteredPools(
       [...originalPools]
         .sort((a, b) => b.apr - a.apr)
         .slice(0, MAX_POOLS_TO_DISPLAY)
     );
-  }, [originalPools]);
+  }, [originalPools, globalMarketMetrics]);
 
   // Sorting
   const handleSort = (col: typeof sortColumn) => {
@@ -554,11 +684,15 @@ const Pools: React.FC = () => {
         fetchPoolsByDex(dex);
       } else {
         setPools(originalPools);
+
+        // Reset to global market metrics (all DEXes)
+        setMarketMetrics(globalMarketMetrics);
+
         if (search.trim()) performSearch(search);
         else setFilteredPools(originalPools.slice(0, MAX_POOLS_TO_DISPLAY));
       }
     },
-    [originalPools, fetchPoolsByDex, search, performSearch]
+    [originalPools, fetchPoolsByDex, search, performSearch, globalMarketMetrics]
   );
 
   /**
@@ -786,11 +920,7 @@ const Pools: React.FC = () => {
 
       console.log("Deposit transaction completed:", txResult);
 
-      setNotification({
-        message: `Successfully deposited ${amountA} ${selectedPool.tokenA} and ${amountB} ${selectedPool.tokenB} to ${selectedPool.dex} pool`,
-        isSuccess: true,
-        txDigest: txResult.digest,
-      });
+      // Removed transaction notification since we're handling it in the deposit modal now
 
       // Refresh positions after a delay
       setTimeout(() => {
@@ -802,12 +932,6 @@ const Pools: React.FC = () => {
       return txResult;
     } catch (err: any) {
       console.error("Deposit failed:", err);
-      setNotification({
-        message: `Failed to deposit: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`,
-        isSuccess: false,
-      });
       throw err;
     }
   };
@@ -849,14 +973,10 @@ const Pools: React.FC = () => {
         slippage
       );
 
-      if (result.success) {
-        setNotification({
-          message: `Successfully deposited ${amountA} ${selectedPool.tokenA} and ${amountB} ${selectedPool.tokenB} to Turbos pool`,
-          isSuccess: true,
-          txDigest: result.digest,
-        });
+      // Removed transaction notification since we're handling it in the deposit modal now
 
-        // Refresh positions after a delay
+      // Refresh positions after a delay
+      if (result.success) {
         setTimeout(() => {
           if (account?.address) {
             // Refresh positions logic would go here
@@ -867,12 +987,6 @@ const Pools: React.FC = () => {
       return result;
     } catch (err: any) {
       console.error("Turbos deposit failed:", err);
-      setNotification({
-        message: `Failed to deposit: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`,
-        isSuccess: false,
-      });
       throw err;
     }
   };
@@ -914,14 +1028,10 @@ const Pools: React.FC = () => {
         slippage
       );
 
-      if (result.success) {
-        setNotification({
-          message: `Successfully deposited ${amountA} ${selectedPool.tokenA} and ${amountB} ${selectedPool.tokenB} to Kriya pool`,
-          isSuccess: true,
-          txDigest: result.digest,
-        });
+      // Removed transaction notification since we're handling it in the deposit modal now
 
-        // Refresh positions after a delay
+      // Refresh positions after a delay
+      if (result.success) {
         setTimeout(() => {
           if (account?.address) {
             // Refresh positions logic would go here
@@ -932,17 +1042,9 @@ const Pools: React.FC = () => {
       return result;
     } catch (err: any) {
       console.error("Kriya deposit failed:", err);
-      setNotification({
-        message: `Failed to deposit: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`,
-        isSuccess: false,
-      });
       throw err;
     }
   };
-
-  const dismissNotification = () => setNotification(null);
 
   const getAprClass = (apr: number) => {
     if (apr >= 100) return "high";
@@ -1033,10 +1135,87 @@ const Pools: React.FC = () => {
     );
   };
 
+  // Render the market dashboard - using global metrics for the overview
+  const renderMarketDashboard = () => {
+    return (
+      <div className="market-dashboard">
+        <h2 className="dashboard-title">Market Overview</h2>
+        <div className="dashboard-stats-grid">
+          <div className="dashboard-stat-card">
+            <div className="stat-icon">
+              <FaChartLine />
+            </div>
+            <div className="stat-content">
+              <div className="stat-label">Total Value Locked</div>
+              <div className="stat-value">
+                {globalMarketMetrics.loading ? (
+                  <div className="stat-loading"></div>
+                ) : (
+                  `$${formatNumber(globalMarketMetrics.totalTVL)}`
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="dashboard-stat-card">
+            <div className="stat-icon">
+              <FaExchangeAlt />
+            </div>
+            <div className="stat-content">
+              <div className="stat-label">24h Volume</div>
+              <div className="stat-value">
+                {globalMarketMetrics.loading ? (
+                  <div className="stat-loading"></div>
+                ) : (
+                  `$${formatNumber(globalMarketMetrics.total24hVolume)}`
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="dashboard-stat-card">
+            <div className="stat-icon">
+              <FaCoins />
+            </div>
+            <div className="stat-content">
+              <div className="stat-label">Total Pools</div>
+              <div className="stat-value">
+                {globalMarketMetrics.loading ? (
+                  <div className="stat-loading"></div>
+                ) : (
+                  globalMarketMetrics.totalPools
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="dashboard-stat-card">
+            <div className="stat-icon">
+              <FaPercentage />
+            </div>
+            <div className="stat-content">
+              <div className="stat-label">Top APR</div>
+              <div className="stat-value">
+                {globalMarketMetrics.loading ? (
+                  <div className="stat-loading"></div>
+                ) : (
+                  `${formatNumber(globalMarketMetrics.topAPR)}%`
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render the pool content
   const renderPoolContent = () => {
     return (
       <>
+        {/* Market Dashboard Section */}
+        {renderMarketDashboard()}
+
         <div className="controls-section">
           <div className="search-container">
             <div className="search-icon">
@@ -1163,9 +1342,10 @@ const Pools: React.FC = () => {
                 ) : (
                   filteredPools.map((item) => {
                     const isStubPool = !hasCompleteData(item);
+                    const poolId = item.poolAddress || item.address;
                     return (
                       <tr
-                        key={item.poolAddress || item.address}
+                        key={poolId}
                         className={isStubPool ? "stub-pool" : ""}
                       >
                         <td className="pool-cell">
@@ -1210,6 +1390,28 @@ const Pools: React.FC = () => {
                               {hasActiveVault(item) && (
                                 <div className="vault-badge">Auto-Vault</div>
                               )}
+
+                              {/* Added pool ID with copy button */}
+                              <div className="pool-id">
+                                <span className="pool-id-label">Pool ID:</span>
+                                <span className="pool-id-value">
+                                  {shortenAddress(poolId)}
+                                </span>
+                                <button
+                                  className="copy-button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyPoolId(poolId);
+                                  }}
+                                  title="Copy pool ID"
+                                >
+                                  {copiedPoolId === poolId ? (
+                                    "Copied!"
+                                  ) : (
+                                    <FaCopy />
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -1287,6 +1489,11 @@ const Pools: React.FC = () => {
 
   return (
     <div className="pools-page">
+      {/* Add glow elements similar to Home page */}
+      <div className="glow-1"></div>
+      <div className="glow-2"></div>
+      <div className="glow-3"></div>
+
       <div className="content-container">
         <div className="main-navigation">
           <div
@@ -1300,13 +1507,8 @@ const Pools: React.FC = () => {
           <Link to="/positions" className="nav-link">
             My Positions
           </Link>
-          <div
-            className={`nav-link ${
-              activeTab === TabType.VAULTS ? "active" : ""
-            }`}
-            onClick={() => navigateToPage(TabType.VAULTS)}
-          >
-            Vaults
+          <div className={`nav-link coming-soon`} title="Coming Soon">
+            Vaults <span className="coming-soon-tooltip">Coming Soon</span>
           </div>
         </div>
 
@@ -1350,17 +1552,6 @@ const Pools: React.FC = () => {
             tokenBBalance={tokenBBalance}
           />
         )}
-
-        {notification && (
-          <div className="notification-container">
-            <TransactionNotification
-              message={notification.message}
-              isSuccess={notification.isSuccess}
-              txDigest={notification.txDigest}
-              onClose={dismissNotification}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -1373,6 +1564,15 @@ function formatNumber(value: number, decimals: number = 2): string {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: decimals,
   }).format(value);
+}
+
+// Helper function to shorten addresses
+function shortenAddress(address: string): string {
+  if (!address) return "";
+  if (address.length <= 13) return address;
+  return `${address.substring(0, 6)}...${address.substring(
+    address.length - 4
+  )}`;
 }
 
 export default Pools;
