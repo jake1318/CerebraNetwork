@@ -1,31 +1,43 @@
 // src/styles/pages/Positions.scss
-// Last Updated: 2025-07-15 04:26:45 UTC by jake1318
+// Last Updated: 2025-07-19 00:07:51 UTC by jake1318
 
 .positions-page {
+  // Change these properties to ensure proper scrolling
   width: 100%;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--navbar-h)); // Adjust for navbar height
   padding: 2rem;
+  padding-top: calc(2rem + var(--navbar-h)); // Add navbar height to top padding
+  margin-top: 0; // Remove any top margin
   position: relative;
   color: #fff;
+  overflow-y: visible; // Allow content to scroll naturally
 
-  // Updated cyberpunk-style gradient background with neon blue (removed grid overlay)
-  background: radial-gradient(
-      circle at top left,
-      rgba(30, 144, 255, 0.15),
-      // Changed to neon blue
-      rgba(5, 15, 30, 0.3) 40%
-    ),
-    radial-gradient(
-      circle at bottom right,
-      rgba(196, 92, 242, 0.15),
-      // Changed to match purple
-      rgba(5, 15, 30, 0.3) 40%
-    ),
-    #0f1624;
+  // Fix the background to be relative to the viewport
+  &::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(
+        circle at top left,
+        rgba(30, 144, 255, 0.15),
+        rgba(5, 15, 30, 0.3) 40%
+      ),
+      radial-gradient(
+        circle at bottom right,
+        rgba(196, 92, 242, 0.15),
+        rgba(5, 15, 30, 0.3) 40%
+      ),
+      #0f1624;
+    z-index: -2; // Behind content
+    pointer-events: none;
+  }
 
-  // Add the glows from other pages
+  // Add the glows from other pages as fixed elements
   .glow-1 {
-    position: absolute;
+    position: fixed; // Change to fixed positioning
     width: 300px;
     height: 300px;
     background: rgba(30, 144, 255, 0.12); // Neon blue
@@ -33,13 +45,13 @@
     filter: blur(70px);
     top: -100px;
     left: 10%;
-    z-index: 0;
+    z-index: -1; // Behind content but above background
     animation: pulsate 8s ease-in-out infinite alternate;
     pointer-events: none;
   }
 
   .glow-2 {
-    position: absolute;
+    position: fixed; // Change to fixed positioning
     width: 300px;
     height: 300px;
     background: rgba(196, 92, 242, 0.12); // Purple
@@ -47,13 +59,13 @@
     filter: blur(80px);
     bottom: -100px;
     right: 10%;
-    z-index: 0;
+    z-index: -1; // Behind content but above background
     animation: pulsate 10s ease-in-out infinite alternate-reverse;
     pointer-events: none;
   }
 
   .glow-3 {
-    position: absolute;
+    position: fixed; // Change to fixed positioning
     width: 250px;
     height: 250px;
     background: rgba(0, 255, 128, 0.12); // Green
@@ -61,7 +73,7 @@
     filter: blur(70px);
     top: 60%;
     left: 70%;
-    z-index: 0;
+    z-index: -1; // Behind content but above background
     animation: pulsate 9s ease-in-out infinite;
     pointer-events: none;
   }
@@ -78,6 +90,7 @@
     display: flex;
     margin-bottom: 2.5rem;
     position: relative;
+    z-index: 5; // Ensure navigation stays above other elements
 
     &::after {
       content: "";
@@ -146,7 +159,7 @@
     display: none;
   }
 
-  // Table styling
+  // Table styling with improved overflow handling
   .positions-table-container {
     background: rgba(15, 25, 40, 0.5);
     border-radius: 12px;
@@ -164,14 +177,19 @@
     box-shadow: 0 8px 32px rgba(30, 144, 255, 0.05),
       // Changed to neon blue
       0 8px 32px rgba(196, 92, 242, 0.05); // Changed to match purple
+    overflow-x: auto; // Allow horizontal scrolling for tables
 
     table {
       width: 100%;
       border-collapse: separate;
       border-spacing: 0;
+      min-width: 900px; // Ensure minimum width for readability
 
       thead {
         background: rgba(10, 20, 35, 0.8);
+        position: sticky; // Make headers sticky
+        top: 0;
+        z-index: 5;
 
         th {
           padding: 1.25rem 1rem;
@@ -234,10 +252,11 @@
 
           td {
             padding: 0;
-          }
 
-          .position-details-container {
-            padding: 1.5rem;
+            .position-details-container {
+              padding: 1.5rem;
+              overflow-x: auto; // Handle overflow in detail sections
+            }
           }
         }
       }
@@ -589,6 +608,9 @@
           text-align: left;
           font-size: 0.8rem;
           color: rgba(255, 255, 255, 0.7);
+          position: sticky; // Make headers sticky
+          top: 0;
+          z-index: 5;
         }
 
         td {
@@ -655,6 +677,14 @@
     }
   }
 
+  // Make sure notification container doesn't interfere with scrolling
+  .notification-container {
+    position: fixed; // Keep fixed but don't block scrolling
+    right: 2rem;
+    bottom: 2rem;
+    z-index: 1000; // Ensure notifications appear on top
+  }
+
   // Animation for glow effects
   @keyframes pulsate {
     0% {
@@ -686,14 +716,6 @@
     }
   }
 
-  // Notification container
-  .notification-container {
-    position: fixed;
-    right: 2rem;
-    bottom: 2rem;
-    z-index: 100;
-  }
-
   // Portfolio Dashboard styles - added to match the Market Overview in Pools page
   .portfolio-dashboard {
     background: rgba(10, 10, 20, 0.4);
@@ -706,7 +728,8 @@
     box-shadow: 0 8px 32px rgba(30, 144, 255, 0.08),
       0 8px 32px rgba(196, 92, 242, 0.08);
     position: relative;
-    overflow: hidden;
+    overflow: visible; // Ensure content flows properly
+    z-index: 5; // Ensure it displays properly
 
     &:hover {
       box-shadow: 0 8px 32px rgba(30, 144, 255, 0.12),
@@ -837,18 +860,6 @@
       }
     }
 
-    /* Remove $ signs via JS */
-    /* This script should be added to run when the component mounts */
-    /* 
-    document.querySelectorAll('.stat-content .stat-value').forEach(el => {
-      if (el.textContent.includes('$')) {
-        // Extract numeric part
-        const cleanValue = el.textContent.replace(/\$/g, '').trim();
-        el.setAttribute('data-clean-value', cleanValue);
-      }
-    });
-    */
-
     .stat-loading {
       height: 20px;
       width: 80px;
@@ -863,11 +874,12 @@
       animation: loading 1.5s infinite;
     }
 
-    // Protocol distribution chart styles
+    // Protocol distribution chart styles with overflow fix
     .protocol-breakdown {
       margin-top: 24px;
       padding-top: 20px;
       border-top: 1px solid rgba(255, 255, 255, 0.05);
+      overflow-x: visible; // Fix overflow issues
 
       h3 {
         font-size: 16px;
@@ -880,6 +892,7 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+        min-width: 0; // Allow chart to shrink if needed
       }
 
       .protocol-bar-container {
@@ -970,20 +983,18 @@
   }
 }
 
-@keyframes loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-// Position type tabs
+// Fix position type tabs to stay in place
 .position-type-tabs {
   display: flex;
   margin-bottom: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky; // Make tabs stick to their position while scrolling
+  top: var(--navbar-h); // Position them below navbar
+  background-color: rgba(15, 22, 36, 0.7); // Semi-transparent background
+  backdrop-filter: blur(10px);
+  z-index: 10; // Above content, below navbar
+  padding-top: 1rem;
+  margin-top: -1rem; // Offset the padding
 }
 
 .position-type-tab {
@@ -998,12 +1009,12 @@
 }
 
 .position-type-tab:hover {
-  color: white;
+  color: #ffffff;
 }
 
 .position-type-tab.active {
-  color: white;
-  font-weight: 500;
+  color: #1e90ff;
+  font-weight: 600;
 }
 
 .position-type-tab.active:after {
@@ -1012,17 +1023,228 @@
   bottom: -1px;
   left: 0;
   right: 0;
-  height: 2px;
-  background-color: #5c43e8;
-}
-.positions-page {
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  height: 3px;
+  background: linear-gradient(90deg, #1e90ff 0%, #c45cf2 100%);
+  border-radius: 3px 3px 0 0;
 }
 
-.positions-table-container {
-  max-height: calc(100vh - 300px); // Adjust based on layout
-  overflow-y: auto;
-  overflow-x: auto;
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+// Scallop summary component styles
+.scallop-summary-container {
+  background: rgba(15, 25, 40, 0.5);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(255, 107, 107, 0.2),
+      rgba(255, 217, 102, 0.2)
+    )
+    1;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(255, 107, 107, 0.05),
+    0 8px 32px rgba(255, 217, 102, 0.05);
+
+  .scallop-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+
+    .protocol-icon {
+      margin-right: 1rem;
+
+      .token-icon {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
+    h3 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #ff6b6b;
+      margin: 0;
+    }
+  }
+
+  .scallop-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+
+    .stat-item {
+      background: rgba(10, 20, 35, 0.7);
+      padding: 1rem;
+      border-radius: 8px;
+
+      .stat-label {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .stat-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #fff;
+      }
+    }
+  }
+
+  .scallop-positions {
+    h4 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      color: #ff6b6b;
+    }
+
+    .position-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .positions-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+
+      .position-item {
+        background: rgba(10, 20, 35, 0.7);
+        padding: 1rem;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+
+        .position-token {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 0.75rem;
+
+          span {
+            font-weight: 600;
+          }
+        }
+
+        .position-details {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.5rem;
+
+          .position-amount {
+            font-weight: 600;
+          }
+
+          .position-value {
+            color: rgba(255, 255, 255, 0.7);
+          }
+
+          .position-apy {
+            color: #00ff80;
+            font-weight: 600;
+            text-align: right;
+          }
+        }
+      }
+    }
+
+    .obligation-item {
+      background: rgba(10, 20, 35, 0.7);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+
+      .obligation-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+
+        .obligation-id {
+          font-weight: 600;
+        }
+      }
+
+      h5 {
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .collateral-list,
+      .borrowed-list {
+        margin-bottom: 1rem;
+      }
+
+      .collateral-item,
+      .borrow-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        background: rgba(5, 10, 20, 0.8);
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+
+        .item-value {
+          margin-left: auto;
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        .borrow-rate {
+          color: #ff5252;
+        }
+      }
+    }
+  }
+}
+
+// Special media query to handle really small screens
+@media (max-width: 480px) {
+  .positions-page {
+    padding: 1rem;
+    padding-top: calc(1rem + var(--navbar-h));
+
+    .positions-table-container {
+      td.actions-cell .action-buttons {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+      }
+    }
+
+    .portfolio-dashboard .dashboard-stats-grid {
+      gap: 10px;
+    }
+
+    .portfolio-dashboard .stat-content .stat-value {
+      font-size: 16px;
+    }
+
+    .position-type-tabs {
+      overflow-x: auto;
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+      padding-bottom: 5px;
+    }
+
+    .position-type-tab {
+      padding: 10px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+  }
 }
