@@ -1,7 +1,8 @@
 // src/pages/Lending/LendingPage.tsx
-// Last Updated: 2025-06-23 06:09:06 UTC by jake1318
+// Last Updated: 2025-07-19 20:53:18 UTC by jake1318
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
+import { ScallopService } from "../../scallop/ScallopService";
 import scallopService from "../../scallop/ScallopService";
 import scallopBorrowService from "../../scallop/ScallopBorrowService";
 import LendingActionModal from "../../components/LendingActionModal";
@@ -62,6 +63,7 @@ interface RewardInfo {
   coinType: string;
   amount: number; // in human units
   valueUSD: number;
+  logoUrl?: string;
 }
 
 interface MarketSummary {
@@ -118,6 +120,10 @@ const DEFAULT_COIN_IMAGE = "/icons/default-coin.svg";
 const LOCAL_LOGOS: Record<string, string> = {
   hasui: "/haSui.webp", // <── your local image
   // add other manual overrides here if you ever need them
+  ssui: "/icons/ssui.png",
+  ssca: "/icons/ssca.png",
+  scallop_sui: "/icons/ssui.png",
+  scallop_sca: "/icons/ssca.png",
 };
 
 const LendingPage: React.FC = () => {
@@ -228,17 +234,35 @@ const LendingPage: React.FC = () => {
   const [walletInitialized, setWalletInitialized] = useState(false);
   const [hasObligationAccount, setHasObligationAccount] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // Use a ref to track initial load
   const initialLoadComplete = useRef(false);
   const fetchInProgress = useRef(false);
 
+  // Store raw portfolio data for use with ClaimRewardsModal
+  const [rawPortfolioData, setRawPortfolioData] = useState<any>(null);
+
   // Helper function to get the logo source with proper fallbacks
-  const getLogoSrc = (coinType: string, symbol: string) =>
-    tokenLogos[coinType] ??
-    tokenLogos[symbol.toLowerCase()] ?? // fallback by symbol
-    LOCAL_LOGOS[symbol.toLowerCase()] ?? // safety‑net
-    DEFAULT_COIN_IMAGE;
+  const getLogoSrc = (coinType: string, symbol: string) => {
+    // Normalize symbol to lowercase for comparison
+    const lowerSymbol = symbol?.toLowerCase() || "";
+
+    // Special cases for reward tokens
+    if (lowerSymbol === "ssui" || lowerSymbol === "scallop_sui") {
+      return LOCAL_LOGOS.ssui;
+    }
+    if (lowerSymbol === "ssca" || lowerSymbol === "scallop_sca") {
+      return LOCAL_LOGOS.ssca;
+    }
+
+    return (
+      tokenLogos[coinType] ??
+      tokenLogos[lowerSymbol] ?? // fallback by symbol
+      LOCAL_LOGOS[lowerSymbol] ?? // safety‑net
+      DEFAULT_COIN_IMAGE
+    );
+  };
 
   // Function to fetch token logos
   const fetchTokenLogos = async (assetsToFetch: AssetInfo[]) => {
@@ -521,6 +545,150 @@ const LendingPage: React.FC = () => {
     }
   };
 
+  // Process supplied assets from lendings data
+  const processSuppliedAssets = (lendings: any[]) => {
+    return lendings
+      .filter(
+        (lending) =>
+          !EXCLUDED_MARKETS.includes(
+            (lending.symbol || lending.coinName || "").toLowerCase()
+          )
+      )
+      .map((lending) => {
+        const matchingAsset = assets.find(
+          (a) => a.coinType.toLowerCase() === lending.coinType.toLowerCase()
+        );
+        return {
+          symbol: lending.symbol || lending.coinName || "Unknown",
+          coinType: lending.coinType,
+          amount: lending.suppliedCoin || 0,
+          valueUSD:
+            lending.suppliedValue ||
+            lending.suppliedCoin * lending.coinPrice ||
+            0,
+          apy: lending.supplyApy || 0,
+          decimals: lending.coinDecimals || matchingAsset?.decimals || 9,
+          price: lending.coinPrice || matchingAsset?.price || 0,
+        };
+      });
+  };
+
+  // Process borrowed assets
+  const processBorrowedAssets = (borrowings: any[]) => {
+    const borrowedAssets = [];
+
+    for (const borrowing of borrowings) {
+      // Check if borrowedPools exists and has items
+      if (borrowing.borrowedPools && borrowing.borrowedPools.length > 0) {
+        for (const pool of borrowing.borrowedPools) {
+          if (
+            EXCLUDED_MARKETS.includes(
+              (pool.symbol || pool.coinName || "").toLowerCase()
+            )
+          ) {
+            continue;
+          }
+
+          const matchingAsset = assets.find(
+            (a) => a.coinType.toLowerCase() === pool.coinType.toLowerCase()
+          );
+
+          borrowedAssets.push({
+            symbol: pool.symbol || pool.coinName || "Unknown",
+            coinType: pool.coinType,
+            amount: pool.borrowedCoin || 0,
+            valueUSD:
+              pool.borrowedValueInUsd ||
+              pool.borrowedCoin * pool.coinPrice ||
+              0,
+            apy: pool.borrowApy || 0,
+            decimals: pool.coinDecimals || matchingAsset?.decimals || 6,
+            price: pool.coinPrice || matchingAsset?.price || 0,
+          });
+        }
+      }
+    }
+
+    return borrowedAssets;
+  };
+
+  // Process collateral assets
+  const processCollateralAssets = (borrowings: any[]) => {
+    const collateralAssets = [];
+
+    for (const borrowing of borrowings) {
+      // Check if collaterals exists and has items
+      if (borrowing.collaterals && borrowing.collaterals.length > 0) {
+        for (const collateral of borrowing.collaterals) {
+          if (
+            EXCLUDED_MARKETS.includes(
+              (collateral.symbol || collateral.coinName || "").toLowerCase()
+            )
+          ) {
+            continue;
+          }
+
+          const matchingAsset = assets.find(
+            (a) =>
+              a.coinType.toLowerCase() === collateral.coinType.toLowerCase()
+          );
+
+          collateralAssets.push({
+            symbol: collateral.symbol || collateral.coinName || "Unknown",
+            coinType: collateral.coinType,
+            amount: collateral.depositedCoin || 0,
+            valueUSD:
+              collateral.depositedValueInUsd ||
+              collateral.depositedCoin * collateral.coinPrice ||
+              0,
+            apy: 0, // Collateral doesn't earn APY directly
+            decimals: collateral.coinDecimals || matchingAsset?.decimals || 9,
+            price: collateral.coinPrice || matchingAsset?.price || 0,
+          });
+        }
+      }
+    }
+
+    return collateralAssets;
+  };
+
+  // Process rewards from different data structures
+  const processRewards = (data: any) => {
+    let allRewards: RewardInfo[] = [];
+
+    if (!data) return allRewards;
+
+    // Process borrow incentives
+    if (data.borrowIncentives && Array.isArray(data.borrowIncentives)) {
+      console.log("Processing borrow incentives:", data.borrowIncentives);
+      const borrowRewards = data.borrowIncentives
+        .filter((reward) => reward.pendingRewardInCoin > 0)
+        .map((reward) => ({
+          symbol: reward.symbol || reward.coinName || "Unknown",
+          coinType: reward.coinType,
+          amount: reward.pendingRewardInCoin || 0,
+          valueUSD: reward.pendingRewardInUsd || 0,
+        }));
+      allRewards = [...allRewards, ...borrowRewards];
+    }
+
+    // Process lending incentives
+    if (data.lendings && Array.isArray(data.lendings)) {
+      console.log("Processing lending incentives:", data.lendings);
+      const lendingRewards = data.lendings
+        .filter((reward) => reward.pendingRewardInCoin > 0)
+        .map((reward) => ({
+          symbol: reward.symbol || reward.coinName || "Unknown",
+          coinType: reward.coinType,
+          amount: reward.pendingRewardInCoin || 0,
+          valueUSD: reward.pendingRewardInUsd || 0,
+        }));
+      allRewards = [...allRewards, ...lendingRewards];
+    }
+
+    return allRewards;
+  };
+
   // Fetch all market assets and user positions
   const fetchData = async () => {
     // Don't allow multiple fetches to run at the same time
@@ -531,6 +699,8 @@ const LendingPage: React.FC = () => {
 
     fetchInProgress.current = true;
     setLoading(true);
+    setDataError(null);
+
     try {
       console.log(`Fetching market assets at ${new Date().toISOString()}`);
       // Fetch market assets
@@ -566,62 +736,152 @@ const LendingPage: React.FC = () => {
           );
           console.log("User positions returned:", positions);
 
-          if (positions && positions.suppliedAssets) {
-            // Filter supplied assets to exclude illiquid markets
-            const filteredSuppliedAssets = positions.suppliedAssets.filter(
-              (asset) => !EXCLUDED_MARKETS.includes(asset.symbol.toLowerCase())
-            );
+          // Store the raw portfolio data for use with ClaimRewardsModal
+          // We need to handle both data structures:
+          // 1. Direct portfolio object in positions
+          // 2. Nested portfolio under positions.portfolio
+          const portfolioData = positions.portfolio || positions;
+          setRawPortfolioData(portfolioData);
+          console.log("Raw portfolio data set:", portfolioData);
+
+          // Process supplied assets
+          let suppliedAssets: UserPosition[] = [];
+
+          // Try all possible paths to find lending data
+          if (positions.lendings && positions.lendings.length > 0) {
             console.log(
-              `Setting ${filteredSuppliedAssets.length} supplied assets (filtered from ${positions.suppliedAssets.length})`
+              "Processing lendings from direct positions:",
+              positions.lendings
             );
-            setUserSupplied(filteredSuppliedAssets);
-          } else {
-            console.log("No supplied assets returned");
-            setUserSupplied([]);
+            suppliedAssets = processSuppliedAssets(positions.lendings);
+          } else if (
+            portfolioData?.lendings &&
+            portfolioData.lendings.length > 0
+          ) {
+            console.log(
+              "Processing lendings from portfolio:",
+              portfolioData.lendings
+            );
+            suppliedAssets = processSuppliedAssets(portfolioData.lendings);
+          } else if (
+            positions.suppliedAssets &&
+            positions.suppliedAssets.length > 0
+          ) {
+            console.log(
+              "Using suppliedAssets directly:",
+              positions.suppliedAssets
+            );
+            suppliedAssets = positions.suppliedAssets;
           }
 
-          if (positions && positions.borrowedAssets) {
-            // Filter borrowed assets to exclude illiquid markets
-            const filteredBorrowedAssets = positions.borrowedAssets.filter(
-              (asset) => !EXCLUDED_MARKETS.includes(asset.symbol.toLowerCase())
-            );
+          console.log(`Setting ${suppliedAssets.length} supplied assets`);
+          setUserSupplied(suppliedAssets);
+
+          // Process borrowed assets
+          let borrowedAssets: UserPosition[] = [];
+
+          if (positions.borrowings && positions.borrowings.length > 0) {
             console.log(
-              `Setting ${filteredBorrowedAssets.length} borrowed assets (filtered from ${positions.borrowedAssets.length})`
+              "Processing borrowings from direct positions:",
+              positions.borrowings
             );
-            setUserBorrowed(filteredBorrowedAssets);
-          } else {
-            console.log("No borrowed assets returned");
-            setUserBorrowed([]);
+            borrowedAssets = processBorrowedAssets(positions.borrowings);
+          } else if (
+            portfolioData?.borrowings &&
+            portfolioData.borrowings.length > 0
+          ) {
+            console.log(
+              "Processing borrowings from portfolio:",
+              portfolioData.borrowings
+            );
+            borrowedAssets = processBorrowedAssets(portfolioData.borrowings);
+          } else if (
+            positions.borrowedAssets &&
+            positions.borrowedAssets.length > 0
+          ) {
+            console.log(
+              "Using borrowedAssets directly:",
+              positions.borrowedAssets
+            );
+            borrowedAssets = positions.borrowedAssets;
           }
 
-          if (positions && positions.collateralAssets) {
-            // Filter collateral assets to exclude illiquid markets
-            const filteredCollateralAssets = positions.collateralAssets.filter(
-              (asset) => !EXCLUDED_MARKETS.includes(asset.symbol.toLowerCase())
-            );
+          console.log(`Setting ${borrowedAssets.length} borrowed assets`);
+          setUserBorrowed(borrowedAssets);
+
+          // Process collateral assets
+          let collateralAssets: UserPosition[] = [];
+
+          if (positions.borrowings && positions.borrowings.length > 0) {
             console.log(
-              `Setting ${filteredCollateralAssets.length} collateral assets from portfolio (filtered from ${positions.collateralAssets.length})`
+              "Processing collaterals from borrowings:",
+              positions.borrowings
             );
-            // Store these initially, but we'll override with obligation-specific data when selected
-            setUserCollateral(filteredCollateralAssets);
-          } else {
-            console.log("No collateral assets returned");
-            setUserCollateral([]);
+            collateralAssets = processCollateralAssets(positions.borrowings);
+          } else if (
+            portfolioData?.borrowings &&
+            portfolioData.borrowings.length > 0
+          ) {
+            console.log(
+              "Processing collaterals from portfolio borrowings:",
+              portfolioData.borrowings
+            );
+            collateralAssets = processCollateralAssets(
+              portfolioData.borrowings
+            );
+          } else if (
+            positions.collateralAssets &&
+            positions.collateralAssets.length > 0
+          ) {
+            console.log(
+              "Using collateralAssets directly:",
+              positions.collateralAssets
+            );
+            collateralAssets = positions.collateralAssets;
           }
 
-          if (positions && positions.pendingRewards) {
-            // Filter pending rewards to exclude illiquid markets
-            const filteredPendingRewards = positions.pendingRewards.filter(
-              (asset) => !EXCLUDED_MARKETS.includes(asset.symbol.toLowerCase())
-            );
+          console.log(`Setting ${collateralAssets.length} collateral assets`);
+          setUserCollateral(collateralAssets);
+
+          // Process rewards
+          let allRewards: RewardInfo[] = [];
+
+          // Try all possible paths to find rewards data
+          if (portfolioData?.pendingRewards) {
             console.log(
-              `Setting ${filteredPendingRewards.length} pending rewards (filtered from ${positions.pendingRewards.length})`
+              "Processing pending rewards from portfolio:",
+              portfolioData.pendingRewards
             );
-            setPendingRewards(filteredPendingRewards);
-          } else {
-            console.log("No pending rewards returned");
-            setPendingRewards([]);
+            allRewards = processRewards(portfolioData.pendingRewards);
+          } else if (positions.pendingRewards) {
+            if (Array.isArray(positions.pendingRewards)) {
+              console.log(
+                "Using pendingRewards array directly:",
+                positions.pendingRewards
+              );
+              allRewards = positions.pendingRewards;
+            } else {
+              console.log(
+                "Processing pending rewards object:",
+                positions.pendingRewards
+              );
+              allRewards = processRewards(positions.pendingRewards);
+            }
           }
+
+          // Add logos to rewards
+          allRewards = allRewards.map((reward) => ({
+            ...reward,
+            logoUrl: getLogoSrc(reward.coinType, reward.symbol),
+          }));
+
+          // Filter out excluded markets and set rewards
+          const filteredRewards = allRewards.filter(
+            (reward) => !EXCLUDED_MARKETS.includes(reward.symbol.toLowerCase())
+          );
+
+          console.log(`Setting ${filteredRewards.length} pending rewards`);
+          setPendingRewards(filteredRewards);
 
           // Check if user has an obligation account
           await checkObligationAccount();
@@ -637,7 +897,12 @@ const LendingPage: React.FC = () => {
             updateCollateralFromSelectedObligation();
           }
         } catch (error) {
-          console.error("Error fetching user positions:", error);
+          console.error("Error processing user positions:", error);
+          setDataError(
+            `Error processing positions: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
           setUserSupplied([]);
           setUserBorrowed([]);
           setUserCollateral([]);
@@ -661,6 +926,11 @@ const LendingPage: React.FC = () => {
       setDataFetched(true);
     } catch (error) {
       console.error("Error fetching lending data:", error);
+      setDataError(
+        `Error fetching data: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     } finally {
       setLoading(false);
       fetchInProgress.current = false;
@@ -1120,15 +1390,21 @@ const LendingPage: React.FC = () => {
 
   // Claim Rewards modal functions
   const openClaimRewardsModal = () => {
-    console.log("Opening claim rewards modal");
+    console.log("Opening claim rewards modal with portfolio data");
     setShowClaimModal(true);
   };
 
   const handleClaimSuccess = (result: ClaimResult) => {
     console.log("Claim result:", result);
     if (result.success) {
-      // Refresh data to reflect zeroed rewards
-      fetchData();
+      // Show success message
+      setStatusMessage("Successfully claimed rewards!");
+
+      // Refresh data to reflect zeroed rewards after a short delay
+      setTimeout(() => {
+        fetchData();
+        setStatusMessage(null);
+      }, 2000);
     } else {
       setStatusMessage(`Claim failed: ${result.error}`);
       setTimeout(() => setStatusMessage(null), 5000);
@@ -1181,6 +1457,408 @@ const LendingPage: React.FC = () => {
       );
       setTimeout(() => setStatusMessage(null), 5000);
     }
+  };
+
+  // Determine if user has any positions
+  const hasPositions = useMemo(() => {
+    return (
+      userSupplied.length > 0 ||
+      userBorrowed.length > 0 ||
+      userCollateral.length > 0 ||
+      pendingRewards.length > 0
+    );
+  }, [userSupplied, userBorrowed, userCollateral, pendingRewards]);
+
+  // Format health factor for display
+  const formatHealthFactor = (factor: number | undefined) => {
+    if (!factor) return "N/A";
+
+    if (factor >= 999) {
+      return "∞";
+    }
+
+    return formatNumber(factor, 2);
+  };
+
+  // Get health factor status class
+  const getHealthFactorClass = (factor: number | undefined) => {
+    if (!factor || factor >= 999) return "safe";
+
+    if (factor >= 1.5) return "safe";
+    if (factor >= 1.2) return "warning";
+    return "danger";
+  };
+
+  // Render health indicator
+  const renderHealthIndicator = (healthFactor: number | undefined) => {
+    const healthClass = getHealthFactorClass(healthFactor);
+
+    return (
+      <div className={`health-indicator ${healthClass}`}>
+        <div className="health-bar">
+          <div className={`health-fill ${healthClass}`} />
+        </div>
+        <div className="health-label">{formatHealthFactor(healthFactor)}</div>
+      </div>
+    );
+  };
+
+  // Render user dashboard
+  const renderUserDashboard = () => {
+    if (!connected) {
+      return (
+        <div className="connect-wallet-prompt">
+          <div className="prompt-content">
+            <h3>Connect your wallet</h3>
+            <p>Connect your wallet to see your lending positions</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!hasPositions) {
+      return (
+        <div className="no-positions-prompt">
+          <div className="prompt-content">
+            <h3>No positions found</h3>
+            <p>Unable to load your lending positions</p>
+            <button className="refresh-btn" onClick={forceRefresh}>
+              Try Again
+            </button>
+            <div className="debug-info">
+              <details>
+                <summary>Debug Info</summary>
+                <pre>
+                  {JSON.stringify(
+                    {
+                      suppliedCount: userSupplied.length,
+                      borrowedCount: userBorrowed.length,
+                      collateralCount: userCollateral.length,
+                      pendingRewardsCount: pendingRewards.length,
+                      dataError: dataError || "No error",
+                    },
+                    null,
+                    2
+                  )}
+                </pre>
+              </details>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Calculate dashboard metrics
+    const totalSuppliedValue = userSupplied.reduce(
+      (sum, asset) => sum + asset.valueUSD,
+      0
+    );
+    const totalBorrowedValue = userBorrowed.reduce(
+      (sum, asset) => sum + asset.valueUSD,
+      0
+    );
+    const totalCollateralValue = userCollateral.reduce(
+      (sum, asset) => sum + asset.valueUSD,
+      0
+    );
+    const totalRewardsValue = pendingRewards.reduce(
+      (sum, reward) => sum + reward.valueUSD,
+      0
+    );
+
+    // Calculate health factor and available borrow
+    const healthFactor =
+      totalBorrowedValue > 0 ? totalCollateralValue / totalBorrowedValue : 999;
+    const availableBorrow = Math.max(
+      0,
+      totalCollateralValue * 0.8 - totalBorrowedValue
+    );
+
+    return (
+      <div className="user-dashboard">
+        <div className="dashboard-header">
+          <h3>Lending Dashboard</h3>
+          <button className="refresh-btn" onClick={forceRefresh}>
+            Refresh
+          </button>
+        </div>
+
+        <div className="dashboard-metrics">
+          <div className="metric">
+            <div className="metric-label">Supplied</div>
+            <div className="metric-value">
+              ${formatNumber(totalSuppliedValue, 2)}
+            </div>
+          </div>
+
+          <div className="metric">
+            <div className="metric-label">Borrowed</div>
+            <div className="metric-value">
+              ${formatNumber(totalBorrowedValue, 2)}
+            </div>
+          </div>
+
+          <div className="metric">
+            <div className="metric-label">Available to Borrow</div>
+            <div className="metric-value">
+              ${formatNumber(availableBorrow, 2)}
+            </div>
+          </div>
+
+          <div className="metric">
+            <div className="metric-label">Health Factor</div>
+            <div className="metric-value health-factor">
+              {renderHealthIndicator(healthFactor)}
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Rewards */}
+        {pendingRewards.length > 0 && (
+          <div className="rewards-section">
+            <div className="rewards-header">
+              <h4>Pending Rewards</h4>
+              <span className="rewards-value">
+                ${formatNumber(totalRewardsValue, 2)}
+              </span>
+            </div>
+
+            <div className="rewards-list">
+              {pendingRewards.map((reward, index) => (
+                <div key={`reward-${index}`} className="reward-item">
+                  <div className="reward-token">
+                    <img
+                      src={getLogoSrc(reward.coinType, reward.symbol)}
+                      alt={reward.symbol}
+                      className="reward-token-logo"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
+                      }}
+                    />
+                    <span>{reward.symbol}</span>
+                  </div>
+                  <div className="reward-amount">
+                    {reward.amount.toFixed(6)}
+                    <span className="reward-value">
+                      (${reward.valueUSD.toFixed(4)})
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="claim-rewards-button"
+              onClick={openClaimRewardsModal}
+              disabled={pendingRewards.length === 0}
+            >
+              Claim All Rewards
+            </button>
+          </div>
+        )}
+
+        {/* Supplied Assets */}
+        {userSupplied.length > 0 && (
+          <div className="position-section">
+            <h4>Your Supplied Assets</h4>
+            <div className="position-table">
+              <div className="position-header">
+                <div className="position-asset">Asset</div>
+                <div className="position-balance">Balance</div>
+                <div className="position-apy">APY</div>
+                <div className="position-actions">Actions</div>
+              </div>
+
+              {userSupplied.map((asset, index) => (
+                <div key={`supplied-${index}`} className="position-row">
+                  <div className="position-asset">
+                    <img
+                      src={getLogoSrc(asset.coinType, asset.symbol)}
+                      alt={asset.symbol}
+                      className="asset-icon"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
+                      }}
+                    />
+                    <span>{asset.symbol}</span>
+                  </div>
+
+                  <div className="position-balance">
+                    <div className="balance-amount">
+                      {formatNumber(asset.amount, 6)} {asset.symbol}
+                    </div>
+                    <div className="balance-value">
+                      ${formatNumber(asset.valueUSD, 2)}
+                    </div>
+                  </div>
+
+                  <div className="position-apy">
+                    {formatNumber(asset.apy * 100, 2)}%
+                  </div>
+
+                  <div className="position-actions">
+                    <button
+                      className="action-button withdraw"
+                      onClick={() => {
+                        const marketAsset = assets.find(
+                          (a) =>
+                            a.symbol.toLowerCase() ===
+                            asset.symbol.toLowerCase()
+                        );
+                        if (marketAsset) {
+                          openModal(
+                            {
+                              ...marketAsset,
+                              suppliedAmount: asset.amount,
+                            },
+                            "withdraw"
+                          );
+                        }
+                      }}
+                    >
+                      Withdraw
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Borrowed Assets */}
+        {userBorrowed.length > 0 && (
+          <div className="position-section">
+            <h4>Your Borrowed Assets</h4>
+            <div className="position-table">
+              <div className="position-header">
+                <div className="position-asset">Asset</div>
+                <div className="position-balance">Balance</div>
+                <div className="position-apy">APY</div>
+                <div className="position-actions">Actions</div>
+              </div>
+
+              {userBorrowed.map((asset, index) => (
+                <div key={`borrowed-${index}`} className="position-row">
+                  <div className="position-asset">
+                    <img
+                      src={getLogoSrc(asset.coinType, asset.symbol)}
+                      alt={asset.symbol}
+                      className="asset-icon"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
+                      }}
+                    />
+                    <span>{asset.symbol}</span>
+                  </div>
+
+                  <div className="position-balance">
+                    <div className="balance-amount">
+                      {formatNumber(asset.amount, 6)} {asset.symbol}
+                    </div>
+                    <div className="balance-value">
+                      ${formatNumber(asset.valueUSD, 2)}
+                    </div>
+                  </div>
+
+                  <div className="position-apy negative">
+                    {formatNumber(asset.apy * 100, 2)}%
+                  </div>
+
+                  <div className="position-actions">
+                    <button
+                      className="action-button repay"
+                      onClick={() => {
+                        const marketAsset = assets.find(
+                          (a) =>
+                            a.symbol.toLowerCase() ===
+                            asset.symbol.toLowerCase()
+                        );
+                        if (marketAsset) {
+                          openRepaymentModal(marketAsset);
+                        }
+                      }}
+                      disabled={!selectedObligationId}
+                    >
+                      Repay
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Collateral Assets */}
+        {userCollateral.length > 0 && (
+          <div className="position-section">
+            <h4>Your Collateral Assets</h4>
+            <div className="position-table">
+              <div className="position-header">
+                <div className="position-asset">Asset</div>
+                <div className="position-balance">Balance</div>
+                <div className="position-actions">Actions</div>
+              </div>
+
+              {userCollateral.map((asset, index) => (
+                <div key={`collateral-${index}`} className="position-row">
+                  <div className="position-asset">
+                    <img
+                      src={getLogoSrc(asset.coinType, asset.symbol)}
+                      alt={asset.symbol}
+                      className="asset-icon"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
+                      }}
+                    />
+                    <span>{asset.symbol}</span>
+                  </div>
+
+                  <div className="position-balance">
+                    <div className="balance-amount">
+                      {formatNumber(asset.amount, 6)} {asset.symbol}
+                    </div>
+                    <div className="balance-value">
+                      ${formatNumber(asset.valueUSD, 2)}
+                    </div>
+                  </div>
+
+                  <div className="position-actions">
+                    <button
+                      className="action-button manage-collateral"
+                      onClick={() => {
+                        const marketAsset = assets.find(
+                          (a) =>
+                            a.symbol.toLowerCase() ===
+                            asset.symbol.toLowerCase()
+                        );
+                        if (marketAsset) {
+                          openCollateralModal(
+                            marketAsset,
+                            "withdraw-collateral"
+                          );
+                        }
+                      }}
+                      disabled={!selectedObligationId}
+                    >
+                      Manage
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Helper function to classify risk levels
+  const getRiskCategory = (riskLevel?: number): string => {
+    if (riskLevel === undefined) return "unknown";
+    if (riskLevel < 0.25) return "low";
+    if (riskLevel < 0.5) return "medium";
+    if (riskLevel < 0.75) return "high";
+    return "extreme";
   };
 
   // Render Obligations Tab Content
@@ -1487,15 +2165,6 @@ const LendingPage: React.FC = () => {
     );
   };
 
-  // Helper function to classify risk levels
-  const getRiskCategory = (riskLevel?: number): string => {
-    if (riskLevel === undefined) return "unknown";
-    if (riskLevel < 0.25) return "low";
-    if (riskLevel < 0.5) return "medium";
-    if (riskLevel < 0.75) return "high";
-    return "extreme";
-  };
-
   return (
     <div className="lending-page">
       <div className="glow-1"></div>
@@ -1591,117 +2260,20 @@ const LendingPage: React.FC = () => {
                   alt={marketSummary.highestSupplyAPY.symbol}
                   className="mini-token-logo"
                   onError={(e) => {
+                    // Fallback if logo fails to load
                     (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
                   }}
                 />
               )}
-              {formatNumber(marketSummary.highestSupplyAPY.value, 2)}% (
+              {formatNumber(marketSummary.highestSupplyAPY.value * 100, 2)}% (
               {marketSummary.highestSupplyAPY.symbol})
             </span>
           </div>
         </div>
       </div>
 
-      {/* Wallet totals summary */}
-      {connected && account?.address && walletTotals && (
-        <div className="wallet-totals-summary">
-          <h2>Your Wallet Positions</h2>
-          <div className="totals-container">
-            <div className="total-item">
-              <span className="total-label">Total Collateral:</span>
-              <span className="total-value">
-                ${formatNumber(walletTotals.totalCollateralUSD, 2)}
-              </span>
-            </div>
-            <div className="total-item">
-              <span className="total-label">Total Borrowed:</span>
-              <span className="total-value">
-                ${formatNumber(walletTotals.totalBorrowUSD, 2)}
-              </span>
-            </div>
-            <div className="total-item">
-              <span className="total-label">Active Obligations:</span>
-              <span className="total-value">
-                {walletTotals.activeObligationCount} of {userObligations.length}
-              </span>
-            </div>
-            {walletTotals.totalBorrowUSD > 0 &&
-              walletTotals.totalCollateralUSD > 0 && (
-                <div className="total-item">
-                  <span className="total-label">Overall Loan-to-Value:</span>
-                  <span className="total-value">
-                    {formatNumber(
-                      (walletTotals.totalBorrowUSD /
-                        walletTotals.totalCollateralUSD) *
-                        100,
-                      2
-                    )}
-                    %
-                  </span>
-                  <span className="total-note">
-                    (Individual obligation LTVs determine liquidation risk)
-                  </span>
-                </div>
-              )}
-          </div>
-
-          {/* Top Collaterals Summary */}
-          {Object.keys(walletTotals.collateralsBySymbol).length > 0 && (
-            <div className="assets-summary">
-              <h3>Top Collaterals</h3>
-              <div className="assets-grid">
-                {Object.values(walletTotals.collateralsBySymbol)
-                  // Filter out excluded markets from the collaterals summary
-                  .filter(
-                    (asset) =>
-                      !EXCLUDED_MARKETS.includes(asset.symbol.toLowerCase())
-                  )
-                  .sort((a, b) => b.totalUSD - a.totalUSD)
-                  .slice(0, 3)
-                  .map((asset) => (
-                    <div className="asset-item" key={`coll-${asset.symbol}`}>
-                      <span className="asset-symbol">{asset.symbol}</span>
-                      <span className="asset-amount">
-                        {formatNumber(asset.totalAmount, 4)}
-                      </span>
-                      <span className="asset-value">
-                        ${formatNumber(asset.totalUSD, 2)}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* Top Borrows Summary */}
-          {Object.keys(walletTotals.borrowsBySymbol).length > 0 && (
-            <div className="assets-summary">
-              <h3>Top Borrows</h3>
-              <div className="assets-grid">
-                {Object.values(walletTotals.borrowsBySymbol)
-                  // Filter out excluded markets from the borrows summary
-                  .filter(
-                    (asset) =>
-                      !EXCLUDED_MARKETS.includes(asset.symbol.toLowerCase())
-                  )
-                  .sort((a, b) => b.totalUSD - a.totalUSD)
-                  .slice(0, 3)
-                  .map((asset) => (
-                    <div className="asset-item" key={`borr-${asset.symbol}`}>
-                      <span className="asset-symbol">{asset.symbol}</span>
-                      <span className="asset-amount">
-                        {formatNumber(asset.totalAmount, 4)}
-                      </span>
-                      <span className="asset-value">
-                        ${formatNumber(asset.totalUSD, 2)}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* User Dashboard Section - removed "Your Wallet Positions" section */}
+      {connected && renderUserDashboard()}
 
       {/* Enhanced Selected Obligation Banner */}
       {connected && selectedObligationId && (
@@ -1893,315 +2465,6 @@ const LendingPage: React.FC = () => {
           >
             Go to Obligations Tab
           </button>
-        </div>
-      )}
-
-      {/* Reward claim banner */}
-      {connected && pendingRewards && pendingRewards.length > 0 && (
-        <div className="rewards-banner">
-          <h3>You have pending rewards!</h3>
-          <ul>
-            {pendingRewards.map((r) => (
-              <li key={r.symbol}>
-                {r.amount.toFixed(6)} {r.symbol} (~$
-                {r.valueUSD.toFixed(4)})
-              </li>
-            ))}
-          </ul>
-          <button
-            className="claim-btn"
-            onClick={() => {
-              console.log("Claim All button clicked");
-              openClaimRewardsModal();
-            }}
-          >
-            Claim All
-          </button>
-        </div>
-      )}
-
-      {/* User Collateral Positions */}
-      {connected && account?.address && userCollateral.length > 0 && (
-        <div className="user-positions-summary collateral">
-          <h3>Your Collateral Positions</h3>
-          <div className="user-positions-grid">
-            {userCollateral.map((asset) => (
-              <div
-                className="user-position-card collateral"
-                key={`collateral-${asset.symbol}`}
-              >
-                <div className="position-icon">
-                  {/* Use getLogoSrc helper for token logo */}
-                  <img
-                    src={getLogoSrc(asset.coinType, asset.symbol)}
-                    alt={asset.symbol}
-                    className="coin-icon"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
-                    }}
-                  />
-                </div>
-                <div className="position-details">
-                  <h4>{asset.symbol}</h4>
-                  <div className="position-values">
-                    <div>
-                      <span className="label">Amount:</span>
-                      <span className="value">
-                        {asset.amount.toLocaleString(undefined, {
-                          maximumFractionDigits: 6,
-                        })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label">Value:</span>
-                      <span className="value">
-                        $
-                        {asset.valueUSD.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="position-actions">
-                    <button
-                      className="deposit-collateral-btn"
-                      onClick={() => {
-                        const marketAsset = assets.find(
-                          (a) =>
-                            a.symbol.toLowerCase() ===
-                            asset.symbol.toLowerCase()
-                        );
-                        if (marketAsset) {
-                          openCollateralModal(
-                            marketAsset,
-                            "deposit-collateral"
-                          );
-                        }
-                      }}
-                      disabled={loading || !selectedObligationId}
-                    >
-                      Add Collateral
-                    </button>
-                    <button
-                      className="withdraw-collateral-btn"
-                      onClick={() => {
-                        const marketAsset = assets.find(
-                          (a) =>
-                            a.symbol.toLowerCase() ===
-                            asset.symbol.toLowerCase()
-                        );
-                        if (marketAsset) {
-                          openCollateralModal(
-                            marketAsset,
-                            "withdraw-collateral"
-                          );
-                        }
-                      }}
-                      disabled={loading || !selectedObligationId}
-                    >
-                      Withdraw
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* User Supply Positions */}
-      {connected && account?.address && userSupplied.length > 0 && (
-        <div className="user-positions-summary">
-          <h3>Your Supply Positions</h3>
-          <div className="user-positions-grid">
-            {userSupplied.map((asset) => (
-              <div
-                className="user-position-card"
-                key={`supply-${asset.symbol}`}
-              >
-                <div className="position-icon">
-                  {/* Use getLogoSrc helper for token logo */}
-                  <img
-                    src={getLogoSrc(asset.coinType, asset.symbol)}
-                    alt={asset.symbol}
-                    className="coin-icon"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
-                    }}
-                  />
-                </div>
-                <div className="position-details">
-                  <h4>{asset.symbol}</h4>
-                  <div className="position-values">
-                    <div>
-                      <span className="label">Amount:</span>
-                      <span className="value">
-                        {asset.amount.toLocaleString(undefined, {
-                          maximumFractionDigits: 6,
-                        })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label">Value:</span>
-                      <span className="value">
-                        $
-                        {asset.valueUSD.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label">APY:</span>
-                      <span className="value positive">
-                        {asset.apy.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        %
-                      </span>
-                    </div>
-                  </div>
-                  <div className="position-actions">
-                    <button
-                      className="deposit-btn"
-                      onClick={() => {
-                        const marketAsset = assets.find(
-                          (a) =>
-                            a.symbol.toLowerCase() ===
-                            asset.symbol.toLowerCase()
-                        );
-                        if (marketAsset) {
-                          openModal(marketAsset, "deposit");
-                        }
-                      }}
-                      disabled={loading}
-                    >
-                      Supply More
-                    </button>
-                    <button
-                      className="withdraw-btn"
-                      onClick={() => {
-                        const marketAsset = assets.find(
-                          (a) =>
-                            a.symbol.toLowerCase() ===
-                            asset.symbol.toLowerCase()
-                        );
-                        if (marketAsset) {
-                          // Pass the current supplied amount to the modal
-                          openModal(
-                            {
-                              ...marketAsset,
-                              suppliedAmount: asset.amount,
-                            },
-                            "withdraw"
-                          );
-                        }
-                      }}
-                      disabled={loading}
-                    >
-                      Withdraw
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* User Borrow Positions */}
-      {connected && account?.address && userBorrowed.length > 0 && (
-        <div className="user-positions-summary borrowed">
-          <h3>Your Borrow Positions</h3>
-          <div className="user-positions-grid">
-            {userBorrowed.map((asset) => (
-              <div
-                className="user-position-card borrowed"
-                key={`borrow-${asset.symbol}`}
-              >
-                <div className="position-icon">
-                  {/* Use getLogoSrc helper for token logo */}
-                  <img
-                    src={getLogoSrc(asset.coinType, asset.symbol)}
-                    alt={asset.symbol}
-                    className="coin-icon"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = DEFAULT_COIN_IMAGE;
-                    }}
-                  />
-                </div>
-                <div className="position-details">
-                  <h4>{asset.symbol}</h4>
-                  <div className="position-values">
-                    <div>
-                      <span className="label">Amount:</span>
-                      <span className="value">
-                        {asset.amount.toLocaleString(undefined, {
-                          maximumFractionDigits: 6,
-                        })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label">Value:</span>
-                      <span className="value">
-                        $
-                        {asset.valueUSD.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label">APY:</span>
-                      <span className="value negative">
-                        {asset.apy.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        %
-                      </span>
-                    </div>
-                  </div>
-                  <div className="position-actions">
-                    <button
-                      className="repay-btn"
-                      onClick={() => {
-                        const marketAsset = assets.find(
-                          (a) =>
-                            a.symbol.toLowerCase() ===
-                            asset.symbol.toLowerCase()
-                        );
-                        if (marketAsset) {
-                          openRepaymentModal(marketAsset);
-                        }
-                      }}
-                      disabled={loading || !selectedObligationId}
-                    >
-                      Repay
-                    </button>
-                    <button
-                      className="borrow-btn"
-                      onClick={() => {
-                        const marketAsset = assets.find(
-                          (a) =>
-                            a.symbol.toLowerCase() ===
-                            asset.symbol.toLowerCase()
-                        );
-                        if (marketAsset) {
-                          openBorrowingModal(marketAsset, "borrow");
-                        }
-                      }}
-                      disabled={loading || !selectedObligationId}
-                    >
-                      Borrow More
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -2552,18 +2815,19 @@ const LendingPage: React.FC = () => {
         />
       )}
 
-      {/* Claim Rewards Modal */}
+      {/* Claim Rewards Modal - UPDATED to pass userPortfolio */}
       {showClaimModal && (
         <ClaimRewardsModal
           pendingRewards={pendingRewards}
           onClose={() => setShowClaimModal(false)}
           onClaimed={handleClaimSuccess}
+          userPortfolio={rawPortfolioData} // Pass the raw portfolio data to help with claiming rewards
         />
       )}
 
       {/* Last updated timestamp */}
       <div className="last-updated">
-        Last updated: 2025-06-23 06:19:12 UTC by jake1318
+        Last updated: 2025-07-19 21:11:18 UTC by jake1318
       </div>
     </div>
   );
