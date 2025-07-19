@@ -88,10 +88,16 @@ interface PortfolioMetrics {
 // Default token icon for fallbacks
 const DEFAULT_TOKEN_ICON = "/assets/token-placeholder.png";
 
+// In Positions.tsx, update the HARDCODED_LOGOS constant around line 62-75:
+
 // Map of token addresses for well-known tokens (Sui mainnet)
 const TOKEN_ADDRESSES: Record<string, string> = {
   SUI: "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+  // Add other tokens as needed
 };
+
+// Hardcoded token logos for fallbacks - use local files for SUI and haSUI
+// In Positions.tsx, update the HARDCODED_LOGOS constant around line 62-75:
 
 // Hardcoded token logos for fallbacks
 const HARDCODED_LOGOS: Record<string, string> = {
@@ -100,6 +106,8 @@ const HARDCODED_LOGOS: Record<string, string> = {
   USDC: "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png",
   USDT: "https://assets.coingecko.com/coins/images/325/thumb/Tether.png",
 
+  // Updated to use local files
+  SUI: "/sui.png",
   HASUI: "/haSui.webp",
   "HA-SUI": "/haSui.webp",
 
