@@ -1,5 +1,5 @@
 // src/pages/Lending/LendingPage.tsx
-// Last Updated: 2025-07-19 20:53:18 UTC by jake1318
+// Last Updated: 2025-07-19 21:33:52 UTC by jake1318
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { ScallopService } from "../../scallop/ScallopService";
@@ -1768,13 +1768,33 @@ const LendingPage: React.FC = () => {
                     <button
                       className="action-button repay"
                       onClick={() => {
+                        // Look up the matching market asset with full details
                         const marketAsset = assets.find(
                           (a) =>
                             a.symbol.toLowerCase() ===
                             asset.symbol.toLowerCase()
                         );
+
                         if (marketAsset) {
-                          openRepaymentModal(marketAsset);
+                          // If we find the matching market asset, open the repayment modal
+                          if (selectedObligationId) {
+                            // We have a selected obligation, open the repayment modal directly
+                            setRepaymentModalAsset(marketAsset);
+                            setRepaymentModalOpen(true);
+                          } else {
+                            // No obligation selected, ask the user to select one first
+                            setError(
+                              "Please select an obligation before repaying"
+                            );
+                            setActiveTab("obligations");
+                          }
+                        } else {
+                          console.error(
+                            `Could not find market asset for ${asset.symbol}`
+                          );
+                          setError(
+                            `Could not find market details for ${asset.symbol}`
+                          );
                         }
                       }}
                       disabled={!selectedObligationId}
@@ -2792,13 +2812,14 @@ const LendingPage: React.FC = () => {
         />
       )}
 
-      {/* Repayment Modal - UPDATED to pass obligationId */}
+      {/* Repayment Modal - UPDATED to pass obligationId and asset */}
       {repaymentModalAsset && selectedObligationId && (
         <RepaymentModal
           onClose={closeRepaymentModal}
           onSuccess={handleSuccess}
           defaultRepayAmount=""
-          obligationId={selectedObligationId} // Pass selected obligation ID
+          obligationId={selectedObligationId}
+          asset={repaymentModalAsset}
         />
       )}
 
@@ -2827,7 +2848,7 @@ const LendingPage: React.FC = () => {
 
       {/* Last updated timestamp */}
       <div className="last-updated">
-        Last updated: 2025-07-19 21:11:18 UTC by jake1318
+        Last updated: 2025-07-19 21:33:52 UTC by jake1318
       </div>
     </div>
   );
