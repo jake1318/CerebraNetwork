@@ -1,5 +1,5 @@
 // src/components/CollateralManagementModal.tsx
-// Last updated: 2025-06-21 23:00:40 UTC by jake1318
+// Updated: 2025-07-22 07:09:03 UTC by jake1318
 
 import React, { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -7,6 +7,7 @@ import scallopService from "../scallop/ScallopService";
 import scallopCollateralService from "../scallop/ScallopCollateralService";
 import scallopBorrowService from "../scallop/ScallopBorrowService";
 import blockvisionService from "../services/blockvisionService";
+import { withdrawCollateralQuick } from "../scallop/ScallopWithdrawService";
 import "../styles/CollateralManagementModal.scss";
 
 // Constants for coin configuration with improved coin type handling
@@ -112,9 +113,14 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
 
   // Add state for obligation information
   const [isEmptyObligation, setIsEmptyObligation] = useState<boolean>(false);
+  const [isBoostLocked, setIsBoostLocked] = useState<boolean>(false);
+  const [isInBorrowIncentive, setIsInBorrowIncentive] =
+    useState<boolean>(false);
   const [obligationData, setObligationData] = useState<any>(null);
   const [accountCoins, setAccountCoins] = useState<any[]>([]);
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
+  const [processingStep, setProcessingStep] = useState<string>("");
+  const [userObligations, setUserObligations] = useState<any[]>([]);
 
   // Reset modal state when asset or action changes
   useEffect(() => {
@@ -130,7 +136,6 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
       // Fetch data
       if (wallet.connected && wallet.address) {
         fetchObligationDetails();
-        fetchUserCollateral();
         fetchWalletCoins();
       }
     }
@@ -154,95 +159,117 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
       console.log(
         `[fetchObligationDetails] Fetching details for obligation ${obligationId}`
       );
-      const result = await scallopBorrowService.getObligationDetails(
-        obligationId,
-        wallet.address
+
+      // First try to get detailed obligation data from SDK
+      let obligation = null;
+      let boostLocked = false;
+      let incentiveLocked = false;
+
+      try {
+        // Get all obligations from the SDK
+        const obligations = await scallopBorrowService.getUserObligations(
+          wallet.address
+        );
+        setUserObligations(obligations);
+
+        // Find the specific obligation we're interested in
+        obligation = obligations.find((o) => o.obligationId === obligationId);
+
+        if (obligation) {
+          // Use the direct SDK flags to determine lock status
+          boostLocked =
+            obligation.hasBoostStake || obligation.lockType === "boost";
+          incentiveLocked =
+            obligation.hasBorrowIncentiveStake ||
+            obligation.lockType === "borrow-incentive";
+
+          console.log(
+            `[fetchObligationDetails] Found obligation in user's obligations:`,
+            {
+              hasBoostStake: obligation.hasBoostStake,
+              hasBorrowIncentiveStake: obligation.hasBorrowIncentiveStake,
+              lockType: obligation.lockType,
+              boostLocked,
+              incentiveLocked,
+            }
+          );
+        }
+      } catch (obligationsError) {
+        console.warn(
+          "[fetchObligationDetails] Error getting user obligations:",
+          obligationsError
+        );
+      }
+
+      // If we couldn't get the obligation data from getUserObligations, fall back to direct obligation fetch
+      if (!obligation) {
+        const result = await scallopBorrowService.getObligationDetails(
+          obligationId,
+          wallet.address
+        );
+
+        if (result.success && result.obligation) {
+          obligation = result.obligation;
+
+          // Still try to determine lock type from getObligationDetails result
+          boostLocked =
+            obligation.hasBoostStake || obligation.lockType === "boost";
+          incentiveLocked =
+            obligation.hasBorrowIncentiveStake ||
+            obligation.lockType === "borrow-incentive";
+        } else {
+          console.error(
+            "[fetchObligationDetails] Failed to get obligation details:",
+            result.error
+          );
+          return;
+        }
+      }
+
+      // Save obligation data
+      setObligationData(obligation);
+
+      // Check if this is an empty obligation (no collateral)
+      const isEmpty =
+        !obligation.collaterals || obligation.collaterals.length === 0;
+      setIsEmptyObligation(isEmpty);
+
+      console.log(
+        `[fetchObligationDetails] Obligation ${obligationId} is empty: ${isEmpty}`
       );
 
-      if (result.success && result.obligation) {
-        setObligationData(result.obligation);
+      // IMPORTANT: Set lock status from obligation properties, not from obligation key existence
+      setIsBoostLocked(boostLocked);
+      setIsInBorrowIncentive(incentiveLocked);
 
-        // Check if this is an empty obligation (no collateral)
-        const isEmpty = result.obligation.collaterals.length === 0;
-        setIsEmptyObligation(isEmpty);
+      console.log(
+        `[fetchObligationDetails] Obligation ${obligationId} status: boost-locked=${boostLocked}, in-borrow-incentive=${incentiveLocked}`
+      );
 
-        console.log(
-          `[fetchObligationDetails] Obligation ${obligationId} is empty: ${isEmpty}`
+      // Find collateral for the selected asset if not empty
+      if (!isEmpty) {
+        const assetCollateral = obligation.collaterals.find(
+          (c: any) => c.symbol.toLowerCase() === asset.symbol.toLowerCase()
         );
 
-        // Find collateral for the selected asset if not empty
-        if (!isEmpty) {
-          const assetCollateral = result.obligation.collaterals.find(
-            (c: any) => c.symbol.toLowerCase() === asset.symbol.toLowerCase()
+        if (assetCollateral) {
+          setCollateralBalance(assetCollateral.amount);
+          console.log(
+            `[fetchObligationDetails] Found ${asset.symbol} collateral balance in obligation:`,
+            assetCollateral.amount
           );
-
-          if (assetCollateral) {
-            setCollateralBalance(assetCollateral.amount);
-            console.log(
-              `[fetchObligationDetails] Found ${asset.symbol} collateral balance in obligation:`,
-              assetCollateral.amount
-            );
-          } else {
-            setCollateralBalance(0);
-            console.log(
-              `[fetchObligationDetails] No ${asset.symbol} collateral in this obligation`
-            );
-          }
         } else {
           setCollateralBalance(0);
+          console.log(
+            `[fetchObligationDetails] No ${asset.symbol} collateral in this obligation`
+          );
         }
       } else {
-        console.error(
-          "[fetchObligationDetails] Failed to get obligation details:",
-          result.error
-        );
         setCollateralBalance(0);
       }
     } catch (error) {
       console.error("[fetchObligationDetails] Error:", error);
       setCollateralBalance(0);
-    }
-  };
-
-  // Fetch user's collateral for the selected asset
-  const fetchUserCollateral = async () => {
-    try {
-      if (!wallet.address) return;
-
-      console.log(
-        "[fetchUserCollateral] Fetching collateral data for wallet:",
-        wallet.address
-      );
-
-      // Get user portfolio data using the combined method
-      const portfolioData = await scallopService.fetchUserPositions(
-        wallet.address
-      );
-
-      if (portfolioData && portfolioData.collateralAssets) {
-        // Find collateral for the selected asset
-        const assetCollateral = portfolioData.collateralAssets.find(
-          (item) => item.symbol.toLowerCase() === asset.symbol.toLowerCase()
-        );
-
-        if (assetCollateral) {
-          console.log(
-            `[fetchUserCollateral] Found ${asset.symbol} collateral balance:`,
-            assetCollateral.amount
-          );
-          // We don't set collateralBalance here anymore as we use the obligation-specific one
-        } else {
-          console.log(
-            `[fetchUserCollateral] No ${asset.symbol} collateral found in portfolio`
-          );
-        }
-      } else {
-        console.log(
-          "[fetchUserCollateral] No collateral assets found in portfolio data"
-        );
-      }
-    } catch (error) {
-      console.error("[fetchUserCollateral] Error:", error);
     }
   };
 
@@ -260,7 +287,7 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
         wallet.address
       );
 
-      // Get coins using the blockvision service - Updated import
+      // Get coins using the blockvision service
       const response = await blockvisionService.getAccountCoins(wallet.address);
       const coins = response.data || [];
       setAccountCoins(coins);
@@ -306,6 +333,9 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
     setIsLoading(false);
     setCollateralBalance(null);
     setWalletBalance(null);
+    setProcessingStep("");
+    setIsBoostLocked(false);
+    setIsInBorrowIncentive(false);
   };
 
   // Handle amount change
@@ -381,7 +411,11 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
       case "deposit-collateral":
         return "Deposit Collateral";
       case "withdraw-collateral":
-        return "Withdraw Collateral";
+        if (isBoostLocked || isInBorrowIncentive) {
+          return "Unlock & Withdraw";
+        } else {
+          return "Withdraw Collateral";
+        }
       default:
         return "Submit";
     }
@@ -393,7 +427,13 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
       case "deposit-collateral":
         return "Depositing collateral";
       case "withdraw-collateral":
-        return "Withdrawing collateral";
+        if (isInBorrowIncentive) {
+          return "Unlocking and withdrawing collateral";
+        } else if (isBoostLocked) {
+          return "Unlocking and withdrawing collateral";
+        } else {
+          return "Withdrawing collateral";
+        }
       default:
         return "Processing";
     }
@@ -404,6 +444,11 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
     return num.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
+  // Contact support for withdraw
+  const handleContactSupport = () => {
+    window.open("https://discord.gg/cerebra", "_blank");
+  };
+
   // Perform transaction
   const performTransaction = async () => {
     if (!validateAmount()) {
@@ -412,6 +457,7 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
 
     setIsLoading(true);
     setError(null);
+    setProcessingStep("Initializing transaction...");
 
     try {
       const amountNum = parseFloat(collateralAmount);
@@ -424,16 +470,19 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
         obligationId: obligationId,
         walletConnected: !!wallet.connected,
         isEmptyObligation: isEmptyObligation,
+        isBoostLocked: isBoostLocked,
+        isInBorrowIncentive: isInBorrowIncentive,
       });
 
       if (!wallet.connected) {
         throw new Error("Wallet not connected");
       }
 
-      // Use the collateral service methods based on the action
+      // Use the appropriate service method based on the action
       let txResult;
       try {
         if (action === "deposit-collateral") {
+          setProcessingStep("Depositing collateral...");
           // Use scallopBorrowService.depositCollateral directly with the specific obligation ID
           txResult = await scallopBorrowService.depositCollateral(
             wallet,
@@ -443,13 +492,29 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
             asset.decimals
           );
         } else if (action === "withdraw-collateral") {
-          // For withdrawals, continue using the previous method
-          txResult = await scallopCollateralService.withdrawCollateral(
+          setProcessingStep(
+            isBoostLocked || isInBorrowIncentive
+              ? "Processing atomic unlock and withdrawal transaction..."
+              : "Processing withdrawal transaction..."
+          );
+
+          // Use the new withdrawCollateralQuick function with proper error handling
+          txResult = await withdrawCollateralQuick(
             wallet,
+            obligationId,
             asset.coinType,
             amountNum,
             asset.decimals
           );
+
+          console.log(
+            `[performTransaction] withdraw-collateral result:`,
+            txResult
+          );
+
+          if (!txResult.success) {
+            throw new Error(txResult.error || "Transaction failed");
+          }
         } else {
           throw new Error("Invalid action");
         }
@@ -470,6 +535,7 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
       console.log(`[performTransaction] ${action} result:`, txResult);
 
       if (txResult.success) {
+        setProcessingStep("Transaction completed successfully!");
         setResult({
           success: true,
           message: `Successfully ${
@@ -491,13 +557,13 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
           onSuccess();
         }
 
-        // Refresh collateral balance and wallet balance after transaction
+        // Refresh obligations and wallet balance after transaction
         setTimeout(() => {
           fetchObligationDetails();
-          fetchUserCollateral();
           fetchWalletCoins();
         }, 2000);
       } else {
+        setProcessingStep("Transaction failed.");
         setResult({
           success: false,
           message: `Failed to ${
@@ -513,6 +579,7 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
       }
     } catch (err: any) {
       console.error(`[performTransaction] Error in ${action}:`, err);
+      setProcessingStep("Error processing transaction.");
       setResult({
         success: false,
         message: `Error ${
@@ -560,10 +627,20 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
           {isLoading ? (
             <div className="loading-container">
               <span className="loader"></span>
-              <p>{getActionVerb()}...</p>
-              <p className="small-text">
-                This may take a moment while we process your transaction.
-              </p>
+              <p>{processingStep || getActionVerb()}</p>
+              {(isBoostLocked || isInBorrowIncentive) &&
+                action === "withdraw-collateral" && (
+                  <p className="small-text">
+                    Your asset is locked in a staking pool. The system is
+                    processing an atomic transaction that combines unlocking and
+                    withdrawal operations.
+                  </p>
+                )}
+              {!isBoostLocked && !isInBorrowIncentive && (
+                <p className="small-text">
+                  This may take a moment while we process your transaction.
+                </p>
+              )}
             </div>
           ) : result ? (
             <div
@@ -611,6 +688,15 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                   {result.success ? "Close" : "Try Again"}
                 </button>
 
+                {!result.success && action === "withdraw-collateral" && (
+                  <button
+                    className="secondary-btn"
+                    onClick={handleContactSupport}
+                  >
+                    Contact Support
+                  </button>
+                )}
+
                 {result.success && (
                   <button className="secondary-btn" onClick={resetForm}>
                     New Transaction
@@ -626,6 +712,31 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                   <p>
                     This is a new obligation. Adding collateral will enable
                     borrowing.
+                  </p>
+                </div>
+              )}
+
+              {/* Add banner for locked obligations */}
+              {action === "withdraw-collateral" && isBoostLocked && (
+                <div className="boost-locked-warning">
+                  <div className="warning-icon">⚠️</div>
+                  <h4>Boost-Pool Locked Obligation</h4>
+                  <p>
+                    This obligation is locked in the Boost-Pool. The system will
+                    automatically unlock and withdraw your collateral in a
+                    single atomic transaction.
+                  </p>
+                </div>
+              )}
+
+              {action === "withdraw-collateral" && isInBorrowIncentive && (
+                <div className="boost-locked-warning">
+                  <div className="warning-icon">⚠️</div>
+                  <h4>Borrow-Incentive Locked Obligation</h4>
+                  <p>
+                    This obligation is locked in the Borrow-Incentive pool. The
+                    system will automatically unlock and withdraw your
+                    collateral in a single atomic transaction.
                   </p>
                 </div>
               )}
@@ -681,6 +792,24 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                     )}
                   </span>
                 </div>
+
+                {/* Add obligation status information */}
+                {action === "withdraw-collateral" && (
+                  <div className="info-row obligation-status">
+                    <span>Obligation Status:</span>
+                    <span>
+                      {isInBorrowIncentive ? (
+                        <span className="locked-status">
+                          Borrow-Incentive Locked
+                        </span>
+                      ) : isBoostLocked ? (
+                        <span className="locked-status">Boost-Pool Locked</span>
+                      ) : (
+                        <span className="unlocked-status">Unlocked</span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="amount-input-container">
@@ -749,6 +878,20 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                       You can withdraw collateral that isn't being used to
                       secure borrowings. If you have active borrows, you may be
                       limited in how much collateral you can withdraw.
+                      {isBoostLocked && (
+                        <>
+                          {" "}
+                          The system handles unlocking from the boost-pool
+                          automatically in the same transaction.
+                        </>
+                      )}
+                      {isInBorrowIncentive && (
+                        <>
+                          {" "}
+                          The system handles unlocking from the borrow-incentive
+                          pool automatically in the same transaction.
+                        </>
+                      )}
                     </>
                   )}
                 </p>
@@ -797,6 +940,10 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                   <p>Asset Coin Type: {asset.coinType}</p>
                   <p>Obligation ID: {obligationId}</p>
                   <p>Is Empty Obligation: {isEmptyObligation ? "Yes" : "No"}</p>
+                  <p>Is Boost-Locked: {isBoostLocked ? "Yes" : "No"}</p>
+                  <p>
+                    Is In Borrow-Incentive: {isInBorrowIncentive ? "Yes" : "No"}
+                  </p>
                   <p>
                     Wallet Balance:{" "}
                     {walletBalance !== null ? walletBalance.toFixed(6) : "N/A"}
@@ -808,6 +955,51 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                       : "N/A"}
                   </p>
                   <p>Account Coins: {accountCoins.length}</p>
+
+                  {userObligations.length > 0 && (
+                    <>
+                      <h5>User Obligations:</h5>
+                      <div style={{ maxHeight: "150px", overflowY: "auto" }}>
+                        {userObligations.map((ob, idx) => (
+                          <div
+                            key={`ob-${idx}`}
+                            style={{ marginBottom: "8px" }}
+                          >
+                            <div>
+                              <strong>ID:</strong> {ob.obligationId.slice(0, 8)}
+                              ...{ob.obligationId.slice(-6)}
+                              {ob.obligationId === obligationId && (
+                                <span style={{ color: "lightgreen" }}>
+                                  {" "}
+                                  (selected)
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <strong>Empty:</strong>{" "}
+                              {ob.isEmpty ? "Yes" : "No"}
+                            </div>
+                            <div>
+                              <strong>Lock Type:</strong>{" "}
+                              {ob.lockType || "None"}
+                            </div>
+                            <div>
+                              <strong>Boost:</strong>{" "}
+                              {ob.hasBoostStake ? "Yes" : "No"}
+                            </div>
+                            <div>
+                              <strong>Incentive:</strong>{" "}
+                              {ob.hasBorrowIncentiveStake ? "Yes" : "No"}
+                            </div>
+                            <div>
+                              <strong>Collaterals:</strong>{" "}
+                              {ob.collaterals?.length || 0}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
 
                   <h5>Matching Coins:</h5>
                   <div style={{ maxHeight: "150px", overflowY: "auto" }}>
@@ -846,6 +1038,49 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                         );
                       })}
                   </div>
+
+                  <h5>Implementation Details:</h5>
+                  <p>
+                    Using the new ScallopWithdrawService with atomic transaction
+                    approach:
+                  </p>
+                  <ol>
+                    <li>
+                      Single atomic transaction combines price update, unlock,
+                      withdraw, and transfer operations
+                    </li>
+                    <li>
+                      Properly handles both Boost-Pool and Borrow-Incentive
+                      locks automatically
+                    </li>
+                    <li>
+                      Uses SDK helpers first, with manual fallbacks only when
+                      needed
+                    </li>
+                    <li>Sets appropriate gas budget for complex operations</li>
+                    <li>
+                      Adds both borrow-incentive and boost unstake operations to
+                      handle all lock scenarios
+                    </li>
+                  </ol>
+                  <p>Benefits of the atomic approach:</p>
+                  <ul>
+                    <li>
+                      No intermediate state where obligation is unlocked but
+                      collateral not withdrawn
+                    </li>
+                    <li>
+                      No need for waiting periods or multiple transactions
+                    </li>
+                    <li>
+                      Either everything succeeds or everything fails
+                      (transactional safety)
+                    </li>
+                    <li>
+                      Aligns with the same successful pattern used in the
+                      deposit flow
+                    </li>
+                  </ul>
                 </div>
               )}
             </>
@@ -854,7 +1089,7 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
 
         {/* Last updated timestamp */}
         <div className="last-updated">
-          Last updated: 2025-06-21 23:00:40 UTC by jake1318
+          Last updated: 2025-07-22 07:09:03 UTC by jake1318
         </div>
       </div>
     </div>

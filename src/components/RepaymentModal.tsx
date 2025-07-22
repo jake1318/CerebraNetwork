@@ -1,5 +1,5 @@
 // src/components/RepaymentModal.tsx
-// Last Updated: 2025-06-21 20:10:05 UTC by jake1318
+// Last Updated: 2025-07-20 01:15:13 UTC by jake1318
 
 import React, { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -11,7 +11,8 @@ import {
   repayUnlockedObligation,
   repayMaximumDebt,
   unlockAndRepay,
-  isObligationLocked, // Make sure this import name matches exactly
+  unlockObligation,
+  isObligationLocked,
 } from "../scallop/ScallopIncentiveService";
 import "../styles/BorrowingActionModal.scss";
 import * as blockvisionService from "../services/blockvisionService"; // Import the blockvision service
@@ -127,6 +128,7 @@ interface RepaymentModalProps {
   onSuccess?: () => void;
   defaultRepayAmount?: string;
   obligationId?: string;
+  asset?: any; // Added asset prop for the asset to repay
 }
 
 const RepaymentModal: React.FC<RepaymentModalProps> = ({
@@ -134,12 +136,15 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
   onSuccess,
   defaultRepayAmount = "",
   obligationId: propObligationId,
+  asset: propAsset = null, // Default to null if not provided
 }) => {
   const wallet = useWallet();
 
   // State
   const [repayAmount, setRepayAmount] = useState<string>(defaultRepayAmount);
-  const [selectedAsset, setSelectedAsset] = useState<string>("USDC");
+  const [selectedAsset, setSelectedAsset] = useState<string>(
+    propAsset?.symbol || "USDC"
+  );
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [transactionResult, setTransactionResult] = useState<any>(null);
@@ -148,7 +153,8 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
   const [obligationId, setObligationId] = useState<string | null>(
     propObligationId || null
   );
-  const [isObligationLocked, setIsObligationLocked] = useState<boolean>(false);
+  const [isObligationLockedState, setIsObligationLocked] =
+    useState<boolean>(false);
   const [healthFactor, setHealthFactor] = useState<number | null>(null);
   const [borrowedAssets, setBorrowedAssets] = useState<any[]>([]);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -156,6 +162,17 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
   const [accountCoins, setAccountCoins] = useState<any[]>([]); // Store all account coins from blockvision
   const [obligationDetails, setObligationDetails] = useState<any>(null);
   const [repayMaximum, setRepayMaximum] = useState<boolean>(false);
+  const [processingSteps, setProcessingSteps] = useState<string[]>([]);
+  const [verifyingTransaction, setVerifyingTransaction] =
+    useState<boolean>(false);
+
+  // Initialize with the prop asset if provided
+  useEffect(() => {
+    if (propAsset) {
+      console.log("Using provided asset:", propAsset);
+      setSelectedAsset(propAsset.symbol);
+    }
+  }, [propAsset]);
 
   // Fetch obligation ID and user portfolio data when component mounts
   useEffect(() => {
@@ -307,8 +324,19 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
 
           setBorrowedAssets(formattedBorrows);
 
-          // Set default selected asset to the first borrowed asset if available
-          if (formattedBorrows.length > 0) {
+          // Set default selected asset to the prop asset if available
+          if (propAsset) {
+            const matchingDebt = formattedBorrows.find(
+              (asset) =>
+                asset.symbol.toLowerCase() === propAsset.symbol.toLowerCase()
+            );
+            if (matchingDebt) {
+              setSelectedAsset(propAsset.symbol);
+              setCurrentDebt(matchingDebt.amount);
+            }
+          }
+          // Otherwise, set to first borrowed asset if available and no prop asset was provided
+          else if (formattedBorrows.length > 0) {
             if (!formattedBorrows.find((a) => a.symbol === selectedAsset)) {
               setSelectedAsset(formattedBorrows[0].symbol);
               setCurrentDebt(formattedBorrows[0].amount);
@@ -370,24 +398,36 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
       calculatedHealthFactor = Math.min(calculatedHealthFactor, 999);
       setHealthFactor(calculatedHealthFactor);
 
-      // Find current debt for the selected asset
-      const debt = userPositions.borrowedAssets.find(
-        (asset) => asset.symbol === selectedAsset
-      );
-
-      // Set default selected asset to the first borrowed asset if available
-      if (
-        userPositions.borrowedAssets &&
-        userPositions.borrowedAssets.length > 0 &&
-        !userPositions.borrowedAssets.find((a) => a.symbol === selectedAsset)
-      ) {
-        setSelectedAsset(userPositions.borrowedAssets[0].symbol);
-        setCurrentDebt(userPositions.borrowedAssets[0].amount);
+      // If there's a prop asset, try to find it in the borrowed assets
+      if (propAsset) {
+        const debt = userPositions.borrowedAssets.find(
+          (asset) =>
+            asset.symbol.toLowerCase() === propAsset.symbol.toLowerCase()
+        );
+        if (debt) {
+          setSelectedAsset(propAsset.symbol);
+          setCurrentDebt(debt.amount);
+        }
       } else {
-        setCurrentDebt(debt ? debt.amount : 0);
+        // Find current debt for the selected asset
+        const debt = userPositions.borrowedAssets.find(
+          (asset) => asset.symbol === selectedAsset
+        );
+
+        // Set default selected asset to the first borrowed asset if available
+        if (
+          userPositions.borrowedAssets &&
+          userPositions.borrowedAssets.length > 0 &&
+          !userPositions.borrowedAssets.find((a) => a.symbol === selectedAsset)
+        ) {
+          setSelectedAsset(userPositions.borrowedAssets[0].symbol);
+          setCurrentDebt(userPositions.borrowedAssets[0].amount);
+        } else {
+          setCurrentDebt(debt ? debt.amount : 0);
+        }
       }
 
-      console.log(`Current debt for ${selectedAsset}: ${debt?.amount || 0}`);
+      console.log(`Current debt for ${selectedAsset}: ${currentDebt || 0}`);
     } catch (err) {
       console.error("Error fetching portfolio data:", err);
     }
@@ -487,18 +527,131 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
     return true;
   };
 
-  // Handle form submission
-  const handleSubmit = async () => {
-    if (!validateForm() || !wallet.connected) {
+  // Verify if a transaction was actually successful by checking if the debt was reduced
+  const verifyTransactionSuccess = async (
+    txDigest: string
+  ): Promise<boolean> => {
+    try {
+      setVerifyingTransaction(true);
+      setProcessingSteps((prev) => [
+        ...prev,
+        "Verifying transaction outcome...",
+      ]);
+
+      // Wait a short time for the transaction to be fully processed
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Fetch the updated obligation details
+      const { obligation } = await scallopBorrowService.getObligationDetails(
+        obligationId!,
+        wallet.address!
+      );
+
+      // Check if the obligation was unlocked (if it was previously locked)
+      if (isObligationLockedState && !obligation.isLocked) {
+        console.log("Verification successful: Obligation was unlocked");
+        setProcessingSteps((prev) => [
+          ...prev,
+          "Verified: Obligation was successfully unlocked",
+        ]);
+        return true;
+      }
+
+      // Find debt for the selected asset
+      const assetDebt = obligation.borrows.find(
+        (borrow: any) =>
+          borrow.symbol.toLowerCase() === selectedAsset.toLowerCase()
+      );
+
+      // If the debt for this asset is now gone or reduced, the transaction was successful
+      const previousDebt = currentDebt || 0;
+      const currentAssetDebt = assetDebt ? assetDebt.amount : 0;
+
+      console.log(
+        `Verification check: Previous debt: ${previousDebt}, Current debt: ${currentAssetDebt}`
+      );
+
+      if (currentAssetDebt < previousDebt || currentAssetDebt === 0) {
+        console.log("Verification successful: Debt was reduced");
+        setProcessingSteps((prev) => [
+          ...prev,
+          `Verified: Debt was reduced from ${previousDebt} to ${currentAssetDebt}`,
+        ]);
+        return true;
+      }
+
+      // If the debt was not reduced, something may have gone wrong
+      setProcessingSteps((prev) => [
+        ...prev,
+        "Verification inconclusive: Debt doesn't appear to be reduced",
+      ]);
+      return false;
+    } catch (err) {
+      console.error("Error verifying transaction:", err);
+      setProcessingSteps((prev) => [
+        ...prev,
+        "Verification failed: Could not confirm outcome",
+      ]);
+      return false;
+    } finally {
+      setVerifyingTransaction(false);
+    }
+  };
+
+  // Improved transaction status detection
+  const detectTransactionSuccess = async (result: any): Promise<boolean> => {
+    // Method 1: Check if the transaction has a digest (all executed transactions have this)
+    if (result.digest) {
+      console.log("Transaction has a digest, likely executed:", result.digest);
+
+      // Method 2: Check effects.status if available
+      if (result.effects?.status?.status === "success") {
+        console.log("Transaction effects.status indicates success");
+        return true;
+      }
+
+      // Method 3: Check for absence of error in effects
+      if (result.effects && !result.effects.status?.error) {
+        console.log("Transaction has no error in effects, likely succeeded");
+        return true;
+      }
+
+      // Method 4: Check for MoveCall events related to repay
+      const events = result.events || [];
+      const hasRepayEvent = events.some(
+        (event: any) =>
+          (event.type && event.type.toLowerCase().includes("repay")) ||
+          (event.parsedJson &&
+            (event.parsedJson.repayment_amount !== undefined ||
+              event.parsedJson.debt_amount !== undefined))
+      );
+
+      if (hasRepayEvent) {
+        console.log("Transaction has repay-related events, confirming success");
+        return true;
+      }
+
+      // Method 5: If transaction has digest but no obvious success/failure indicators,
+      // verify the actual outcome by checking if the debt was reduced
+      console.log("Transaction status unclear, verifying outcome on-chain");
+      return await verifyTransactionSuccess(result.digest);
+    }
+
+    return false;
+  };
+
+  // Handle repayment using atomic transaction builder
+  const handleAtomicRepayment = async () => {
+    if (!validateForm() || !wallet.connected || !obligationId) {
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setProcessingSteps(["Preparing transaction..."]);
 
     try {
       const coinCfg = COINS[selectedAsset as keyof typeof COINS];
-
       if (!coinCfg) {
         throw new Error(`Unknown coin: ${selectedAsset}`);
       }
@@ -506,119 +659,181 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
       // Convert symbol to lowercase for the API
       const asset = coinCfg.name.toLowerCase() as "usdc" | "sui" | "usdt";
 
-      let result;
+      console.log(
+        `[handleAtomicRepayment] Processing for ${selectedAsset} on obligation ${obligationId}`
+      );
 
-      if (isObligationLocked) {
-        // For locked obligations, use unlockAndRepay
-        // This will handle the unlock first, then perform the repay operation
-        console.log(
-          "[handleSubmit] Obligation is locked, using unlockAndRepay to handle unlock + repay"
-        );
+      // Initialize Scallop SDK builder
+      setProcessingSteps((prev) => [
+        ...prev,
+        "Initializing transaction builder...",
+      ]);
 
-        if (repayMaximum) {
-          // For maximum repayment of locked obligations
-          result = await unlockAndRepay(
-            wallet,
-            obligationId!,
-            asset,
-            BigInt(0), // Amount is ignored when repayMaximum is true
-            true // repayMaximum flag
-          );
-        } else {
-          // For specific amount repayment of locked obligations
-          const amt = parseFloat(repayAmount);
-          const baseUnits = BigInt(
-            Math.floor(amt * Math.pow(10, coinCfg.decimals))
-          );
-          result = await unlockAndRepay(
-            wallet,
-            obligationId!,
-            asset,
-            baseUnits,
-            false
-          );
-        }
-      } else {
-        // For unlocked obligations, directly use repay functionality
-        console.log(
-          "[handleSubmit] Obligation is not locked, using direct repay"
-        );
+      const scallopBuilder = await scallop.createScallopBuilder();
+      const txBlock = scallopBuilder.createTxBlock();
+      const sender = wallet.address!;
+      txBlock.setSender(sender);
 
-        if (repayMaximum && currentDebt !== null) {
-          // For maximum repayment of unlocked obligations, calculate exact debt amount
-          // repayMaximumDebt will add a small buffer (1%) to account for accrued interest
-          result = await repayMaximumDebt(
-            wallet,
-            obligationId!,
-            asset,
-            currentDebt,
-            coinCfg.decimals
-          );
-        } else {
-          // For specific amount repayment of unlocked obligations
-          const amt = parseFloat(repayAmount);
-          const baseUnits = BigInt(
-            Math.floor(amt * Math.pow(10, coinCfg.decimals))
-          );
-          result = await repayUnlockedObligation(
-            wallet,
-            obligationId!,
-            asset,
-            baseUnits
-          );
-        }
+      // Add steps to the transaction:
+      // 1. If locked, add unstake operation to unlock the obligation
+      if (isObligationLockedState) {
+        setProcessingSteps((prev) => [
+          ...prev,
+          "Adding unlock operation to transaction...",
+        ]);
+        // Pass undefined as the obligation key since SDK will look it up
+        await txBlock.unstakeObligationQuick(obligationId, undefined);
       }
 
-      console.log("Repayment result:", result);
+      // 2. Add repayment operation
+      setProcessingSteps((prev) => [
+        ...prev,
+        "Adding repay operation to transaction...",
+      ]);
+      if (repayMaximum && currentDebt !== null) {
+        // For maximum repayment, use the current debt value plus a small buffer
+        const amt = currentDebt * 1.01; // 1% buffer for accrued interest
+        const baseUnits = BigInt(
+          Math.floor(amt * Math.pow(10, coinCfg.decimals))
+        );
+        await txBlock.repayQuick(baseUnits, asset, obligationId);
+      } else {
+        // For specific amount repayment
+        const amt = parseFloat(repayAmount);
+        const baseUnits = BigInt(
+          Math.floor(amt * Math.pow(10, coinCfg.decimals))
+        );
+        await txBlock.repayQuick(baseUnits, asset, obligationId);
+      }
 
-      if (result.success) {
+      // Execute the transaction
+      setProcessingSteps((prev) => [
+        ...prev,
+        "Signing and sending transaction...",
+      ]);
+
+      // Use wallet to sign and execute the transaction with options to see effects
+      const result = await wallet.signAndExecuteTransactionBlock({
+        transactionBlock: txBlock,
+        options: {
+          showEffects: true,
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      console.log("Transaction result:", result);
+      setProcessingSteps((prev) => [
+        ...prev,
+        "Transaction submitted to blockchain...",
+      ]);
+
+      // Check if the transaction succeeded using our improved detection logic
+      const success = await detectTransactionSuccess(result);
+
+      if (success) {
+        setProcessingSteps((prev) => [
+          ...prev,
+          "Transaction completed successfully!",
+        ]);
+
+        // Transaction succeeded
         const successMessage = `Successfully ${
-          isObligationLocked ? "unlocked obligation and " : ""
+          isObligationLockedState ? "unlocked obligation and " : ""
         }repaid ${repayMaximum ? "maximum" : repayAmount} ${selectedAsset}`;
 
         setTransactionResult({
           success: true,
           message: successMessage,
           txHash: result.digest,
-          txLink: result.txLink,
+          txLink: `https://suivision.xyz/txblock/${result.digest}`,
+          steps: [...processingSteps, "Transaction completed successfully!"],
         });
+
+        // Update obligation lock status if it was locked
+        if (isObligationLockedState) {
+          setIsObligationLocked(false);
+        }
 
         // If a success callback was provided, call it
         if (onSuccess) {
           onSuccess();
         }
 
-        // Update obligation lock status if it was locked and now unlocked
-        if (isObligationLocked) {
-          setIsObligationLocked(false);
-        }
-
-        // Refresh portfolio data after a short delay
+        // Refresh data after a short delay
         setTimeout(() => {
-          fetchUserPortfolioData(obligationId!);
-          fetchWalletCoins(); // Also refresh wallet coins
+          fetchUserPortfolioData(obligationId);
+          fetchWalletCoins();
         }, 2000);
       } else {
+        // Transaction failed
+        const errorCode = result.effects?.status?.error || "Unknown error";
+
+        setProcessingSteps((prev) => [
+          ...prev,
+          `Transaction failed: ${errorCode}`,
+        ]);
+
+        // Check for error 770 specifically
+        if (errorCode.includes("770") || errorCode.includes("locked")) {
+          setError(
+            `Transaction failed with error 770: Obligation is locked in a borrow incentive program. Please try again with the "Unlock & Repay" option.`
+          );
+        } else {
+          setError(`Transaction failed: ${errorCode}`);
+        }
+
         setTransactionResult({
           success: false,
-          message: `Failed to repay ${selectedAsset}`,
-          error: result.error,
+          message: "Transaction Failed",
+          txHash: result.digest,
+          txLink: `https://suivision.xyz/txblock/${result.digest}`,
+          error: errorCode,
+          steps: processingSteps,
         });
-        setError(result.error || `Transaction failed`);
       }
     } catch (err: any) {
-      console.error("Error in repayment transaction:", err);
+      console.error("Error in atomic repayment transaction:", err);
+
+      // Add error to steps
+      setProcessingSteps((prev) => [
+        ...prev,
+        `Error: ${err.message || "Unknown error"}`,
+      ]);
+
+      // Provide more user-friendly error messages
+      let errorMessage = err.message || String(err);
+
+      if (errorMessage.includes("No obligation found for sender")) {
+        errorMessage =
+          "Could not find the obligation for your wallet. Please ensure you're using the correct wallet that owns this obligation.";
+      } else if (errorMessage.includes("Insufficient balance")) {
+        errorMessage = `You don't have enough ${selectedAsset} in your wallet to complete this transaction.`;
+      } else if (
+        errorMessage.includes("obligation locked") ||
+        errorMessage.includes("770")
+      ) {
+        errorMessage = `This obligation is locked in a borrow incentive program and the unlock operation failed. Please try again using the "Unlock & Repay" option.`;
+      } else if (errorMessage.includes("User rejected")) {
+        errorMessage = "Transaction was cancelled by the user.";
+      }
+
       setTransactionResult({
         success: false,
-        message: `Error repaying ${selectedAsset}`,
-        error: err.message || String(err),
+        message: `Error Processing Transaction`,
+        error: errorMessage,
+        steps: processingSteps,
       });
-      setError(
-        err.message || `An error occurred while repaying ${selectedAsset}`
-      );
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle form submission - using the right unlock+repay method based on obligation state
+  const handleSubmit = async () => {
+    return handleAtomicRepayment();
   };
 
   // Debug info and verification
@@ -644,7 +859,7 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
     console.log("Wallet connected:", wallet.connected);
     console.log("Wallet address:", wallet.address);
     console.log("Obligation ID:", obligationId);
-    console.log("Obligation Locked:", isObligationLocked);
+    console.log("Obligation Locked:", isObligationLockedState);
     console.log("Obligation Details:", obligationDetails);
 
     // Log import verifications
@@ -668,6 +883,16 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
     );
   };
 
+  // Navigate to Obligations tab
+  const goToObligationsTab = () => {
+    // Close this modal
+    onClose();
+
+    // Set a flag in localStorage to indicate we want to navigate to the obligations tab
+    localStorage.setItem("navigateToObligations", "true");
+    localStorage.setItem("scrollToObligationId", obligationId || "");
+  };
+
   // Don't render if not open
   if (!onClose) return null;
 
@@ -682,12 +907,28 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
         </div>
 
         <div className="modal-body">
-          {isLoading ? (
+          {isLoading || verifyingTransaction ? (
             <div className="loading-container">
               <span className="loader"></span>
-              <p>Repaying...</p>
+              <p>Processing Repayment</p>
+              <div className="processing-steps">
+                {processingSteps.map((step, index) => (
+                  <div key={index} className="processing-step">
+                    {index === processingSteps.length - 1 ? (
+                      <span className="current-step">➤ {step}</span>
+                    ) : (
+                      <span className="completed-step">✓ {step}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
               <p className="small-text">
                 This may take a moment while we process your transaction.
+                {isObligationLockedState && (
+                  <span className="unlock-notice">
+                    The obligation will be unlocked first, then repaid.
+                  </span>
+                )}
               </p>
             </div>
           ) : isInitialLoading ? (
@@ -713,8 +954,8 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
                   <p>
                     Transaction Hash:{" "}
                     <span className="tx-hash">
-                      {transactionResult.txHash.slice(0, 10)}...
-                      {transactionResult.txHash.slice(-8)}
+                      {transactionResult.txHash.slice(0, 8)}...
+                      {transactionResult.txHash.slice(-5)}
                     </span>
                   </p>
                   {transactionResult.txLink && (
@@ -731,12 +972,36 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
               )}
 
               {transactionResult.error && (
-                <p className="error-message">
-                  Error: {transactionResult.error}
-                </p>
+                <div className="error-details">
+                  <p className="error-message">
+                    Error: {transactionResult.error}
+                  </p>
+
+                  {/* Show steps that were executed for error debugging */}
+                  {transactionResult.steps &&
+                    transactionResult.steps.length > 0 && (
+                      <div className="executed-steps">
+                        <p>
+                          <strong>Steps Executed:</strong>
+                        </p>
+                        <ol>
+                          {transactionResult.steps.map(
+                            (step: string, i: number) => (
+                              <li key={i}>{step}</li>
+                            )
+                          )}
+                        </ol>
+                      </div>
+                    )}
+                </div>
               )}
 
               <div className="action-buttons">
+                {!transactionResult.success && isObligationLockedState && (
+                  <button className="navigate-btn" onClick={goToObligationsTab}>
+                    Go to Obligations Tab
+                  </button>
+                )}
                 <button
                   className="primary-btn"
                   onClick={
@@ -760,18 +1025,29 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
             </div>
           ) : (
             <>
-              {isObligationLocked && (
+              {isObligationLockedState && (
                 <div className="locked-obligation-warning">
                   <LockIcon />
                   <div className="warning-text">
                     <strong>
-                      This obligation is locked in the borrow incentive program.
+                      This obligation is locked in a borrow incentive program
+                      (Error 770)
                     </strong>
                     <p>
-                      The repayment will first unlock your obligation from the
-                      borrow incentive program, then repay your debt in a
-                      separate transaction.
+                      When an obligation is locked in the borrow incentive
+                      program, you must unlock it before repaying. The repay
+                      button below will handle this automatically by:
                     </p>
+                    <ol>
+                      <li>
+                        First unlocking the obligation from the incentive
+                        program
+                      </li>
+                      <li>Then repaying the selected debt amount</li>
+                      <li>
+                        Both operations will happen in a single transaction
+                      </li>
+                    </ol>
                   </div>
                 </div>
               )}
@@ -878,8 +1154,11 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
                     <span>
                       Obligation: {obligationId.slice(0, 8)}...
                       {obligationId.slice(-6)}
-                      {isObligationLocked && (
-                        <span className="locked-indicator"> 🔒 Locked</span>
+                      {isObligationLockedState && (
+                        <span className="locked-indicator">
+                          {" "}
+                          🔒 Locked in Incentive Program
+                        </span>
                       )}
                     </span>
                   </div>
@@ -941,7 +1220,7 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
 
               <button
                 className={`repay-btn ${
-                  isObligationLocked ? "unlock-repay-btn" : ""
+                  isObligationLockedState ? "unlock-repay-btn" : ""
                 }`}
                 onClick={handleSubmit}
                 disabled={
@@ -952,11 +1231,13 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
                   currentDebt <= 0
                 }
               >
-                {isObligationLocked
-                  ? `Unlock Obligation & Repay ${
-                      repayMaximum ? "Maximum" : selectedAsset
-                    }`
-                  : `Repay ${repayMaximum ? "Maximum" : selectedAsset}`}
+                {isObligationLockedState
+                  ? `Unlock & Repay ${
+                      repayMaximum ? "Maximum" : repayAmount
+                    } ${selectedAsset}`
+                  : `Repay ${
+                      repayMaximum ? "Maximum" : repayAmount
+                    } ${selectedAsset}`}
               </button>
 
               <div className="debug-controls">
@@ -978,7 +1259,9 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
                 <div className="debug-info">
                   <p>Obligation ID: {obligationId || "None"}</p>
                   <p>Prop Obligation ID: {propObligationId || "None"}</p>
-                  <p>Obligation Locked: {isObligationLocked ? "Yes" : "No"}</p>
+                  <p>
+                    Obligation Locked: {isObligationLockedState ? "Yes" : "No"}
+                  </p>
                   <p>Repay Maximum: {repayMaximum ? "Yes" : "No"}</p>
                   <p>
                     Current Debt:{" "}
@@ -1001,31 +1284,54 @@ const RepaymentModal: React.FC<RepaymentModalProps> = ({
                       Asset Decimals:{" "}
                       {COINS[selectedAsset as keyof typeof COINS]?.decimals}
                     </p>
-                    <p>Implementation: Using repayQuick pattern</p>
-                  </div>
-                  <h4>SDK Status:</h4>
-                  <div className="wallet-sdk-status">
                     <p>
-                      Wallet Connected: {wallet.connected ? "Yes ✓" : "No ✗"}
-                    </p>
-                    <p>Wallet Address: {wallet.address || "Not connected"}</p>
-                    <p>
-                      Scallop createScallopBuilder available:{" "}
-                      {typeof scallop.createScallopBuilder === "function"
-                        ? "Yes ✓"
-                        : "No ✗"}
+                      Implementation: Using atomic transaction builder with
+                      improved success detection
                     </p>
                   </div>
-                  <h4>Implementation Notes:</h4>
+                  <h4>Transaction Implementation:</h4>
                   <div className="implementation-details">
-                    <p>Using repayQuick with correct parameter order:</p>
-                    <pre>
-                      {`const scallopBuilder = await scallop.createScallopBuilder();
-const scallopTxBlock = scallopBuilder.createTxBlock();
-scallopTxBlock.setSender(sender);
-await scallopTxBlock.repayQuick(amount, asset, obligationId);`}
-                    </pre>
-                    <p>Updated: 2025-06-21 20:10:05 UTC</p>
+                    <p>Atomic Transaction Flow for Locked Obligations:</p>
+                    <pre>{`// Create transaction builder
+const scallopBuilder = await scallop.createScallopBuilder();
+const txBlock = scallopBuilder.createTxBlock();
+txBlock.setSender(sender);
+
+// 1. If obligation is locked, add unlock operation first
+if (isObligationLockedState) {
+  await txBlock.unstakeObligationQuick(obligationId, undefined);
+}
+
+// 2. Add repayment operation
+await txBlock.repayQuick(amount, asset, obligationId);
+
+// Execute the transaction
+await wallet.signAndExecuteTransactionBlock({ 
+  transactionBlock: txBlock,
+  options: {
+    showEffects: true,
+    showEvents: true,
+    showObjectChanges: true
+  }
+});`}</pre>
+                    <p>Improved Transaction Success Detection:</p>
+                    <pre>{`// Multiple methods to determine transaction success
+const success = 
+  // Method 1: Check effects.status if available
+  (result.effects?.status?.status === "success") || 
+  // Method 2: Check for absence of explicit errors
+  !(result.effects?.status?.error) ||
+  // Method 3: Check for repay events
+  result.events?.some(event => 
+    event.type?.includes('repay')
+  );
+
+// Method 4: If still unclear, verify by checking debt reduction
+if (result.digest && !success) {
+  const verified = await verifyTransactionSuccess(result.digest);
+  if (verified) success = true;
+}`}</pre>
+                    <p>Updated: 2025-07-20 01:15:13 UTC</p>
                   </div>
                 </div>
               )}
@@ -1035,10 +1341,9 @@ await scallopTxBlock.repayQuick(amount, asset, obligationId);`}
 
         <div className="modal-footer">
           <p className="disclaimer">
-            Repaying your debt will reduce your interest costs and improve your
-            position's health factor.
-            {isObligationLocked &&
-              " Since this obligation is locked in the borrow incentive program, it will be unlocked first."}
+            {isObligationLockedState
+              ? "When repaying a locked obligation, the system will first unlock it from the borrow incentive program, then repay your debt, all in one transaction."
+              : "Repaying your debt will reduce your interest costs and improve your position's health factor."}
           </p>
         </div>
       </div>
