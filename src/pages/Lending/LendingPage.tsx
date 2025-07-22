@@ -1,5 +1,5 @@
 // src/pages/Lending/LendingPage.tsx
-// Last Updated: 2025-07-19 21:33:52 UTC by jake1318
+// Last Updated: 2025-07-20 02:10:03 UTC by jake1318
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { ScallopService } from "../../scallop/ScallopService";
@@ -1613,14 +1613,23 @@ const LendingPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Pending Rewards */}
+        {/* Pending Rewards - MODIFIED to have the claim button inline */}
         {pendingRewards.length > 0 && (
           <div className="rewards-section">
             <div className="rewards-header">
               <h4>Pending Rewards</h4>
-              <span className="rewards-value">
-                ${formatNumber(totalRewardsValue, 2)}
-              </span>
+              <div className="rewards-actions">
+                <span className="rewards-value">
+                  ${formatNumber(totalRewardsValue, 2)}
+                </span>
+                <button
+                  className="claim-rewards-button"
+                  onClick={openClaimRewardsModal}
+                  disabled={pendingRewards.length === 0}
+                >
+                  Claim All Rewards
+                </button>
+              </div>
             </div>
 
             <div className="rewards-list">
@@ -1646,18 +1655,10 @@ const LendingPage: React.FC = () => {
                 </div>
               ))}
             </div>
-
-            <button
-              className="claim-rewards-button"
-              onClick={openClaimRewardsModal}
-              disabled={pendingRewards.length === 0}
-            >
-              Claim All Rewards
-            </button>
           </div>
         )}
 
-        {/* Supplied Assets */}
+        {/* Supplied Assets - MODIFIED to open LendingActionModal when withdraw button is clicked */}
         {userSupplied.length > 0 && (
           <div className="position-section">
             <h4>Your Supplied Assets</h4>
@@ -1706,6 +1707,7 @@ const LendingPage: React.FC = () => {
                             asset.symbol.toLowerCase()
                         );
                         if (marketAsset) {
+                          // Open LendingActionModal with withdraw action
                           openModal(
                             {
                               ...marketAsset,
@@ -1808,7 +1810,7 @@ const LendingPage: React.FC = () => {
           </div>
         )}
 
-        {/* Collateral Assets */}
+        {/* Collateral Assets - MODIFIED to open CollateralManagementModal when manage button is clicked */}
         {userCollateral.length > 0 && (
           <div className="position-section">
             <h4>Your Collateral Assets</h4>
@@ -1851,11 +1853,17 @@ const LendingPage: React.FC = () => {
                             a.symbol.toLowerCase() ===
                             asset.symbol.toLowerCase()
                         );
-                        if (marketAsset) {
-                          openCollateralModal(
-                            marketAsset,
-                            "withdraw-collateral"
+                        if (marketAsset && selectedObligationId) {
+                          // Open CollateralManagementModal with withdraw-collateral action
+                          setCollateralModalAsset(marketAsset);
+                          setCollateralModalAction("withdraw-collateral");
+                          setCollateralModalOpen(true);
+                        } else {
+                          // No obligation selected, ask the user to select one first
+                          setError(
+                            "Please select an obligation to manage collateral"
                           );
+                          setActiveTab("obligations");
                         }
                       }}
                       disabled={!selectedObligationId}
@@ -2848,7 +2856,7 @@ const LendingPage: React.FC = () => {
 
       {/* Last updated timestamp */}
       <div className="last-updated">
-        Last updated: 2025-07-19 21:33:52 UTC by jake1318
+        Last updated: 2025-07-20 02:15:22 UTC by jake1318
       </div>
     </div>
   );
