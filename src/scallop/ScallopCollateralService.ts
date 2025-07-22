@@ -1,5 +1,5 @@
-// ScallopCollateralService.ts
-// Last Updated: 2025-06-11 07:17:14 UTC by jake1318
+// src/scallop/ScallopCollateralService.ts
+// Last Updated: 2025-07-21 01:29:21 UTC by jake1318
 
 import { Scallop } from "@scallop-io/sui-scallop-sdk";
 import { SuiClient } from "@mysten/sui.js/client";
@@ -17,6 +17,21 @@ import {
   SCALLOP_VERSION_OBJECT,
   SUIVISION_URL,
 } from "./ScallopService";
+
+// Import Scallop package IDs and objects from config
+import {
+  SCALLOP_PACKAGE_IDS,
+  SUI_MARKET_OBJECTS,
+  SCALLOP_GLOBALS,
+  SUI_NETWORK_CONFIG,
+} from "./config";
+
+// Define shared objects for direct Move calls (Clock)
+export const SUI_CLOCK_OBJECT = {
+  objectId: "0x6",
+  initialSharedVersion: "1",
+  mutable: true,
+};
 
 // Initialize the Scallop client for collateral operations
 const client = new SuiClient({ url: SUI_MAINNET });
@@ -36,6 +51,48 @@ const obligationIdCache: Record<string, { id: string; timestamp: number }> = {};
 // Cache for obligation keys
 const obligationKeyCache: Record<string, { key: string; timestamp: number }> =
   {};
+
+/**
+ * Helper to verify transaction success
+ * @param digest The transaction digest
+ * @returns True if transaction succeeded or was found
+ * @throws Error if transaction fails with specific error
+ */
+async function verifyTransactionSuccess(digest: string): Promise<boolean> {
+  if (!digest) {
+    throw new Error("No transaction digest provided");
+  }
+
+  try {
+    console.log(`[Collateral] Verifying transaction ${digest}`);
+    const txResult = await client.getTransactionBlock({
+      digest,
+      options: { showEffects: true },
+    });
+
+    if (txResult && txResult.effects?.status?.status === "success") {
+      console.log(`[Collateral] Transaction ${digest} verified successful`);
+      return true;
+    } else if (txResult && txResult.effects?.status?.status === "failure") {
+      throw new Error(
+        txResult.effects.status.error || "Transaction failed on chain"
+      );
+    } else {
+      // Transaction exists but status is unknown - assume success
+      console.log(
+        `[Collateral] Transaction ${digest} exists on chain, assuming success`
+      );
+      return true;
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("Transaction not found")) {
+      throw new Error("Transaction not found on chain");
+    } else {
+      // Rethrow other errors
+      throw err;
+    }
+  }
+}
 
 /**
  * Add an obligation ID to the cache
@@ -161,6 +218,48 @@ export async function getObligationKey(
 }
 
 /**
+ * Check if an obligation is locked in the borrow-incentive pool
+ * @param address User address
+ * @param obligationId Obligation ID to check
+ * @returns True if the obligation is locked in borrow-incentive
+ */
+export async function isObligationInBorrowIncentive(
+  address: string,
+  obligationId: string
+): Promise<boolean> {
+  try {
+    console.log(
+      `[Collateral] Checking if obligation ${obligationId} is in borrow-incentive`
+    );
+    const query = await scallop.createScallopQuery();
+    await query.init();
+
+    // Query the obligation
+    const obligation = await query.queryObligation(obligationId);
+
+    if (obligation) {
+      // Check if it's locked in borrow-incentive
+      const isLocked =
+        obligation.lockType === "borrow-incentive" ||
+        obligation.hasBorrowIncentiveStake === true;
+
+      console.log(
+        `[Collateral] Obligation ${obligationId} in borrow-incentive: ${isLocked}`
+      );
+      return isLocked;
+    }
+
+    return false;
+  } catch (err) {
+    console.error(
+      `[Collateral] Error checking if obligation is in borrow-incentive:`,
+      err
+    );
+    return false; // Default to false on error
+  }
+}
+
+/**
  * Creates an obligation account for the user, which is required for borrowing
  */
 export async function createObligationAccount(signer: any) {
@@ -192,10 +291,34 @@ export async function createObligationAccount(signer: any) {
     console.log("[Collateral] Executing create obligation transaction...");
     const result = await signer.signAndExecuteTransactionBlock({
       transactionBlock: txBlockToSign,
+      requestType: "WaitForLocalExecution", // Changed from WaitForEffectsCert
       options: { showEffects: true, showEvents: true },
     });
 
     console.log("[Collateral] Create obligation result:", result);
+
+    // Verify transaction success
+    if (!result.digest) {
+      return {
+        success: false,
+        error: "No transaction digest returned",
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    try {
+      await verifyTransactionSuccess(result.digest);
+    } catch (err) {
+      return {
+        success: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Transaction verification failed",
+        timestamp: new Date().toISOString(),
+        digest: result.digest, // Include the digest even if verification failed
+      };
+    }
 
     // Get transaction details for the response
     const digest = result.digest;
@@ -205,7 +328,7 @@ export async function createObligationAccount(signer: any) {
     clearObligationIdCache(senderAddress);
 
     return {
-      success: !!digest,
+      success: true,
       digest: digest,
       txLink: txLink,
       timestamp: new Date().toISOString(),
@@ -269,7 +392,7 @@ export async function addCollateral(
     txb.setSender(senderAddress);
 
     // Extract coin symbol for SDK helpers
-    const coinSymbol = getCoinSymbol(coinType);
+    const coinSymbol = getCoinSymbol(coinType).toLowerCase();
 
     // Let the SDK handle obligation creation/reuse automatically
     await txb.addCollateralQuick(amountInBaseUnits, coinSymbol);
@@ -282,6 +405,7 @@ export async function addCollateral(
     console.log("[Collateral] Executing add collateral transaction...");
     const result = await wallet.signAndExecuteTransactionBlock({
       transactionBlock: txBlockToSign,
+      requestType: "WaitForLocalExecution", // Changed from WaitForEffectsCert
       options: {
         showEffects: true,
         showEvents: true,
@@ -290,12 +414,35 @@ export async function addCollateral(
 
     console.log("[Collateral] Add collateral result:", result);
 
+    // Verify transaction success
+    if (!result.digest) {
+      return {
+        success: false,
+        error: "No transaction digest returned",
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    try {
+      await verifyTransactionSuccess(result.digest);
+    } catch (err) {
+      return {
+        success: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Transaction verification failed",
+        digest: result.digest, // Include the digest even if verification failed
+        timestamp: new Date().toISOString(),
+      };
+    }
+
     // Get transaction details for the response
     const digest = result.digest;
     const txLink = `${SUIVISION_URL}${digest}`;
 
     return {
-      success: !!digest,
+      success: true,
       digest,
       txLink,
       amount,
@@ -310,119 +457,558 @@ export async function addCollateral(
 }
 
 /**
- * Withdraw collateral from the user's obligation
- * @param wallet Connected wallet
- * @param coinType Coin type to withdraw
- * @param amount Amount to withdraw
- * @param decimals Decimals of the coin
- * @returns Transaction result
+ * Two-step approach to unlock and withdraw collateral.
+ * First unstakes the obligation in a separate transaction, then withdraws the collateral.
  */
-export async function withdrawCollateral(
+export async function twoStepUnlockAndWithdrawCollateral(
   wallet: any,
   coinType: string,
   amount: number,
-  decimals: number
-) {
+  obligationId: string,
+  isBoostLocked: boolean,
+  isInBorrowIncentive: boolean,
+  decimals = 9
+): Promise<{
+  success: boolean;
+  digest?: string;
+  txLink?: string;
+  error?: string;
+}> {
   try {
-    // Get the sender's address
-    const senderAddress = await extractWalletAddress(wallet);
+    const sender = await extractWalletAddress(wallet);
+    if (!sender) throw new Error("Wallet not connected");
 
-    if (!senderAddress) {
-      throw new Error("Could not determine sender address from wallet");
+    console.log(
+      `[Collateral] Two-step unlock and withdraw for ${amount} ${getCoinSymbol(
+        coinType
+      )} from obligation ${obligationId}`
+    );
+    console.log(
+      `[Collateral] Obligation status: boost-locked=${isBoostLocked}, borrow-incentive=${isInBorrowIncentive}`
+    );
+
+    // ── convert amount ───────────────────────────────────────────────
+    const baseUnits = BigInt(Math.floor(amount * 10 ** decimals)); // Changed back to BigInt
+    const symbol = getCoinSymbol(coinType).toLowerCase(); // "sui" | "usdc" | "usdt"...
+
+    // Step 1: Unstake obligation in a separate transaction if needed
+    if (isBoostLocked || isInBorrowIncentive) {
+      console.log(`[Collateral] Step 1: Unlocking obligation ${obligationId}`);
+      const builder = await scallop.createScallopBuilder();
+      const txb = builder.createTxBlock();
+      txb.setSender(sender);
+
+      if (isBoostLocked) {
+        // For boost-locked obligations, use unstakeObligationQuick
+        console.log(
+          `[Collateral] Unstaking from Boost-Pool using unstakeObligationQuick`
+        );
+        await txb.unstakeObligationQuick(obligationId);
+      } else if (isInBorrowIncentive) {
+        // For borrow-incentive locked obligations
+        console.log(`[Collateral] Unstaking from Borrow-Incentive pool`);
+
+        // Get the obligation key (should exist for borrow-incentive)
+        const obligationKey = await getObligationKey(sender, obligationId);
+        if (!obligationKey) {
+          throw new Error(
+            `Cannot find obligation key for borrow-incentive unlock. This is unexpected.`
+          );
+        }
+
+        // Get the Scallop SDK's known addresses
+        const addresses = builder.address.getAll();
+        const borrowIncentivePackage = addresses["borrowIncentive.id"];
+        const borrowIncentiveConfig = addresses["borrowIncentive.config"];
+        const borrowIncentivePools =
+          addresses["borrowIncentive.incentivePools"];
+        const borrowIncentiveAccounts =
+          addresses["borrowIncentive.incentiveAccounts"];
+        const vescaSubsTable = addresses["vesca.subsTable"];
+        const vescaSubsWhitelist = addresses["vesca.subsWhitelist"];
+
+        if (
+          !borrowIncentivePackage ||
+          !borrowIncentiveConfig ||
+          !borrowIncentivePools ||
+          !borrowIncentiveAccounts
+        ) {
+          throw new Error(
+            "Required borrow-incentive objects not found in Scallop SDK configuration"
+          );
+        }
+
+        // Call user::unstake_v2
+        console.log(`[Collateral] Calling borrow_incentive::user::unstake_v2`);
+        txb.moveCall({
+          target: `${borrowIncentivePackage}::user::unstake_v2`,
+          arguments: [
+            txb.object(borrowIncentiveConfig),
+            txb.object(borrowIncentivePools),
+            txb.object(borrowIncentiveAccounts),
+            txb.object(obligationKey),
+            txb.object(obligationId),
+            txb.object(vescaSubsTable || "0x0"), // Use 0x0 as fallback
+            txb.object(vescaSubsWhitelist || "0x0"), // Use 0x0 as fallback
+            txb.object(SUI_CLOCK_OBJECT.objectId),
+          ],
+          typeArguments: [],
+        });
+      }
+
+      txb.setGasBudget(40_000_000);
+
+      console.log(`[Collateral] Executing unlock transaction`);
+      const unlockRes = await wallet.signAndExecuteTransactionBlock({
+        transactionBlock: txb.txBlock,
+        requestType: "WaitForLocalExecution", // Changed from WaitForEffectsCert
+        options: { showEffects: true },
+      });
+
+      console.log(`[Collateral] Unlock result:`, unlockRes);
+      console.log(`[Collateral] Unlock digest:`, unlockRes.digest);
+
+      // Check if we got a digest (transaction was accepted)
+      if (!unlockRes.digest) {
+        throw new Error(`Unlocking failed: No transaction digest returned`);
+      }
+
+      // Verify the transaction succeeded on chain
+      try {
+        await verifyTransactionSuccess(unlockRes.digest);
+      } catch (err) {
+        throw new Error(
+          `Unlocking failed: ${
+            err instanceof Error
+              ? err.message
+              : "Transaction verification failed"
+          }`
+        );
+      }
+
+      // Wait a longer moment for the chain state to update (increased to 5 seconds)
+      console.log(
+        `[Collateral] Unlocking successful, waiting 5 seconds before withdrawing...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
+
+    // Step 2: Withdraw collateral in a separate transaction
+    // Create a fresh builder after unlock to ensure it reads the updated on-chain state
+    console.log(
+      `[Collateral] Step 2: Withdrawing ${baseUnits.toString()} ${symbol} from obligation ${obligationId}`
+    );
+    const withdrawBuilder = await scallop.createScallopBuilder();
+    const withdrawTxb = withdrawBuilder.createTxBlock();
+    withdrawTxb.setSender(sender);
+
+    // No redeem call needed - unstake is enough
+
+    // Removed all price update calls as they're unreliable and not strictly needed
+
+    // Withdraw the collateral
+    const coin = await withdrawTxb.takeCollateralQuick(baseUnits, symbol);
+
+    // Send the coin to the user
+    withdrawTxb.transferObjects([coin], sender);
+    withdrawTxb.setGasBudget(40_000_000);
+
+    console.log(`[Collateral] Executing withdrawal transaction`);
+    const withdrawRes = await wallet.signAndExecuteTransactionBlock({
+      transactionBlock: withdrawTxb.txBlock,
+      requestType: "WaitForLocalExecution", // Changed from WaitForEffectsCert
+      options: { showEffects: true },
+    });
+
+    console.log(`[Collateral] Withdrawal result:`, withdrawRes);
+    console.log(`[Collateral] Withdrawal digest:`, withdrawRes.digest);
+
+    // Check if we got a digest (transaction was accepted)
+    if (!withdrawRes.digest) {
+      throw new Error(`Withdrawal failed: No transaction digest returned`);
+    }
+
+    // Verify the withdrawal transaction succeeded
+    try {
+      await verifyTransactionSuccess(withdrawRes.digest);
+    } catch (err) {
+      throw new Error(
+        `Withdrawal failed: ${
+          err instanceof Error ? err.message : "Transaction verification failed"
+        }`
+      );
+    }
+
+    return {
+      success: true,
+      digest: withdrawRes.digest,
+      txLink: `${SUIVISION_URL}${withdrawRes.digest}`,
+      amount,
+      symbol: coinType.includes("sui")
+        ? "SUI"
+        : coinType.split("::").pop() || coinType,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (e: any) {
+    console.error(
+      `[Collateral] Error in twoStepUnlockAndWithdrawCollateral:`,
+      e
+    );
+    return {
+      success: false,
+      error: e.message ?? String(e),
+      amount,
+      symbol: coinType.includes("sui")
+        ? "SUI"
+        : coinType.split("::").pop() || coinType,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Atomic transaction to unlock and withdraw collateral.
+ * Uses SDK helpers to unstake properly from boost-pool or borrow-incentive.
+ */
+export async function atomicUnlockAndWithdrawCollateral(
+  wallet: any,
+  coinType: string,
+  amount: number,
+  obligationId: string,
+  isBoostLocked: boolean,
+  isInBorrowIncentive: boolean,
+  decimals = 9
+): Promise<{
+  success: boolean;
+  digest?: string;
+  txLink?: string;
+  error?: string;
+}> {
+  try {
+    const sender = await extractWalletAddress(wallet);
+    if (!sender) throw new Error("Wallet not connected");
+
+    console.log(
+      `[Collateral] Atomic unlock and withdraw for ${amount} ${getCoinSymbol(
+        coinType
+      )} from obligation ${obligationId}`
+    );
+    console.log(
+      `[Collateral] Obligation status: boost-locked=${isBoostLocked}, borrow-incentive=${isInBorrowIncentive}`
+    );
+
+    // ── convert amount ───────────────────────────────────────────────
+    const baseUnits = BigInt(Math.floor(amount * 10 ** decimals)); // Changed back to BigInt
+    const symbol = getCoinSymbol(coinType).toLowerCase(); // "sui" | "usdc" | "usdt"...
+
+    // ── build tx ─────────────────────────────────────────────────────
+    const scallopBuilder = await scallop.createScallopBuilder();
+    const txb = scallopBuilder.createTxBlock();
+    txb.setSender(sender);
+
+    // 1) Handle different lock types FIRST
+    if (isBoostLocked) {
+      // For boost-locked obligations, use the SDK helper
+      console.log(
+        `[Collateral] Unstaking from Boost-Pool using unstakeObligationQuick`
+      );
+      await txb.unstakeObligationQuick(obligationId);
+
+      // No redeem call needed - unstake is enough
+    } else if (isInBorrowIncentive) {
+      // For borrow-incentive locked obligations
+      console.log(`[Collateral] Unstaking from Borrow-Incentive pool`);
+
+      // Get the obligation key (should exist for borrow-incentive)
+      const obligationKey = await getObligationKey(sender, obligationId);
+      if (!obligationKey) {
+        throw new Error(
+          `Cannot find obligation key for borrow-incentive unlock. This is unexpected.`
+        );
+      }
+
+      // Get the Scallop SDK's known addresses
+      const addresses = scallopBuilder.address.getAll();
+      const borrowIncentivePackage = addresses["borrowIncentive.id"];
+      const borrowIncentiveConfig = addresses["borrowIncentive.config"];
+      const borrowIncentivePools = addresses["borrowIncentive.incentivePools"];
+      const borrowIncentiveAccounts =
+        addresses["borrowIncentive.incentiveAccounts"];
+      const vescaSubsTable = addresses["vesca.subsTable"];
+      const vescaSubsWhitelist = addresses["vesca.subsWhitelist"];
+
+      if (
+        !borrowIncentivePackage ||
+        !borrowIncentiveConfig ||
+        !borrowIncentivePools ||
+        !borrowIncentiveAccounts
+      ) {
+        throw new Error(
+          "Required borrow-incentive objects not found in Scallop SDK configuration"
+        );
+      }
+
+      // Call user::unstake_v2
+      console.log(`[Collateral] Calling borrow_incentive::user::unstake_v2`);
+      txb.moveCall({
+        target: `${borrowIncentivePackage}::user::unstake_v2`,
+        arguments: [
+          txb.object(borrowIncentiveConfig),
+          txb.object(borrowIncentivePools),
+          txb.object(borrowIncentiveAccounts),
+          txb.object(obligationKey),
+          txb.object(obligationId),
+          txb.object(vescaSubsTable || "0x0"), // Use 0x0 as fallback
+          txb.object(vescaSubsWhitelist || "0x0"), // Use 0x0 as fallback
+          txb.object(SUI_CLOCK_OBJECT.objectId),
+        ],
+        typeArguments: [],
+      });
+    }
+
+    // 2) Removed all price update calls as they're unreliable and not strictly needed
+
+    // 3) FINALLY withdraw collateral
+    console.log(
+      `[Collateral] Taking collateral: ${baseUnits.toString()} ${symbol}`
+    );
+    const coin = await txb.takeCollateralQuick(baseUnits, symbol);
+
+    // Send coin to user
+    console.log(`[Collateral] Transferring withdrawn coin to ${sender}`);
+    txb.transferObjects([coin], sender);
+
+    // Use higher gas budget for this complex transaction
+    txb.setGasBudget(80_000_000);
+
+    // ── sign & execute ───────────────────────────────────────────────
+    console.log(`[Collateral] Signing and executing transaction`);
+    const res = await wallet.signAndExecuteTransactionBlock({
+      transactionBlock: txb.txBlock,
+      requestType: "WaitForLocalExecution", // Changed from WaitForEffectsCert
+      options: { showEffects: true },
+    });
+
+    console.log("[Collateral] Transaction result:", res);
+    console.log("[Collateral] Transaction digest:", res.digest);
+
+    // Check if we got a digest (transaction was accepted)
+    if (!res.digest) {
+      throw new Error(`Transaction failed: No transaction digest returned`);
+    }
+
+    // Verify the transaction succeeded
+    try {
+      await verifyTransactionSuccess(res.digest);
+    } catch (err) {
+      return {
+        success: false,
+        digest: res.digest,
+        error: `Transaction verification failed: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        amount,
+        symbol: coinType.includes("sui")
+          ? "SUI"
+          : coinType.split("::").pop() || coinType,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    return {
+      success: true,
+      digest: res.digest,
+      txLink: `${SUIVISION_URL}${res.digest}`,
+      amount,
+      symbol: coinType.includes("sui")
+        ? "SUI"
+        : coinType.split("::").pop() || coinType,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (e: any) {
+    console.error(
+      `[Collateral] Error in atomicUnlockAndWithdrawCollateral:`,
+      e
+    );
+    return {
+      success: false,
+      error: e.message ?? String(e),
+      amount,
+      symbol: coinType.includes("sui")
+        ? "SUI"
+        : coinType.split("::").pop() || coinType,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Unlock an obligation (unstake) and withdraw collateral.
+ * Automatically chooses the best method based on obligation status.
+ */
+export async function unlockAndWithdrawCollateral(
+  wallet: any,
+  coinType: string,
+  amount: number,
+  obligationId: string,
+  isBoostLocked: boolean,
+  isInBorrowIncentive: boolean,
+  decimals = 9,
+  preferredMethod: "atomic" | "two-step" = "two-step" // Changed default to two-step as it's more reliable
+): Promise<{
+  success: boolean;
+  digest?: string;
+  txLink?: string;
+  error?: string;
+}> {
+  // Handle any locked obligations based on the preferred method
+  if (isBoostLocked || isInBorrowIncentive) {
+    console.log(
+      `[Collateral] Obligation ${obligationId} is locked (boost=${isBoostLocked}, incentive=${isInBorrowIncentive})`
+    );
+
+    if (preferredMethod === "two-step") {
+      return twoStepUnlockAndWithdrawCollateral(
+        wallet,
+        coinType,
+        amount,
+        obligationId,
+        isBoostLocked,
+        isInBorrowIncentive,
+        decimals
+      );
+    } else {
+      return atomicUnlockAndWithdrawCollateral(
+        wallet,
+        coinType,
+        amount,
+        obligationId,
+        isBoostLocked,
+        isInBorrowIncentive,
+        decimals
+      );
+    }
+  }
+
+  // For obligations that are not locked, we can use a simpler approach
+  try {
+    const sender = await extractWalletAddress(wallet);
+    if (!sender) throw new Error("Wallet not connected");
 
     console.log(
       `[Collateral] Withdrawing collateral: ${amount} ${getCoinSymbol(
         coinType
-      )} for ${senderAddress}`
+      )} from obligation ${obligationId}`
     );
 
-    // Calculate amount in base units
-    const amountInBaseUnits = Math.floor(amount * Math.pow(10, decimals));
+    // ── convert amount ───────────────────────────────────────────────
+    const baseUnits = BigInt(Math.floor(amount * 10 ** decimals)); // Changed back to BigInt
+    const symbol = getCoinSymbol(coinType).toLowerCase();
 
-    // Clean up the coin type to ensure it's a proper Move type string
-    // Use the full path for SUI
-    const fullCoinType =
-      coinType === "SUI" || coinType === "sui"
-        ? SUI_COIN_TYPE
-        : normalizeCoinType(coinType);
+    // ── build tx ─────────────────────────────────────────────────────
+    const builder = await scallop.createScallopBuilder();
+    const txb = builder.createTxBlock();
+    txb.setSender(sender);
 
+    // Removed all price update calls as they're unreliable and not strictly needed
+
+    // Withdraw collateral directly as the obligation is not locked
     console.log(
-      `[Collateral] Using coin type: ${fullCoinType} for withdraw collateral operation`
+      `[Collateral] Taking collateral: ${baseUnits.toString()} ${symbol}`
     );
+    const coin = await txb.takeCollateralQuick(baseUnits, symbol);
 
-    // Use the SDK builder for withdrawal as well
-    const scallopBuilder = await scallop.createScallopBuilder();
-    const txb = scallopBuilder.createTxBlock();
-    txb.setSender(senderAddress);
+    // Send coin to user
+    txb.transferObjects([coin], sender);
+    txb.setGasBudget(40_000_000);
 
-    // Extract coin symbol for SDK helpers
-    const coinSymbol = getCoinSymbol(coinType);
-
-    // First update asset prices (required by protocol)
-    await txb.updateAssetPricesQuick([coinSymbol]);
-
-    // Then take collateral using the SDK helper
-    const withdrawnCoin = await txb.takeCollateralQuick(
-      amountInBaseUnits,
-      coinSymbol
-    );
-
-    // Transfer the withdrawn coin back to sender
-    txb.transferObjects([withdrawnCoin], senderAddress);
-
-    // Set gas budget
-    const txBlockToSign = txb.txBlock;
-    txBlockToSign.setGasBudget(50000000);
-
-    // Sign and execute
-    const result = await wallet.signAndExecuteTransactionBlock({
-      transactionBlock: txBlockToSign,
-      options: {
-        showEffects: true,
-        showEvents: true,
-      },
+    // ── sign & execute ───────────────────────────────────────────────
+    console.log(`[Collateral] Signing and executing transaction`);
+    const res = await wallet.signAndExecuteTransactionBlock({
+      transactionBlock: txb.txBlock,
+      requestType: "WaitForLocalExecution", // Changed from WaitForEffectsCert
+      options: { showEffects: true },
     });
 
-    console.log("[Collateral] Withdraw collateral result:", result);
+    console.log("[Collateral] Transaction result:", res);
+    console.log("[Collateral] Transaction digest:", res.digest);
+
+    // Check if we got a digest (transaction was accepted)
+    if (!res.digest) {
+      throw new Error(`Transaction failed: No transaction digest returned`);
+    }
+
+    // Verify the transaction succeeded
+    try {
+      await verifyTransactionSuccess(res.digest);
+    } catch (err) {
+      return {
+        success: false,
+        digest: res.digest,
+        error: `Transaction verification failed: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        amount,
+        symbol: coinType.includes("sui")
+          ? "SUI"
+          : coinType.split("::").pop() || coinType,
+        timestamp: new Date().toISOString(),
+      };
+    }
 
     return {
-      success: !!result.digest,
-      digest: result.digest,
-      txLink: `${SUIVISION_URL}${result.digest}`,
+      success: true,
+      digest: res.digest,
+      txLink: `${SUIVISION_URL}${res.digest}`,
       amount,
-      symbol: getSymbolFromCoinType(coinType),
+      symbol: coinType.includes("sui")
+        ? "SUI"
+        : coinType.split("::").pop() || coinType,
       timestamp: new Date().toISOString(),
     };
-  } catch (err) {
-    console.error("[Collateral] Error withdrawing collateral:", err);
-
-    // Parse error for better user feedback
-    const errorMessage = parseMoveCallError(err);
-    const error = errorMessage || "Failed to withdraw collateral";
-
-    // Check for specific error code
-    const isLiquidationError =
-      String(err).includes("1795") ||
-      String(err).includes("withdraw_collateral");
-
+  } catch (e: any) {
+    console.error(`[Collateral] Error in unlockAndWithdrawCollateral:`, e);
     return {
       success: false,
-      error,
-      errorCode: isLiquidationError ? "1795" : undefined,
+      error: e.message ?? String(e),
+      amount,
+      symbol: coinType.includes("sui")
+        ? "SUI"
+        : coinType.split("::").pop() || coinType,
+      timestamp: new Date().toISOString(),
     };
   }
 }
+
+/**
+ * Check if a user has an obligation account
+ * @param wallet The wallet object
+ * @returns True if the user has an obligation account
+ */
+export const hasObligationAccount = async (wallet: any): Promise<boolean> => {
+  try {
+    const address = await extractWalletAddress(wallet);
+    const obligations = await getObligationId(address);
+    return !!obligations;
+  } catch (error) {
+    console.error("Error checking obligation account:", error);
+    return false;
+  }
+};
 
 // Export the collateral service functions
 const scallopCollateralService = {
   createObligationAccount,
   addCollateral,
-  withdrawCollateral,
+  unlockAndWithdrawCollateral,
+  twoStepUnlockAndWithdrawCollateral,
+  atomicUnlockAndWithdrawCollateral,
   getObligationId,
   getObligationKey,
+  isObligationInBorrowIncentive,
   cacheObligationId,
   clearObligationIdCache,
+  hasObligationAccount,
 };
 
 export default scallopCollateralService;

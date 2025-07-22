@@ -1,9 +1,22 @@
 // src/scallop/ScallopIncentiveService.ts
-// Last updated: 2025-06-21 20:10:05 UTC by jake1318
+// Last updated: 2025-07-19 06:49:52 UTC by jake1318
 
 import { extractWalletAddress, SUIVISION_URL } from "./ScallopService";
 import { scallop } from "./ScallopService"; // Import from local service file
 import * as scallopBorrowService from "./ScallopBorrowService";
+import { TransactionBlock } from "@mysten/sui.js/transactions";
+
+// Define the constants directly
+const SCALLOP_PACKAGE_ID =
+  "0x69a9f7b93a44f5337274027d76771560db35dbffd93e1af9b4a3f752badb9561";
+const SCALLOP_MARKET_MANAGER =
+  "0x200a694ebdadb198e4ca8a07cd6d0aaa42ba09b6fc99457766a2cefc01933722";
+const SCALLOP_INCENTIVE_MANAGER =
+  "0x7e0aef2a8c9119e0e5b14e956f0e5d25ff3af4f98671b655fb1102e9423fb00e";
+const SCALLOP_INCENTIVE_POOL =
+  "0xcddaa56b35e975ce3b7e89baa321a22f8276dde2e3487ceb2b3c1b6d494514e9";
+const SUI_SYSTEM_STATE =
+  "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 /**
  * Ensures the Scallop client is initialized
@@ -423,6 +436,85 @@ export async function verifyObligationOwnership(
   }
 }
 
+/**
+ * Claims rewards for a user's lending and borrowing activity
+ *
+ * @param wallet - User's wallet
+ * @param obligationId - ID of the obligation to claim rewards for
+ * @returns Transaction result
+ */
+export async function claimScallopRewards(wallet: any, obligationId: string) {
+  try {
+    console.log(
+      `[claimScallopRewards] Claiming rewards for obligation ${obligationId}`
+    );
+
+    // Get wallet address
+    const sender = await extractWalletAddress(wallet);
+    if (!sender) throw new Error("Wallet not connected");
+
+    // Verify the obligation exists for this user
+    const userObligations = await scallopBorrowService.getUserObligations(
+      sender
+    );
+    const matchingObligation = userObligations.find(
+      (ob) => ob.obligationId === obligationId
+    );
+
+    if (!matchingObligation) {
+      console.error(
+        `[claimScallopRewards] Obligation ${obligationId} not found in user obligations`
+      );
+      throw new Error(
+        "Obligation not found for this wallet address - cannot claim rewards"
+      );
+    }
+
+    await ensureClient(); // Initialize the client
+
+    const tx = new TransactionBlock();
+
+    // Construct the claim rewards transaction
+    tx.moveCall({
+      target: `${SCALLOP_PACKAGE_ID}::incentive::claim_obligation_incentives_with_types`,
+      arguments: [
+        tx.object(SCALLOP_INCENTIVE_MANAGER),
+        tx.object(SCALLOP_MARKET_MANAGER),
+        tx.object(obligationId),
+        tx.object(SCALLOP_INCENTIVE_POOL),
+        tx.pure([]), // Empty vector for coin types, will claim all rewards
+        tx.object(SUI_SYSTEM_STATE), // SUI system state object
+      ],
+      typeArguments: [],
+    });
+
+    // Execute transaction through wallet
+    console.log("[claimScallopRewards] Sending transaction...");
+    const result = await wallet.signAndExecuteTransactionBlock({
+      transactionBlock: tx,
+      options: {
+        showEffects: true,
+        showEvents: true,
+      },
+    });
+
+    console.log("[claimScallopRewards] Transaction submitted:", result);
+
+    // Return success response
+    return {
+      success: true,
+      digest: result.digest,
+      txLink: `${SUIVISION_URL}${result.digest}`,
+    };
+  } catch (err) {
+    console.error("[claimScallopRewards] Failed:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 // For backward compatibility - clients can still use the old function name
-export const repayObligation = repayUnlockedObligation; // OK again
+export const repayObligation = repayUnlockedObligation;
 export const unlockAndRepayObligation = unlockAndRepay;
