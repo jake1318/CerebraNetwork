@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-12 23:16:00 UTC by jake1318
+// Last Updated: 2025-07-13 03:26:54 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -15,6 +15,22 @@ const BLOCKVISION_API_KEY =
 
 // Add this new constant for the list endpoint limit
 const LIST_LIMIT = 20;
+
+// Define SUI address constants to use consistently across the codebase
+const FULL_SUI_ADDRESS =
+  "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+const SHORT_SUI_ADDRESS = "0x2::sui::SUI";
+
+// Function to normalize addresses (especially SUI)
+const normalizeAddress = (address: string): string => {
+  if (!address) return address;
+
+  // If this is the abbreviated SUI address, replace with full version
+  if (address === SHORT_SUI_ADDRESS) {
+    return FULL_SUI_ADDRESS;
+  }
+  return address;
+};
 
 const blockvisionApi = axios.create({
   baseURL: BLOCKVISION_API_BASE_URL,
@@ -219,6 +235,9 @@ function enqueueBirdeyeRequest<T>(fn: () => Promise<T>): Promise<T> {
   });
 }
 
+// Simple delay function to avoid rate limiting
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // ─── Helper Functions for DeFi Portfolio ───────────────────────────────────────
 
 /**
@@ -335,8 +354,9 @@ function processCetusVaultData(rawCetusData: any): PoolGroup[] {
   for (const vault of rawCetusData.vaults) {
     if (!vault.id) continue;
 
-    const coinTypeA = vault.coinTypeA;
-    const coinTypeB = vault.coinTypeB || ""; // Some vaults might only have single asset
+    // Normalize coin addresses
+    const coinTypeA = normalizeAddress(vault.coinTypeA);
+    const coinTypeB = normalizeAddress(vault.coinTypeB || ""); // Some vaults might only have single asset
 
     const tokenASymbol = vault.coinA?.symbol || getSymbolFromType(coinTypeA);
     const tokenBSymbol = vault.coinB?.symbol || getSymbolFromType(coinTypeB);
@@ -405,6 +425,10 @@ function processCetusFarmsData(rawCetusFarms: any[]): PoolGroup[] {
   for (const farm of rawCetusFarms) {
     if (!farm.pool) continue;
 
+    // Normalize coin addresses
+    const coinTypeA = normalizeAddress(farm.coinTypeA);
+    const coinTypeB = normalizeAddress(farm.coinTypeB || "");
+
     // Create a position for this farm
     const position: NormalizedPosition = {
       id: farm.position || `cetus-farm-${farm.pool}`,
@@ -420,8 +444,8 @@ function processCetusFarmsData(rawCetusFarms: any[]): PoolGroup[] {
     // Create reward info if available
     if (farm.rewards && Array.isArray(farm.rewards)) {
       position.rewards = farm.rewards.map((reward: any) => ({
-        tokenSymbol: getSymbolFromType(reward.coinType),
-        tokenAddress: reward.coinType,
+        tokenSymbol: getSymbolFromType(normalizeAddress(reward.coinType)),
+        tokenAddress: normalizeAddress(reward.coinType),
         amount: reward.amount || "0",
         formatted: "0", // Will be calculated during enrichment
         valueUsd: 0,
@@ -438,10 +462,10 @@ function processCetusFarmsData(rawCetusFarms: any[]): PoolGroup[] {
       totalLiquidity: 0, // Will be calculated later
       totalValueUsd: 0, // Will be calculated later with token prices
       apr: farm.apr || 0,
-      tokenA: farm.coinTypeA,
-      tokenB: farm.coinTypeB || "",
-      tokenASymbol: getSymbolFromType(farm.coinTypeA),
-      tokenBSymbol: farm.coinTypeB ? getSymbolFromType(farm.coinTypeB) : "",
+      tokenA: coinTypeA,
+      tokenB: coinTypeB,
+      tokenASymbol: getSymbolFromType(coinTypeA),
+      tokenBSymbol: coinTypeB ? getSymbolFromType(coinTypeB) : "",
     });
   }
 
@@ -481,8 +505,12 @@ function processCetusLPsData(rawCetusLPs: any[]): PoolGroup[] {
 
     // Use first position for pool metadata
     const firstPosition = positions[0];
-    const tokenASymbol = getSymbolFromType(firstPosition.coinTypeA);
-    const tokenBSymbol = getSymbolFromType(firstPosition.coinTypeB);
+    // Normalize coin addresses
+    const coinTypeA = normalizeAddress(firstPosition.coinTypeA);
+    const coinTypeB = normalizeAddress(firstPosition.coinTypeB);
+
+    const tokenASymbol = getSymbolFromType(coinTypeA);
+    const tokenBSymbol = getSymbolFromType(coinTypeB);
 
     // Create normalized positions
     const normalizedPositions = positions.map((lp) => {
@@ -505,8 +533,8 @@ function processCetusLPsData(rawCetusLPs: any[]): PoolGroup[] {
       // Add rewards if available
       if (lp.rewards && Array.isArray(lp.rewards)) {
         position.rewards = lp.rewards.map((reward: any) => ({
-          tokenSymbol: getSymbolFromType(reward.coinType),
-          tokenAddress: reward.coinType,
+          tokenSymbol: getSymbolFromType(normalizeAddress(reward.coinType)),
+          tokenAddress: normalizeAddress(reward.coinType),
           amount: reward.amount || "0",
           formatted: "0", // Will be calculated during enrichment
           valueUsd: 0,
@@ -526,8 +554,8 @@ function processCetusLPsData(rawCetusLPs: any[]): PoolGroup[] {
       totalLiquidity: 0, // Will be calculated later
       totalValueUsd: 0, // Will be calculated later
       apr: firstPosition.apr || 0,
-      tokenA: firstPosition.coinTypeA,
-      tokenB: firstPosition.coinTypeB,
+      tokenA: coinTypeA,
+      tokenB: coinTypeB,
       tokenASymbol,
       tokenBSymbol,
     });
@@ -579,8 +607,12 @@ function processTurbosData(rawTurbosData: any): PoolGroup[] {
 
       // Use the first position to get pool metadata
       const firstPosition = positions[0];
-      const tokenASymbol = getSymbolFromType(firstPosition.coinTypeA);
-      const tokenBSymbol = getSymbolFromType(firstPosition.coinTypeB);
+      // Normalize coin addresses
+      const coinTypeA = normalizeAddress(firstPosition.coinTypeA);
+      const coinTypeB = normalizeAddress(firstPosition.coinTypeB);
+
+      const tokenASymbol = getSymbolFromType(coinTypeA);
+      const tokenBSymbol = getSymbolFromType(coinTypeB);
 
       // Create normalized positions for this pool
       const normalizedPositions: NormalizedPosition[] = positions.map((pos) => {
@@ -590,8 +622,8 @@ function processTurbosData(rawTurbosData: any): PoolGroup[] {
           rewards = pos.rewards
             .filter((r) => r.amount && parseInt(r.amount) > 0)
             .map((r) => ({
-              tokenSymbol: getSymbolFromType(r.coinType),
-              tokenAddress: r.coinType,
+              tokenSymbol: getSymbolFromType(normalizeAddress(r.coinType)),
+              tokenAddress: normalizeAddress(r.coinType),
               amount: r.amount || "0",
               formatted: normalizeAmount(r.amount, 9).toString(), // Default decimals
               valueUsd: 0, // Will be calculated later with token prices
@@ -629,12 +661,12 @@ function processTurbosData(rawTurbosData: any): PoolGroup[] {
         totalLiquidity: 0, // Will be calculated later
         totalValueUsd: 0, // Will be calculated later with token prices
         apr: 0, // Not directly provided by Turbos
-        tokenA: firstPosition.coinTypeA || "",
-        tokenB: firstPosition.coinTypeB || "",
+        tokenA: coinTypeA,
+        tokenB: coinTypeB,
         tokenASymbol,
         tokenBSymbol,
-        tokenAAddress: firstPosition.coinTypeA,
-        tokenBAddress: firstPosition.coinTypeB,
+        tokenAAddress: coinTypeA,
+        tokenBAddress: coinTypeB,
         // Logos will be added later in the enrichment phase
       });
     }
@@ -695,6 +727,9 @@ function processBluefinData(rawBluefinData: any): PoolGroup[] {
 
     // Use the first position to get pool metadata
     const firstPosition = positions[0];
+    // Normalize coin addresses
+    const coinTypeA = normalizeAddress(firstPosition.coinTypeA || "");
+    const coinTypeB = normalizeAddress(firstPosition.coinTypeB || "");
 
     // Create normalized positions for this pool
     const normalizedPositions: NormalizedPosition[] = positions.map((pos) => {
@@ -704,8 +739,9 @@ function processBluefinData(rawBluefinData: any): PoolGroup[] {
         rewards = pos.reward.rewards
           .filter((r) => r.coinAmount && parseInt(r.coinAmount) > 0)
           .map((r) => ({
-            tokenSymbol: r.coinSymbol || getSymbolFromType(r.coinType),
-            tokenAddress: r.coinType,
+            tokenSymbol:
+              r.coinSymbol || getSymbolFromType(normalizeAddress(r.coinType)),
+            tokenAddress: normalizeAddress(r.coinType),
             amount: r.coinAmount || "0",
             formatted: normalizeAmount(
               r.coinAmount,
@@ -744,8 +780,8 @@ function processBluefinData(rawBluefinData: any): PoolGroup[] {
       totalLiquidity: 0, // Will be calculated later
       totalValueUsd: 0, // Will be calculated later
       apr: parseFloat(firstPosition.apr || "0"),
-      tokenA: firstPosition.coinTypeA || "",
-      tokenB: firstPosition.coinTypeB || "",
+      tokenA: coinTypeA,
+      tokenB: coinTypeB,
       tokenASymbol: tokenASymbol.trim(),
       tokenBSymbol: tokenBSymbol.trim(),
       // Logos will be added later in the enrichment phase
@@ -785,7 +821,7 @@ function processSuilendData(rawSuilendData: any): PoolGroup[] {
     const depositsByType: Record<string, any[]> = {};
 
     for (const asset of rawSuilendData.depositedAssets) {
-      const coinType = asset.coinType;
+      const coinType = normalizeAddress(asset.coinType);
       if (!coinType) continue;
 
       if (!depositsByType[coinType]) {
@@ -846,7 +882,7 @@ function processSuilendData(rawSuilendData: any): PoolGroup[] {
     const borrowsByType: Record<string, any[]> = {};
 
     for (const asset of rawSuilendData.borrowedAssets) {
-      const coinType = asset.coinType;
+      const coinType = normalizeAddress(asset.coinType);
       if (!coinType) continue;
 
       if (!borrowsByType[coinType]) {
@@ -939,8 +975,12 @@ function processHaedalData(rawHaedalData: any): PoolGroup[] {
 
       // Use the first position to get pool metadata
       const firstPosition = positions[0];
-      const tokenASymbol = getSymbolFromType(firstPosition.coinTypeA);
-      const tokenBSymbol = getSymbolFromType(firstPosition.coinTypeB);
+      // Normalize coin addresses
+      const coinTypeA = normalizeAddress(firstPosition.coinTypeA || "");
+      const coinTypeB = normalizeAddress(firstPosition.coinTypeB || "");
+
+      const tokenASymbol = getSymbolFromType(coinTypeA);
+      const tokenBSymbol = getSymbolFromType(coinTypeB);
 
       // Create normalized positions for this pool
       const normalizedPositions: NormalizedPosition[] = positions.map((pos) => {
@@ -965,12 +1005,12 @@ function processHaedalData(rawHaedalData: any): PoolGroup[] {
         totalLiquidity: 0, // Will be calculated later
         totalValueUsd: 0, // Will be calculated later with token prices
         apr: 0, // Haedal may not provide APR directly
-        tokenA: firstPosition.coinTypeA || "",
-        tokenB: firstPosition.coinTypeB || "",
+        tokenA: coinTypeA,
+        tokenB: coinTypeB,
         tokenASymbol,
         tokenBSymbol,
-        tokenAAddress: firstPosition.coinTypeA,
-        tokenBAddress: firstPosition.coinTypeB,
+        tokenAAddress: coinTypeA,
+        tokenBAddress: coinTypeB,
       });
     }
   }
@@ -986,12 +1026,13 @@ function processHaedalData(rawHaedalData: any): PoolGroup[] {
     );
 
     for (const staking of rawHaedalData.stakings) {
-      if (!staking.coinType) continue;
+      const coinType = normalizeAddress(staking.coinType);
+      if (!coinType) continue;
 
-      const tokenSymbol = getSymbolFromType(staking.coinType);
+      const tokenSymbol = getSymbolFromType(coinType);
 
       const position: NormalizedPosition = {
-        id: `haedal-staking-${staking.coinType}`,
+        id: `haedal-staking-${coinType}`,
         liquidity: staking.amount || "0",
         balanceA: staking.amount || "0",
         balanceB: "0",
@@ -1002,14 +1043,14 @@ function processHaedalData(rawHaedalData: any): PoolGroup[] {
       };
 
       poolGroups.push({
-        poolAddress: `haedal-staking-${staking.coinType}`,
+        poolAddress: `haedal-staking-${coinType}`,
         poolName: `${tokenSymbol} Staking`,
         protocol: "Haedal",
         positions: [position],
         totalLiquidity: 0,
         totalValueUsd: 0,
         apr: staking.apr ? parseFloat(staking.apr) : 0,
-        tokenA: staking.coinType,
+        tokenA: coinType,
         tokenB: "",
         tokenASymbol: tokenSymbol,
         tokenBSymbol: "",
@@ -1076,8 +1117,8 @@ function processAftermathData(rawAftermathData: any): PoolGroup[] {
         Array.isArray(firstPosition.coins) &&
         firstPosition.coins.length >= 2
       ) {
-        tokenA = firstPosition.coins[0]?.coinType || "";
-        tokenB = firstPosition.coins[1]?.coinType || "";
+        tokenA = normalizeAddress(firstPosition.coins[0]?.coinType || "");
+        tokenB = normalizeAddress(firstPosition.coins[1]?.coinType || "");
 
         tokenASymbol = getSymbolFromType(tokenA);
         tokenBSymbol = getSymbolFromType(tokenB);
@@ -1152,8 +1193,8 @@ function processAftermathData(rawAftermathData: any): PoolGroup[] {
         Array.isArray(firstFarm.coins) &&
         firstFarm.coins.length >= 2
       ) {
-        tokenA = firstFarm.coins[0]?.coinType || "";
-        tokenB = firstFarm.coins[1]?.coinType || "";
+        tokenA = normalizeAddress(firstFarm.coins[0]?.coinType || "");
+        tokenB = normalizeAddress(firstFarm.coins[1]?.coinType || "");
 
         tokenASymbol = getSymbolFromType(tokenA);
         tokenBSymbol = getSymbolFromType(tokenB);
@@ -1165,8 +1206,8 @@ function processAftermathData(rawAftermathData: any): PoolGroup[] {
       if (firstFarm.rewards && Array.isArray(firstFarm.rewards)) {
         for (const reward of firstFarm.rewards) {
           rewards.push({
-            tokenSymbol: getSymbolFromType(reward.coinType),
-            tokenAddress: reward.coinType,
+            tokenSymbol: getSymbolFromType(normalizeAddress(reward.coinType)),
+            tokenAddress: normalizeAddress(reward.coinType),
             amount: reward.amount || "0",
             formatted: "0", // Will be calculated during enrichment
             valueUsd: 0,
@@ -1262,7 +1303,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑07‑12 23:16:00 UTC by jake1318
+//  last‑updated: 2025‑07‑13 03:26:54 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1325,6 +1366,13 @@ async function bvGet<T>(
   path: string,
   params: Record<string, string>
 ): Promise<T> {
+  // Normalize any SUI addresses in params
+  Object.keys(params).forEach((key) => {
+    if (typeof params[key] === "string" && params[key] === SHORT_SUI_ADDRESS) {
+      params[key] = FULL_SUI_ADDRESS;
+    }
+  });
+
   const qs = new URLSearchParams(params).toString();
   const url = `${BLOCKVISION_BASE}${path}?${qs}`;
 
@@ -1351,6 +1399,9 @@ async function bvGet<T>(
 export async function getCoinMarketDataPro(
   coinType: string // full type tag
 ): Promise<CoinMarketData> {
+  // Normalize SUI address and other addresses
+  coinType = normalizeAddress(coinType);
+
   // API default is SUI if param omitted, so always pass ours
   return await bvGet<CoinMarketData>("/coin/market/pro", { coinType });
 }
@@ -1372,6 +1423,9 @@ export async function getCoinOhlcv(
     | "1M" = "1d",
   start?: number // unix seconds – default handled by API
 ): Promise<OhlcvPoint[]> {
+  // Normalize SUI address
+  token = normalizeAddress(token);
+
   const params: Record<string, string> = { token, interval };
   if (start) params.start = String(start);
   const result = await bvGet<{ ohlcs: OhlcvPoint[] }>("/coin/ohlcv", params);
@@ -1387,17 +1441,22 @@ export async function getCoinMarketDataBulk(
 ): Promise<Record<string, CoinMarketData>> {
   if (!coinTypes.length) return {};
 
-  const base = "https://api.blockvision.org/v2/sui/coin/market/list";
-  const qs = new URLSearchParams({
-    coinTypes: coinTypes.join(","),
-    show24hChange: "true",
-  }).toString();
+  // Normalize all addresses, especially SUI
+  const normalizedCoinTypes = coinTypes.map((ct) => normalizeAddress(ct));
 
-  const res = await fetch(`${base}?${qs}`, {
+  const url = "https://api.blockvision.org/v2/sui/coin/market/list";
+
+  const res = await fetch(url, {
+    method: "POST",
     headers: {
+      "content-type": "application/json",
       accept: "application/json",
       "x-api-key": BLOCKVISION_API_KEY,
     },
+    body: JSON.stringify({
+      coinTypes: normalizedCoinTypes,
+      show24hChange: true,
+    }),
   });
 
   if (!res.ok) {
@@ -1407,10 +1466,9 @@ export async function getCoinMarketDataBulk(
   type Resp = { result: CoinMarketData[] };
   const json: Resp = await res.json();
 
-  // Map by coinType for easier merging
   return (json.result ?? []).reduce<Record<string, CoinMarketData>>(
-    (acc, item) => {
-      acc[item.tokenId] = item;
+    (acc, c) => {
+      acc[c.tokenId] = c;
       return acc;
     },
     {}
@@ -1424,11 +1482,14 @@ export async function getCoinMarketDataBulk(
  */
 export async function getCoinMarketDataBulkChunked(
   coinTypes: string[],
-  concurrency = 4
+  concurrency = 2 // Reduced from 4 to 2 to avoid rate limiting
 ): Promise<Record<string, CoinMarketData>> {
+  // Normalize all addresses, especially SUI
+  const normalizedCoinTypes = coinTypes.map((ct) => normalizeAddress(ct));
+
   const chunks: string[][] = [];
-  for (let i = 0; i < coinTypes.length; i += LIST_LIMIT) {
-    chunks.push(coinTypes.slice(i, i + LIST_LIMIT));
+  for (let i = 0; i < normalizedCoinTypes.length; i += LIST_LIMIT) {
+    chunks.push(normalizedCoinTypes.slice(i, i + LIST_LIMIT));
   }
 
   const out: Record<string, CoinMarketData> = {};
@@ -1440,17 +1501,109 @@ export async function getCoinMarketDataBulkChunked(
     const myIndex = idx++;
     const chunk = chunks[myIndex];
     try {
+      // Add small delay between chunk calls to avoid rate limiting
+      if (myIndex > 0) {
+        await delay(300); // 300ms delay between chunks
+      }
+
       const m = await getCoinMarketDataBulk(chunk);
       Object.assign(out, m);
+    } catch (e) {
+      console.warn(
+        "Bulk chunk failed, falling back to /market/pro with rate limiting",
+        e
+      );
+
+      // Graceful fallback - try each token individually with rate limiting
+      // Use sequential calls instead of Promise.all to avoid rate limiting
+      for (const token of chunk) {
+        try {
+          await delay(100); // 100ms delay between individual token requests (max 10 per second)
+          const single = await getCoinMarketDataPro(token);
+          out[token] = single;
+        } catch (error) {
+          console.warn(`Failed individual fetch for token: ${token}`, error);
+          /* ignore individual failures */
+        }
+      }
     } finally {
       await runNext(); // take the next chunk
     }
   }
 
+  // Reduce max concurrency to 2 (or even 1 if still getting rate limited)
   await Promise.all(
     Array(Math.min(concurrency, chunks.length)).fill(0).map(runNext)
   );
   return out;
+}
+
+/**
+ * Hybrid approach that tries bulk first, then falls back to individual fetches for missing tokens
+ */
+export async function getCoinMarketDataHybrid(
+  coinTypes: string[],
+  concurrency = 2
+): Promise<Record<string, CoinMarketData>> {
+  try {
+    // First try with bulk API
+    const bulkMap = await getCoinMarketDataBulkChunked(coinTypes, concurrency);
+
+    // Find any missing tokens
+    const missing = coinTypes.filter((id) => !bulkMap[normalizeAddress(id)]);
+
+    // If there are missing tokens, fetch them individually
+    if (missing.length > 0) {
+      console.log(`Fetching ${missing.length} missing tokens individually`);
+
+      // Use sequential calls with delay to avoid rate limiting
+      for (const token of missing) {
+        try {
+          await delay(100); // 100ms delay between requests
+          const normalizedToken = normalizeAddress(token);
+          const single = await getCoinMarketDataPro(normalizedToken);
+          bulkMap[normalizedToken] = single;
+          // Also map the original token ID for consistency
+          if (normalizedToken !== token) {
+            bulkMap[token] = single;
+          }
+        } catch (err) {
+          console.warn(
+            `Failed to fetch individual token data for ${token}`,
+            err
+          );
+        }
+      }
+    }
+
+    return bulkMap;
+  } catch (err) {
+    console.error(
+      "Bulk fetching failed, falling back to individual fetching",
+      err
+    );
+
+    // If bulk completely fails, fetch everything individually with rate limiting
+    const result: Record<string, CoinMarketData> = {};
+
+    // Use sequential calls with delay to avoid rate limiting
+    for (const token of coinTypes) {
+      try {
+        await delay(100); // 100ms delay between requests
+        const normalizedToken = normalizeAddress(token);
+        const data = await getCoinMarketDataPro(normalizedToken);
+        result[normalizedToken] = data;
+        // Also map the original token ID for consistency
+        if (normalizedToken !== token) {
+          result[token] = data;
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch data for ${token}`, err);
+      }
+    }
+
+    return result;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1464,14 +1617,21 @@ export async function getCoinMarketDataBatch(
   const out: Record<string, CoinMarketData> = {};
   let index = 0;
 
+  // Normalize all addresses, especially SUI
+  const normalizedCoinTypes = coinTypes.map((ct) => normalizeAddress(ct));
+
   async function worker() {
-    while (index < coinTypes.length) {
+    while (index < normalizedCoinTypes.length) {
       const myIndex = index++;
-      const ct = coinTypes[myIndex];
+      const ct = normalizedCoinTypes[myIndex];
 
       try {
         const data = await getCoinMarketDataPro(ct); // existing single‑call helper
         out[ct] = data;
+        // Also map the original token ID for consistency
+        if (ct !== coinTypes[myIndex]) {
+          out[coinTypes[myIndex]] = data;
+        }
       } catch (e) {
         console.warn(`BlockVision market/pro failed for ${ct}`, e);
       }
@@ -1486,6 +1646,9 @@ export async function getCoinMarketDataBatch(
 export const blockvisionService = {
   getCoinDetail: async (coinType: string) => {
     try {
+      // Normalize SUI address
+      coinType = normalizeAddress(coinType);
+
       const response = await blockvisionApi.get("/v2/sui/coin/detail", {
         params: { coinType },
       });
@@ -1531,6 +1694,9 @@ export const blockvisionService = {
         // Update cache with coin metadata - use getCoinMeta to ensure accurate decimals
         for (const coin of result.coins) {
           if (coin.coinType) {
+            // Normalize SUI address
+            coin.coinType = normalizeAddress(coin.coinType);
+
             // Get authoritative decimals from on-chain metadata
             const { decimals: authoritativeDecimals } = await getCoinMeta(
               coin.coinType
@@ -1738,8 +1904,6 @@ export const blockvisionService = {
           combinedRawData.cetus.farms &&
           combinedRawData.cetus.farms.length > 0
         ) {
-          // Continuing from where it was cut off:
-
           console.log(
             `Processing ${combinedRawData.cetus.farms.length} Cetus farms`
           );
@@ -2080,10 +2244,13 @@ export const blockvisionService = {
             pool.tokenASymbol = pool.tokenASymbol || "SUI";
             pool.tokenBSymbol = pool.tokenBSymbol || "USDC";
 
-            // Set token addresses if missing
+            // Set token addresses if missing - use the full length address for SUI
             if (!pool.tokenA) {
-              pool.tokenA = "0x2::sui::SUI";
+              pool.tokenA = FULL_SUI_ADDRESS;
+            } else {
+              pool.tokenA = normalizeAddress(pool.tokenA);
             }
+
             if (!pool.tokenB) {
               pool.tokenB =
                 "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
@@ -2150,8 +2317,11 @@ export const blockvisionService = {
                   Array.isArray(rawData.reward.rewards)
                 ) {
                   pos.rewards = rawData.reward.rewards.map((reward) => {
+                    // Normalize the coin type address
+                    const coinType = normalizeAddress(reward.coinType);
+
                     // Get token info for the reward
-                    const rewardTokenInfo = tokenCache[reward.coinType] || {
+                    const rewardTokenInfo = tokenCache[coinType] || {
                       symbol: reward.coinSymbol,
                       decimals: reward.coinDecimals || 9,
                       price: 0,
@@ -2165,7 +2335,7 @@ export const blockvisionService = {
 
                     return {
                       tokenSymbol: reward.coinSymbol,
-                      tokenAddress: reward.coinType,
+                      tokenAddress: coinType,
                       amount: reward.coinAmount,
                       formatted: formatTokenAmount(normalizedAmount),
                       valueUsd: normalizedAmount * (rewardTokenInfo.price || 0),
@@ -2210,7 +2380,7 @@ export const blockvisionService = {
               if (pos.raw) {
                 // Extract data from raw asset
                 const asset = pos.raw;
-                const coinType = asset.coinType;
+                const coinType = normalizeAddress(asset.coinType);
                 const decimals = asset.decimals || 9;
 
                 // Get detailed token info to ensure we have price data
@@ -2269,10 +2439,11 @@ export const blockvisionService = {
 
           // Special handling for Suistake - often has SUI token info
           if (pool.protocol === "Suistake") {
-            // Try to find SUI as tokenA
-            const suiCoinType = "0x2::sui::SUI";
-            tokenAInfo = await blockvisionService.getTokenInfo(suiCoinType);
-            pool.tokenA = suiCoinType;
+            // Use the full-length SUI address
+            tokenAInfo = await blockvisionService.getTokenInfo(
+              FULL_SUI_ADDRESS
+            );
+            pool.tokenA = FULL_SUI_ADDRESS;
             pool.tokenASymbol = "SUI";
 
             // Extract staked amount from position.raw
@@ -2302,7 +2473,7 @@ export const blockvisionService = {
                   pos.rewards = [
                     {
                       tokenSymbol: "SUI",
-                      tokenAddress: suiCoinType,
+                      tokenAddress: FULL_SUI_ADDRESS,
                       amount: pos.raw.estimatedRewardAmount,
                       formatted: formatTokenAmount(
                         normalizeAmount(
@@ -2395,7 +2566,7 @@ export const blockvisionService = {
                   // Process each coin in the position
                   for (let i = 0; i < pos.raw.coins.length; i++) {
                     const coin = pos.raw.coins[i];
-                    const coinType = coin.coinType;
+                    const coinType = normalizeAddress(coin.coinType);
                     const amount = coin.amount || "0";
 
                     // Get token info for this coin
@@ -2626,6 +2797,9 @@ export const blockvisionService = {
       return { symbol: "Unknown", decimals: 9, price: 0 };
     }
 
+    // Normalize SUI address
+    coinType = normalizeAddress(coinType);
+
     // Check cache first
     if (tokenCache[coinType] && tokenCache[coinType].price !== undefined) {
       // If the cache still has the optimistic default (9), upgrade it silently
@@ -2735,6 +2909,7 @@ export const blockvisionService = {
   getCoinMarketDataBatch,
   getCoinMarketDataBulk,
   getCoinMarketDataBulkChunked,
+  getCoinMarketDataHybrid,
 };
 
 export default blockvisionService;
