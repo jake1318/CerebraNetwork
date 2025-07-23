@@ -1,10 +1,10 @@
 // src/components/LendingActionModal.tsx
-// Last updated: 2025-06-21 22:53:07 UTC by jake1318
+// Last updated: 2025-07-23 19:10:44 UTC by jake1318
 
 import React, { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import scallopService from "../scallop/ScallopService";
-import blockvisionService from "../services/blockvisionService"; // Change to import the whole service
+import blockvisionService from "../services/blockvisionService";
 import "../styles/LendingActionModal.scss";
 
 // Constants for coin configuration
@@ -159,10 +159,20 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
         const userPositions = await scallopService.fetchUserPositions(
           wallet.address
         );
-        const suppliedAsset = userPositions.suppliedAssets.find(
-          (a) => a.symbol.toLowerCase() === asset.symbol.toLowerCase()
+        const suppliedAsset =
+          userPositions.suppliedAssets?.find(
+            (a: any) => a.symbol.toLowerCase() === asset.symbol.toLowerCase()
+          ) ||
+          // Try to find in legacy format
+          userPositions.lendings?.find(
+            (l: any) =>
+              (l.symbol || l.coinName || "").toLowerCase() ===
+              asset.symbol.toLowerCase()
+          );
+
+        setCurrentSupply(
+          suppliedAsset ? suppliedAsset.amount || suppliedAsset.suppliedCoin : 0
         );
-        setCurrentSupply(suppliedAsset ? suppliedAsset.amount : 0);
       }
 
       // Fetch wallet coins using blockvisionService
