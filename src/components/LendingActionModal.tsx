@@ -1,52 +1,23 @@
 // src/components/LendingActionModal.tsx
-// Last updated: 2025-07-23 19:10:44 UTC by jake1318
+// Last updated: 2025-07-24 01:18:31 UTC by jake1318
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
 import scallopService from "../scallop/ScallopService";
 import blockvisionService from "../services/blockvisionService";
 import "../styles/LendingActionModal.scss";
 
-// Constants for coin configuration
-const COINS = {
-  SUI: {
-    symbol: "SUI",
-    name: "sui",
-    decimals: 9,
-    icon: "/icons/sui-icon.svg",
-    coinTypes: ["0x2::sui::SUI"],
-  },
-  USDC: {
-    symbol: "USDC",
-    name: "usdc",
-    decimals: 6,
-    icon: "/icons/usdc-icon.svg",
-    coinTypes: [
-      "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
-      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-      "0xc3f8927de33d3deb52c282a836082a413bc73c6ee0bd4d7ec7e3b6b4c28e9abf::coin::COIN",
-    ],
-  },
-  USDT: {
-    symbol: "USDT",
-    name: "usdt",
-    decimals: 6,
-    icon: "/icons/usdt-icon.svg",
-    coinTypes: [
-      "0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN",
-      "0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT",
-    ],
-  },
-  CETUS: {
-    symbol: "CETUS",
-    name: "cetus",
-    decimals: 9,
-    icon: "/icons/cetus-icon.svg",
-    coinTypes: [
-      "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS",
-    ],
-  },
-};
+// A *dynamic* registry that we fill once the market list is known
+type CoinRegistry = Record<
+  string,
+  {
+    symbol: string; // "WAL"
+    name: string; // "wal"
+    decimals: number; // 6 or 9
+    icon: string; // optional, for UI
+    coinTypes: string[]; // Move types recognised by the wallet
+  }
+>;
 
 // Simple utility functions
 const formatNumber = (num: number, decimals: number = 2): string => {
@@ -84,13 +55,29 @@ function getTotalCoinBalance(coins: any[], coinConfig: any): number {
 
   // Check each possible coin type for the symbol and sum their balances
   for (const coinType of coinConfig.coinTypes) {
-    const matchingCoins = coins.filter((coin) => coin.coinType === coinType);
+    const matchingCoins = coins.filter((coin) => {
+      // Normalize coin types for comparison (SUI especially)
+      const normalizedCoinType = coinType.toLowerCase();
+      const normalizedCoin = coin.coinType.toLowerCase();
+
+      // Check if the coin matches any of our coin types (with normalization)
+      return (
+        normalizedCoin === normalizedCoinType ||
+        normalizedCoin.endsWith(normalizedCoinType) ||
+        normalizedCoin.includes(`::${normalizedCoinType.split("::").pop()}`)
+      );
+    });
 
     for (const coin of matchingCoins) {
       if (coin && coin.balance) {
         // Apply correct decimals (from coin.decimals if available, otherwise from coinConfig)
         const decimals = coin.decimals || coinConfig.decimals;
-        totalBalance += Number(coin.balance) / Math.pow(10, decimals);
+        const balanceValue = parseFloat(coin.balance);
+
+        // Only add if it's a valid number
+        if (!isNaN(balanceValue)) {
+          totalBalance += balanceValue / Math.pow(10, decimals);
+        }
       }
     }
   }
@@ -126,14 +113,37 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
   // State
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [useMaxWithdraw, setUseMax] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [transactionResult, setTransactionResult] = useState<any>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [currentSupply, setCurrentSupply] = useState<number | null>(null);
-  const [accountCoins, setAccountCoins] = useState<any[]>([]); // Store all account coins
+  const [accountCoins, setAccountCoins] = useState<any[]>([]);
+  const [registry, setRegistry] = useState<CoinRegistry>({});
 
   // Track whether the modal should be rendered
   const [shouldRender, setShouldRender] = useState<boolean>(false);
+
+  // One-time: pull every pool once the modal is ever opened
+  useEffect(() => {
+    if (Object.keys(registry).length) return; // already done
+    (async () => {
+      const assets = await scallopService.fetchMarketAssets();
+      const map: CoinRegistry = {};
+      assets.forEach((a: any) => {
+        map[a.symbol.toUpperCase()] = {
+          symbol: a.symbol.toUpperCase(),
+          name: a.symbol.toLowerCase(),
+          decimals: a.decimals ?? 9,
+          icon: `/icons/${a.symbol.toLowerCase()}-icon.svg`,
+          coinTypes: [a.coinType], // ← canonical type
+        };
+      });
+      // (optional) add aliases that are not returned by the pool list,
+      // e.g. wrapped vs. underlying – here is where you'd merge arrays
+      setRegistry(map);
+    })();
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -154,48 +164,136 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
     if (!wallet.connected || !wallet.address || !asset) return;
 
     try {
+      console.log(
+        `Fetching wallet data for ${wallet.address} and asset ${asset.symbol}`
+      );
+
       // Fetch current supply amount from the ScallopService
       if (action === "withdraw") {
         const userPositions = await scallopService.fetchUserPositions(
           wallet.address
         );
+
+        // ❶ **NEW – robust rule for human‑readable amount**
         const suppliedAsset =
           userPositions.suppliedAssets?.find(
             (a: any) => a.symbol.toLowerCase() === asset.symbol.toLowerCase()
           ) ||
-          // Try to find in legacy format
           userPositions.lendings?.find(
             (l: any) =>
               (l.symbol || l.coinName || "").toLowerCase() ===
               asset.symbol.toLowerCase()
           );
 
-        setCurrentSupply(
-          suppliedAsset ? suppliedAsset.amount || suppliedAsset.suppliedCoin : 0
-        );
+        if (suppliedAsset) {
+          const {
+            suppliedCoin,
+            amount: sdkIndex,
+            coinDecimals = 9,
+          } = suppliedAsset as any;
+
+          // a) normal case – SDK already gives the human amount
+          if (suppliedCoin !== undefined && Number(suppliedCoin) > 0) {
+            setCurrentSupply(Number(suppliedCoin));
+            console.log(
+              `[supply] using suppliedCoin → ${Number(suppliedCoin)} ${
+                asset.symbol
+              }`
+            );
+          }
+          // b) fallback – only the tiny index is present; scale it up
+          else if (sdkIndex !== undefined) {
+            const human = Number(sdkIndex) * Math.pow(10, coinDecimals);
+            setCurrentSupply(human);
+            console.log(
+              `[supply] scaled SDK index (${sdkIndex}) × 10^${coinDecimals} → ${human} ${asset.symbol}`
+            );
+          } else {
+            setCurrentSupply(0);
+          }
+        } else {
+          setCurrentSupply(0);
+        }
       }
 
       // Fetch wallet coins using blockvisionService
       try {
-        // Use the imported blockvisionService to get account coins
+        console.log(
+          `Fetching account coins from BlockVision for ${wallet.address}`
+        );
         const coinsResponse = await blockvisionService.getAccountCoins(
           wallet.address
         );
         const coins = coinsResponse.data || [];
+        console.log(`Retrieved ${coins.length} coins from BlockVision`);
         setAccountCoins(coins);
 
+        // Debug: Log all coins received
+        console.log(
+          "All coins from BlockVision:",
+          coins.map((c) => `${c.symbol} (${c.coinType}): ${c.balance}`)
+        );
+
         // Match the asset with its coin config
-        const coinConfig = Object.values(COINS).find(
-          (coin) => coin.symbol.toLowerCase() === asset.symbol.toLowerCase()
+        const assetSymbol = asset.symbol.toLowerCase();
+        console.log(`Looking for coin config for symbol: ${assetSymbol}`);
+
+        const coinConfig = Object.values(registry).find(
+          (coin) => coin.symbol.toLowerCase() === assetSymbol
         );
 
         if (coinConfig) {
+          console.log(`Found coin config for ${assetSymbol}:`, coinConfig);
+
           // Calculate total balance for this asset across all its coin types
           const balance = getTotalCoinBalance(coins, coinConfig);
+          console.log(
+            `Calculated total balance for ${assetSymbol}: ${balance}`
+          );
           setWalletBalance(balance);
+
+          // Debug: Log the matching coins that were found
+          const matchedCoins = coins.filter((coin) => {
+            const normalizedCoin = coin.coinType.toLowerCase();
+            return coinConfig.coinTypes.some((coinType) => {
+              const normalizedCoinType = coinType.toLowerCase();
+              return (
+                normalizedCoin === normalizedCoinType ||
+                normalizedCoin.endsWith(normalizedCoinType) ||
+                normalizedCoin.includes(
+                  `::${normalizedCoinType.split("::").pop()}`
+                )
+              );
+            });
+          });
+
+          console.log(
+            `Matched coins for ${assetSymbol}:`,
+            matchedCoins.map(
+              (c) =>
+                `${c.symbol} (${c.coinType}): ${c.balance} (decimals: ${c.decimals})`
+            )
+          );
         } else {
-          console.warn(`No coin config found for ${asset.symbol}`);
-          setWalletBalance(0);
+          console.warn(`No coin config found for ${assetSymbol}`);
+
+          // As fallback, try to find by matching symbol directly
+          const matchingCoin = coins.find(
+            (c) => c.symbol.toLowerCase() === assetSymbol
+          );
+
+          if (matchingCoin) {
+            console.log(
+              `Found matching coin by symbol: ${matchingCoin.symbol} with balance ${matchingCoin.balance}`
+            );
+            const decimals = matchingCoin.decimals || 9;
+            const balance =
+              parseFloat(matchingCoin.balance) / Math.pow(10, decimals);
+            setWalletBalance(balance);
+          } else {
+            console.log(`No matching coin found by symbol either`);
+            setWalletBalance(0);
+          }
         }
       } catch (err) {
         console.error("Error fetching account coins:", err);
@@ -215,6 +313,7 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
     if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
       setAmount(value);
       setError(null); // Clear any previous error
+      setUseMax(false); // Cancel the max flag when the user types
     }
   };
 
@@ -222,8 +321,10 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
   const handleUseMaxAmount = () => {
     if (action === "deposit" && walletBalance !== null) {
       setAmount(walletBalance.toString());
+      setUseMax(false);
     } else if (action === "withdraw" && currentSupply !== null) {
       setAmount(currentSupply.toString());
+      setUseMax(true); // remember that the user pressed "Max"
     }
   };
 
@@ -233,6 +334,7 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
     const safeAmount =
       SAFE_AMOUNTS[symbol as keyof typeof SAFE_AMOUNTS] || SAFE_AMOUNTS.USDC;
     setAmount(safeAmount.toString());
+    setUseMax(false);
   };
 
   // Validate form before submission
@@ -286,7 +388,7 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
       const numAmount = parseFloat(amount);
 
       // Find the correct coin configuration
-      const coinConfig = Object.values(COINS).find(
+      const coinConfig = Object.values(registry).find(
         (coin) => coin.symbol.toLowerCase() === asset.symbol.toLowerCase()
       );
 
@@ -309,7 +411,8 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
         result = await scallopService.withdrawAsset(
           wallet,
           coinConfig.name,
-          baseUnits
+          baseUnits,
+          useMaxWithdraw // pass the flag
         );
       }
 
