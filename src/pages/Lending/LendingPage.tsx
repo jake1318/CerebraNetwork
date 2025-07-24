@@ -1,5 +1,5 @@
 // src/pages/Lending/LendingPage.tsx
-// Last Updated: 2025-07-20 02:10:03 UTC by jake1318
+// Last Updated: 2025-07-23 18:08:17 UTC by jake1318
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { ScallopService } from "../../scallop/ScallopService";
@@ -118,12 +118,12 @@ const DEFAULT_COIN_IMAGE = "/icons/default-coin.svg";
  * Values are paths relative to /public (a leading "/" is required in Vite).
  */
 const LOCAL_LOGOS: Record<string, string> = {
-  hasui: "/haSui.webp", // <── your local image
-  // add other manual overrides here if you ever need them
-  ssui: "/icons/ssui.png",
-  ssca: "/icons/ssca.png",
-  scallop_sui: "/icons/ssui.png",
-  scallop_sca: "/icons/ssca.png",
+  hasui: "/haSui.webp",
+  // Updated paths for sSui and sSca to point to the correct files in public folder
+  ssui: "/sSui.png",
+  ssca: "/sSca.png",
+  scallop_sui: "/sSui.png",
+  scallop_sca: "/sSca.png",
 };
 
 const LendingPage: React.FC = () => {
@@ -1525,24 +1525,6 @@ const LendingPage: React.FC = () => {
             <button className="refresh-btn" onClick={forceRefresh}>
               Try Again
             </button>
-            <div className="debug-info">
-              <details>
-                <summary>Debug Info</summary>
-                <pre>
-                  {JSON.stringify(
-                    {
-                      suppliedCount: userSupplied.length,
-                      borrowedCount: userBorrowed.length,
-                      collateralCount: userCollateral.length,
-                      pendingRewardsCount: pendingRewards.length,
-                      dataError: dataError || "No error",
-                    },
-                    null,
-                    2
-                  )}
-                </pre>
-              </details>
-            </div>
           </div>
         </div>
       );
@@ -2856,7 +2838,7 @@ const LendingPage: React.FC = () => {
 
       {/* Last updated timestamp */}
       <div className="last-updated">
-        Last updated: 2025-07-20 02:15:22 UTC by jake1318
+        Last updated: 2025-07-23 18:41:37 UTC by jake1318
       </div>
     </div>
   );
