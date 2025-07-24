@@ -1,5 +1,5 @@
 // src/pages/Lending/LendingPage.tsx
-// Last Updated: 2025-07-23 18:08:17 UTC by jake1318
+// Last Updated: 2025-07-24 01:58:33 UTC by jake1318
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { ScallopService } from "../../scallop/ScallopService";
@@ -2275,7 +2275,7 @@ const LendingPage: React.FC = () => {
                   }}
                 />
               )}
-              {formatNumber(marketSummary.highestSupplyAPY.value * 100, 2)}% (
+              {formatNumber(marketSummary.highestSupplyAPY.value, 2)}% (
               {marketSummary.highestSupplyAPY.symbol})
             </span>
           </div>
@@ -2837,9 +2837,7 @@ const LendingPage: React.FC = () => {
       )}
 
       {/* Last updated timestamp */}
-      <div className="last-updated">
-        Last updated: 2025-07-23 18:41:37 UTC by jake1318
-      </div>
+      <div className="last-updated"></div>
     </div>
   );
 };
