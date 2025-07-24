@@ -1,5 +1,5 @@
 // ScallopBorrowService.ts
-// Last Updated: 2025-06-18 03:18:32 UTC by jake1318
+// Last Updated: 2025-07-24 05:53:32 UTC by jake1318
 
 import {
   extractWalletAddress,
@@ -1167,7 +1167,7 @@ export async function createObligationAndDeposit(
       `[createObligationAndDeposit] Creating new obligation and depositing ${amount} ${coin}`
     );
 
-    // Calculate amount in base units
+    // Calculate amount in base units as bigint
     const baseUnits = BigInt(Math.floor(amount * 10 ** decimals));
 
     // Build transaction with openObligation and depositCollateral in one tx
@@ -1179,12 +1179,14 @@ export async function createObligationAndDeposit(
     // 1. Create the new obligation
     const [obl, oblKey, hp] = await tx.openObligation();
 
-    // 2. Add collateral to the new obligation - omit clock parameter
+    // Update prices first for more accurate LTV calculations
+    await tx.updateAssetPricesQuick({ coinTypes: [coin] });
+
+    // 2. Add collateral to the new obligation - using proper method with shared object reference
     await tx.addCollateral({
-      obligation: obl,
+      obligation: obl, // This is already a shared object reference
       coinType: coin,
       amount: baseUnits,
-      // clock parameter omitted - builder injects it automatically
     });
 
     // 3. Return the obligation (shared object) and key to sender
@@ -1238,6 +1240,12 @@ export async function createObligationAndDeposit(
     ) {
       userErrorMessage =
         "Failed due to a technical issue with the price oracle. Try again with a different amount.";
+    } else if (errorMessage.includes("No valid coins")) {
+      userErrorMessage =
+        "Failed: Your wallet balance is fragmented across many small coins. Try a smaller amount.";
+    } else if (errorMessage.includes("Invalid argument type")) {
+      userErrorMessage =
+        "Failed: There was an issue with the obligation reference. Please try again or contact support.";
     }
 
     return {
@@ -1499,7 +1507,8 @@ export async function borrowFromObligation(
 }
 
 /**
- * Add collateral to a specific obligation using depositCollateralQuick
+ * Add collateral to a specific obligation using proper shared object references
+ * and the robust addCollateral method that works with fragmented coins
  *
  * @param wallet Connected wallet
  * @param obligationId The ID of the obligation to add collateral to
@@ -1523,8 +1532,8 @@ export async function depositCollateral(
       `[Deposit] Adding ${amount} ${coin} to obligation ${obligationId}`
     );
 
-    // Convert amount to base units
-    const baseUnits = Math.floor(amount * 10 ** decimals);
+    // Convert amount to base units *as bigint* (avoids JS‑number pitfalls)
+    const baseUnits = BigInt(Math.floor(amount * 10 ** decimals));
 
     // Create a ScallopBuilder
     const scallop = await getScallop();
@@ -1532,9 +1541,48 @@ export async function depositCollateral(
     const tx = builder.createTxBlock();
     tx.setSender(sender);
 
-    // Use depositCollateralQuick to handle everything
-    console.log(`[Deposit] Using depositCollateralQuick for ${amount} ${coin}`);
-    await tx.depositCollateralQuick(baseUnits, coin, obligationId);
+    try {
+      // Step 1: Fetch shared-object metadata once
+      console.log(
+        `[Deposit] Fetching shared object metadata for ${obligationId}`
+      );
+      const { reference } = await suiClient.getObject({
+        id: obligationId,
+        options: { showContent: true },
+      });
+
+      console.log(`[Deposit] Got reference with version: ${reference.version}`);
+
+      // First update prices for more accurate LTV calculations
+      await tx.updateAssetPricesQuick({ coinTypes: [coin] });
+
+      // Step 2: Use addCollateral with proper SharedObjectRef
+      console.log(
+        `[Deposit] Using addCollateral for ${amount} ${coin} with proper SharedObjectRef`
+      );
+
+      // Supply a real SharedObjectRef to addCollateral
+      await tx.addCollateral({
+        obligation: tx.sharedObjectRef({
+          objectId: reference.objectId,
+          initialSharedVersion: reference.version,
+          mutable: true,
+        }),
+        coinType: coin,
+        amount: baseUnits,
+      });
+    } catch (objError) {
+      console.error(
+        "[Deposit] Error fetching object or calling addCollateral:",
+        objError
+      );
+
+      // Fall back to addCollateralQuick if there's an issue with the shared object reference
+      console.log(
+        `[Deposit] Falling back to addCollateralQuick for ${amount} ${coin}`
+      );
+      await tx.addCollateralQuick(baseUnits, coin, obligationId);
+    }
 
     // Set gas budget
     tx.setGasBudget(30_000_000);
@@ -1578,6 +1626,9 @@ export async function depositCollateral(
     ) {
       userErrorMessage =
         "Deposit failed due to SDK compatibility issues. Please try a smaller amount or try again later.";
+    } else if (errorMessage.includes("No valid coins")) {
+      userErrorMessage =
+        "Deposit failed: Your wallet balance is fragmented across many small coins. Try a smaller amount.";
     }
 
     return {
@@ -1625,7 +1676,7 @@ export async function smartDeposit(
       `[smartDeposit] Using obligation: ${obligationId} (new: ${isNewObligation})`
     );
 
-    // Use the depositCollateral function which uses depositCollateralQuick
+    // Use the depositCollateral function which now properly handles shared object references
     const depositResult = await depositCollateral(
       wallet,
       obligationId,
@@ -1671,6 +1722,9 @@ export async function smartDeposit(
     ) {
       userErrorMessage =
         "Deposit failed due to SDK compatibility issues. Please try a smaller amount or try again later.";
+    } else if (errorMessage.includes("No valid coins")) {
+      userErrorMessage =
+        "Deposit failed: Your wallet balance is fragmented across many small coins. Try a smaller amount.";
     }
 
     return {
@@ -1740,7 +1794,7 @@ export function createObligationDebugger(
                 .filter((c) => c.hasValue)
                 .forEach((collateral) => {
                   html += `
-                    <tr>
+                                      <tr>
                       <td style="padding: 5px; border-bottom: 1px solid #4a5568;">${
                         collateral.symbol
                       }</td>

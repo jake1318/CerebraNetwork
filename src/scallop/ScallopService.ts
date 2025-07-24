@@ -1,5 +1,5 @@
 // src/scallop/ScallopService.ts
-// Last Updated: 2025-06-18 02:44:48 UTC - jake1318
+// Last Updated: 2025-07-24 01:28:44 UTC by jake1318
 
 import { SuiClient } from "@mysten/sui.js/client";
 import { Scallop } from "@scallop-io/sui-scallop-sdk";
@@ -58,6 +58,20 @@ export interface RewardInfo {
   coinType: string;
   amount: number; // in human units
   valueUSD: number;
+}
+
+// Helper function to get decimals for a coin type from the blockchain
+async function getDecimalsFromChain(coinType: string): Promise<number> {
+  try {
+    const meta = await client.getCoinMetadata({ coinType });
+    return Number(meta?.decimals ?? 9);
+  } catch (error) {
+    console.warn(
+      `Failed to get decimals for ${coinType}, using default of 9:`,
+      error
+    );
+    return 9; // Default to 9 if metadata retrieval fails
+  }
 }
 
 /**
@@ -544,14 +558,100 @@ export async function fetchUserPositions(address: string) {
     });
     console.log("[fetchUserPositions] Raw portfolio data:", positions);
 
-    // Initialize arrays to store processed data
-    const suppliedAssets = [];
-    const borrowedAssets = [];
-    const collateralAssets = [];
-    const pendingRewards = [];
+    /** ------------------------------------------------------------------
+     * 1.  SUPPLIED ASSETS  (positions.lendings)
+     * ------------------------------------------------------------------ */
+    const suppliedAssets: UserPosition[] = [];
+    if (positions?.lendings && Array.isArray(positions.lendings)) {
+      for (const l of positions.lendings) {
+        // skip zero balances
+        if (!l.suppliedCoin || Number(l.suppliedCoin) === 0) continue;
 
-    // Process the portfolio data (keep the existing implementation)
-    // (This part would be the unchanged code from the original implementation)
+        // symbol can be "wsui", "wusdc", etc.  Strip leading "w" to match pool.
+        const rawSymbol = (l.symbol || "").toLowerCase();
+        const symbol = rawSymbol.startsWith("w")
+          ? rawSymbol.slice(1)
+          : rawSymbol;
+
+        const decimals = Number(l.coinDecimals || 9);
+        const amount = Number(l.suppliedCoin) / 10 ** decimals; // human units
+        const price = Number(l.coinPrice || 0);
+
+        suppliedAssets.push({
+          symbol: symbol.toUpperCase(),
+          coinType: l.coinType,
+          amount,
+          valueUSD: amount * price,
+          apy: Number(l.supplyApy ?? l.supplyApr ?? 0) * 100,
+          decimals,
+          price,
+        });
+      }
+    }
+
+    /** ------------------------------------------------------------------
+     * 2.  BORROWED ASSETS  (positions.borrowings[].borrowedPools)
+     * ------------------------------------------------------------------ */
+    const borrowedAssets: UserPosition[] = [];
+    if (positions?.borrowings && Array.isArray(positions.borrowings)) {
+      for (const b of positions.borrowings) {
+        if (!b.borrowedPools) continue;
+        for (const p of b.borrowedPools) {
+          if (!p.borrowedCoin || Number(p.borrowedCoin) === 0) continue;
+
+          const symbol = (
+            p.symbol || getSymbolFromCoinType(p.coinType)
+          ).toUpperCase();
+          const decimals = Number(p.coinDecimals || 9);
+          const amount = Number(p.borrowedCoin) / 10 ** decimals;
+          const price = Number(p.coinPrice || 0);
+
+          borrowedAssets.push({
+            symbol,
+            coinType: p.coinType,
+            amount,
+            valueUSD: amount * price,
+            apy: Number(p.borrowApy ?? p.borrowApr ?? 0) * 100,
+            decimals,
+            price,
+          });
+        }
+      }
+    }
+
+    /** ------------------------------------------------------------------
+     * 3.  COLLATERAL  (positions.borrowings[].collaterals)
+     * ------------------------------------------------------------------ */
+    const collateralAssets: UserPosition[] = [];
+    if (positions?.borrowings && Array.isArray(positions.borrowings)) {
+      for (const b of positions.borrowings) {
+        if (!b.collaterals) continue;
+        for (const c of b.collaterals) {
+          if (!c.depositedCoin || Number(c.depositedCoin) === 0) continue;
+
+          const symbol = (
+            c.symbol || getSymbolFromCoinType(c.coinType)
+          ).toUpperCase();
+          const decimals = Number(c.coinDecimals || 9);
+          const amount = Number(c.depositedCoin) / 10 ** decimals;
+          const price = Number(c.coinPrice || 0);
+
+          collateralAssets.push({
+            symbol,
+            coinType: c.coinType,
+            amount,
+            valueUSD: amount * price,
+            apy: 0,
+            decimals,
+            price,
+            isCollateral: true,
+          });
+        }
+      }
+    }
+
+    /** (Optional) pendingRewards, etc. */
+    const pendingRewards: RewardInfo[] = []; // fill later if you need it
 
     return {
       suppliedAssets,
@@ -1204,6 +1304,40 @@ export async function repay(
   }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Simple aliases so UI can call depositAsset / withdrawAsset        */
+/* ------------------------------------------------------------------ */
+
+export async function depositAsset(
+  wallet: any,
+  coinType: string, // e.g. "0x2::sui::SUI" or "sui"
+  amountBaseUnits: number // integer in base units
+) {
+  // Get decimals from chain metadata
+  const decimals = await getDecimalsFromChain(coinType);
+
+  // convert base‑unit integer → human float for existing helper
+  const amountHuman = amountBaseUnits / 10 ** decimals;
+
+  return supply(wallet, coinType, amountHuman, decimals);
+}
+
+export async function withdrawAsset(
+  wallet: any,
+  coinType: string,
+  amountBaseUnits: number,
+  isMax = false
+) {
+  // Get decimals from chain metadata
+  const decimals = await getDecimalsFromChain(coinType);
+
+  const amountHuman = amountBaseUnits / 10 ** decimals;
+
+  // Forward the "max" intent; when true the low-level withdraw()
+  // ignores amountHuman and redeems exactly the sCoin balance it finds.
+  return withdraw(wallet, coinType, amountHuman, decimals, isMax);
+}
+
 /**
  * Debug function to test wallet connection
  */
@@ -1546,6 +1680,8 @@ const scallopService = {
   withdraw,
   borrow,
   repay,
+  depositAsset,
+  withdrawAsset,
   debugWalletConnection,
   debugScallopStructures,
   getSDKInstance,
@@ -1557,6 +1693,8 @@ const scallopService = {
   claimRewards,
   init,
   getObligationBorrowData,
+  // Export client for other components that might need it
+  client,
 };
 
 export default scallopService;
