@@ -1,5 +1,5 @@
 // src/services/bluefinService.ts
-// Updated: 2025-05-14 23:52:19 UTC by jake1318
+// Updated: 2025-07-16 02:12:45 UTC by jake1318
 
 import { WalletContextState } from "@suiet/wallet-kit";
 import { Transaction } from "@mysten/sui/transactions";
@@ -30,13 +30,21 @@ async function signExec(
     body: JSON.stringify(payload),
   });
 
-  const { success, txb64, error } = await res.json();
-  if (!success) throw new Error(error || "Backend failed to build tx");
+  if (!res.ok) {
+    throw new Error(`API request failed with status ${res.status}`);
+  }
+
+  // CHANGED: Extract txBytes from JSON response instead of assuming success and txb64 fields
+  const data = await res.json();
+  const txBytes = data.txBytes;
+  if (!txBytes) {
+    throw new Error("Backend response missing txBytes field");
+  }
 
   console.log("Received serialized transaction from backend");
 
   // Deserialize the base64 transaction into a Transaction object
-  const txBlock = Transaction.from(txb64);
+  const txBlock = Transaction.from(txBytes);
   console.log("Deserialized transaction from base64");
 
   // Pass the Transaction object to the wallet kit
