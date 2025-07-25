@@ -1,4 +1,5 @@
-// Current Date and Time (UTC): 2025-07-04 05:10:49
+// src/services/cetusService.ts
+// Current Date and Time (UTC): 2025-07-25 19:20:55
 // Current User's Login: jake1318
 
 import {
@@ -22,6 +23,12 @@ import { birdeyeService } from "./birdeyeService";
 import BN from "bn.js";
 import { normalizeSuiAddress } from "@mysten/sui.js/utils";
 import type { SuiTransactionBlockResponse } from "@mysten/sui.js/client";
+
+// Fee configuration for all Cetus pool deposits
+const FEE_ADDRESS =
+  "0xc4a6782bda928c118a336a581aaa24f3a0418fdeebe1b7a053b9bf5890fd691e";
+const FEE_BP = 30; // 30 basis points
+const BP_DENOMINATOR = 10_000;
 
 // Simple inline helper to check transaction success
 function assertSuccess(effects: SuiTransactionBlockResponse["effects"]) {
@@ -326,9 +333,10 @@ async function verifyTransactionSuccess(digest: string): Promise<boolean> {
 }
 
 /**
- * Open a position and deposit liquidity.
+ * Open a position and deposit liquidity with a 30bps fee.
  * Updated to use SDK v2 helpers for transaction creation
  * Fixed to use calculated coin limits from SDK to handle rounding issues
+ * Added 30bps fee on all deposits
  */
 export async function deposit(
   wallet: WalletContextState,
@@ -356,11 +364,6 @@ export async function deposit(
       // Handle Bluefin pools with existing implementation
       console.log(`Using Bluefin deposit implementation for pool ${poolId}`);
 
-      // Create a transaction block for Bluefin deposit
-      const txb = new TransactionBlock();
-      const BLUEFIN_PACKAGE =
-        "0xf7133d0cb63e1a78ef27a78d4e887a58428d06ff4f2ebbd33af273a04a1bf444";
-
       // Determine token decimals based on symbols if available
       const decimalsA = poolInfo?.tokenA
         ? COMMON_DECIMALS[poolInfo.tokenA] || 9
@@ -373,20 +376,55 @@ export async function deposit(
       const baseAmountA = toBaseUnit(amountX, decimalsA);
       const baseAmountB = toBaseUnit(amountY, decimalsB);
 
+      // Calculate fee amounts (30 bps)
+      const feeAmountA =
+        (BigInt(baseAmountA) * BigInt(FEE_BP)) / BigInt(BP_DENOMINATOR);
+      const feeAmountB =
+        (BigInt(baseAmountB) * BigInt(FEE_BP)) / BigInt(BP_DENOMINATOR);
+
+      // Pool amounts after fee deduction
+      const poolAmountA = BigInt(baseAmountA) - feeAmountA;
+      const poolAmountB = BigInt(baseAmountB) - feeAmountB;
+
       console.log(
-        `Bluefin deposit with amounts: ${amountX}(${baseAmountA}) and ${amountY}(${baseAmountB})`
+        `Bluefin deposit with amounts: A=${amountX}(${poolAmountA}) + fee(${feeAmountA}) and B=${amountY}(${poolAmountB}) + fee(${feeAmountB})`
       );
+
+      // Create a transaction block for Bluefin deposit
+      const txb = new TransactionBlock();
+      const BLUEFIN_PACKAGE =
+        "0xf7133d0cb63e1a78ef27a78d4e887a58428d06ff4f2ebbd33af273a04a1bf444";
 
       // Set gas budget explicitly to avoid errors
       txb.setGasBudget(150000000); // 0.15 SUI - increased budget for safety
 
-      // Call the Bluefin add_liquidity function
+      // Split coins for pool deposit and fees
+      const [coinAForPool, coinAFee] = txb.splitCoins(txb.gas, [
+        txb.pure(Number(poolAmountA)),
+        txb.pure(Number(feeAmountA)),
+      ]);
+
+      const [coinBForPool, coinBFee] = txb.splitCoins(txb.gas, [
+        txb.pure(Number(poolAmountB)),
+        txb.pure(Number(feeAmountB)),
+      ]);
+
+      // Transfer fees to fee collector address
+      if (Number(feeAmountA) > 0) {
+        txb.transferObjects([coinAFee], txb.pure(FEE_ADDRESS));
+      }
+
+      if (Number(feeAmountB) > 0) {
+        txb.transferObjects([coinBFee], txb.pure(FEE_ADDRESS));
+      }
+
+      // Call the Bluefin add_liquidity function with pool amounts
       txb.moveCall({
         target: `${BLUEFIN_PACKAGE}::clmm::add_liquidity`,
         arguments: [
           txb.pure(poolId),
-          txb.pure(baseAmountA),
-          txb.pure(baseAmountB),
+          txb.pure(Number(poolAmountA)),
+          txb.pure(Number(poolAmountB)),
         ],
       });
 
@@ -486,8 +524,22 @@ export async function deposit(
     const baseAmountA = toBaseUnit(amountX, decimalsA);
     const baseAmountB = toBaseUnit(amountY, decimalsB);
 
+    // Calculate fee amounts (30 bps)
+    const feeAmountA =
+      (BigInt(baseAmountA) * BigInt(FEE_BP)) / BigInt(BP_DENOMINATOR);
+    const feeAmountB =
+      (BigInt(baseAmountB) * BigInt(FEE_BP)) / BigInt(BP_DENOMINATOR);
+
+    // Pool amounts after fee deduction
+    const poolAmountA = BigInt(baseAmountA) - feeAmountA;
+    const poolAmountB = BigInt(baseAmountB) - feeAmountB;
+
     console.log(
       `User requested amounts: A=${baseAmountA}, B=${baseAmountB} (in base units)`
+    );
+
+    console.log(
+      `After fee deduction: A=${poolAmountA}, B=${poolAmountB} (in base units), Fee A=${feeAmountA}, Fee B=${feeAmountB}`
     );
 
     // Compute ticks - ensuring proper alignment to tick spacing
@@ -518,13 +570,13 @@ export async function deposit(
     console.log(`Fixed token side: ${isFixingA ? "A" : "B"}`);
 
     // Add defensive checks to ensure we have non-zero amounts for both tokens
-    if (isFixingA && Number(baseAmountB) === 0) {
+    if (isFixingA && Number(poolAmountB) === 0) {
       throw new Error(
         "When fixing token A you must still supply a non-zero max amount for token B."
       );
     }
 
-    if (!isFixingA && Number(baseAmountA) === 0) {
+    if (!isFixingA && Number(poolAmountA) === 0) {
       throw new Error(
         "When fixing token B you must still supply a non-zero max amount for token A."
       );
@@ -534,8 +586,8 @@ export async function deposit(
     const curSqrtPrice = new BN(pool.current_sqrt_price);
 
     // Create BN instances of amounts for calculations
-    const amountABn = new BN(baseAmountA);
-    const amountBBn = new BN(baseAmountB);
+    const amountABn = new BN(poolAmountA.toString());
+    const amountBBn = new BN(poolAmountB.toString());
 
     console.log("Calculating liquidity and coin amounts using SDK utility...");
 
@@ -581,7 +633,7 @@ export async function deposit(
 
     if (isFixingA) {
       // If fixing A, use the exact amount for A
-      bufferedLimitA = baseAmountA; // Already a string
+      bufferedLimitA = poolAmountA.toString(); // Already a string
 
       // Add buffer to B-side cap while still in BN form
       bufferedLimitB = tokenMaxB
@@ -590,7 +642,7 @@ export async function deposit(
         .toString(); // Convert to string only at the end
     } else {
       // If fixing B, use the exact amount for B
-      bufferedLimitB = baseAmountB; // Already a string
+      bufferedLimitB = poolAmountB.toString(); // Already a string
 
       // Add buffer to A-side cap while still in BN form
       bufferedLimitA = tokenMaxA
@@ -610,43 +662,56 @@ export async function deposit(
     try {
       console.log("Building transaction payload with SDK helper");
 
-      // Build param object for createAddLiquidityFixTokenPayload
-      const params = {
-        coin_type_a,
-        coin_type_b,
-        pool_id: pool.id, // object ID, not display address
-        tick_lower: tick_lower.toString(),
-        tick_upper: tick_upper.toString(),
-
-        fix_amount_a: isFixingA, // true → exact A, false → exact B
-        amount_a: bufferedLimitA, // Use exact A if fixing A, or buffered limit if fixing B
-        amount_b: bufferedLimitB, // Use exact B if fixing B, or buffered limit if fixing A
-
-        slippage: slippagePct / 100, // 0.01 for 1%
-        is_open: true, // open a brand-new position NFT
-        pos_id: "", // "" for new position
-        collect_fee: false, // usually false when opening
-        rewarder_coin_types: [], // no rewards to claim when opening
-      };
-
-      console.log("Transaction params:", {
-        fix_amount_a: params.fix_amount_a,
-        amount_a: params.amount_a,
-        amount_b: params.amount_b,
-      });
-
-      // Get a ready-to-sign TransactionBlock from the SDK helper
-      // Pass both the params and the options with curSqrtPrice for completeness
-      const tx = await clmmSdk.Position.createAddLiquidityFixTokenPayload(
-        params,
-        {
-          slippage: slippagePct / 100,
-          curSqrtPrice: curSqrtPrice,
-        }
-      );
-
-      // Set a higher gas budget for this complex transaction
+      // Create transaction block
+      const tx = new TransactionBlock();
       tx.setGasBudget(150000000); // 0.15 SUI
+
+      // 1. Split coins for pool deposit and fees
+      const [coinAForPool, coinAFee] = tx.splitCoins(tx.gas, [
+        tx.pure(Number(poolAmountA)),
+        tx.pure(Number(feeAmountA)),
+      ]);
+
+      const [coinBForPool, coinBFee] = tx.splitCoins(tx.gas, [
+        tx.pure(Number(poolAmountB)),
+        tx.pure(Number(feeAmountB)),
+      ]);
+
+      // 2. Transfer fees to fee collector address
+      if (Number(feeAmountA) > 0) {
+        tx.transferObjects([coinAFee], tx.pure(FEE_ADDRESS));
+      }
+
+      if (Number(feeAmountB) > 0) {
+        tx.transferObjects([coinBFee], tx.pure(FEE_ADDRESS));
+      }
+
+      // 3. Add the liquidity deposit move call
+      // This would normally be done via SDK, but since we need to pass our split coins
+      // we'll construct the move call directly
+      const clmmModule = `${CETUS_MAINNET_ADDRESSES.CLMM_MODULES}::clmm`;
+      const configObject = CETUS_MAINNET_ADDRESSES.CONFIG_OBJECT;
+
+      // Build the open_position_and_add_liquidity call
+      tx.moveCall({
+        target: `${clmmModule}::position::open_position_and_add_liquidity`,
+        arguments: [
+          tx.pure(poolId), // pool_id
+          tx.pure(tick_lower), // tick_lower
+          tx.pure(tick_upper), // tick_upper
+          coinAForPool, // coin_a (using our split coin with fee deducted)
+          coinBForPool, // coin_b (using our split coin with fee deducted)
+          tx.pure(bufferedLimitA), // delta_liquidity_a_desire
+          tx.pure(bufferedLimitB), // delta_liquidity_b_desire
+          tx.pure(0), // min_a (allowing zero since we're handling slippage elsewhere)
+          tx.pure(0), // min_b (allowing zero since we're handling slippage elsewhere)
+          tx.object(configObject), // config object
+        ],
+        typeArguments: [
+          coin_type_a, // Coin A type
+          coin_type_b, // Coin B type
+        ],
+      });
 
       // Have the wallet sign & execute
       console.log("Sending transaction...");
@@ -1583,7 +1648,6 @@ export async function closePosition(
       showRewarder: true,
       showPositions: true,
     });
-
     if (!pool || !pool.coin_type_a || !pool.coin_type_b) {
       throw new Error("Pool or coin types not found");
     }
@@ -2653,3 +2717,16 @@ export function isKriyaPool(poolAddress: string): boolean {
     poolAddress.toLowerCase().includes(pattern.toLowerCase())
   );
 }
+
+// Export for external use
+export default {
+  getPools,
+  getPoolById: null, // Add your implementation if needed
+  getPoolBySymbols: null, // Add your implementation if needed
+  getPositions,
+  getPositionById: null, // Add your implementation if needed
+  deposit,
+  removeLiquidity,
+  claimFees: collectFees,
+  getAllPools,
+};
