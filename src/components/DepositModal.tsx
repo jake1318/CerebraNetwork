@@ -1,5 +1,6 @@
 // src/components/DepositModal.tsx
-// Last Updated: 2025-07-14 02:35:52 UTC by jake1318
+// Current Date and Time (UTC): 2025-07-25 19:26:19
+// Current User's Login: jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { PoolInfo } from "../services/coinGeckoService";
@@ -53,6 +54,9 @@ const USE_BIRDEYE_FOR_CETUS = true;
 
 // Path to placeholder token icon
 const TOKEN_PLACEHOLDER = "/assets/token-placeholder.png";
+
+// Fee configuration for Cetus pool deposits
+const FEE_BP = 30; // 30 basis points = 0.30%
 
 const DepositModal: React.FC<DepositModalProps> = ({
   isOpen,
@@ -1326,6 +1330,18 @@ const DepositModal: React.FC<DepositModalProps> = ({
     setTxNotification({ message: "Processing deposit…", isSuccess: true });
 
     try {
+      // Display fee information
+      const feeA = Number(amountA) * (FEE_BP / BP_DENOMINATOR);
+      const feeB = Number(amountB) * (FEE_BP / BP_DENOMINATOR);
+      const poolAmountA = Number(amountA) - feeA;
+      const poolAmountB = Number(amountB) - feeB;
+
+      console.log(
+        `Depositing ${poolAmountA} ${pool.tokenA} and ${poolAmountB} ${pool.tokenB} to pool`
+      );
+      console.log(`Fee: ${feeA} ${pool.tokenA} and ${feeB} ${pool.tokenB}`);
+
+      // We still send the original amounts to onDeposit - it will handle the fee internally
       const result = await onDeposit(
         amountA,
         amountB,
@@ -1336,8 +1352,13 @@ const DepositModal: React.FC<DepositModalProps> = ({
       );
 
       if (result.success) {
+        // Include fee information in success message
         setTxNotification({
-          message: `Successfully deposited ${amountA} ${pool.tokenA} and ${amountB} ${pool.tokenB}`,
+          message: `Successfully deposited ${poolAmountA.toFixed(6)} ${
+            pool.tokenA
+          } and ${poolAmountB.toFixed(6)} ${pool.tokenB} (Fee: ${feeA.toFixed(
+            6
+          )} ${pool.tokenA}, ${feeB.toFixed(6)} ${pool.tokenB})`,
           isSuccess: true,
           txDigest: result.digest,
         });
@@ -1587,6 +1608,12 @@ const DepositModal: React.FC<DepositModalProps> = ({
               </div>
             )}
 
+            {/* Fee information for vaults */}
+            <div className="fee-info">
+              <div className="info-icon">ℹ️</div>
+              <p>Fee: 0.30% ({FEE_BP} bps) on deposits</p>
+            </div>
+
             {/* Regular notification for non-success or non-tx notifications */}
             {txNotification && !txNotification.txDigest && (
               <div
@@ -1762,6 +1789,12 @@ const DepositModal: React.FC<DepositModalProps> = ({
               </div>
             </div>
 
+            {/* Fee information */}
+            <div className="fee-info">
+              <div className="info-icon">ℹ️</div>
+              <p>Fee: 0.30% ({FEE_BP} bps) on deposits</p>
+            </div>
+
             {/* Slippage tolerance */}
             <div className="slippage-section">
               <label>Slippage Tolerance</label>
@@ -1865,6 +1898,23 @@ const DepositModal: React.FC<DepositModalProps> = ({
         }
 
         .info-content p {
+          margin: 0;
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.9);
+        }
+
+        .fee-info {
+          background: rgba(255, 165, 0, 0.1);
+          border: 1px solid rgba(255, 165, 0, 0.3);
+          border-radius: 8px;
+          padding: 12px;
+          margin: 16px 0;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .fee-info p {
           margin: 0;
           font-size: 14px;
           color: rgba(255, 255, 255, 0.9);
