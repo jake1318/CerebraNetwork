@@ -1,5 +1,5 @@
 // src/services/cetusService.ts
-// Current Date and Time (UTC): 2025-07-25 19:20:55
+// Current Date and Time (UTC): 2025-07-25 23:41:58
 // Current User's Login: jake1318
 
 import {
@@ -28,6 +28,7 @@ import type { SuiTransactionBlockResponse } from "@mysten/sui.js/client";
 const FEE_ADDRESS =
   "0xc4a6782bda928c118a336a581aaa24f3a0418fdeebe1b7a053b9bf5890fd691e";
 const FEE_BP = 30; // 30 basis points
+// denominator for basis points
 const BP_DENOMINATOR = 10_000;
 
 // Simple inline helper to check transaction success
@@ -1651,7 +1652,6 @@ export async function closePosition(
     if (!pool || !pool.coin_type_a || !pool.coin_type_b) {
       throw new Error("Pool or coin types not found");
     }
-
     // Get ALL reward coin types from the pool
     let rewarder_coin_types: string[] = [];
     if (pool.reward_manager && pool.reward_manager.rewards) {
