@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-18 00:12:12 UTC by jake1318
+// Updated: 2025-07-18 07:22:03 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -30,6 +30,16 @@ const BLUEFIN_ABORTS = {
   1018: "Position cannot be closed yet (cooldown period)",
   1029: "Position has no liquidity to remove",
 };
+
+/**
+ * Helper function to create a pure u64 value for transaction arguments
+ * @param {TransactionBlock} txb - Transaction block instance
+ * @param {BigInt|number|string} n - The value to convert to u64
+ * @returns {TransactionArgument} - A transaction argument of u64 type
+ */
+function toPureU64(txb, n) {
+  return txb.pure(n.toString(), "u64");
+}
 
 // Helper to extract error information from SUI transaction failures
 function extractBluefinError(error) {
@@ -267,7 +277,7 @@ function toSignedI32(u) {
  * Helper function for type-safe boolean conversion in transaction arguments
  */
 function pureBool(txb, value) {
-  return txb.pure(value ? 1 : 0, "bool");
+  return txb.pure.bool(value); // Use explicit boolean type
 }
 
 /**
@@ -514,7 +524,7 @@ function prepareCoinWithSufficientBalance(
         `Requested SUI amount ${requiredBigInt} is too close to total balance ${gasBalance}`
       );
     }
-    return txb.splitCoins(txb.gas, [txb.pure(requiredBigInt.toString())]);
+    return txb.splitCoins(txb.gas, [txb.pure.u64(requiredBigInt.toString())]);
   }
 
   // For non-SUI tokens, sort coins by balance (largest first)
@@ -629,9 +639,9 @@ function buildLiquidityArgs(
   return [
     coinA, // Always CoinTypeA
     coinB, // Always CoinTypeB
-    txb.pure(fixedAmount.toString()), // fixed_amount (of whichever coin is fixed)
-    txb.pure(coinAMax.toString()), // coin_a_max - exact user amount
-    txb.pure(coinBMax.toString()), // coin_b_max - exact user amount
+    toPureU64(txb, fixedAmount), // fixed_amount as u64
+    toPureU64(txb, coinAMax), // coin_a_max as u64
+    toPureU64(txb, coinBMax), // coin_b_max as u64
   ];
 }
 
@@ -994,15 +1004,27 @@ export async function buildDepositTx({
     txb.setGasBudget(30_000_000);
 
     // =========== STEP 1: Get shared object references ============
-    // CHANGED: Get the initial shared version for both pool and config
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
 
     console.log(
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // CHANGED: Create proper shared object references for both pool and config
+    // Create proper shared object references
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1016,20 +1038,19 @@ export async function buildDepositTx({
     });
 
     // =========== STEP 2: Create the Position ============
-    // First, we create the position - REVERTED: use snake_case function name
-    const position = txb.moveCall({
+    // First, we create the position with explicit type annotations
+    const newPosition = txb.moveCall({
       target: `${packageId}::pool::open_position`,
       arguments: [
         configRef,
         poolRef,
-        txb.pure(toU32(lowerTickSnapped)),
-        txb.pure(toU32(upperTickSnapped)),
+        txb.pure.u32(toU32(lowerTickSnapped)),
+        txb.pure.u32(toU32(upperTickSnapped)),
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
     // =========== STEP 3: Prepare Coins ================
-    // REVERTED: Use the simpler version that doesn't split unnecessarily
     // Prepare coinA with sufficient balance
     let coinA = prepareCoinWithSufficientBalance(
       txb,
@@ -1051,20 +1072,16 @@ export async function buildDepositTx({
       coinB (${isCoinB_SUI ? "SUI" : coinTypeB}): ${amountBOnChain}`);
 
     // =========== STEP 4: Add Liquidity to Position ============
-    // Get the arguments in the correct order with slippage buffer for min amount
-    // Pass RAW amounts to the helper, NOT transaction arguments
-    const liquidityArgs = buildLiquidityArgs(
-      aIsFixed,
-      coinA,
-      coinB,
-      amountAOnChain, // Raw number
-      amountBOnChain, // Raw number
-      slippagePct,
-      txb
-    );
+    // Convert to BigInt for precise calculations
+    const rawAmountA = BigInt(amountAOnChain);
+    const rawAmountB = BigInt(amountBOnChain);
 
-    // Create a proper TransactionArgument for the boolean
-    const aIsFixedArg = pureBool(txb, aIsFixed);
+    // Calculate the fixed amount based on which side is fixed
+    const fixedAmount = aIsFixed ? rawAmountA : rawAmountB;
+
+    // Set max amounts - use exactly what the user provided
+    const coinAMax = rawAmountA;
+    const coinBMax = rawAmountB;
 
     // Log which side is fixed for debugging
     console.log(
@@ -1073,44 +1090,32 @@ export async function buildDepositTx({
       })`
     );
 
-    // Add liquidity to the created position - REVERTED: use snake_case function name
-    // IMPORTANT: gateway::provide_liquidity_with_fixed_amount returns TWO values:
-    // 0 -> leftover_a: vector<Coin<CoinTypeA>> (may be empty vector)
-    // 1 -> leftover_b: vector<Coin<CoinTypeB>> (may be empty vector)
-    // The position is mutated in-place (&mut), it is NOT returned
+    // FIXED: Pass numbers as u64 strings to match Move contract parameters
     txb.moveCall({
       target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
-        poolRef, // &mut Pool (shared, mutable)
-        position, // &mut Position - mutated, not consumed
-        ...liquidityArgs,
-        aIsFixedArg,
+        poolRef,
+        newPosition,
+        coinA,
+        coinB,
+        toPureU64(txb, fixedAmount), // Properly serialized as u64
+        toPureU64(txb, coinAMax), // Properly serialized as u64
+        toPureU64(txb, coinBMax), // Properly serialized as u64
+        txb.pure.bool(aIsFixed),
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // SIMPLIFIED APPROACH: Just transfer the position and skip handling leftover vectors
-    // This avoids the TransferObjects call on empty vectors that causes our failure
-    txb.transferObjects([position], txb.pure(walletAddress));
+    // Transfer the position NFT to the user's wallet
+    txb.transferObjects([newPosition], txb.pure.address(walletAddress));
 
     // =========== STEP 5: Build and Return Transaction ============
-    // This is the simplest transaction that should work
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
-    console.log(
-      "Transaction built successfully - simplified approach that avoids transferring leftover vectors"
-    );
-
-    // Log the base64 transaction bytes for dev-inspect debugging
-    console.log(
-      `To debug with dev-inspect: sui client dev-inspect --gas-budget 30000000 --tx-bytes ${base64Tx.substring(
-        0,
-        20
-      )}...`
-    );
+    console.log("Transaction built successfully with proper u64 serialization");
 
     return base64Tx;
   } catch (error) {
@@ -1392,16 +1397,27 @@ export async function buildAddLiquidityTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // =========== STEP 1: Get shared object references ============
-    // CHANGED: Get the correct initial shared version for both pool and config
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
 
     console.log(
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // CHANGED: Create proper shared object references for both pool and config
+    // Create proper shared object references
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1414,9 +1430,7 @@ export async function buildAddLiquidityTx({
       mutable: true,
     });
 
-    // =========== STEP 2: Prepare Coins ================
-    // REVERTED: Use the simpler version that doesn't split unnecessarily
-    // Prepare coinA with sufficient balance
+    // Prepare coins with sufficient balance
     let coinA = prepareCoinWithSufficientBalance(
       txb,
       coinsA.data,
@@ -1424,7 +1438,6 @@ export async function buildAddLiquidityTx({
       isCoinA_SUI
     );
 
-    // Prepare coinB with sufficient balance
     let coinB = prepareCoinWithSufficientBalance(
       txb,
       coinsB.data,
@@ -1432,34 +1445,16 @@ export async function buildAddLiquidityTx({
       isCoinB_SUI
     );
 
-    console.log(`Prepared coins for adding liquidity: 
-      coinA (${isCoinA_SUI ? "SUI" : coinTypeA}): ${amountAOnChain}
-      coinB (${isCoinB_SUI ? "SUI" : coinTypeB}): ${amountBOnChain}`);
+    // Convert to BigInt for precise calculations
+    const rawAmountA = BigInt(amountAOnChain);
+    const rawAmountB = BigInt(amountBOnChain);
 
-    // =========== STEP 3: Add Liquidity to Position ============
-    // Get the arguments in the correct order with slippage buffer for min amount
-    const liquidityArgs = buildLiquidityArgs(
-      aIsFixed,
-      coinA,
-      coinB,
-      amountAOnChain,
-      amountBOnChain,
-      slippagePct,
-      txb
-    );
+    // Calculate the fixed amount based on which side is fixed
+    const fixedAmount = aIsFixed ? rawAmountA : rawAmountB;
+    const coinAMax = rawAmountA;
+    const coinBMax = rawAmountB;
 
-    // Create a proper TransactionArgument for the boolean
-    const aIsFixedArg = pureBool(txb, aIsFixed);
-
-    // Log which side is fixed for debugging
-    console.log(
-      `Fixed side is coin${aIsFixed ? "A" : "B"} (${
-        aIsFixed ? coinTypeA : coinTypeB
-      })`
-    );
-
-    // REVERTED: use snake_case function name
-    // Call the provide liquidity function without trying to handle leftover vectors
+    // FIXED: Pass numbers as u64 strings to match Move contract parameters
     txb.moveCall({
       target: `${packageId}::gateway::provide_liquidity_with_fixed_amount`,
       arguments: [
@@ -1467,26 +1462,22 @@ export async function buildAddLiquidityTx({
         configRef,
         poolRef,
         txb.object(positionId),
-        ...liquidityArgs,
-        aIsFixedArg,
+        coinA,
+        coinB,
+        toPureU64(txb, fixedAmount), // Properly serialized as u64
+        toPureU64(txb, coinAMax), // Properly serialized as u64
+        toPureU64(txb, coinBMax), // Properly serialized as u64
+        txb.pure.bool(aIsFixed),
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // =========== STEP 4: Build and Return Transaction ============
+    // Build and return transaction
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
     console.log(
-      "Add liquidity transaction built successfully - simplified approach that avoids transferring leftover vectors"
-    );
-
-    // Log the base64 transaction bytes for dev-inspect debugging
-    console.log(
-      `To debug with dev-inspect: sui client dev-inspect --gas-budget 30000000 --tx-bytes ${base64Tx.substring(
-        0,
-        20
-      )}...`
+      "Add liquidity transaction built successfully with proper u64 serialization"
     );
 
     return base64Tx;
@@ -1511,7 +1502,6 @@ export async function buildAddLiquidityTx({
 
 /**
  * Builds a transaction for removing liquidity from a position
- * Checks if the position has any liquidity before building the transaction
  *
  * @param {object} options - Options for building the transaction
  * @returns {Promise<{tx: string|null, hasLiquidity: boolean}>} - Transaction bytes and whether position has liquidity
@@ -1529,28 +1519,7 @@ export async function buildRemoveLiquidityTx({
   }
 
   try {
-    // First check if the position has any liquidity
-    const hasLiquidity = await positionHasLiquidity(positionId);
-
-    if (!hasLiquidity) {
-      console.log(
-        `Position ${positionId} has no liquidity to remove, skipping`
-      );
-      return { tx: null, hasLiquidity: false };
-    }
-
     const suiClient = await getSuiClient();
-
-    // Get the latest Bluefin package ID and config object ID
-    const packageId = await getBluefinPackageId();
-    const configId = await getBluefinConfigObjectId();
-    console.log(
-      `Using Bluefin package ID: ${packageId}, config object ID: ${configId}`
-    );
-
-    // Get pool details using the helper
-    const pool = await getPoolDetails(poolId);
-    const { coinTypeA, coinTypeB } = pool.parsed;
 
     // Get position details
     const positionResponse = await suiClient.getObject({
@@ -1565,8 +1534,16 @@ export async function buildRemoveLiquidityTx({
     const positionContent = positionResponse.data.content;
     const positionFields = positionContent.fields;
 
+    // Check if the position has any liquidity
+    const currentLiquidity = positionFields.liquidity || "0";
+    if (BigInt(currentLiquidity) <= 0n) {
+      console.log(
+        `Position ${positionId} has no liquidity to remove, skipping`
+      );
+      return { tx: null, hasLiquidity: false };
+    }
+
     // Calculate liquidity to remove
-    const currentLiquidity = positionFields.liquidity;
     const liquidityToRemove =
       (BigInt(currentLiquidity) * BigInt(percent)) / BigInt(100);
 
@@ -1577,20 +1554,40 @@ export async function buildRemoveLiquidityTx({
       liquidityToRemove: liquidityToRemove.toString(),
     });
 
+    // Get the latest Bluefin package ID and config object ID
+    const packageId = await getBluefinPackageId();
+    const configId = await getBluefinConfigObjectId();
+
+    // Get pool details for coin types
+    const pool = await getPoolDetails(poolId);
+    const { coinTypeA, coinTypeB } = pool.parsed;
+
     // Create the transaction block
     const txb = new TransactionBlock();
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the initial shared version for pool and config
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
 
     console.log(
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create proper shared object references for both pool and config
+    // Create shared object references
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1603,25 +1600,24 @@ export async function buildRemoveLiquidityTx({
       mutable: true,
     });
 
-    // FIXED: Removed type annotations that were causing "Incorrect number of arguments" error
-    const [tokenA, tokenB] = txb.moveCall({
+    // REQUIRED: Include the recipient address as the eighth parameter for remove_liquidity
+    const result = txb.moveCall({
       target: `${packageId}::gateway::remove_liquidity`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
         poolRef,
         txb.object(positionId),
-        txb.pure(liquidityToRemove.toString()), // Remove type annotation
-        txb.pure("0"), // min_amount_a - removed type annotation
-        txb.pure("0"), // min_amount_b - removed type annotation
+        txb.pure(liquidityToRemove, "u128"), // Use u128 for liquidity
+        txb.pure.u64("0"), // min_amount_a
+        txb.pure.u64("0"), // min_amount_b
+        txb.pure.address(walletAddress), // recipient address
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Transfer the token results to the user's wallet
-    txb.transferObjects([tokenA, tokenB], txb.pure(walletAddress));
-
-    // Serialize the transaction to bytes and encode as base64
+    // With recipient address specified, tokens go directly to the wallet
+    // No need to transfer objects, just build and return the transaction
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
@@ -1629,19 +1625,15 @@ export async function buildRemoveLiquidityTx({
     return { tx: base64Tx, hasLiquidity: true };
   } catch (error) {
     console.error("Error building remove liquidity transaction:", error);
-
-    // Check for Bluefin-specific errors
+    // Check for Bluefin-specific errors and rethrow
     const bluefinError = extractBluefinError(error);
     if (bluefinError) {
-      // Throw a more user-friendly error
       const enhancedError = new Error(bluefinError.message);
       enhancedError.code = bluefinError.code;
       enhancedError.type = "bluefin";
       enhancedError.originalError = error;
       throw enhancedError;
     }
-
-    // Otherwise throw the original error
     throw error;
   }
 }
@@ -1684,15 +1676,27 @@ export async function buildCollectFeesTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // CHANGED: Get the correct initial shared version for pool and config
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
 
     console.log(
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // CHANGED: Create proper shared object references for both pool and config
+    // Create proper shared object references
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1705,15 +1709,13 @@ export async function buildCollectFeesTx({
       mutable: true,
     });
 
-    // REVERTED: use snake_case function name
-    // Clock → Config → Pool → Position
     // Note: Bluefin moves fees directly to the transaction signer
     txb.moveCall({
       target: `${packageId}::gateway::collect_fee`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        configRef, // CHANGED: Use shared config ref
-        poolRef, // CHANGED: Use shared pool ref
+        configRef,
+        poolRef,
         txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB],
@@ -1786,15 +1788,27 @@ export async function buildCollectRewardsTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // CHANGED: Get the correct initial shared version for pool and config
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
 
     console.log(
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // CHANGED: Create proper shared object references for both pool and config
+    // Create proper shared object references
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1807,15 +1821,13 @@ export async function buildCollectRewardsTx({
       mutable: true,
     });
 
-    // REVERTED: use snake_case function name
-    // Clock → Config → Pool → Position
     // Note: Bluefin moves rewards directly to the transaction signer
     txb.moveCall({
       target: `${packageId}::gateway::collect_reward`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID), // &Clock (immutable)
-        configRef, // CHANGED: Use shared config ref
-        poolRef, // CHANGED: Use shared pool ref
+        configRef,
+        poolRef,
         txb.object(positionId), // &mut Position (owned)
       ],
       typeArguments: [coinTypeA, coinTypeB, rewardCoinType],
@@ -1901,15 +1913,27 @@ export async function buildCollectFeesAndRewardsTx({
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the correct initial shared version for pool and config
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
 
     console.log(
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create proper shared object references for both pool and config
+    // Create proper shared object references
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -1996,15 +2020,8 @@ export async function buildClosePositionTx({
 
   const suiClient = await getSuiClient();
 
-  // Get the latest Bluefin package ID and config object ID
-  const packageId = await getBluefinPackageId();
-  const configId = await getBluefinConfigObjectId();
-  console.log(
-    `Using Bluefin package ID: ${packageId}, config object ID: ${configId}`
-  );
-
   try {
-    // Get pool details using the helper
+    // Get pool details for coin types
     const pool = await getPoolDetails(poolId);
     const { coinTypeA, coinTypeB } = pool.parsed;
 
@@ -2013,20 +2030,36 @@ export async function buildClosePositionTx({
       positionId,
     });
 
+    // Get the latest Bluefin package ID and config object ID
+    const packageId = await getBluefinPackageId();
+    const configId = await getBluefinConfigObjectId();
+
     // Create the transaction block
     const txb = new TransactionBlock();
     txb.setSender(walletAddress);
     txb.setGasBudget(30_000_000);
 
-    // Get the correct initial shared version for pool and config
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
 
     console.log(
       `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
     );
 
-    // Create proper shared object references for both pool and config
+    // Create shared object references
     const poolRef = txb.sharedObjectRef({
       objectId: poolId,
       initialSharedVersion: initialPoolVersion,
@@ -2039,55 +2072,45 @@ export async function buildClosePositionTx({
       mutable: true,
     });
 
-    // FIXED: Removed type annotations that were causing "Incorrect number of arguments" error
-    const [tokenA, tokenB, feeA, feeB] = txb.moveCall({
+    // REQUIRED: Include the recipient address as the fifth parameter for close_position
+    const result = txb.moveCall({
       target: `${packageId}::gateway::close_position`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
         poolRef,
         txb.object(positionId),
+        txb.pure.address(walletAddress), // recipient address
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Transfer all coin results to the user's wallet
-    txb.transferObjects([tokenA, tokenB, feeA, feeB], txb.pure(walletAddress));
-
-    // Serialize the transaction to bytes and encode as base64
+    // With recipient address specified, tokens go directly to the wallet
+    // No need to transfer objects, just build and return the transaction
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
     console.log("Close position transaction built successfully");
-    return base64Tx; // Return base64 encoded string
+    return base64Tx;
   } catch (error) {
     console.error("Error building close position transaction:", error);
-
-    // Check for Bluefin-specific errors
+    // Check for Bluefin-specific errors and rethrow
     const bluefinError = extractBluefinError(error);
     if (bluefinError) {
-      // Throw a more user-friendly error
       const enhancedError = new Error(bluefinError.message);
       enhancedError.code = bluefinError.code;
       enhancedError.type = "bluefin";
       enhancedError.originalError = error;
       throw enhancedError;
     }
-
-    // Otherwise throw the original error
     throw error;
   }
 }
 
 /**
  * Builds a transaction to force close a position
- * This is a simplified version that doesn't rely on the Bluefin SDK
  *
  * @param {Object} options - The parameters for the force close operation
- * @param {string} options.poolId - The pool ID
- * @param {string} options.positionId - The position ID to close
- * @param {string} options.walletAddress - The wallet address of the user
- * @param {boolean} options.force - Whether to force close the position
  * @returns {Promise<string>} - Base64 encoded transaction bytes
  */
 export async function buildForceClosePositionTx({
@@ -2107,11 +2130,8 @@ export async function buildForceClosePositionTx({
   const suiClient = await getSuiClient();
 
   try {
-    // Get pool details using the helper
+    // Get pool details for coin types
     const pool = await getPoolDetails(poolId);
-    if (!pool) {
-      throw new Error(`Pool ${poolId} not found`);
-    }
     const { coinTypeA, coinTypeB } = pool.parsed;
 
     console.log(`Pool details loaded for ${poolId}: ${coinTypeA}/${coinTypeB}`);
@@ -2131,25 +2151,39 @@ export async function buildForceClosePositionTx({
       positionResponse.data.display?.data
     );
 
-    // Skip the Bluefin SDK dynamic import since it's causing issues
-    // Instead, use our own implementation directly
+    // Use direct force close implementation
+    console.log("Using direct force close implementation");
 
     // Get the latest Bluefin package ID and config object ID
     const packageId = await getBluefinPackageId();
     const configId = await getBluefinConfigObjectId();
 
-    console.log(
-      `Using standard close position approach with package ID: ${packageId}, config ID: ${configId}`
-    );
+    console.log(`Using package ID: ${packageId}, config ID: ${configId}`);
 
     // Create the transaction block
     const txb = new TransactionBlock();
     txb.setSender(walletAddress);
     txb.setGasBudget(50_000_000); // Use higher gas budget for force operations
 
-    // Get the initial shared versions
-    const initialPoolVersion = await getInitialVersion(poolId);
-    const initialConfigVersion = await getInitialVersion(configId);
+    // Get the initial shared versions directly
+    const poolObj = await suiClient.getObject({
+      id: poolId,
+      options: { showOwner: true },
+    });
+
+    const configObj = await suiClient.getObject({
+      id: configId,
+      options: { showOwner: true },
+    });
+
+    const initialPoolVersion =
+      poolObj.data?.owner?.Shared?.initial_shared_version || "1";
+    const initialConfigVersion =
+      configObj.data?.owner?.Shared?.initial_shared_version || "1";
+
+    console.log(
+      `Using initial shared versions - pool: ${initialPoolVersion}, config: ${initialConfigVersion}`
+    );
 
     // Create shared object references
     const poolRef = txb.sharedObjectRef({
@@ -2164,42 +2198,37 @@ export async function buildForceClosePositionTx({
       mutable: true,
     });
 
-    // FIXED: Removed type annotations that were causing "Incorrect number of arguments" error
-    const [tokenA, tokenB, feeA, feeB] = txb.moveCall({
+    // REQUIRED: Include the recipient address as the fifth parameter for close_position
+    const result = txb.moveCall({
       target: `${packageId}::gateway::close_position`,
       arguments: [
         txb.object(SUI_CLOCK_OBJECT_ID),
         configRef,
         poolRef,
         txb.object(positionId),
+        txb.pure.address(walletAddress), // recipient address
       ],
       typeArguments: [coinTypeA, coinTypeB],
     });
 
-    // Transfer all coin results to the user's wallet
-    txb.transferObjects([tokenA, tokenB, feeA, feeB], txb.pure(walletAddress));
-
-    // Serialize the transaction to bytes and encode as base64
+    // With recipient address specified, tokens go directly to the wallet
+    // No need to transfer objects, just build and return the transaction
     const txBytes = await txb.build({ client: suiClient });
     const base64Tx = Buffer.from(txBytes).toString("base64");
 
-    console.log("Close position transaction built successfully");
+    console.log("Force close position transaction built successfully");
     return base64Tx;
   } catch (error) {
     console.error("Error building force close position transaction:", error);
-
-    // Check for Bluefin-specific errors
+    // Check for Bluefin-specific errors and rethrow
     const bluefinError = extractBluefinError(error);
     if (bluefinError) {
-      // Throw a more user-friendly error
       const enhancedError = new Error(bluefinError.message);
       enhancedError.code = bluefinError.code;
       enhancedError.type = "bluefin";
       enhancedError.originalError = error;
       throw enhancedError;
     }
-
-    // Otherwise throw the original error
     throw error;
   }
 }
