@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-12 20:23:34 UTC by jake1318
+// Last Updated: 2025-07-18 23:08:20 UTC by jake1318
 
 import React, {
   useState,
@@ -543,18 +543,11 @@ function WalletAssetsSection({ walletTokens }: { walletTokens: any[] }) {
             <div className="asset-card" key={`wallet-token-${idx}`}>
               <div className="asset-card__header">
                 <div className="token-info">
-                  <div className="token-icon">
-                    <img
-                      src={
-                        logoCache[token.coinType?.toLowerCase()] || DEFAULT_LOGO
-                      }
-                      alt={token.symbol}
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src =
-                          DEFAULT_LOGO;
-                      }}
-                    />
-                  </div>
+                  <TokenIcon
+                    symbol={token.symbol}
+                    address={token.coinType}
+                    size="md"
+                  />
                   <span className="token-symbol">{token.symbol}</span>
                 </div>
                 <div className="token-price">
@@ -605,6 +598,9 @@ function PortfolioValueCard({
   portfolioChange24h,
   selectedTimeframe,
   setSelectedTimeframe,
+  assetCount,
+  positionCount,
+  highestApy,
 }: {
   totalValue: number;
   portfolioChange24h: { value: number; percent: number };
@@ -612,6 +608,9 @@ function PortfolioValueCard({
   setSelectedTimeframe: React.Dispatch<
     React.SetStateAction<"7d" | "30d" | "1yr">
   >;
+  assetCount: number;
+  positionCount: number;
+  highestApy: number;
 }) {
   return (
     <div className="dashboard-card dashboard-card--glass dashboard-card--hero portfolio-value-card">
@@ -655,7 +654,9 @@ function PortfolioValueCard({
 
           <div className="metric">
             <div className="metric-label">Assets</div>
-            <div className="metric-value">7 Tokens / 13 Positions</div>
+            <div className="metric-value">
+              {assetCount} Tokens / {positionCount} Positions
+            </div>
           </div>
 
           <div className="metric">
@@ -667,7 +668,7 @@ function PortfolioValueCard({
                 textShadow: "0 0 10px rgba(30, 215, 96, 0.5)",
               }}
             >
-              64.8%
+              {highestApy.toFixed(1)}%
             </div>
           </div>
         </div>
@@ -1940,6 +1941,42 @@ function Portfolio() {
     return categories;
   };
 
+  // Calculate portfolio metrics for overview section
+  const calculatePortfolioMetrics = () => {
+    // Calculate unique tokens count (from wallet + positions)
+    const uniqueTokens = new Set<string>();
+
+    // Add wallet tokens
+    walletTokens.forEach((token) => {
+      if (token.symbol) {
+        uniqueTokens.add(token.symbol.toUpperCase());
+      }
+    });
+
+    // Add position tokens
+    allPositions.forEach((position) => {
+      if (position.tokenASymbol) {
+        uniqueTokens.add(position.tokenASymbol.toUpperCase());
+      }
+      if (position.tokenBSymbol) {
+        uniqueTokens.add(position.tokenBSymbol.toUpperCase());
+      }
+    });
+
+    // Count positions
+    const positionCount = allPositions.length;
+
+    // Calculate highest APY
+    const allAprs = allPositions.map((position) => position.apr || 0);
+    const highestApy = allAprs.length > 0 ? Math.max(...allAprs) : 0;
+
+    return {
+      tokenCount: uniqueTokens.size,
+      positionCount,
+      highestApy,
+    };
+  };
+
   // Categorize positions using allPositions instead of poolPositions
   const categorizedPositions = useMemo(() => {
     const categorized = categorizePositions(allPositions);
@@ -2218,6 +2255,9 @@ function Portfolio() {
       );
     }
 
+    // Get the portfolio metrics for the overview card
+    const portfolioMetrics = calculatePortfolioMetrics();
+
     return (
       <>
         {/* Portfolio Value Card */}
@@ -2227,6 +2267,9 @@ function Portfolio() {
             portfolioChange24h={portfolioChange24h}
             selectedTimeframe={selectedTimeframe}
             setSelectedTimeframe={setSelectedTimeframe}
+            assetCount={portfolioMetrics.tokenCount}
+            positionCount={portfolioMetrics.positionCount}
+            highestApy={portfolioMetrics.highestApy}
           />
         </div>
 

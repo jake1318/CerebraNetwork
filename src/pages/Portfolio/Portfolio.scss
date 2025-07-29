@@ -1,5 +1,5 @@
-// src/pages/Portfolio/Portfolio.scss
-// Last Updated: 2025-07-16 01:03:16 UTC by jake1318
+/* src/pages/Portfolio/Portfolio.scss */
+/* Last Updated: 2025-07-18 23:26:35 UTC by jake1318 */
 
 // Variables for consistent colors - matching Home.scss
 $background-dark: #020314;
@@ -28,39 +28,47 @@ html {
   font-family: "Inter", sans-serif;
   background-color: $background-dark;
   color: $text-primary;
+  height: 100%;
 }
 
 // Main app layout with sidebar
 .app-layout {
   display: flex;
   min-height: 100vh;
-  font-family: "Inter", sans-serif;
+  position: relative;
+  flex-direction: row;
 
   // Sidebar styles
   .sidebar {
+    position: fixed;
+    top: var(--navbar-h); // Position below the navbar
+    left: 0;
+    bottom: 0;
+    height: calc(100% - var(--navbar-h)); // Adjust height to account for navbar
+    max-height: calc(100% - var(--navbar-h)); // Adjust max height too
     width: 280px; // Increased width to accommodate values
     background-color: rgba($background-surface, 0.5);
     border-right: 1px solid rgba($border-dark, 0.8);
-    position: fixed;
-    height: 100vh;
     z-index: 100;
     transition: all 0.3s ease;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    overflow: hidden;
+    overflow-y: auto;
 
     &__content {
-      height: 100%;
+      flex-grow: 1;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch; // Smooth scrolling on iOS
 
       // ENHANCED SCROLLBAR STYLING
       // Firefox
-      scrollbar-width: thin;
+      scrollbar-width: none; // Hide scrollbars
       scrollbar-color: rgba($neon-blue, 0.5) rgba($background-dark, 0.3);
 
       // Chrome, Edge, Safari
       &::-webkit-scrollbar {
         width: 6px;
+        display: none; // Hide scrollbars
       }
 
       &::-webkit-scrollbar-track {
@@ -193,7 +201,7 @@ html {
       display: none;
       position: fixed;
       left: 1rem;
-      top: 1rem;
+      top: calc(var(--navbar-h) + 1rem); // Position below navbar
       z-index: 110;
       background: rgba($background-surface, 0.8);
       backdrop-filter: blur(10px);
@@ -218,11 +226,16 @@ html {
   // Main content area
   .main-content {
     flex: 1;
-    margin-left: 280px; // Match the sidebar width
-    padding: 0;
-    transition: all 0.3s ease;
+    padding-left: 280px; // Use padding-left instead of margin-left
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding-bottom: 200px; // Ensure space for footer
+    padding-top: var(--navbar-h); // Add padding to account for navbar
+    overflow-y: visible !important;
 
     .page-content {
+      flex: 1 0 auto;
       padding: 1.5rem;
     }
   }
@@ -234,6 +247,7 @@ html {
   position: relative;
   color: $text-primary;
   font-family: "Inter", sans-serif;
+  overflow-y: visible !important; // Fix for nested scrolling issues
 
   // Add the glow elements for blue, green, and magenta
   .glow-1 {
@@ -1304,6 +1318,11 @@ html {
   .app-layout {
     .sidebar {
       transform: translateX(-100%);
+      position: fixed;
+      top: var(--navbar-h); // Keep the top offset for navbar
+      bottom: 0;
+      height: calc(100% - var(--navbar-h)); // Adjust height for navbar
+      z-index: 1000;
 
       &.active {
         transform: translateX(0);
@@ -1315,50 +1334,51 @@ html {
     }
 
     .main-content {
-      margin-left: 0;
+      padding-left: 0; // No padding when sidebar is hidden on mobile
     }
   }
 }
 
-// Dark scrollbar styling for the entire app
+// Fix z-index footer stacking
+footer,
+.footer {
+  position: relative;
+  z-index: 101; // Higher than sidebar to ensure it's always visible
+  margin-top: auto; // Push to the bottom
+  flex-shrink: 0;
+}
+
+// Modified scrollbar styles to preserve main scrolling
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba($background-dark, 0.5);
-  border-radius: 8px;
-  margin: 3px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    rgba($neon-blue, 0.4),
-    rgba($neon-magenta, 0.4)
-  );
-  border-radius: 8px;
-  border: 1px solid rgba($background-dark, 0.4);
-
-  &:hover {
-    background: linear-gradient(
-      180deg,
-      rgba($neon-blue, 0.6),
-      rgba($neon-magenta, 0.6)
-    );
-    box-shadow: inset 0 0 6px rgba($neon-blue, 0.4);
-  }
+  background: rgba($neon-blue, 0.3);
+  border-radius: 4px;
 }
 
-::-webkit-scrollbar-corner {
-  background: transparent;
+::-webkit-scrollbar-thumb:hover {
+  background: rgba($neon-blue, 0.5);
+}
+
+// Add smooth scrolling for mobile
+html,
+body {
+  -webkit-overflow-scrolling: touch;
 }
 
 // Activity specific styles
 .activity-page {
   width: 100%;
   position: relative;
+  overflow-y: visible !important; // Fix for nested scrolling issues
 
   // Activity filters
   .activity-filters {
@@ -1829,4 +1849,16 @@ html {
 // Small utility for smaller icon sizes
 .icon-sm {
   font-size: 0.8rem;
+}
+
+// Animations for pulsating effects
+@keyframes pulsate {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
 }
