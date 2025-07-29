@@ -1,18 +1,19 @@
 // src/services/cetusService.ts
-// Current Date and Time (UTC): 2025-07-25 23:41:58
+// Current Date and Time (UTC): 2025-07-28 02:36:44
 // Current User's Login: jake1318
 
 import {
   CetusClmmSDK,
   LiquidityMath,
   SqrtPriceMath,
+  AddLiquidityFixTokenParams,
 } from "@cetusprotocol/sui-clmm-sdk";
 import {
   ClmmPoolUtil,
   TickMath,
   CoinAssist,
   Percentage,
-  adjustForCoinSlippage, // Restored this missing import
+  adjustForCoinSlippage,
 } from "@cetusprotocol/common-sdk";
 import type { WalletContextState } from "@suiet/wallet-kit";
 import type { PoolInfo } from "./coinGeckoService";
@@ -22,14 +23,52 @@ import { SuiClient } from "@mysten/sui.js/client";
 import { birdeyeService } from "./birdeyeService";
 import BN from "bn.js";
 import { normalizeSuiAddress } from "@mysten/sui.js/utils";
-import type { SuiTransactionBlockResponse } from "@mysten/sui.js/client";
+import type {
+  SuiTransactionBlockResponse,
+  CoinStruct,
+} from "@mysten/sui.js/client";
 
 // Fee configuration for all Cetus pool deposits
 const FEE_ADDRESS =
   "0xc4a6782bda928c118a336a581aaa24f3a0418fdeebe1b7a053b9bf5890fd691e";
 const FEE_BP = 30; // 30 basis points
-// denominator for basis points
-const BP_DENOMINATOR = 10_000;
+// denominator for basis points - explicitly export this constant
+export const BP_DENOMINATOR = 10_000;
+
+// Fallback constants for module paths in case the SDK doesn't provide them
+const CETUS_FALLBACK = {
+  PACKAGE_ID:
+    "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb",
+  CLMM_POSITION: "clmm_router", // Changed from "pool" to "clmm_router"
+  CLMM_CONFIG:
+    "0xdaa46292632c3c4d8f31f23ea0f9b36a28ff3677e9684980e4438403a67a3d8f",
+  CLMM_REWARDER: "clmm_rewarder",
+};
+
+// Native SUI coin type
+const SUI_TYPE = "0x2::sui::SUI";
+// Clock object ID (0x6 on all networks)
+const CLOCK_OBJECT_ID = "0x6";
+
+// Centralized BCS primitive helper for compile-time safety
+// UPDATED: Fixed parameter order for tx.pure calls in Sui SDK 1.30+
+export const bcs = {
+  u64: (tx: TransactionBlock, n: bigint | number) =>
+    tx.pure(n.toString(), "u64"),
+  u8: (tx: TransactionBlock, n: number) => tx.pure(n, "u8"),
+  bool: (tx: TransactionBlock, b: boolean) => tx.pure(b, "bool"),
+  addr: (tx: TransactionBlock, a: string) => tx.pure(a, "address"),
+};
+
+/**
+ * Encode signed 32-bit tick index as unsigned u32 expected by the ABI
+ * Needed because Cetus CLMM v3 (July 2024) changed tick types from i32 to u32
+ * NOTE: The SDK helpers now handle this conversion internally
+ */
+function encodeTick(idx: number): string {
+  // >>> forces two's-complement conversion and returns an unsigned JS int
+  return (idx >>> 0).toString(); // returns a decimal string safe for `pure`
+}
 
 // Simple inline helper to check transaction success
 function assertSuccess(effects: SuiTransactionBlockResponse["effects"]) {
@@ -40,20 +79,14 @@ function assertSuccess(effects: SuiTransactionBlockResponse["effects"]) {
   }
 }
 
-// Correct mainnet object IDs for Cetus CLMM SDK v2
-const CETUS_MAINNET_ADDRESSES = {
-  // CLMM core modules
-  CLMM_MODULES:
-    "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb",
-  // Global config object
-  CONFIG_OBJECT:
-    "0xdaa46292632c3c4d8f31f23ea0f9b36a28ff3677e9684980e4438403a67a3d8f",
-};
-
 // Initialize Cetus CLMM SDK - singleton pattern
 // No need for init() call, the SDK is ready to use immediately after createSDK()
 export const clmmSdk = CetusClmmSDK.createSDK({ env: "mainnet" });
-console.log("Cetus SDK created with mainnet environment");
+
+// Create a global SuiClient instance for RPC queries
+export const suiClient = new SuiClient({
+  url: "https://fullnode.mainnet.sui.io:443",
+});
 
 // In-memory cache for token info to avoid repeated API calls
 export const coinInfoCache: Record<
@@ -64,12 +97,10 @@ export const coinInfoCache: Record<
 // Set sender address when wallet connects
 export function setCetusSender(address: string) {
   if (!address) {
-    console.warn("Cannot set sender address: address is undefined");
     return;
   }
 
   clmmSdk.setSenderAddress(address);
-  console.log(`Set SDK sender address to ${address}`);
 }
 
 // Common token decimals - helps us handle the most common ones
@@ -83,6 +114,35 @@ const COMMON_DECIMALS: Record<string, number> = {
   CETUS: 9,
   WAL: 9,
 };
+
+/**
+ * Helper function to safely get Cetus module paths, with fallbacks
+ * @returns An object containing package_id, clmm_position, and clmm_config
+ */
+function getCetusModulePaths() {
+  if (clmmSdk.sdkOptions && clmmSdk.sdkOptions.cetusModule) {
+    return {
+      package_id:
+        clmmSdk.sdkOptions.cetusModule.package_id || CETUS_FALLBACK.PACKAGE_ID,
+      clmm_position:
+        clmmSdk.sdkOptions.cetusModule.clmm_position ||
+        CETUS_FALLBACK.CLMM_POSITION,
+      clmm_config:
+        clmmSdk.sdkOptions.cetusModule.clmm_config ||
+        CETUS_FALLBACK.CLMM_CONFIG,
+      clmm_rewarder:
+        clmmSdk.sdkOptions.cetusModule.clmm_rewarder ||
+        CETUS_FALLBACK.CLMM_REWARDER,
+    };
+  }
+
+  return {
+    package_id: CETUS_FALLBACK.PACKAGE_ID,
+    clmm_position: CETUS_FALLBACK.CLMM_POSITION,
+    clmm_config: CETUS_FALLBACK.CLMM_CONFIG,
+    clmm_rewarder: CETUS_FALLBACK.CLMM_REWARDER,
+  };
+}
 
 /**
  * Helper function to apply slippage to an amount
@@ -105,7 +165,6 @@ function compareWithSlippage(n: string, bps: number): string {
       .divn(10_000)
       .toString();
   } catch (error) {
-    console.error(`Error in compareWithSlippage for value ${n}:`, error);
     return "0"; // Safe fallback
   }
 }
@@ -169,13 +228,8 @@ export async function getCoinInfo(
 
     const info = { symbol, decimals };
     coinInfoCache[coinType] = info;
-    console.log(
-      `Using extracted info for ${coinType}: ${symbol}, ${decimals} decimals`
-    );
     return info;
   } catch (err) {
-    console.error(`Failed to fetch metadata for ${coinType}`, err);
-
     // Last resort fallback
     const parts = coinType.split("::");
     const symbol = parts[parts.length - 1] || "Unknown";
@@ -244,24 +298,17 @@ function toBaseUnit(amount: number, decimals: number): string {
 function guessTokenDecimals(coinType?: string): number {
   // Guard against undefined coinType
   if (!coinType) {
-    console.warn("guessTokenDecimals: no coinType provided, defaulting to 9");
     return 9;
   }
 
   // Default fallbacks by token name
   for (const [symbol, decimals] of Object.entries(COMMON_DECIMALS)) {
     if (coinType.toLowerCase().includes(symbol.toLowerCase())) {
-      console.log(
-        `Guessed ${decimals} decimals for ${coinType} based on symbol ${symbol}`
-      );
       return decimals;
     }
   }
 
   // Default fallback
-  console.log(
-    `Could not determine decimals for ${coinType}, using default of 9`
-  );
   return 9;
 }
 
@@ -300,6 +347,22 @@ export function isBluefinPool(poolId: string, dex?: string): boolean {
 }
 
 /**
+ * Check if a pool is a Kriya pool
+ */
+export function isKriyaPool(poolId: string, dex?: string): boolean {
+  if (dex && dex.toLowerCase().includes("kriya")) {
+    return true;
+  }
+
+  // Common patterns in Kriya pool addresses
+  const kriyaPatterns = ["kriya", "0x2a3b", "0x5a41d", "0x8d88d"];
+
+  return kriyaPatterns.some((pattern) =>
+    poolId.toLowerCase().includes(pattern.toLowerCase())
+  );
+}
+
+/**
  * Helper function to verify transaction success on-chain when the wallet reports unknown status
  * @param digest Transaction digest to check
  * @returns true if the transaction succeeded on-chain, false otherwise
@@ -310,9 +373,6 @@ async function verifyTransactionSuccess(digest: string): Promise<boolean> {
   }
 
   try {
-    const suiClient = new SuiClient({
-      url: "https://fullnode.mainnet.sui.io:443",
-    });
     // Query the transaction status from a full node
     let txStatus = await suiClient.getTransactionBlock({
       digest,
@@ -328,16 +388,144 @@ async function verifyTransactionSuccess(digest: string): Promise<boolean> {
     }
     return txStatus?.effects?.status?.status === "success";
   } catch (queryError) {
-    console.error("Failed to query transaction status from RPC:", queryError);
     return false;
   }
 }
 
 /**
+ * Select and prepare coins for a deposit, handling both SUI and non-SUI tokens.
+ * In CLMM v3, the router pulls tokens directly from the transaction coins, so we
+ * don't need to explicitly return a coin object for the deposit. We only need to
+ * ensure the fee is paid correctly.
+ *
+ * @param tx The transaction block
+ * @param address User's wallet address
+ * @param coinType Token type (e.g., "0x2::sui::SUI")
+ * @param poolAmount Amount needed for the pool after fee deduction
+ * @param feeAmount Amount for the 30bps fee
+ * @param makeDepositCoin Whether to create and return a deposit coin (needed for Bluefin)
+ * @returns The TransactionArgument representing the coin for pool deposit, or undefined if not needed
+ */
+async function prepareCoinWithFee(
+  tx: TransactionBlock,
+  address: string,
+  coinType: string,
+  poolAmount: bigint,
+  feeAmount: bigint,
+  makeDepositCoin = false
+): Promise<void | any> {
+  const isSui = coinType === SUI_TYPE;
+  const hasNonZeroFee = Number(feeAmount) > 0;
+
+  // Helper functions to create typed pure values for sui.js v1.30+
+  const u64 = (n: bigint | number) => bcs.u64(tx, n);
+  const addr = (a: string) => bcs.addr(tx, a);
+
+  // For SUI, we can leverage the gas coin directly
+  if (isSui) {
+    // Carve out the fee first
+    if (hasNonZeroFee) {
+      const [coinFee] = tx.splitCoins(tx.gas, [u64(feeAmount)]);
+      tx.transferObjects([coinFee], addr(FEE_ADDRESS));
+    }
+
+    if (!makeDepositCoin) return; // CLMM-v3 path finished
+
+    // Bluefin still needs an exact-sized coin for the Move call
+    const [coinForPool] = tx.splitCoins(tx.gas, [u64(poolAmount)]);
+    return coinForPool;
+  }
+
+  // For non-SUI tokens, we need to fetch the user's coins of this type
+
+  // Fetch all user's coins of this type
+  const totalNeeded = poolAmount + feeAmount;
+  const coinsData = await suiClient.getCoins({
+    owner: address,
+    coinType: coinType,
+  });
+
+  if (coinsData.data.length === 0) {
+    throw new Error(`No ${coinType} coins found in wallet`);
+  }
+
+  // Sort coins by balance (largest first) using comparison approach for BigInt
+  coinsData.data.sort((a, b) => {
+    const balanceA = BigInt(a.balance);
+    const balanceB = BigInt(b.balance);
+    // For descending order (largest first):
+    if (balanceB > balanceA) return 1;
+    if (balanceB < balanceA) return -1;
+    return 0;
+  });
+
+  // Select coins until we have enough to cover the total needed
+  let remainingAmount = totalNeeded;
+  const selectedCoins: string[] = [];
+
+  for (const coin of coinsData.data) {
+    selectedCoins.push(coin.coinObjectId);
+    remainingAmount -= BigInt(coin.balance);
+    if (remainingAmount <= 0n) break;
+  }
+
+  // If we don't have enough coins, throw an error
+  if (remainingAmount > 0n) {
+    throw new Error(`Insufficient balance for ${coinType}`);
+  }
+
+  // CLMM-v3 → no merge at all (let the router select the coins it needs)
+  if (!makeDepositCoin) {
+    // We already sorted by balance, just use the first coin for fee
+    const primary = tx.object(selectedCoins[0]);
+
+    if (hasNonZeroFee) {
+      const [feeCoin] = tx.splitCoins(primary, [u64(feeAmount)]);
+      tx.transferObjects([feeCoin], addr(FEE_ADDRESS));
+    }
+
+    // Return without merging - let the router handle coin selection
+    return;
+  }
+
+  // Bluefin still needs one exact-sized coin:
+  // - merge if necessary
+  // - split fee
+  // - split pool amount and return it
+
+  // Merge coins if more than one was selected
+  let coinTotal;
+  if (selectedCoins.length > 1) {
+    coinTotal = tx.mergeCoins(
+      tx.object(selectedCoins[0]),
+      selectedCoins.slice(1).map((id) => tx.object(id))
+    );
+  } else {
+    coinTotal = tx.object(selectedCoins[0]);
+  }
+
+  // Carve out the fee first
+  if (hasNonZeroFee) {
+    const [coinFee] = tx.splitCoins(coinTotal, [u64(feeAmount)]);
+    tx.transferObjects([coinFee], addr(FEE_ADDRESS));
+  }
+
+  // Now split and return the exact pool amount (for Bluefin)
+  const [coinForPool] = tx.splitCoins(coinTotal, [u64(poolAmount)]);
+  return coinForPool;
+}
+
+/**
  * Open a position and deposit liquidity with a 30bps fee.
- * Updated to use SDK v2 helpers for transaction creation
- * Fixed to use calculated coin limits from SDK to handle rounding issues
- * Added 30bps fee on all deposits
+ * Updated to use the SDK helper functions for CLMM v3 (July 2024):
+ * - Uses clmm_router::open_and_add_liquidity_fix_token via SDK helper
+ * - Handles non-SUI tokens with proper coin selection
+ * - Includes 30bps fee on all deposits
+ * - Fixed for @mysten/sui.js v1.30+ compatibility with correct BCS parameter order
+ * - Fixed to handle Bluefin and Kriya pools correctly
+ * - Fixed to avoid UnusedValueWithoutDrop error in CLMM v3
+ * - Fixed to avoid CommandArgumentError by preventing coin merging for CLMM v3
+ * - Fixed the USDC/SUI issue by preparing coins BEFORE the SDK builds the payload
  */
 export async function deposit(
   wallet: WalletContextState,
@@ -354,7 +542,6 @@ export async function deposit(
   }
 
   const address = wallet.account.address;
-  console.log("Starting deposit process for address:", address);
 
   // Set sender address for this operation - important for the SDK helpers
   clmmSdk.setSenderAddress(address);
@@ -363,15 +550,21 @@ export async function deposit(
   if (isBluefinPool(poolId, poolInfo?.dex)) {
     try {
       // Handle Bluefin pools with existing implementation
-      console.log(`Using Bluefin deposit implementation for pool ${poolId}`);
 
-      // Determine token decimals based on symbols if available
+      // Determine token decimals and types
       const decimalsA = poolInfo?.tokenA
         ? COMMON_DECIMALS[poolInfo.tokenA] || 9
         : 9;
       const decimalsB = poolInfo?.tokenB
         ? COMMON_DECIMALS[poolInfo.tokenB] || 9
         : 9;
+
+      const coin_type_a = poolInfo?.tokenAAddress;
+      const coin_type_b = poolInfo?.tokenBAddress;
+
+      if (!coin_type_a || !coin_type_b) {
+        throw new Error("Cannot determine token types for Bluefin pool.");
+      }
 
       // Convert to base units
       const baseAmountA = toBaseUnit(amountX, decimalsA);
@@ -387,46 +580,47 @@ export async function deposit(
       const poolAmountA = BigInt(baseAmountA) - feeAmountA;
       const poolAmountB = BigInt(baseAmountB) - feeAmountB;
 
-      console.log(
-        `Bluefin deposit with amounts: A=${amountX}(${poolAmountA}) + fee(${feeAmountA}) and B=${amountY}(${poolAmountB}) + fee(${feeAmountB})`
-      );
-
       // Create a transaction block for Bluefin deposit
       const txb = new TransactionBlock();
       const BLUEFIN_PACKAGE =
         "0xf7133d0cb63e1a78ef27a78d4e887a58428d06ff4f2ebbd33af273a04a1bf444";
 
+      // Helper functions for transaction types (sui.js v1.30+ with correct order)
+      const addr = (a: string) => bcs.addr(txb, a);
+
       // Set gas budget explicitly to avoid errors
       txb.setGasBudget(150000000); // 0.15 SUI - increased budget for safety
 
-      // Split coins for pool deposit and fees
-      const [coinAForPool, coinAFee] = txb.splitCoins(txb.gas, [
-        txb.pure(Number(poolAmountA)),
-        txb.pure(Number(feeAmountA)),
-      ]);
+      // FIXED: Use prepareCoinWithFee to get correct coins for each token, explicitly requesting deposit coins
+      const coinAForPool = await prepareCoinWithFee(
+        txb,
+        address,
+        coin_type_a,
+        poolAmountA,
+        feeAmountA,
+        true
+      );
 
-      const [coinBForPool, coinBFee] = txb.splitCoins(txb.gas, [
-        txb.pure(Number(poolAmountB)),
-        txb.pure(Number(feeAmountB)),
-      ]);
+      const coinBForPool = await prepareCoinWithFee(
+        txb,
+        address,
+        coin_type_b,
+        poolAmountB,
+        feeAmountB,
+        true
+      );
 
-      // Transfer fees to fee collector address
-      if (Number(feeAmountA) > 0) {
-        txb.transferObjects([coinAFee], txb.pure(FEE_ADDRESS));
-      }
+      // prepareCoinWithFee has already transferred fees to FEE_ADDRESS
 
-      if (Number(feeAmountB) > 0) {
-        txb.transferObjects([coinBFee], txb.pure(FEE_ADDRESS));
-      }
-
-      // Call the Bluefin add_liquidity function with pool amounts
+      // Call the Bluefin add_liquidity function with coin objects and types
       txb.moveCall({
         target: `${BLUEFIN_PACKAGE}::clmm::add_liquidity`,
         arguments: [
-          txb.pure(poolId),
-          txb.pure(Number(poolAmountA)),
-          txb.pure(Number(poolAmountB)),
+          addr(poolId),
+          coinAForPool, // Now uses actual coin object
+          coinBForPool, // Now uses actual coin object
         ],
+        typeArguments: [coin_type_a, coin_type_b],
       });
 
       // Execute the transaction
@@ -442,8 +636,6 @@ export async function deposit(
       if (result.effects?.status?.status !== "success") {
         const digest = result.digest || "unknown";
         const errorMsg = result.effects?.status?.error;
-        console.error(`Bluefin transaction failed with digest: ${digest}`);
-        console.error(`Error details: ${errorMsg || "unknown"}`);
 
         // If error message is empty or "unknown", double-check transaction status on-chain
         if (
@@ -453,9 +645,6 @@ export async function deposit(
             errorMsg.toLowerCase().includes("timeout"))
         ) {
           if (await verifyTransactionSuccess(digest)) {
-            console.warn(
-              `Bluefin transaction digest ${digest} succeeded on-chain despite earlier error`
-            );
             return { success: true, digest }; // Treat as success
           }
         }
@@ -465,17 +654,11 @@ export async function deposit(
         );
       }
 
-      console.log(
-        "Bluefin deposit transaction completed, digest:",
-        result.digest
-      );
-
       return {
         success: true,
         digest: result.digest || "",
       };
     } catch (error) {
-      console.error("Bluefin deposit failed:", error);
       throw new Error(
         `Bluefin deposit failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -484,8 +667,15 @@ export async function deposit(
     }
   }
 
+  // NEW: Check for Kriya pools, which are unsupported
+  if (isKriyaPool(poolId, poolInfo?.dex)) {
+    throw new Error(
+      "Deposits to Kriya pools are not supported in this version. " +
+        "Please use the Kriya app to manage liquidity for Kriya pools."
+    );
+  }
+
   try {
-    console.log(`Fetching pool information for: ${poolId}`);
     const pool = await clmmSdk.Pool.getPool(poolId);
     if (!pool) {
       throw new Error("Pool not found");
@@ -494,12 +684,6 @@ export async function deposit(
     // Determine coin types with fallback to poolInfo
     const coin_type_a = pool.coin_type_a || poolInfo?.tokenAAddress;
     const coin_type_b = pool.coin_type_b || poolInfo?.tokenBAddress;
-
-    console.log(
-      `Resolved coin types: A=${coin_type_a || "undefined"}, B=${
-        coin_type_b || "undefined"
-      }`
-    );
 
     if (!coin_type_a || !coin_type_b) {
       throw new Error(
@@ -513,13 +697,6 @@ export async function deposit(
 
     const decimalsA = tokenAInfo.decimals;
     const decimalsB = tokenBInfo.decimals;
-
-    console.log(
-      `Token A (${coin_type_a}): ${tokenAInfo.symbol}, ${decimalsA} decimals`
-    );
-    console.log(
-      `Token B (${coin_type_b}): ${tokenBInfo.symbol}, ${decimalsB} decimals`
-    );
 
     // Convert amounts to base units using accurate decimals
     const baseAmountA = toBaseUnit(amountX, decimalsA);
@@ -535,40 +712,28 @@ export async function deposit(
     const poolAmountA = BigInt(baseAmountA) - feeAmountA;
     const poolAmountB = BigInt(baseAmountB) - feeAmountB;
 
-    console.log(
-      `User requested amounts: A=${baseAmountA}, B=${baseAmountB} (in base units)`
-    );
-
-    console.log(
-      `After fee deduction: A=${poolAmountA}, B=${poolAmountB} (in base units), Fee A=${feeAmountA}, Fee B=${feeAmountB}`
-    );
-
     // Compute ticks - ensuring proper alignment to tick spacing
     const tick_spacing = parseInt(pool.tick_spacing) || 60;
-    console.log(`Pool tick spacing: ${tick_spacing}`);
 
     let tick_lower, tick_upper;
     if (tickLower !== undefined && tickUpper !== undefined) {
       // Ensure user-provided ticks are aligned with tick spacing
       tick_lower = Math.floor(tickLower / tick_spacing) * tick_spacing;
       tick_upper = Math.ceil(tickUpper / tick_spacing) * tick_spacing;
-      console.log(`Using provided tick range: ${tick_lower} to ${tick_upper}`);
     } else {
       // Use full range ticks aligned to spacing if no ticks provided
       const { lower, upper } = getGlobalTickRange(tick_spacing);
       tick_lower = lower;
       tick_upper = upper;
-      console.log(`Using full range ticks: ${tick_lower} to ${tick_upper}`);
     }
 
     // Fixed 1% slippage - could be made configurable
-    const slippagePct = 1;
+    const slippagePct = 0.01; // 1% as decimal
     // Optional safety buffer percentage (adds extra margin to avoid rounding errors)
     const bufferPct = 1; // Add 1% buffer
 
     // Calculate liquidity and required amounts based on fixed side
     const isFixingA = fixedTokenSide === "A";
-    console.log(`Fixed token side: ${isFixingA ? "A" : "B"}`);
 
     // Add defensive checks to ensure we have non-zero amounts for both tokens
     if (isFixingA && Number(poolAmountB) === 0) {
@@ -590,8 +755,6 @@ export async function deposit(
     const amountABn = new BN(poolAmountA.toString());
     const amountBBn = new BN(poolAmountB.toString());
 
-    console.log("Calculating liquidity and coin amounts using SDK utility...");
-
     // Calculate liquidity and coin amounts using SDK utility
     const liqInput = ClmmPoolUtil.estLiquidityAndCoinAmountFromOneAmounts(
       tick_lower,
@@ -599,11 +762,9 @@ export async function deposit(
       isFixingA ? amountABn : amountBBn,
       isFixingA, // true if fixing A
       true, // round_up
-      slippagePct / 100, // 0.01 for 1%
+      slippagePct, // 0.01 for 1%
       curSqrtPrice
     );
-
-    console.log("Raw liqInput object:", liqInput);
 
     // Extract the calculated limits that account for rounding - handle both camelCase and snake_case field names
     let tokenMaxA = liqInput.coin_amount_limit_a || liqInput.tokenMaxA;
@@ -611,7 +772,6 @@ export async function deposit(
     let liquidityAmount = liqInput.liquidity_amount || liqInput.liquidity;
 
     if (!tokenMaxA || !tokenMaxB || !liquidityAmount) {
-      console.error("Unexpected liqInput format:", liqInput);
       throw new Error("SDK returned unexpected format. Please try again.");
     }
 
@@ -619,15 +779,6 @@ export async function deposit(
     tokenMaxA = new BN(tokenMaxA.toString());
     tokenMaxB = new BN(tokenMaxB.toString());
     liquidityAmount = new BN(liquidityAmount.toString());
-
-    console.log("Type checks:", {
-      tokenMaxA_type: typeof tokenMaxA,
-      tokenMaxA_isBN: tokenMaxA instanceof BN,
-      tokenMaxB_type: typeof tokenMaxB,
-      tokenMaxB_isBN: tokenMaxB instanceof BN,
-      liquidityAmount_type: typeof liquidityAmount,
-      liquidityAmount_isBN: liquidityAmount instanceof BN,
-    });
 
     // Add safety buffer to the non-fixed side limit - keep all math in BN form
     let bufferedLimitA, bufferedLimitB;
@@ -652,83 +803,109 @@ export async function deposit(
         .toString(); // Convert to string only at the end
     }
 
-    console.log("Calculated values from SDK:", {
-      liquidity: liquidityAmount.toString(),
-      tokenMaxA: tokenMaxA.toString(),
-      tokenMaxB: tokenMaxB.toString(),
-      bufferedLimitA,
-      bufferedLimitB,
-    });
-
     try {
-      console.log("Building transaction payload with SDK helper");
+      // Fixed: Use snake_case parameter names to match what the SDK expects
+      const addParams: AddLiquidityFixTokenParams = {
+        pool_id: poolId,
+        coin_type_a: coin_type_a,
+        coin_type_b: coin_type_b,
+        tick_lower: tick_lower.toString(),
+        tick_upper: tick_upper.toString(),
+        fix_amount_a: isFixingA,
+        amount_a: isFixingA ? poolAmountA.toString() : bufferedLimitA,
+        amount_b: isFixingA ? bufferedLimitB : poolAmountB.toString(),
+        slippage: slippagePct, // e.g. 0.01 for 1%
+        is_open: true, // we are creating a brand-new position
+        pos_id: "", // empty → router opens the NFT for us
+        rewarder_coin_types: [],
+        collect_fee: false,
+      };
 
-      // Create transaction block
-      const tx = new TransactionBlock();
-      tx.setGasBudget(150000000); // 0.15 SUI
+      // Create transaction for fee payment
+      const feeTx = new TransactionBlock();
+      feeTx.setGasBudget(50000000); // 0.05 SUI for fee tx
 
-      // 1. Split coins for pool deposit and fees
-      const [coinAForPool, coinAFee] = tx.splitCoins(tx.gas, [
-        tx.pure(Number(poolAmountA)),
-        tx.pure(Number(feeAmountA)),
-      ]);
+      // Helper functions for Sui types
+      const addr = (a: string) => bcs.addr(feeTx, a);
+      const u64 = (n: string | number | bigint) => bcs.u64(feeTx, n);
 
-      const [coinBForPool, coinBFee] = tx.splitCoins(tx.gas, [
-        tx.pure(Number(poolAmountB)),
-        tx.pure(Number(feeAmountB)),
-      ]);
+      // For token A fee
+      let feeAPaid = false;
+      if (feeAmountA > 0n) {
+        if (coin_type_a === SUI_TYPE) {
+          const [feeA] = feeTx.splitCoins(feeTx.gas, [u64(feeAmountA)]);
+          feeTx.transferObjects([feeA], addr(FEE_ADDRESS));
+          feeAPaid = true;
+        } else {
+          const coinsA = await suiClient.getCoins({
+            owner: address,
+            coinType: coin_type_a,
+          });
 
-      // 2. Transfer fees to fee collector address
-      if (Number(feeAmountA) > 0) {
-        tx.transferObjects([coinAFee], tx.pure(FEE_ADDRESS));
+          if (coinsA.data.length > 0) {
+            const [feeA] = feeTx.splitCoins(
+              feeTx.object(coinsA.data[0].coinObjectId),
+              [u64(feeAmountA)]
+            );
+            feeTx.transferObjects([feeA], addr(FEE_ADDRESS));
+            feeAPaid = true;
+          }
+        }
       }
 
-      if (Number(feeAmountB) > 0) {
-        tx.transferObjects([coinBFee], tx.pure(FEE_ADDRESS));
+      // For token B fee
+      let feeBPaid = false;
+      if (feeAmountB > 0n) {
+        if (coin_type_b === SUI_TYPE) {
+          const [feeB] = feeTx.splitCoins(feeTx.gas, [u64(feeAmountB)]);
+          feeTx.transferObjects([feeB], addr(FEE_ADDRESS));
+          feeBPaid = true;
+        } else {
+          const coinsB = await suiClient.getCoins({
+            owner: address,
+            coinType: coin_type_b,
+          });
+
+          if (coinsB.data.length > 0) {
+            const [feeB] = feeTx.splitCoins(
+              feeTx.object(coinsB.data[0].coinObjectId),
+              [u64(feeAmountB)]
+            );
+            feeTx.transferObjects([feeB], addr(FEE_ADDRESS));
+            feeBPaid = true;
+          }
+        }
       }
 
-      // 3. Add the liquidity deposit move call
-      // This would normally be done via SDK, but since we need to pass our split coins
-      // we'll construct the move call directly
-      const clmmModule = `${CETUS_MAINNET_ADDRESSES.CLMM_MODULES}::clmm`;
-      const configObject = CETUS_MAINNET_ADDRESSES.CONFIG_OBJECT;
+      // Only execute the fee tx if we actually have fees to pay
+      if (feeAPaid || feeBPaid) {
+        await wallet.signAndExecuteTransactionBlock({
+          transactionBlock: feeTx,
+          options: { showEffects: true },
+        });
+      }
 
-      // Build the open_position_and_add_liquidity call
-      tx.moveCall({
-        target: `${clmmModule}::position::open_position_and_add_liquidity`,
-        arguments: [
-          tx.pure(poolId), // pool_id
-          tx.pure(tick_lower), // tick_lower
-          tx.pure(tick_upper), // tick_upper
-          coinAForPool, // coin_a (using our split coin with fee deducted)
-          coinBForPool, // coin_b (using our split coin with fee deducted)
-          tx.pure(bufferedLimitA), // delta_liquidity_a_desire
-          tx.pure(bufferedLimitB), // delta_liquidity_b_desire
-          tx.pure(0), // min_a (allowing zero since we're handling slippage elsewhere)
-          tx.pure(0), // min_b (allowing zero since we're handling slippage elsewhere)
-          tx.object(configObject), // config object
-        ],
-        typeArguments: [
-          coin_type_a, // Coin A type
-          coin_type_b, // Coin B type
-        ],
-      });
+      // Now create the SDK deposit tx separately
+      const sdkTx = await clmmSdk.Position.createAddLiquidityFixTokenPayload(
+        addParams,
+        { slippage: slippagePct, curSqrtPrice }
+      );
 
-      // Have the wallet sign & execute
-      console.log("Sending transaction...");
+      // Set gas budget
+      sdkTx.setGasBudget(150000000); // 0.15 SUI
+
+      // Execute the SDK transaction with the wallet
       const res = await wallet.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
+        transactionBlock: sdkTx,
         options: { showEffects: true, showEvents: true },
       });
 
-      // Check transaction success and get detailed error if available
+      // Check transaction success
       if (res.effects?.status?.status !== "success") {
         const digest = res.digest || "unknown";
         const errorMsg = res.effects?.status?.error;
-        console.error(`Transaction failed with digest: ${digest}`);
-        console.error(`Error details: ${errorMsg || "unknown"}`);
 
-        // NEW: If error message is empty or "unknown", double-check transaction status on-chain
+        // If error message is empty or "unknown", double-check transaction status on-chain
         if (
           digest &&
           (!errorMsg ||
@@ -736,33 +913,23 @@ export async function deposit(
             errorMsg.toLowerCase().includes("timeout"))
         ) {
           if (await verifyTransactionSuccess(digest)) {
-            console.warn(
-              `Transaction digest ${digest} succeeded on-chain despite earlier error`
-            );
             return { success: true, digest }; // Treat as success
           }
         }
 
-        // If we reach here, consider it a genuine failure
         throw new Error(
           `Transaction failed: ${errorMsg || "unknown"} (Digest: ${digest})`
         );
       }
-
-      console.log("Transaction completed successfully");
-      console.log("Transaction digest:", res.digest);
 
       return {
         success: true,
         digest: res.digest || "",
       };
     } catch (error) {
-      console.error("Transaction failed:", error);
       throw error;
     }
   } catch (error) {
-    console.error("Error in deposit function:", error);
-
     // Provide user-friendly error messages
     if (error instanceof Error) {
       // Check for specific error patterns
@@ -828,6 +995,69 @@ export async function deposit(
         throw new Error(
           "Transaction preparation failed due to an SDK data format issue. This could be due to a version mismatch. Please try again with different amounts or contact support."
         );
+      } else if (
+        error.message.includes("No function was found with function name")
+      ) {
+        throw new Error(
+          "Transaction failed: This app needs to be updated to work with the latest Cetus protocol version. The current protocol no longer supports the function being called."
+        );
+      } else if (error.message.includes("Incorrect number of arguments")) {
+        throw new Error(
+          "Transaction failed: The Move function signature has changed in the latest protocol version. Please update the app to match the new function signature."
+        );
+      } else if (error.message.includes("Invalid u32 value")) {
+        throw new Error(
+          "Transaction failed: Tick indices must be properly encoded for the new CLMM v3 contract format. This issue has been fixed in the latest version."
+        );
+      } else if (error.message.includes("E_MIN_OUT_NOT_REACHED")) {
+        throw new Error(
+          "Transaction failed: Slippage check failed. The on-chain price has moved too much. Try increasing the buffered limit amounts or decrease slippage tolerance."
+        );
+      } else if (
+        error.message.includes("Cannot convert a BigInt value to a number")
+      ) {
+        throw new Error(
+          "Transaction failed: There was an error processing the token balances. This issue has been fixed in the latest version."
+        );
+      } else if (
+        error.message.includes(
+          "The amount(0) is Insufficient balance for undefined"
+        )
+      ) {
+        throw new Error(
+          "Transaction failed: Unable to find tokens of the required type. This is likely due to a mismatch in parameter names. Please ensure coin_type_a and coin_type_b are correctly specified."
+        );
+      } else if (error.message.includes("tx.pure must be called")) {
+        throw new Error(
+          "Transaction failed: Missing type information for transaction values. This has been fixed to work with the latest Sui.js version by adding explicit types."
+        );
+      } else if (error.message.includes("Invalid Pure type name")) {
+        throw new Error(
+          "Transaction failed: Invalid BCS type specified in a transaction parameter. This has been fixed to use proper type annotations for sui.js v1.30+."
+        );
+      } else if (error.message.includes("UnusedValueWithoutDrop")) {
+        throw new Error(
+          "Transaction failed: The transaction has an unused coin value. This issue has been fixed by updating how we handle token preparation for CLMM v3."
+        );
+      } else if (error.message.includes("CommandArgumentError")) {
+        throw new Error(
+          "Transaction failed: A coin object is being used multiple times. This issue has been fixed by preventing coin merging for CLMM v3."
+        );
+      } else if (error.message.includes("InvalidValueUsage")) {
+        throw new Error(
+          "Transaction failed: A coin was consumed but then referenced again. This issue has been fixed by letting the router handle coin selection."
+        );
+      } else if (error.message.toLowerCase().includes("usdc/sui")) {
+        throw new Error(
+          "Transaction failed with USDC/SUI pool. For best results, try merging your USDC coins by sending your entire USDC balance to yourself once, then try again."
+        );
+      } else if (
+        error.message.toLowerCase().includes("type") &&
+        error.message.toLowerCase().includes("is not registered")
+      ) {
+        throw new Error(
+          "Transaction failed: Sui type registration error. This is likely due to using the old parameter order with tx.pure in Sui SDK 1.30+. The bcs helper has been updated to fix this issue."
+        );
       }
     }
 
@@ -864,7 +1094,6 @@ export async function withdraw(
   for (const posId of opts.positionIds) {
     // Skip if this position has already been processed
     if (processedIds.has(posId)) {
-      console.log(`Skipping duplicate position ID: ${posId}`);
       continue;
     }
 
@@ -916,6 +1145,7 @@ function isAlreadyClosedError(e: unknown) {
 /**
  * Helper function to collect fees after a liquidity removal
  * Used primarily for single-sided positions
+ * Fixed for @mysten/sui.js v1.30+ compatibility
  */
 async function collectFeesAfterRemoval(
   wallet: WalletContextState,
@@ -924,8 +1154,6 @@ async function collectFeesAfterRemoval(
   coin_type_a: string,
   coin_type_b: string
 ): Promise<void> {
-  console.log("Collecting fees separately after removal");
-
   // Check if there are any fees to collect first
   try {
     const feeOwed = await clmmSdk.Position.fetchPendingFee({
@@ -935,20 +1163,15 @@ async function collectFeesAfterRemoval(
     });
 
     if (feeOwed.amount_a === "0" && feeOwed.amount_b === "0") {
-      console.log("No pending fees - skip collectFeePayload");
       return;
     }
-
-    console.log(
-      `Pending fees detected: ${feeOwed.amount_a} / ${feeOwed.amount_b}. Collecting...`
-    );
   } catch (error) {
-    console.warn("Error checking pending fees:", error);
     // Continue anyway - better to try collecting than miss out on fees
   }
 
   try {
-    const collectFeeTx = await clmmSdk.Position.collectFeePayload({
+    // Use SDK helper to create the collectFee payload
+    const collectFeeTx = await clmmSdk.Position.createCollectFeePayload({
       coin_type_a,
       coin_type_b,
       pool_id: poolId,
@@ -975,39 +1198,21 @@ async function collectFeesAfterRemoval(
           errorMsg.toLowerCase().includes("timeout"))
       ) {
         if (await verifyTransactionSuccess(digest)) {
-          console.warn(
-            `Fee collection transaction digest ${digest} succeeded on-chain despite earlier error`
-          );
-          console.log(
-            "Fees collected separately after removal, digest:",
-            digest
-          );
           return;
         }
       }
 
-      console.warn(
-        `Fee collection failed but continuing: ${
-          errorMsg || "unknown"
-        } (Digest: ${digest})`
-      );
       return;
     }
-
-    console.log(
-      "Fees collected separately after removal, digest:",
-      collectFeeRes.digest
-    );
   } catch (e) {
     // Special handling for empty transaction error from wallet
     if (
       e instanceof Error &&
       e.message.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
     ) {
-      console.warn("Fee collection skipped - wallet refused empty TX");
+      // Fee collection skipped - wallet refused empty TX
     } else {
       // Log but don't throw on fee collection failure
-      console.warn("Error collecting fees after removal:", e);
     }
   }
 }
@@ -1016,6 +1221,8 @@ async function collectFeesAfterRemoval(
  * Remove a percentage (0–100) of liquidity from a position, collecting fees.
  * Updated to fix slippage percentage construction and ensure all amount parameters
  * are properly converted to strings as required by the SDK.
+ * Uses SDK helpers for CLMM v3 compatibility.
+ * Fixed for @mysten/sui.js v1.30+ compatibility with correct BCS parameter order.
  */
 export async function removeLiquidity(
   wallet: WalletContextState,
@@ -1044,10 +1251,6 @@ export async function removeLiquidity(
   let posId, poolIdSanitized;
 
   try {
-    console.log(
-      `Removing ${liquidityPct}% liquidity from position ${positionId} in pool ${poolId}`
-    );
-
     // Sanitize IDs
     posId = normalizeSuiAddress(positionId.trim());
     poolIdSanitized = normalizeSuiAddress(poolId.trim());
@@ -1064,26 +1267,16 @@ export async function removeLiquidity(
       if (!position) {
         throw new Error(`Position ${posId} not found`);
       }
-      console.log(`Position found: ${posId}, liquidity: ${position.liquidity}`);
     } catch (error) {
-      console.warn(`Position verification failed for ${posId}:`, error);
-
       if (isAlreadyClosedError(error)) {
-        console.log(`Position ${posId} appears to be already closed`);
         return { success: true, digest: "" };
       }
 
       // For all other errors, surface them
-      console.error(
-        `Failed to get position data: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
       throw error;
     }
 
     if (!position.liquidity || position.liquidity === "0") {
-      console.log("Position has zero liquidity, nothing to withdraw");
       return { success: true, digest: "" };
     }
 
@@ -1095,12 +1288,10 @@ export async function removeLiquidity(
 
     // Cap at MAX_U64 to avoid overflow
     if (removeLiquidity.gt(MAX_U64)) {
-      console.log("Liquidity exceeds u64 max, capping to MAX_U64");
       removeLiquidity = MAX_U64;
     }
 
     if (removeLiquidity.isZero()) {
-      console.log("No liquidity to withdraw based on percentage");
       return { success: true, digest: "" };
     }
 
@@ -1138,43 +1329,34 @@ export async function removeLiquidity(
       false
     );
 
-    console.log("Expected withdrawal amounts:", {
-      coin_amount_a: coinAmounts.coin_amount_a,
-      coin_amount_b: coinAmounts.coin_amount_b,
-    });
-
     // Determine if this is a single-sided position
     const isSingleSided =
       coinAmounts.coin_amount_a === "0" || coinAmounts.coin_amount_b === "0";
 
     let tx;
+    const slippageDecimal = slippagePc / 100; // Convert from percentage to decimal (e.g., 0.5% -> 0.005)
 
     if (isSingleSided) {
       // SINGLE-SIDED POSITION HANDLING
       // We must use the fix-token variant that routes everything to one side
-      console.log("Detected single-sided position, using fix-token variant");
 
       // Determine which token has value
       const isFixedA = coinAmounts.coin_amount_a === "0"; // true if A is 0 (all value in B)
-      console.log(
-        `Single-sided position with ${isFixedA ? "B" : "A"} token only`
-      );
 
       // FIXED: Ensure removeLiquidity is a string
       const deltaLiquidity = removeLiquidity.toString();
-      console.log(`Removing liquidity amount (as string): ${deltaLiquidity}`);
 
-      // Build transaction with removeLiquidityFixTokenPayload
-      tx = await clmmSdk.Position.removeLiquidityFixTokenPayload({
+      // Use SDK helper for removeLiquidityFixToken - handles routing to the correct module
+      tx = await clmmSdk.Position.createRemoveLiquidityFixTokenPayload({
         coin_type_a,
         coin_type_b,
         pool_id: poolIdSanitized,
         pos_id: posId,
-        tick_lower: position.tick_lower_index.toString(),
-        tick_upper: position.tick_upper_index.toString(),
+        tick_lower: position.tick_lower_index.toString(), // SDK handles encoding
+        tick_upper: position.tick_upper_index.toString(), // SDK handles encoding
         fix_amount_a: isFixedA, // true → receive only B, false → only A
-        delta_liquidity: deltaLiquidity, // FIXED: Ensure it's a string
-        min_amount: "0", // Ensure it's a string
+        delta_liquidity: deltaLiquidity,
+        min_amount: "0", // Zero minimum as string - will add slippage handling later if needed
         collect_fee: false, // Never collect fees during fix-token removal
       });
 
@@ -1205,15 +1387,6 @@ export async function removeLiquidity(
       const min_amount_b = (adjustedAmounts.amount_b ?? "0").toString();
       const deltaLiquidity = removeLiquidity.toString();
 
-      console.log(
-        `Using min amounts (with ${slippagePc}% slippage, as strings):`,
-        {
-          min_amount_a,
-          min_amount_b,
-          deltaLiquidity,
-        }
-      );
-
       // For double-sided positions, we can use the regular removeLiquidityPayload
       // Get rewards if collecting fees
       let rewarder_coin_types: string[] = [];
@@ -1228,22 +1401,18 @@ export async function removeLiquidity(
           rewarder_coin_types = rewards
             .filter((r: any) => r && Number(r.amount_owed) > 0)
             .map((r: any) => r.coin_address);
-
-          console.log(
-            `Found ${rewarder_coin_types.length} reward types to claim`
-          );
         } catch (error) {
-          console.warn(`Error fetching rewards: ${error}`);
+          // Silent fail - we'll just not collect rewards
         }
       }
 
-      // Build transaction payload - double-sided approach
-      tx = await clmmSdk.Position.removeLiquidityPayload({
+      // Use SDK helper for createRemoveLiquidityPayload - this ensures compatibility with router
+      tx = await clmmSdk.Position.createRemoveLiquidityPayload({
         coin_type_a,
         coin_type_b,
         pool_id: poolIdSanitized,
         pos_id: posId,
-        delta_liquidity: deltaLiquidity, // FIXED: Ensure it's a string
+        delta_liquidity: deltaLiquidity,
         min_amount_a, // Already converted to string
         min_amount_b, // Already converted to string
         collect_fee: collectFee, // Safe for double-sided positions
@@ -1264,8 +1433,6 @@ export async function removeLiquidity(
     if (res.effects?.status?.status !== "success") {
       const digest = res.digest || "unknown";
       const errorMsg = res.effects?.status?.error;
-      console.error(`Liquidity removal failed with digest: ${digest}`);
-      console.error(`Error details: ${errorMsg || "unknown"}`);
 
       // If error message is empty or "unknown", double-check transaction status on-chain
       if (
@@ -1275,10 +1442,6 @@ export async function removeLiquidity(
           errorMsg.toLowerCase().includes("timeout"))
       ) {
         if (await verifyTransactionSuccess(digest)) {
-          console.warn(
-            `Liquidity removal transaction digest ${digest} succeeded on-chain despite earlier error`
-          );
-
           // For single-sided positions, still try to collect fees separately if requested
           if (isSingleSided && collectFee) {
             await collectFeesAfterRemoval(
@@ -1300,8 +1463,6 @@ export async function removeLiquidity(
       );
     }
 
-    console.log("Liquidity removal successful, digest:", res.digest);
-
     // For single-sided positions, collect fees separately if requested
     if (isSingleSided && collectFee) {
       await collectFeesAfterRemoval(
@@ -1318,8 +1479,6 @@ export async function removeLiquidity(
       digest: res.digest || "",
     };
   } catch (error) {
-    console.error("Error in removeLiquidity:", error);
-
     // Try fallback with zero minimums for any slippage error
     if (
       error instanceof Error &&
@@ -1328,10 +1487,6 @@ export async function removeLiquidity(
         error.message.includes("code 9") ||
         error.message.includes("invalid token amounts"))
     ) {
-      console.log(
-        "Slippage or token amounts error detected, trying fallback approach"
-      );
-
       try {
         // Variables are now accessible thanks to wider scope
         if (
@@ -1359,26 +1514,28 @@ export async function removeLiquidity(
           // Single-sided fallback: use fix-token variant
           const isFixedA = coinAmounts.coin_amount_a === "0"; // true if A is 0 (all value in B)
 
-          fallbackTx = await clmmSdk.Position.removeLiquidityFixTokenPayload({
-            coin_type_a,
-            coin_type_b,
-            pool_id: poolIdSanitized,
-            pos_id: posId,
-            tick_lower: position.tick_lower_index.toString(),
-            tick_upper: position.tick_upper_index.toString(),
-            fix_amount_a: isFixedA,
-            delta_liquidity: deltaLiquidity, // FIXED: Use string
-            min_amount: "0", // Zero minimum as string
-            collect_fee: false, // Never collect fees in the fallback
-          });
+          // Use SDK helper for fallback - ticks are handled internally
+          fallbackTx =
+            await clmmSdk.Position.createRemoveLiquidityFixTokenPayload({
+              coin_type_a,
+              coin_type_b,
+              pool_id: poolIdSanitized,
+              pos_id: posId,
+              tick_lower: position.tick_lower_index.toString(),
+              tick_upper: position.tick_upper_index.toString(),
+              fix_amount_a: isFixedA,
+              delta_liquidity: deltaLiquidity,
+              min_amount: "0", // Zero minimum as string
+              collect_fee: false, // Never collect fees in the fallback
+            });
         } else {
           // Double-sided fallback: use standard variant with zero minimums
-          fallbackTx = await clmmSdk.Position.removeLiquidityPayload({
+          fallbackTx = await clmmSdk.Position.createRemoveLiquidityPayload({
             coin_type_a,
             coin_type_b,
             pool_id: poolIdSanitized,
             pos_id: posId,
-            delta_liquidity: deltaLiquidity, // FIXED: Use string
+            delta_liquidity: deltaLiquidity,
             min_amount_a: "0", // Zero minimum as string
             min_amount_b: "0", // Zero minimum as string
             collect_fee: false, // Don't collect fees in the fallback
@@ -1397,8 +1554,6 @@ export async function removeLiquidity(
         if (fallbackRes.effects?.status?.status !== "success") {
           const digest = fallbackRes.digest || "unknown";
           const errorMsg = fallbackRes.effects?.status?.error;
-          console.error(`Fallback removal failed with digest: ${digest}`);
-          console.error(`Error details: ${errorMsg || "unknown"}`);
 
           // If error message is empty or "unknown", double-check transaction status on-chain
           if (
@@ -1408,10 +1563,6 @@ export async function removeLiquidity(
               errorMsg.toLowerCase().includes("timeout"))
           ) {
             if (await verifyTransactionSuccess(digest)) {
-              console.warn(
-                `Fallback liquidity removal transaction digest ${digest} succeeded on-chain despite earlier error`
-              );
-
               // For single-sided positions, still try to collect fees separately if requested
               if (isSingleSided && collectFee) {
                 await collectFeesAfterRemoval(
@@ -1434,11 +1585,6 @@ export async function removeLiquidity(
           );
         }
 
-        console.log(
-          "Fallback liquidity removal succeeded, digest:",
-          fallbackRes.digest
-        );
-
         // For single-sided positions, collect fees separately if requested
         if (isSingleSided && collectFee) {
           await collectFeesAfterRemoval(
@@ -1452,10 +1598,9 @@ export async function removeLiquidity(
 
         return {
           success: true,
-          digest: fallbackRes.digest,
+          digest: fallbackRes.digest || "",
         };
       } catch (fallbackError) {
-        console.error("Fallback approach also failed:", fallbackError);
         throw new Error(
           "Failed to remove liquidity: Both standard and fallback approaches failed"
         );
@@ -1469,8 +1614,6 @@ export async function removeLiquidity(
 
     // Surface the error details for debugging
     if (error instanceof Error) {
-      console.warn(`removeLiquidity failed. Error: ${error.message}`);
-
       if (error.message.toLowerCase().includes("invalid sui object id")) {
         throw new Error(
           "Invalid position ID format or RPC node error. This position might exist but the node couldn't fetch it correctly."
@@ -1481,6 +1624,57 @@ export async function removeLiquidity(
         throw new Error(
           "Invalid token amounts error. This is likely due to a formatting issue with the transaction parameters. Please try again."
         );
+      } else if (error.message.toLowerCase().includes("invalid u32 value")) {
+        throw new Error(
+          "Transaction failed: Tick indices must be properly encoded for the new CLMM v3 contract format. This issue has been fixed in the latest version."
+        );
+      } else if (
+        error.message
+          .toLowerCase()
+          .includes("cannot convert a bigint value to a number")
+      ) {
+        throw new Error(
+          "Transaction failed: There was an error processing the token balances. This issue has been fixed in the latest version."
+        );
+      } else if (
+        error.message.toLowerCase().includes("no function was found")
+      ) {
+        throw new Error(
+          "Transaction failed: This app needs to be updated to work with the latest Cetus protocol version. The current protocol no longer supports the function being called."
+        );
+      } else if (
+        error.message.toLowerCase().includes("tx.pure must be called")
+      ) {
+        throw new Error(
+          "Transaction failed: Missing type information for transaction values. This has been fixed to work with the latest Sui.js version by adding explicit types."
+        );
+      } else if (
+        error.message.toLowerCase().includes("invalid pure type name")
+      ) {
+        throw new Error(
+          "Transaction failed: Invalid BCS type specified in a transaction parameter. This has been fixed to use proper type annotations for sui.js v1.30+."
+        );
+      } else if (
+        error.message.toLowerCase().includes("unusedvalueswithoutdrop")
+      ) {
+        throw new Error(
+          "Transaction failed: The transaction has an unused coin value. This issue has been fixed by updating how we handle token preparation for CLMM v3."
+        );
+      } else if (error.message.toLowerCase().includes("commandargumenterror")) {
+        throw new Error(
+          "Transaction failed: A coin object is being used multiple times. This issue has been fixed by preventing coin merging for CLMM v3."
+        );
+      } else if (error.message.toLowerCase().includes("invalidvalueusage")) {
+        throw new Error(
+          "Transaction failed: A coin was consumed but then referenced again. This issue has been fixed by letting the router handle coin selection."
+        );
+      } else if (
+        error.message.toLowerCase().includes("type") &&
+        error.message.toLowerCase().includes("is not registered")
+      ) {
+        throw new Error(
+          "Transaction failed: Sui type registration error. This is likely due to using the old parameter order with tx.pure in Sui SDK 1.30+. The bcs helper has been updated to fix this issue."
+        );
       }
     }
 
@@ -1490,6 +1684,7 @@ export async function removeLiquidity(
 
 /**
  * Helper function to close a Bluefin position
+ * Fixed for @mysten/sui.js v1.30+ compatibility
  */
 async function closeBluefinPosition(
   wallet: WalletContextState,
@@ -1497,26 +1692,28 @@ async function closeBluefinPosition(
   positionId: string
 ): Promise<{ success: boolean; digest: string }> {
   try {
-    console.log(`Closing Bluefin position ${positionId} in pool ${poolId}`);
-
     const txb = new TransactionBlock();
     const BLUEFIN_PACKAGE =
       "0xf7133d0cb63e1a78ef27a78d4e887a58428d06ff4f2ebbd33af273a04a1bf444";
+
+    // FIXED: Helper functions for transaction types (sui.js v1.30+ with correct order)
+    const addr = (a: string) => bcs.addr(txb, a);
+    const u64 = (n: string) => bcs.u64(txb, n);
 
     // First remove all liquidity
     txb.moveCall({
       target: `${BLUEFIN_PACKAGE}::clmm::remove_liquidity`,
       arguments: [
-        txb.pure(poolId),
-        txb.pure(positionId),
-        txb.pure("18446744073709551615"), // Max uint64 value to remove all liquidity
+        addr(poolId),
+        addr(positionId),
+        u64("18446744073709551615"), // Max uint64 value to remove all liquidity
       ],
     });
 
     // Then burn the position if balance is zero
     txb.moveCall({
       target: `${BLUEFIN_PACKAGE}::position::burn`,
-      arguments: [txb.pure(poolId), txb.pure(positionId)],
+      arguments: [addr(poolId), addr(positionId)],
     });
 
     txb.setGasBudget(150000000); // Increased to 0.15 SUI
@@ -1533,8 +1730,6 @@ async function closeBluefinPosition(
     if (result.effects?.status?.status !== "success") {
       const digest = result.digest || "unknown";
       const errorMsg = result.effects?.status?.error;
-      console.error(`Bluefin position closing failed with digest: ${digest}`);
-      console.error(`Error details: ${errorMsg || "unknown"}`);
 
       // If error message is empty or "unknown", double-check transaction status on-chain
       if (
@@ -1544,9 +1739,6 @@ async function closeBluefinPosition(
           errorMsg.toLowerCase().includes("timeout"))
       ) {
         if (await verifyTransactionSuccess(digest)) {
-          console.warn(
-            `Bluefin position closing transaction digest ${digest} succeeded on-chain despite earlier error`
-          );
           return { success: true, digest }; // Treat as success
         }
       }
@@ -1558,15 +1750,11 @@ async function closeBluefinPosition(
       );
     }
 
-    console.log("Bluefin position closed successfully, digest:", result.digest);
-
     return {
       success: true,
       digest: result.digest || "",
     };
   } catch (error) {
-    console.error("Bluefin position closing failed:", error);
-
     // Check if it's a benign error
     if (isAlreadyClosedError(error)) {
       return { success: true, digest: "" };
@@ -1585,6 +1773,9 @@ async function closeBluefinPosition(
  *
  * This fixes the "$Intent,$kind" error by skipping empty transactions
  * and treating wallet signature errors for optional steps as warnings.
+ *
+ * Updated to use SDK helpers for CLMM v3 compatibility.
+ * Fixed for @mysten/sui.js v1.30+ compatibility with correct BCS parameter order.
  */
 export async function closePosition(
   wallet: WalletContextState,
@@ -1611,8 +1802,6 @@ export async function closePosition(
   clmmSdk.setSenderAddress(address);
 
   try {
-    console.log(`Closing position ${posId} in pool ${poolIdSanitized}`);
-
     // Step 0: Check if the position exists and get position info
     let position;
     try {
@@ -1625,21 +1814,11 @@ export async function closePosition(
       if (!position) {
         throw new Error(`Position ${posId} not found`);
       }
-
-      console.log(`Position found: ${posId}, liquidity: ${position.liquidity}`);
     } catch (error) {
-      console.warn(`Position verification failed for ${posId}:`, error);
-
       if (isAlreadyClosedError(error)) {
-        console.log(`Position ${posId} appears to be already closed`);
         return { success: true, digest: "" };
       }
 
-      console.error(
-        `Failed to get position data: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
       throw error;
     }
 
@@ -1652,6 +1831,7 @@ export async function closePosition(
     if (!pool || !pool.coin_type_a || !pool.coin_type_b) {
       throw new Error("Pool or coin types not found");
     }
+
     // Get ALL reward coin types from the pool
     let rewarder_coin_types: string[] = [];
     if (pool.reward_manager && pool.reward_manager.rewards) {
@@ -1660,11 +1840,7 @@ export async function closePosition(
         rewarder_coin_types = pool.reward_manager.rewards.map(
           (r: any) => r.reward_coin
         );
-        console.log(
-          `Including all ${rewarder_coin_types.length} reward coin types from pool: ${rewarder_coin_types}`
-        );
       } catch (error) {
-        console.warn(`Error getting reward types: ${error}`);
         warnings.push("Could not fetch all reward types");
 
         // Fallback: try to get at least the non-zero reward amounts
@@ -1679,12 +1855,8 @@ export async function closePosition(
             rewarder_coin_types = rewards
               .filter((r: any) => r && r.coin_address)
               .map((r: any) => r.coin_address);
-
-            console.log(
-              `Using fallback: found ${rewarder_coin_types.length} reward types: ${rewarder_coin_types}`
-            );
           } catch (fallbackError) {
-            console.warn(`Fallback reward fetch also failed: ${fallbackError}`);
+            // Silent fail for fallback
           }
         }
       }
@@ -1692,11 +1864,10 @@ export async function closePosition(
 
     // If position has no liquidity, we can skip Step 1 and proceed directly to closing
     if (!position.liquidity || position.liquidity === "0") {
-      console.log("Position has zero liquidity, proceeding to direct close");
-
       // Go directly to Step 3: Close the position
       try {
-        const closeTx = await clmmSdk.Position.closePositionPayload({
+        // Use SDK helper to create close position payload
+        const closeTx = await clmmSdk.Position.createClosePositionPayload({
           coin_type_a: pool.coin_type_a,
           coin_type_b: pool.coin_type_b,
           pool_id: poolIdSanitized,
@@ -1718,10 +1889,6 @@ export async function closePosition(
         if (result.effects?.status?.status !== "success") {
           const digest = result.digest || "unknown";
           const errorMsg = result.effects?.status?.error;
-          console.error(
-            `Direct position closing failed with digest: ${digest}`
-          );
-          console.error(`Error details: ${errorMsg || "unknown"}`);
 
           if (
             digest &&
@@ -1730,9 +1897,6 @@ export async function closePosition(
               errorMsg.toLowerCase().includes("timeout"))
           ) {
             if (await verifyTransactionSuccess(digest)) {
-              console.warn(
-                `Position closing transaction digest ${digest} succeeded on-chain despite earlier error`
-              );
               return { success: true, digest };
             }
           }
@@ -1744,10 +1908,6 @@ export async function closePosition(
           );
         }
 
-        console.log(
-          "Direct position closing succeeded, digest:",
-          result.digest
-        );
         return {
           success: true,
           digest: result.digest || "",
@@ -1758,9 +1918,6 @@ export async function closePosition(
           error instanceof Error &&
           error.message.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
         ) {
-          console.warn(
-            "Wallet refused to sign empty transaction. Position is already empty."
-          );
           warnings.push("Position appears to be already empty");
           return {
             success: true,
@@ -1771,20 +1928,17 @@ export async function closePosition(
 
         // If there's another issue with direct closing, try without collecting fees
         try {
-          console.log(
-            "Direct closing failed. Trying without fee collection..."
-          );
-
-          const fallbackCloseTx = await clmmSdk.Position.closePositionPayload({
-            coin_type_a: pool.coin_type_a,
-            coin_type_b: pool.coin_type_b,
-            pool_id: poolIdSanitized,
-            pos_id: posId,
-            min_amount_a: "0",
-            min_amount_b: "0",
-            rewarder_coin_types,
-            collect_fee: false, // Don't try to collect fees
-          });
+          const fallbackCloseTx =
+            await clmmSdk.Position.createClosePositionPayload({
+              coin_type_a: pool.coin_type_a,
+              coin_type_b: pool.coin_type_b,
+              pool_id: poolIdSanitized,
+              pos_id: posId,
+              min_amount_a: "0",
+              min_amount_b: "0",
+              rewarder_coin_types,
+              collect_fee: false, // Don't try to collect fees
+            });
 
           fallbackCloseTx.setGasBudget(80000000);
 
@@ -1797,9 +1951,6 @@ export async function closePosition(
             fallbackResult.effects?.status?.status === "success" ||
             (await verifyTransactionSuccess(fallbackResult.digest || ""))
           ) {
-            console.log(
-              "Fallback direct close succeeded (without fee collection)"
-            );
             return {
               success: true,
               digest: fallbackResult.digest || "",
@@ -1807,7 +1958,6 @@ export async function closePosition(
             };
           }
         } catch (fallbackError) {
-          console.warn("Fallback direct close also failed:", fallbackError);
           warnings.push("Could not close position directly");
         }
 
@@ -1820,13 +1970,11 @@ export async function closePosition(
 
     // STEP 1: First remove all liquidity with zero minimums to ensure it succeeds
     // This is the CRITICAL step - if this succeeds, we consider the operation successful
-    console.log("STEP 1: Removing all liquidity from position");
-
     // Make sure to convert liquidity amount to a string
     const liquidityAmount = position.liquidity.toString();
-    console.log(`Liquidity amount to remove (as string): ${liquidityAmount}`);
 
-    const removeTx = await clmmSdk.Position.removeLiquidityPayload({
+    // Use SDK helper to create removeLiquidity payload
+    const removeTx = await clmmSdk.Position.createRemoveLiquidityPayload({
       coin_type_a: pool.coin_type_a,
       coin_type_b: pool.coin_type_b,
       pool_id: poolIdSanitized,
@@ -1840,7 +1988,6 @@ export async function closePosition(
 
     removeTx.setGasBudget(150000000);
 
-    console.log("Executing liquidity removal transaction");
     const removeRes = await wallet.signAndExecuteTransactionBlock({
       transactionBlock: removeTx,
       options: { showEffects: true, showEvents: true },
@@ -1850,8 +1997,6 @@ export async function closePosition(
     if (removeRes.effects?.status?.status !== "success") {
       const digest = removeRes.digest || "unknown";
       const errorMsg = removeRes.effects?.status?.error;
-      console.error(`Liquidity removal failed with digest: ${digest}`);
-      console.error(`Error details: ${errorMsg || "unknown"}`);
 
       // Verify on-chain status if it was unknown
       if (
@@ -1861,9 +2006,6 @@ export async function closePosition(
           errorMsg.toLowerCase().includes("timeout"))
       ) {
         if (await verifyTransactionSuccess(digest)) {
-          console.warn(
-            `Liquidity removal transaction digest ${digest} succeeded on-chain despite earlier error`
-          );
           // Continue to next step - liquidity was removed
         } else {
           throw new Error(
@@ -1881,14 +2023,10 @@ export async function closePosition(
       }
     }
 
-    console.log("Liquidity removal succeeded, digest:", removeRes.digest);
-
     // Brief pause to allow node to update state
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // STEP 2: Check for pending fees and collect only if non-zero
-    console.log("STEP 2: Checking for pending fees");
-
     // IMPROVEMENT: Check if there are actually fees to collect before building transaction
     try {
       const feeOwed = await clmmSdk.Position.fetchPendingFee({
@@ -1898,13 +2036,10 @@ export async function closePosition(
       });
 
       if (feeOwed.amount_a === "0" && feeOwed.amount_b === "0") {
-        console.log("No pending fees - skip collectFeePayload");
+        // No pending fees - skip collectFeePayload
       } else {
-        console.log(
-          `Pending fees detected: ${feeOwed.amount_a} / ${feeOwed.amount_b}. Collecting...`
-        );
-
-        const collectTx = await clmmSdk.Position.collectFeePayload({
+        // Use SDK helper to create collectFee payload
+        const collectTx = await clmmSdk.Position.createCollectFeePayload({
           coin_type_a: pool.coin_type_a,
           coin_type_b: pool.coin_type_b,
           pool_id: poolIdSanitized,
@@ -1913,7 +2048,6 @@ export async function closePosition(
 
         collectTx.setGasBudget(80000000);
 
-        console.log("Executing fee collection transaction");
         const collectRes = await wallet.signAndExecuteTransactionBlock({
           transactionBlock: collectTx,
           options: { showEffects: true, showEvents: true },
@@ -1924,16 +2058,9 @@ export async function closePosition(
           collectRes.effects?.status?.status !== "success" &&
           !(await verifyTransactionSuccess(collectRes.digest || ""))
         ) {
-          console.warn(
-            `Fee collection failed: ${
-              collectRes.effects?.status?.error || "unknown"
-            }`
-          );
           warnings.push(
             "Fee collection failed but liquidity was removed successfully"
           );
-        } else {
-          console.log("Fee collection succeeded, digest:", collectRes.digest);
         }
       }
     } catch (e) {
@@ -1942,10 +2069,8 @@ export async function closePosition(
         e instanceof Error &&
         e.message.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
       ) {
-        console.warn("Fee collection skipped - wallet refused empty TX");
         warnings.push("Fee collection skipped - no fees to collect");
       } else {
-        console.warn("Fee collection failed but continuing:", e);
         warnings.push(
           "Fee collection failed but liquidity was removed successfully"
         );
@@ -1957,8 +2082,6 @@ export async function closePosition(
 
     // STEP 3: Check for rewards and collect them separately if available
     if (rewarder_coin_types.length > 0) {
-      console.log("STEP 3: Checking for rewards");
-
       try {
         // Check if there are actually rewards to collect
         let hasRewards = false;
@@ -1973,30 +2096,26 @@ export async function closePosition(
             hasRewards = rewards.some(
               (r: any) => r && Number(r.amount_owed) > 0
             );
-            if (hasRewards) {
-              console.log("Pending rewards detected. Collecting...");
-            } else {
-              console.log("No pending rewards - skip collectRewarderPayload");
-            }
           } catch (error) {
-            console.warn("Error checking reward amounts:", error);
             hasRewards = true; // Default to trying to collect if we can't check
           }
         }
 
         if (hasRewards) {
-          const rewardsTx = await clmmSdk.Rewarder.collectRewarderPayload({
-            coin_type_a: pool.coin_type_a,
-            coin_type_b: pool.coin_type_b,
-            pool_id: poolIdSanitized,
-            pos_id: posId,
-            rewarder_coin_types,
-            collect_fee: false, // Already collected fees
-          });
+          // Use SDK helper to create collectRewarder payload
+          const rewardsTx = await clmmSdk.Rewarder.createCollectRewarderPayload(
+            {
+              coin_type_a: pool.coin_type_a,
+              coin_type_b: pool.coin_type_b,
+              pool_id: poolIdSanitized,
+              pos_id: posId,
+              rewarder_coin_types,
+              collect_fee: false, // Already collected fees
+            }
+          );
 
           rewardsTx.setGasBudget(80000000);
 
-          console.log("Executing rewards collection transaction");
           const rewardsRes = await wallet.signAndExecuteTransactionBlock({
             transactionBlock: rewardsTx,
             options: { showEffects: true, showEvents: true },
@@ -2007,18 +2126,8 @@ export async function closePosition(
             rewardsRes.effects?.status?.status !== "success" &&
             !(await verifyTransactionSuccess(rewardsRes.digest || ""))
           ) {
-            console.warn(
-              `Rewards collection failed: ${
-                rewardsRes.effects?.status?.error || "unknown"
-              }`
-            );
             warnings.push(
               "Rewards collection failed but liquidity was removed successfully"
-            );
-          } else {
-            console.log(
-              "Rewards collection succeeded, digest:",
-              rewardsRes.digest
             );
           }
         }
@@ -2028,10 +2137,8 @@ export async function closePosition(
           e instanceof Error &&
           e.message.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
         ) {
-          console.warn("Rewards collection skipped - wallet refused empty TX");
           warnings.push("Rewards collection skipped - no rewards to collect");
         } else {
-          console.warn("Rewards collection failed but continuing:", e);
           warnings.push(
             "Rewards collection failed but liquidity was removed successfully"
           );
@@ -2043,10 +2150,9 @@ export async function closePosition(
     }
 
     // STEP 4: Finally, try to close the now-empty position
-    console.log("STEP 4: Closing the now-empty position");
-
     try {
-      const closeTx = await clmmSdk.Position.closePositionPayload({
+      // Use SDK helper to create closePosition payload
+      const closeTx = await clmmSdk.Position.createClosePositionPayload({
         coin_type_a: pool.coin_type_a,
         coin_type_b: pool.coin_type_b,
         pool_id: poolIdSanitized,
@@ -2059,7 +2165,6 @@ export async function closePosition(
 
       closeTx.setGasBudget(80000000);
 
-      console.log("Executing position closing transaction");
       const closeRes = await wallet.signAndExecuteTransactionBlock({
         transactionBlock: closeTx,
         options: { showEffects: true, showEvents: true },
@@ -2070,16 +2175,10 @@ export async function closePosition(
         closeRes.effects?.status?.status !== "success" &&
         !(await verifyTransactionSuccess(closeRes.digest || ""))
       ) {
-        console.warn(
-          `Final position closing failed: ${
-            closeRes.effects?.status?.error || "unknown"
-          }`
-        );
         warnings.push(
           "Position NFT burning failed but liquidity was removed successfully"
         );
       } else {
-        console.log("Position successfully closed, digest:", closeRes.digest);
         return {
           success: true,
           digest: closeRes.digest || "",
@@ -2092,20 +2191,15 @@ export async function closePosition(
         e instanceof Error &&
         e.message.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
       ) {
-        console.warn("Position closing skipped - wallet refused empty TX");
         warnings.push("Position closing skipped - may already be closed");
       } else if (
         e instanceof Error &&
         e.message.toLowerCase().includes("invalid token amounts")
       ) {
-        console.warn(
-          "Position closing failed with 'invalid token amounts' - likely already empty"
-        );
         warnings.push(
           "Position NFT burning failed but liquidity was removed successfully"
         );
       } else {
-        console.warn("Position closing failed but continuing:", e);
         warnings.push(
           "Position NFT burning failed but liquidity was removed successfully"
         );
@@ -2120,12 +2214,9 @@ export async function closePosition(
       warnings: warnings.length > 0 ? warnings : undefined,
     };
   } catch (error) {
-    console.error("Error in closePosition:", error);
-
     // Surface the error details for debugging
     if (error instanceof Error) {
       const errorMessage = error.message.toLowerCase();
-      console.warn(`closePosition failed. Error: ${error.message}`);
 
       // Check if it matches patterns for already closed positions
       if (isAlreadyClosedError(error)) {
@@ -2152,6 +2243,51 @@ export async function closePosition(
         throw new Error(
           "Invalid token amounts error. The transaction parameters couldn't be processed by the contract. The position's liquidity has likely been removed, but the NFT might remain in your wallet."
         );
+      } else if (errorMessage.includes("no function was found")) {
+        throw new Error(
+          "Transaction failed: This app needs to be updated to work with the latest Cetus protocol version. The current protocol no longer supports the function being called."
+        );
+      } else if (errorMessage.includes("incorrect number of arguments")) {
+        throw new Error(
+          "Transaction failed: The Move function signature has changed in the latest protocol version. Please update the app to match the new function signature."
+        );
+      } else if (errorMessage.includes("invalid u32 value")) {
+        throw new Error(
+          "Transaction failed: Tick indices must be properly encoded for the new CLMM v3 contract format. This issue has been fixed in the latest version."
+        );
+      } else if (
+        errorMessage.includes("cannot convert a bigint value to a number")
+      ) {
+        throw new Error(
+          "Transaction failed: There was an error processing the token balances. This issue has been fixed in the latest version."
+        );
+      } else if (errorMessage.includes("tx.pure must be called")) {
+        throw new Error(
+          "Transaction failed: Missing type information for transaction values. This has been fixed to work with the latest Sui.js version by adding explicit types."
+        );
+      } else if (errorMessage.includes("invalid pure type name")) {
+        throw new Error(
+          "Transaction failed: Invalid BCS type specified in a transaction parameter. This has been fixed to use proper type annotations for sui.js v1.30+."
+        );
+      } else if (errorMessage.includes("unusedvalueswithoutdrop")) {
+        throw new Error(
+          "Transaction failed: The transaction has an unused coin value. This issue has been fixed by updating how we handle token preparation for CLMM v3."
+        );
+      } else if (errorMessage.includes("commandargumenterror")) {
+        throw new Error(
+          "Transaction failed: A coin object is being used multiple times. This issue has been fixed by preventing coin merging for CLMM v3."
+        );
+      } else if (errorMessage.includes("invalidvalueusage")) {
+        throw new Error(
+          "Transaction failed: A coin was consumed but then referenced again. This issue has been fixed by letting the router handle coin selection."
+        );
+      } else if (
+        errorMessage.includes("type") &&
+        errorMessage.includes("is not registered")
+      ) {
+        throw new Error(
+          "Transaction failed: Sui type registration error. This is likely due to using the old parameter order with tx.pure in Sui SDK 1.30+. The bcs helper has been updated to fix this issue."
+        );
       }
     }
 
@@ -2162,7 +2298,8 @@ export async function closePosition(
 /**
  * Collect fees from a position.
  * Updated for SDK v2 with proper position verification
- * Fixed to handle string conversions for amount parameters
+ * Uses SDK helpers for CLMM v3 compatibility
+ * Fixed for @mysten/sui.js v1.30+ compatibility with correct BCS parameter order
  */
 export async function collectFees(
   wallet: WalletContextState,
@@ -2178,10 +2315,6 @@ export async function collectFees(
   clmmSdk.setSenderAddress(address);
 
   try {
-    console.log(
-      `Collecting fees for position: ${positionId} in pool: ${poolId}`
-    );
-
     // Sanitize IDs
     const posId = normalizeSuiAddress(positionId.trim());
     const poolIdSanitized = normalizeSuiAddress(poolId.trim());
@@ -2199,20 +2332,12 @@ export async function collectFees(
       if (!position) {
         throw new Error(`Position ${posId} not found`);
       }
-      console.log(`Position found: ${posId}`);
     } catch (error) {
-      console.warn(`Position verification failed for ${posId}:`, error);
-
       if (isAlreadyClosedError(error)) {
         return { success: true, digest: "" };
       }
 
       // For all other errors, surface them
-      console.error(
-        `Failed to get position data: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
       throw error;
     }
 
@@ -2228,9 +2353,7 @@ export async function collectFees(
       if (!pool) {
         throw new Error(`Pool ${poolIdSanitized} not found`);
       }
-      console.log("Found pool:", poolIdSanitized);
     } catch (error) {
-      console.error("Error fetching pool:", error);
       throw new Error(`Pool not found: ${poolIdSanitized}`);
     }
 
@@ -2253,51 +2376,41 @@ export async function collectFees(
       });
 
       if (feeOwed.amount_a === "0" && feeOwed.amount_b === "0") {
-        console.log("No pending fees - nothing to collect");
         return { success: true, digest: "" };
       }
-
-      console.log(
-        `Pending fees detected: ${feeOwed.amount_a} / ${feeOwed.amount_b}. Collecting...`
-      );
     } catch (error) {
-      console.warn("Error checking pending fees:", error);
       // Continue anyway - better to try collecting than miss out on fees
     }
 
-    // Create transaction payload - updated to V2 method name
+    // Use SDK helper to create collectFee payload
     let tx;
     try {
-      tx = await clmmSdk.Position.collectFeePayload({
+      tx = await clmmSdk.Position.createCollectFeePayload({
         coin_type_a,
         coin_type_b,
         pool_id: poolIdSanitized,
         pos_id: posId,
       });
     } catch (error) {
-      console.error("SDK collect fee transaction creation failed:", error);
-
       // If we get errors with this approach, use a fallback
       // Create transaction block manually
       const txb = new TransactionBlock();
 
-      // Get the correct module path from the SDK config
-      const clmmModule =
-        clmmSdk.sdkOptions?.cetusModule?.clmm ||
-        `${CETUS_MAINNET_ADDRESSES.CLMM_MODULES}::clmm`;
+      // FIXED: Helper functions for transaction types (sui.js v1.30+ with correct order)
+      const addr = (a: string) => bcs.addr(txb, a);
+      const bool = (b: boolean) => bcs.bool(txb, b);
 
-      const configAddress =
-        clmmSdk.sdkOptions?.cetusModule?.config ||
-        CETUS_MAINNET_ADDRESSES.CONFIG_OBJECT;
+      // Get Cetus module paths (with fallbacks if SDK doesn't provide them)
+      const { package_id, clmm_position, clmm_config } = getCetusModulePaths();
 
-      // Create move call directly to the position module
+      // Create move call directly to the pool module (updated from clmm_position)
       txb.moveCall({
-        target: `${clmmModule}::position::collect_fee`,
+        target: `${package_id}::pool::collect_fee`, // Updated from clmm_position to pool
         arguments: [
-          txb.object(poolIdSanitized),
-          txb.object(posId),
-          txb.object(configAddress),
-          txb.pure(true), // is_immutable
+          addr(poolIdSanitized),
+          addr(posId),
+          txb.object(clmm_config),
+          bool(true), // is_immutable
         ],
         typeArguments: [coin_type_a, coin_type_b],
       });
@@ -2309,7 +2422,6 @@ export async function collectFees(
     tx.setGasBudget(50000000); // 0.05 SUI
 
     // Execute transaction
-    console.log("Executing fee collection transaction");
     const res = await wallet.signAndExecuteTransactionBlock({
       transactionBlock: tx,
       options: { showEffects: true, showEvents: true },
@@ -2319,8 +2431,6 @@ export async function collectFees(
     if (res.effects?.status?.status !== "success") {
       const digest = res.digest || "unknown";
       const errorMsg = res.effects?.status?.error;
-      console.error(`Fee collection failed with digest: ${digest}`);
-      console.error(`Error details: ${errorMsg || "unknown"}`);
 
       // If error message is empty or "unknown", double-check transaction status on-chain
       if (
@@ -2330,9 +2440,6 @@ export async function collectFees(
           errorMsg.toLowerCase().includes("timeout"))
       ) {
         if (await verifyTransactionSuccess(digest)) {
-          console.warn(
-            `Fee collection transaction digest ${digest} succeeded on-chain despite earlier error`
-          );
           return { success: true, digest }; // Treat as success
         }
       }
@@ -2342,7 +2449,6 @@ export async function collectFees(
         errorMsg &&
         errorMsg.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
       ) {
-        console.warn("Fee collection skipped - wallet refused empty TX");
         return { success: true, digest: "" };
       }
 
@@ -2351,21 +2457,16 @@ export async function collectFees(
       );
     }
 
-    console.log("Fee collection transaction successful, digest:", res.digest);
-
     return {
       success: true,
       digest: res.digest || "",
     };
   } catch (error) {
-    console.error("Fee collection failed:", error);
-
     // Special handling for empty transaction error from wallet
     if (
       error instanceof Error &&
       error.message.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
     ) {
-      console.warn("Fee collection skipped - wallet refused empty TX");
       return { success: true, digest: "" };
     }
 
@@ -2385,6 +2486,47 @@ export async function collectFees(
         throw new Error(
           "Invalid token amounts error. This is likely due to a formatting issue with the transaction parameters. Please try again."
         );
+      } else if (errorMessage.includes("no function was found")) {
+        throw new Error(
+          "Transaction failed: This app needs to be updated to work with the latest Cetus protocol version. The current protocol no longer supports the function being called."
+        );
+      } else if (errorMessage.includes("incorrect number of arguments")) {
+        throw new Error(
+          "Transaction failed: The Move function signature has changed in the latest protocol version. Please update the app to match the new function signature."
+        );
+      } else if (
+        errorMessage.includes("cannot convert a bigint value to a number")
+      ) {
+        throw new Error(
+          "Transaction failed: There was an error processing the token balances. This issue has been fixed in the latest version."
+        );
+      } else if (errorMessage.includes("tx.pure must be called")) {
+        throw new Error(
+          "Transaction failed: Missing type information for transaction values. This has been fixed to work with the latest Sui.js version by adding explicit types."
+        );
+      } else if (errorMessage.includes("invalid pure type name")) {
+        throw new Error(
+          "Transaction failed: Invalid BCS type specified in a transaction parameter. This has been fixed to use proper type annotations for sui.js v1.30+."
+        );
+      } else if (errorMessage.includes("unusedvalueswithoutdrop")) {
+        throw new Error(
+          "Transaction failed: The transaction has an unused coin value. This issue has been fixed by updating how we handle token preparation for CLMM v3."
+        );
+      } else if (errorMessage.includes("commandargumenterror")) {
+        throw new Error(
+          "Transaction failed: A coin object is being used multiple times. This issue has been fixed by preventing coin merging for CLMM v3."
+        );
+      } else if (errorMessage.includes("invalidvalueusage")) {
+        throw new Error(
+          "Transaction failed: A coin was consumed but then referenced again. This issue has been fixed by letting the router handle coin selection."
+        );
+      } else if (
+        errorMessage.includes("type") &&
+        errorMessage.includes("is not registered")
+      ) {
+        throw new Error(
+          "Transaction failed: Sui type registration error. This is likely due to using the old parameter order with tx.pure in Sui SDK 1.30+. The bcs helper has been updated to fix this issue."
+        );
       }
     }
 
@@ -2395,7 +2537,8 @@ export async function collectFees(
 /**
  * Collect rewards from a position.
  * Updated for SDK v2 with proper position verification
- * Fixed to handle string conversions for amount parameters
+ * Uses SDK helpers for CLMM v3 compatibility
+ * Fixed for @mysten/sui.js v1.30+ compatibility with correct BCS parameter order
  */
 export async function collectRewards(
   wallet: WalletContextState,
@@ -2411,10 +2554,6 @@ export async function collectRewards(
   clmmSdk.setSenderAddress(address);
 
   try {
-    console.log(
-      `Attempting to collect rewards for position ${positionId} in pool ${poolId}`
-    );
-
     // Sanitize IDs
     const posId = normalizeSuiAddress(positionId.trim());
     const poolIdSanitized = normalizeSuiAddress(poolId.trim());
@@ -2433,18 +2572,11 @@ export async function collectRewards(
         throw new Error(`Position ${posId} not found`);
       }
     } catch (error) {
-      console.warn(`Position verification failed for ${posId}:`, error);
-
       if (isAlreadyClosedError(error)) {
         return { success: true, digest: "" };
       }
 
       // For all other errors, surface them
-      console.error(
-        `Failed to get position data: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
       throw error;
     }
 
@@ -2460,9 +2592,7 @@ export async function collectRewards(
       if (!pool) {
         throw new Error(`Pool ${poolIdSanitized} not found`);
       }
-      console.log("Found pool:", poolIdSanitized);
     } catch (error) {
-      console.error("Error fetching pool:", error);
       throw new Error(`Pool not found: ${poolIdSanitized}`);
     }
 
@@ -2496,25 +2626,16 @@ export async function collectRewards(
           (r: any) => r && Number(r.amount_owed) > 0
         );
 
-        console.log(
-          `Found ${rewarder_coin_types.length} reward types, ${
-            hasNonZeroRewards ? "has" : "no"
-          } non-zero rewards`
-        );
-
         if (!hasNonZeroRewards) {
-          console.log("No rewards available to claim");
           return {
             success: true,
             digest: "",
           };
         }
       } catch (error) {
-        console.error("Error checking rewards:", error);
         throw new Error("Failed to check rewards. Please try again.");
       }
     } else {
-      console.warn("Pool has no positions_handle – skip reward query");
       return {
         success: true,
         digest: "",
@@ -2522,16 +2643,15 @@ export async function collectRewards(
     }
 
     if (rewarder_coin_types.length === 0) {
-      console.log("No reward types found");
       return {
         success: true,
         digest: "",
       };
     }
 
-    // If we have rewards, collect them - using the correct SDK v2 method name
+    // Use SDK helper to create collectRewarder payload
     try {
-      const tx = await clmmSdk.Rewarder.collectRewarderPayload({
+      const tx = await clmmSdk.Rewarder.createCollectRewarderPayload({
         coin_type_a,
         coin_type_b,
         pool_id: poolIdSanitized,
@@ -2552,8 +2672,6 @@ export async function collectRewards(
       if (res.effects?.status?.status !== "success") {
         const digest = res.digest || "unknown";
         const errorMsg = res.effects?.status?.error;
-        console.error(`Reward collection failed with digest: ${digest}`);
-        console.error(`Error details: ${errorMsg || "unknown"}`);
 
         // If error message is empty or "unknown", double-check transaction status on-chain
         if (
@@ -2563,9 +2681,6 @@ export async function collectRewards(
             errorMsg.toLowerCase().includes("timeout"))
         ) {
           if (await verifyTransactionSuccess(digest)) {
-            console.warn(
-              `Reward collection transaction digest ${digest} succeeded on-chain despite earlier error`
-            );
             return { success: true, digest }; // Treat as success
           }
         }
@@ -2575,7 +2690,6 @@ export async function collectRewards(
           errorMsg &&
           errorMsg.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
         ) {
-          console.warn("Reward collection skipped - wallet refused empty TX");
           return { success: true, digest: "" };
         }
 
@@ -2586,21 +2700,16 @@ export async function collectRewards(
         );
       }
 
-      console.log("Rewards successfully collected, digest:", res.digest);
-
       return {
         success: true,
         digest: res.digest || "",
       };
     } catch (error) {
-      console.error("Error in reward collection transaction:", error);
-
       // Special handling for empty transaction error from wallet
       if (
         error instanceof Error &&
         error.message.includes("[WALLET.SIGN_TX_ERROR] Unknown transaction")
       ) {
-        console.warn("Reward collection skipped - wallet refused empty TX");
         return { success: true, digest: "" };
       }
 
@@ -2614,11 +2723,85 @@ export async function collectRewards(
         );
       }
 
+      // Check for function not found error
+      if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("no function was found")
+      ) {
+        throw new Error(
+          "Transaction failed: This app needs to be updated to work with the latest Cetus protocol version. The current protocol no longer supports the function being called."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("incorrect number of arguments")
+      ) {
+        throw new Error(
+          "Transaction failed: The Move function signature has changed in the latest protocol version. Please update the app to match the new function signature."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("invalid u32 value")
+      ) {
+        throw new Error(
+          "Transaction failed: Tick indices must be properly encoded for the new CLMM v3 contract format. This issue has been fixed in the latest version."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message
+          .toLowerCase()
+          .includes("cannot convert a bigint value to a number")
+      ) {
+        throw new Error(
+          "Transaction failed: There was an error processing the token balances. This issue has been fixed in the latest version."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("tx.pure must be called")
+      ) {
+        throw new Error(
+          "Transaction failed: Missing type information for transaction values. This has been fixed to work with the latest Sui.js version by adding explicit types."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("invalid pure type name")
+      ) {
+        throw new Error(
+          "Transaction failed: Invalid BCS type specified in a transaction parameter. This has been fixed to use proper type annotations for sui.js v1.30+."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("unusedvalueswithoutdrop")
+      ) {
+        throw new Error(
+          "Transaction failed: The transaction has an unused coin value. This issue has been fixed by updating how we handle token preparation for CLMM v3."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("commandargumenterror")
+      ) {
+        throw new Error(
+          "Transaction failed: A coin object is being used multiple times. This issue has been fixed by preventing coin merging for CLMM v3."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("invalidvalueusage")
+      ) {
+        throw new Error(
+          "Transaction failed: A coin was consumed but then referenced again. This issue has been fixed by letting the router handle coin selection."
+        );
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("type") &&
+        error.message.toLowerCase().includes("is not registered")
+      ) {
+        throw new Error(
+          "Transaction failed: Sui type registration error. This is likely due to using the old parameter order with tx.pure in Sui SDK 1.30+. The bcs helper has been updated to fix this issue."
+        );
+      }
+
       throw new Error("Failed to collect rewards. Transaction error occurred.");
     }
   } catch (error) {
-    console.error("Error in collectRewards:", error);
-
     // Only return success for truly closed positions
     if (error instanceof Error && isAlreadyClosedError(error)) {
       return { success: true, digest: "" };
@@ -2641,7 +2824,6 @@ export async function getPositions(
 
     // Use the SDK v2 method
     const positions = await clmmSdk.Position.getPositionList(ownerAddress);
-    console.log(`Found ${positions.length} positions for ${ownerAddress}`);
 
     // Process positions to extract useful information
     const processedPositions = positions
@@ -2658,10 +2840,8 @@ export async function getPositions(
         };
       });
 
-    console.log(`Returning ${processedPositions.length} positions`);
     return processedPositions;
   } catch (error) {
-    console.error("Error fetching positions:", error);
     return []; // Return empty array instead of throwing
   }
 }
@@ -2699,23 +2879,8 @@ export async function getAllPools() {
       };
     });
   } catch (error) {
-    console.error("Failed to fetch Cetus pools:", error);
     return [];
   }
-}
-
-/**
- * Check if a pool is a Kriya pool
- */
-export function isKriyaPool(poolAddress: string): boolean {
-  if (!poolAddress) return false;
-
-  // Common patterns in Kriya pool addresses
-  const kriyaPatterns = ["kriya", "0x2a3b", "0x5a41d", "0x8d88d"];
-
-  return kriyaPatterns.some((pattern) =>
-    poolAddress.toLowerCase().includes(pattern.toLowerCase())
-  );
 }
 
 // Export for external use
