@@ -1,5 +1,5 @@
 // src/components/portfolio/MarketNews.scss
-// Last Updated: 2025-07-30 01:38:28 UTC by jake1318
+// Last Updated: 2025-07-30 03:13:00 UTC by jake1318
 
 // Variables for consistent colors - matching Home.scss
 $background-dark: #020314;
@@ -227,12 +227,10 @@ $border-dark: rgba(255, 255, 255, 0.05);
     padding: 0.75rem 1.5rem;
     position: relative;
     z-index: 2;
+    /* Changed to rely on parent scroll instead of having its own scrollbar */
     height: auto;
-    overflow-y: visible; // Changed from 'auto' to 'visible' to allow full scrolling
-    max-height: none; // Removed max-height constraint that was preventing full scrolling
-
-    /* Custom scrollbar styling applies to the whole page now */
-    /* These apply to the browser's main scrollbar instead */
+    overflow-y: visible; // Changed from auto to visible
+    padding-bottom: 50px; // Add padding to bottom to ensure spacing
 
     .results-info {
       font-size: 0.9rem;
@@ -248,6 +246,7 @@ $border-dark: rgba(255, 255, 255, 0.05);
       gap: 1rem;
       position: relative;
       z-index: 5;
+      margin-bottom: 2rem; /* Add margin at the bottom to ensure we can scroll to the last item */
     }
 
     .news-item {
@@ -419,30 +418,21 @@ $border-dark: rgba(255, 255, 255, 0.05);
   }
 }
 
-// Add these styles for the main body scrollbar
+/* Fix for the overall page overflow - enable main scrollbar only */
+body,
 html {
-  scrollbar-width: thin; // For Firefox
-  scrollbar-color: rgba($neon-blue, 0.7) $background-surface; // For Firefox
+  overflow-y: auto !important;
+  height: 100% !important;
+}
 
-  &::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-    background-color: rgba(0, 0, 0, 0.2);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, $neon-blue, rgba($neon-magenta, 0.8));
-    border-radius: 5px;
-
-    &:hover {
-      background: linear-gradient(180deg, $neon-blue, $neon-magenta);
-    }
-  }
-
-  &::-webkit-scrollbar-track {
-    background: $background-surface;
-    border-radius: 5px;
-  }
+/* Ensure the main app container allows scrolling */
+#root,
+.app-layout,
+.main-content,
+.portfolio-page {
+  overflow-y: auto !important;
+  height: auto !important;
+  min-height: 100vh !important;
 }
 
 @keyframes spin {
@@ -601,9 +591,4 @@ html {
       }
     }
   }
-}
-
-// Add a bottom margin to ensure the content is fully visible at the end
-.market-news .news-list {
-  margin-bottom: 2rem; // Add space at the bottom of the news list
 }
