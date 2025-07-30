@@ -8,10 +8,16 @@ $background-dark: rgba(5, 15, 30, 0.95);
 $background-medium: rgba(10, 20, 40, 0.9);
 $background-lighter: rgba(15, 25, 40, 0.8);
 $card-background: rgba(5, 15, 30, 0.7);
-$border-gradient: linear-gradient(45deg, rgba(0, 255, 255, 0.2), rgba(255, 0, 255, 0.2));
+$border-gradient: linear-gradient(
+  45deg,
+  rgba(0, 255, 255, 0.2),
+  rgba(255, 0, 255, 0.2)
+);
 $text-gradient: linear-gradient(90deg, #00ffff, #ff00ff);
-$shadow-glow: 0 8px 32px rgba(0, 255, 255, 0.08), 0 8px 32px rgba(255, 0, 255, 0.08);
-$shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 0, 255, 0.15);
+$shadow-glow: 0 8px 32px rgba(0, 255, 255, 0.08),
+  0 8px 32px rgba(255, 0, 255, 0.08);
+$shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
+  0 8px 32px rgba(255, 0, 255, 0.15);
 
 .modal-overlay {
   position: fixed;
@@ -41,7 +47,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
   border: 1px solid;
   border-image: $border-gradient 1;
   animation: slideUp 0.3s ease;
-  
+
   // Add glow effects
   &::before {
     content: "";
@@ -55,7 +61,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     left: -100px;
     z-index: 0;
   }
-  
+
   &::after {
     content: "";
     position: absolute;
@@ -68,11 +74,11 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     right: -100px;
     z-index: 0;
   }
-  
+
   &.collateral-modal {
     .modal-header h2 {
       position: relative;
-      
+
       &::after {
         content: "";
         position: absolute;
@@ -93,10 +99,15 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid;
-  border-image: linear-gradient(90deg, rgba(0, 255, 255, 0.1), rgba(255, 0, 255, 0.1)) 1;
+  border-image: linear-gradient(
+      90deg,
+      rgba(0, 255, 255, 0.1),
+      rgba(255, 0, 255, 0.1)
+    )
+    1;
   position: relative;
   z-index: 2;
-  
+
   h2 {
     margin: 0;
     font-size: 1.5rem;
@@ -108,7 +119,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     font-weight: bold;
     letter-spacing: 0.5px;
   }
-  
+
   .close-btn {
     background: transparent;
     border: none;
@@ -122,7 +133,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     justify-content: center;
     border-radius: 50%;
     transition: all 0.2s ease;
-    
+
     &:hover {
       background: rgba(255, 255, 255, 0.1);
       color: #fff;
@@ -135,7 +146,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
   position: relative;
   z-index: 1;
   color: #fff;
-  
+
   // Info banner styling
   .info-banner {
     background: rgba(255, 152, 0, 0.1);
@@ -143,46 +154,46 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     padding: 1rem;
     border-radius: 8px;
     margin-bottom: 1.5rem;
-    
+
     p {
       margin: 0;
       color: #ff9800;
       font-size: 0.95rem;
     }
   }
-  
+
   // Asset info styling
   .asset-info {
     background: rgba(0, 0, 0, 0.2);
     padding: 1.2rem;
     border-radius: 8px;
     margin-bottom: 1.5rem;
-    
+
     .info-row {
       display: flex;
       justify-content: space-between;
       margin-bottom: 0.8rem;
       font-size: 0.95rem;
-      
+
       &:last-child {
         margin-bottom: 0;
       }
-      
+
       span:first-child {
         color: rgba(255, 255, 255, 0.7);
       }
-      
+
       span:last-child {
         font-weight: 500;
       }
-      
+
       &.wallet-status {
         .connected {
           color: #4caf50;
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          
+
           .status-dot {
             width: 10px;
             height: 10px;
@@ -191,13 +202,13 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
             box-shadow: 0 0 8px #4caf50;
           }
         }
-        
+
         .disconnected {
           color: #f44336;
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          
+
           .status-dot {
             width: 10px;
             height: 10px;
@@ -209,24 +220,24 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
       }
     }
   }
-  
+
   // Amount input container
   .amount-input-container {
     margin-bottom: 2rem;
-    
+
     label {
       display: block;
       margin-bottom: 0.8rem;
       color: rgba(255, 255, 255, 0.8);
       font-size: 1rem;
     }
-    
+
     .input-with-max {
       display: flex;
       gap: 0.8rem;
       align-items: center;
       margin-bottom: 0.5rem;
-      
+
       .amount-input {
         flex: 1;
         background: rgba(255, 255, 255, 0.05);
@@ -238,21 +249,22 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
         color: #fff;
         outline: none;
         transition: all 0.2s ease;
-        
+
         &:focus {
-          box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.2), 0 0 0 2px rgba(255, 0, 255, 0.2);
+          box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.2),
+            0 0 0 2px rgba(255, 0, 255, 0.2);
         }
-        
+
         &::placeholder {
           color: rgba(255, 255, 255, 0.3);
         }
-        
+
         &:disabled {
           opacity: 0.6;
           cursor: not-allowed;
         }
       }
-      
+
       .max-btn {
         background: rgba(33, 150, 243, 0.1);
         border: 1px solid #2196f3;
@@ -262,19 +274,19 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
-        
+
         &:hover:not(:disabled) {
           background: rgba(33, 150, 243, 0.2);
           transform: translateY(-2px);
         }
-        
+
         &:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
       }
     }
-    
+
     .amount-in-usd {
       color: rgba(255, 255, 255, 0.7);
       font-size: 0.9rem;
@@ -282,7 +294,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
       text-align: right;
     }
   }
-  
+
   // Error message
   .error-message {
     background: rgba(244, 67, 54, 0.1);
@@ -293,18 +305,18 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     border-left: 3px solid #f44336;
     font-size: 0.95rem;
   }
-  
+
   // Collateral info
   .collateral-info {
     margin-bottom: 2rem;
-    
+
     .info-text {
       color: rgba(255, 255, 255, 0.7);
       font-size: 0.9rem;
       line-height: 1.5;
     }
   }
-  
+
   // Primary button
   .submit-btn {
     width: 100%;
@@ -318,18 +330,19 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     color: #000;
     border: none;
     box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 20px rgba(255, 0, 255, 0.3);
-    
+
     &:hover:not(:disabled) {
       transform: translateY(-3px);
-      box-shadow: 0 5px 25px rgba(0, 255, 255, 0.4), 0 5px 25px rgba(255, 0, 255, 0.4);
+      box-shadow: 0 5px 25px rgba(0, 255, 255, 0.4),
+        0 5px 25px rgba(255, 0, 255, 0.4);
     }
-    
+
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
   }
-  
+
   // Debug button styling
   .debug-btn {
     width: 100%;
@@ -341,26 +354,26 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
     transition: all 0.2s ease;
-    
+
     &:hover {
       background: rgba(0, 0, 0, 0.4);
     }
   }
-  
+
   // Debug info styling
   .debug-info {
     font-family: monospace;
     overflow-wrap: break-word;
-    
+
     p {
       margin: 0.4rem 0;
     }
-    
+
     h5 {
       margin: 1rem 0 0.5rem;
     }
   }
-  
+
   // Loading container
   .loading-container {
     display: flex;
@@ -368,32 +381,33 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     align-items: center;
     justify-content: center;
     padding: 2rem 1rem;
-    
+
     .loader {
       display: inline-block;
       width: 50px;
       height: 50px;
       margin-bottom: 1.5rem;
       border: 4px solid;
-      border-color: rgba(0, 255, 255, 0.3) rgba(255, 0, 255, 0.3) transparent transparent;
+      border-color: rgba(0, 255, 255, 0.3) rgba(255, 0, 255, 0.3) transparent
+        transparent;
       border-radius: 50%;
       animation: spin 1.2s linear infinite;
     }
-    
+
     p {
       font-size: 1.2rem;
       margin: 0 0 0.8rem;
       color: rgba(255, 255, 255, 0.9);
       font-weight: 500;
     }
-    
+
     .small-text {
       font-size: 0.9rem;
       color: rgba(255, 255, 255, 0.6);
       text-align: center;
     }
   }
-  
+
   // Result container
   .result-container {
     display: flex;
@@ -401,29 +415,29 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
     align-items: center;
     text-align: center;
     padding: 1rem;
-    
+
     h3 {
       font-size: 1.3rem;
       margin-top: 0;
       margin-bottom: 1rem;
     }
-    
+
     p {
       margin-bottom: 1.5rem;
       color: rgba(255, 255, 255, 0.9);
     }
-    
+
     &.success {
       h3 {
         color: #4caf50;
       }
     }
-    
+
     &.error {
       h3 {
         color: #f44336;
       }
-      
+
       .error-message {
         background: rgba(244, 67, 54, 0.1);
         padding: 0.8rem 1rem;
@@ -435,43 +449,43 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
         width: 100%;
       }
     }
-    
+
     .tx-details {
       background: rgba(0, 0, 0, 0.2);
       padding: 1rem;
       border-radius: 8px;
       width: 100%;
       margin-bottom: 1.5rem;
-      
+
       p {
         margin: 0 0 0.5rem;
         font-size: 0.9rem;
         color: rgba(255, 255, 255, 0.8);
       }
-      
+
       .tx-hash {
         font-family: monospace;
         background: rgba(255, 255, 255, 0.1);
         padding: 0.2rem 0.4rem;
         border-radius: 4px;
       }
-      
+
       .tx-link {
         color: #2196f3;
         text-decoration: none;
         display: inline-block;
         margin-top: 0.5rem;
-        
+
         &:hover {
           text-decoration: underline;
         }
       }
     }
-    
+
     .action-buttons {
       display: flex;
       gap: 1rem;
-      
+
       button {
         padding: 0.8rem 1.5rem;
         border-radius: 12px;
@@ -479,25 +493,27 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
         font-size: 1rem;
         cursor: pointer;
         transition: all 0.3s ease;
-        
+
         &.primary-btn {
           background: linear-gradient(45deg, #00ffff, #ff00ff);
           color: #000;
           border: none;
-          box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), 0 0 20px rgba(255, 0, 255, 0.2);
-          
+          box-shadow: 0 0 20px rgba(0, 255, 255, 0.2),
+            0 0 20px rgba(255, 0, 255, 0.2);
+
           &:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3), 0 5px 20px rgba(255, 0, 255, 0.3);
+            box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3),
+              0 5px 20px rgba(255, 0, 255, 0.3);
           }
         }
-        
+
         &.secondary-btn {
           background: rgba(0, 0, 0, 0.3);
           border: 2px solid;
           border-image: $border-gradient 1;
           color: #fff;
-          
+
           &:hover {
             background: rgba(0, 0, 0, 0.5);
             transform: translateY(-2px);
@@ -553,25 +569,656 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15), 0 8px 32px rgba(255, 
   .modal-overlay {
     padding: 1rem;
   }
-  
+
   .modal-body {
     padding: 1.5rem;
   }
-  
+
   .result-container .action-buttons {
     flex-direction: column;
     width: 100%;
-    
+
     button {
       width: 100%;
     }
   }
-  
+
   .input-with-max {
     flex-direction: column;
-    
+
     .max-btn {
       align-self: flex-end;
+    }
+  }
+}
+// src/styles/CollateralManagementModal.scss
+// Last Updated: 2025-07-20 05:13:20 UTC by jake1318
+
+// Method selection styles
+.method-selection {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+
+  .method-selector {
+    padding: 8px;
+    background-color: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(94, 224, 191, 0.3);
+    border-radius: 4px;
+    color: #e0e0ff;
+    width: 100%;
+    cursor: pointer;
+
+    &:focus {
+      border-color: #5ee0bf;
+      outline: none;
+    }
+
+    option {
+      background-color: #1a1a2e;
+    }
+  }
+
+  .method-info {
+    font-size: 12px;
+    color: #a5b4fc;
+    margin-top: 4px;
+    font-style: italic;
+  }
+}
+
+// Processing step styles
+.loading-container {
+  .small-text {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #a5b4fc;
+  }
+}
+
+// Maintenance message styling
+.maintenance-message {
+  text-align: center;
+  padding: 30px;
+  border-radius: 10px;
+  background-color: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 203, 69, 0.4);
+
+  .maintenance-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+  }
+
+  h3 {
+    color: #ffcb45;
+    margin-bottom: 15px;
+    font-weight: 600;
+  }
+
+  p {
+    margin-bottom: 20px;
+    color: #e0e0ff;
+    line-height: 1.5;
+  }
+
+  .highlighted-balance {
+    background-color: rgba(94, 224, 191, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #5ee0bf;
+  }
+
+  .maintenance-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+    margin-bottom: 20px;
+
+    button {
+      padding: 10px 20px;
+      font-weight: 500;
+    }
+  }
+
+  .maintenance-details {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .small-text {
+      font-size: 12px;
+      color: #a5b4fc;
+      opacity: 0.7;
+    }
+  }
+}
+// src/styles/CollateralManagementModal.scss
+// Last Updated: 2025-07-20 18:19:27 UTC by jake1318
+
+// Method selection styles
+.method-selection {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+
+  .method-selector {
+    padding: 8px;
+    background-color: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(94, 224, 191, 0.3);
+    border-radius: 4px;
+    color: #e0e0ff;
+    width: 100%;
+    cursor: pointer;
+
+    &:focus {
+      border-color: #5ee0bf;
+      outline: none;
+    }
+
+    option {
+      background-color: #1a1a2e;
+    }
+  }
+
+  .method-info {
+    font-size: 12px;
+    color: #a5b4fc;
+    margin-top: 4px;
+    font-style: italic;
+  }
+}
+
+// Processing step styles
+.loading-container {
+  .small-text {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #a5b4fc;
+  }
+}
+
+// Maintenance message styling
+.maintenance-message {
+  text-align: center;
+  padding: 30px;
+  border-radius: 10px;
+  background-color: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 203, 69, 0.4);
+
+  .maintenance-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+  }
+
+  h3 {
+    color: #ffcb45;
+    margin-bottom: 15px;
+    font-weight: 600;
+  }
+
+  p {
+    margin-bottom: 20px;
+    color: #e0e0ff;
+    line-height: 1.5;
+  }
+
+  .highlighted-balance {
+    background-color: rgba(94, 224, 191, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #5ee0bf;
+  }
+
+  .maintenance-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+    margin-bottom: 20px;
+
+    button {
+      padding: 10px 20px;
+      font-weight: 500;
+    }
+  }
+
+  .maintenance-details {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .small-text {
+      font-size: 12px;
+      color: #a5b4fc;
+      opacity: 0.7;
+    }
+  }
+}
+
+// Boost-locked warning styles
+.boost-locked-warning {
+  background-color: rgba(255, 201, 82, 0.1);
+  border: 1px solid rgba(255, 201, 82, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+
+  .warning-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  h4 {
+    color: #ffca52;
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+
+  p {
+    color: #e0e0ff;
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  ol {
+    margin: 0 0 15px 20px;
+    padding: 0;
+
+    li {
+      color: #e0e0ff;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+  }
+
+  .info-link {
+    color: #5ee0bf;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+// src/styles/CollateralManagementModal.scss
+// Last Updated: 2025-07-20 19:55:07 UTC by jake1318great
+
+// Method selection styles
+.method-selection {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+
+  .method-selector {
+    padding: 8px;
+    background-color: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(94, 224, 191, 0.3);
+    border-radius: 4px;
+    color: #e0e0ff;
+    width: 100%;
+    cursor: pointer;
+
+    &:focus {
+      border-color: #5ee0bf;
+      outline: none;
+    }
+
+    option {
+      background-color: #1a1a2e;
+    }
+  }
+
+  .method-info {
+    font-size: 12px;
+    color: #a5b4fc;
+    margin-top: 4px;
+    font-style: italic;
+  }
+}
+
+// Processing step styles
+.loading-container {
+  .small-text {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #a5b4fc;
+  }
+}
+
+// Obligation status styling
+.obligation-status {
+  .locked-status {
+    color: #ffca52;
+    display: flex;
+    align-items: center;
+
+    &:before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #ffca52;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+  }
+
+  .unlocked-status {
+    color: #5ee0bf;
+    display: flex;
+    align-items: center;
+
+    &:before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #5ee0bf;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+  }
+}
+
+// Maintenance message styling
+.maintenance-message {
+  text-align: center;
+  padding: 30px;
+  border-radius: 10px;
+  background-color: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 203, 69, 0.4);
+
+  .maintenance-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+  }
+
+  h3 {
+    color: #ffcb45;
+    margin-bottom: 15px;
+    font-weight: 600;
+  }
+
+  p {
+    margin-bottom: 20px;
+    color: #e0e0ff;
+    line-height: 1.5;
+  }
+
+  .highlighted-balance {
+    background-color: rgba(94, 224, 191, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #5ee0bf;
+  }
+
+  .maintenance-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+    margin-bottom: 20px;
+
+    button {
+      padding: 10px 20px;
+      font-weight: 500;
+    }
+  }
+
+  .maintenance-details {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .small-text {
+      font-size: 12px;
+      color: #a5b4fc;
+      opacity: 0.7;
+    }
+  }
+}
+
+// Boost-locked warning styles
+.boost-locked-warning {
+  background-color: rgba(255, 201, 82, 0.1);
+  border: 1px solid rgba(255, 201, 82, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+
+  .warning-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  h4 {
+    color: #ffca52;
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+
+  p {
+    color: #e0e0ff;
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  ol {
+    margin: 0 0 15px 20px;
+    padding: 0;
+
+    li {
+      color: #e0e0ff;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+  }
+
+  .info-link {
+    color: #5ee0bf;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+// src/styles/CollateralManagementModal.scss
+// Last Updated: 2025-07-20 20:45:06 UTC by jake1318please
+
+// Method selection styles
+.method-selection {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+
+  .method-selector {
+    padding: 8px;
+    background-color: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(94, 224, 191, 0.3);
+    border-radius: 4px;
+    color: #e0e0ff;
+    width: 100%;
+    cursor: pointer;
+
+    &:focus {
+      border-color: #5ee0bf;
+      outline: none;
+    }
+
+    option {
+      background-color: #1a1a2e;
+    }
+  }
+
+  .method-info {
+    font-size: 12px;
+    color: #a5b4fc;
+    margin-top: 4px;
+    font-style: italic;
+  }
+}
+
+// Processing step styles
+.loading-container {
+  .small-text {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #a5b4fc;
+  }
+}
+
+// Obligation status styling
+.obligation-status {
+  .locked-status {
+    color: #ffca52;
+    display: flex;
+    align-items: center;
+
+    &:before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #ffca52;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+  }
+
+  .unlocked-status {
+    color: #5ee0bf;
+    display: flex;
+    align-items: center;
+
+    &:before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #5ee0bf;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+  }
+}
+
+// Maintenance message styling
+.maintenance-message {
+  text-align: center;
+  padding: 30px;
+  border-radius: 10px;
+  background-color: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 203, 69, 0.4);
+
+  .maintenance-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+  }
+
+  h3 {
+    color: #ffcb45;
+    margin-bottom: 15px;
+    font-weight: 600;
+  }
+
+  p {
+    margin-bottom: 20px;
+    color: #e0e0ff;
+    line-height: 1.5;
+  }
+
+  .highlighted-balance {
+    background-color: rgba(94, 224, 191, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #5ee0bf;
+  }
+
+  .maintenance-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+    margin-bottom: 20px;
+
+    button {
+      padding: 10px 20px;
+      font-weight: 500;
+    }
+  }
+
+  .maintenance-details {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .small-text {
+      font-size: 12px;
+      color: #a5b4fc;
+      opacity: 0.7;
+    }
+  }
+}
+
+// Boost-locked warning styles
+.boost-locked-warning {
+  background-color: rgba(255, 201, 82, 0.1);
+  border: 1px solid rgba(255, 201, 82, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+
+  .warning-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  h4 {
+    color: #ffca52;
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+
+  p {
+    color: #e0e0ff;
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  ol {
+    margin: 0 0 15px 20px;
+    padding: 0;
+
+    li {
+      color: #e0e0ff;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+  }
+
+  .info-link {
+    color: #5ee0bf;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
     }
   }
 }

@@ -1,634 +1,1787 @@
-// src/styles/pages/Lending/LendingPage.scss
-// Last Updated: 2025-05-08 17:38:37 UTC by jake1318
+// src/styles/LendingPage.scss
+// Last updated: 2025-07-14 01:42:05 UTC by jake1318
+
+// Variables for consistent styling with the new neon blue color scheme
+$neon-blue: #1e90ff; // Changed from cyan to neon blue
+$purple: #c45cf2; // Changed from magenta to the purple used in other pages
+$green: #00ff80; // Green from other pages
+$background-dark: rgba(5, 15, 30, 0.95);
+$background-medium: rgba(10, 15, 30, 0.9);
+$background-lighter: rgba(15, 25, 40, 0.8);
+$card-background: rgba(5, 15, 30, 0.7);
+$border-gradient: linear-gradient(
+  45deg,
+  rgba(30, 144, 255, 0.2),
+  // Changed to neon blue
+  rgba(196, 92, 242, 0.2) // Changed to purple
+);
+$text-gradient: linear-gradient(
+  90deg,
+  #1e90ff,
+  #c45cf2
+); // Changed to neon blue and purple
+$shadow-glow: 0 8px 32px rgba(30, 144, 255, 0.08),
+  // Changed to neon blue
+  0 8px 32px rgba(196, 92, 242, 0.08); // Changed to purple
+$shadow-glow-stronger: 0 8px 32px rgba(30, 144, 255, 0.15),
+  // Changed to neon blue
+  0 8px 32px rgba(196, 92, 242, 0.15); // Changed to purple
 
 .lending-page {
   width: 100%;
   min-height: 100vh;
-  padding: 2rem;
-  position: relative;
-  color: #fff;
-
-  // Add cyberpunk-style gradient background with grid overlay to match homepage
   background: radial-gradient(
       circle at top left,
-      rgba(0, 255, 255, 0.15),
-      rgba(5, 15, 30, 0.3) 40%
+      rgba(30, 144, 255, 0.15) 0%,
+      // Changed to neon blue
+      rgba(5, 15, 30, 0.5) 40%
     ),
     radial-gradient(
       circle at bottom right,
-      rgba(255, 0, 255, 0.15),
-      rgba(5, 15, 30, 0.3) 40%
+      rgba(196, 92, 242, 0.15) 0%,
+      // Changed to purple
+      rgba(5, 15, 30, 0.5) 40%
     ),
-    #0f1624;
+    linear-gradient(
+      135deg,
+      rgba(5, 5, 15, 0.95) 0%,
+      rgba(10, 10, 30, 0.95) 100%
+    );
+  color: #fff;
+  padding: 2rem 1.5rem;
+  position: relative;
+  overflow: hidden;
 
-  &::before {
-    content: "";
+  // Removed grid overlay to match other pages
+
+  // Add glow effects with updated colors
+  .glow-1 {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.05) 1px,
-        transparent 1px
-      ),
-      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
-    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
+    width: 300px;
+    height: 300px;
+    background: rgba(30, 144, 255, 0.12); // Changed to neon blue
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 10%;
+    left: 15%;
+    z-index: -1;
+    animation: pulsate 8s ease-in-out infinite alternate;
     pointer-events: none;
-    z-index: 0;
   }
 
-  .content-container {
-    position: relative;
-    z-index: 1;
-    max-width: 1400px;
-    margin: 0 auto;
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(196, 92, 242, 0.12); // Changed to purple
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: 10%;
+    right: 15%;
+    z-index: -1;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    pointer-events: none;
   }
 
-  .page-header {
+  // Add the green glow from other pages
+  .glow-3 {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba(0, 255, 128, 0.12); // Green
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 60%;
+    left: 70%;
+    z-index: -1;
+    animation: pulsate 9s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 2.5rem;
     margin-bottom: 2rem;
+    background: $text-gradient;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: 0 0 20px rgba(30, 144, 255, 0.2); // Changed to neon blue
+    font-weight: bold;
+    letter-spacing: 1px;
 
-    .page-title {
-      h1 {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        background: linear-gradient(90deg, #00e7ff, #a15ffe);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-        display: inline-block;
+    &::after {
+      content: "";
+      display: block;
+      width: 100px;
+      height: 4px;
+      margin: 0.5rem auto 0;
+      background: $text-gradient;
+      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(30, 144, 255, 0.5),
+        // Changed to neon blue
+        0 0 10px rgba(196, 92, 242, 0.5); // Changed to purple
+    }
+  }
+
+  // Action section styling
+  .action-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+
+    button {
+      padding: 0.8rem 1.5rem;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 2px solid;
+      border-image: $border-gradient 1;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover:not(:disabled) {
+        background: rgba(0, 0, 0, 0.5);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(30, 144, 255, 0.15),
+          // Changed to neon blue
+          0 5px 15px rgba(196, 92, 242, 0.15); // Changed to purple
       }
 
-      .subtitle {
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 1.1rem;
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      &.refresh-btn {
+        background: linear-gradient(
+          45deg,
+          rgba(30, 144, 255, 0.2),
+          // Changed to neon blue
+          rgba(196, 92, 242, 0.2) // Changed to purple
+        );
+        &:hover:not(:disabled) {
+          background: linear-gradient(
+            45deg,
+            rgba(30, 144, 255, 0.3),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.3) // Changed to purple
+          );
+        }
+      }
+
+      &.connect-btn {
+        background: linear-gradient(
+          45deg,
+          #1e90ff,
+          #c45cf2
+        ); // Changed to neon blue and purple
+        color: #000;
+        border: none;
+        box-shadow: 0 0 20px rgba(30, 144, 255, 0.3),
+          // Changed to neon blue
+          0 0 20px rgba(196, 92, 242, 0.3); // Changed to purple
+
+        &:hover:not(:disabled) {
+          transform: translateY(-3px);
+          box-shadow: 0 5px 25px rgba(30, 144, 255, 0.4),
+            // Changed to neon blue
+            0 5px 25px rgba(196, 92, 242, 0.4); // Changed to purple
+        }
+      }
+
+      &.obligation-btn {
+        background: rgba(0, 0, 0, 0.3);
+        border: 2px solid;
+        border-image: linear-gradient(
+            45deg,
+            rgba(30, 144, 255, 0.6),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.6) // Changed to purple
+          )
+          1;
+      }
+    }
+
+    .status-message {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border-left: 3px solid;
+      border-image: $text-gradient 1;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.9);
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+    }
+  }
+
+  // Wallet status indicator
+  .wallet-status {
+    margin-bottom: 2rem;
+
+    .connected-status,
+    .disconnected-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.7rem 1.5rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      max-width: 500px;
+      margin: 0 auto;
+      box-shadow: $shadow-glow;
+      border: 1px solid;
+      border-image: $border-gradient 1;
+
+      .status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+
+        &.connected {
+          background: $green; // Changed to green from other pages
+          box-shadow: 0 0 10px $green; // Changed to green from other pages
+        }
+
+        &.disconnected {
+          background: #f44336;
+          box-shadow: 0 0 10px #f44336;
+        }
+
+        &.obligation {
+          background: $neon-blue; // Changed to neon blue
+          box-shadow: 0 0 10px $neon-blue; // Changed to neon blue
+        }
+      }
+
+      .obligation-status {
+        margin-left: 1rem;
+        padding-left: 1rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
       }
     }
   }
 
-  // User dashboard area
-  .user-lending-dashboard {
-    margin-bottom: 2rem;
-    background: rgba(15, 25, 40, 0.5);
-    border-radius: 12px;
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
-      )
-      1;
+  // NEW: Market Summary styling
+  .market-summary {
+    background: $card-background;
+    border-radius: 16px;
     padding: 1.5rem;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
-      0 8px 32px rgba(255, 0, 255, 0.05);
+    margin: 1.5rem 0;
+    color: white;
+    box-shadow: $shadow-glow;
+    border: 1px solid;
+    border-image: $border-gradient 1;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    position: relative;
+    overflow: hidden;
 
-    .dashboard-stats {
+    &::before {
+      content: "";
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+      border-radius: 50%;
+      filter: blur(30px);
+      top: -50px;
+      left: 20px;
+      z-index: 0;
+    }
+
+    &::after {
+      content: "";
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      background: rgba(196, 92, 242, 0.1); // Changed to purple
+      border-radius: 50%;
+      filter: blur(30px);
+      bottom: -50px;
+      right: 20px;
+      z-index: 0;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin-top: 0;
+      margin-bottom: 1.2rem;
+      color: $neon-blue; // Changed to neon blue
+      text-align: center;
+      background: $text-gradient;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      font-weight: bold;
+      position: relative;
+      z-index: 1;
+    }
+
+    .summary-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 1.2rem;
+      position: relative;
+      z-index: 1;
+
+      .summary-item {
+        flex: 1;
+        min-width: 180px;
+        background: rgba(22, 32, 48, 0.7);
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        transition: transform 0.2s;
+        border: 1px solid;
+        border-image: $border-gradient 1;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+      }
+
+      .summary-label {
+        display: block;
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+        color: #aabbcc;
+      }
+
+      .summary-value {
+        display: block;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: white;
+
+        &.highlight {
+          background: $text-gradient;
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: transparent;
+          position: relative;
+
+          &::after {
+            content: "";
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: $text-gradient;
+            transform: scaleX(0);
+            transition: transform 0.3s ease-in-out;
+            transform-origin: left;
+          }
+
+          &:hover::after {
+            transform: scaleX(1);
+          }
+        }
+      }
+    }
+  }
+
+  // Wallet totals summary
+  .wallet-totals-summary {
+    background: $card-background;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    color: white;
+    box-shadow: $shadow-glow;
+    border: 1px solid;
+    border-image: $border-gradient 1;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    h2 {
+      font-size: 1.5rem;
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      background: $text-gradient;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      font-weight: bold;
+    }
+
+    .totals-container {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      grid-gap: 1rem;
+      gap: 1rem;
       margin-bottom: 1.5rem;
 
-      .stat-item {
+      .total-item {
+        background: rgba(15, 25, 40, 0.7);
         padding: 1rem;
-        background: rgba(10, 20, 35, 0.5);
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
+        border-radius: 12px;
+        border: 1px solid;
+        border-image: $border-gradient 1;
+        transition: all 0.3s ease;
 
-        .stat-label {
-          font-size: 0.9rem;
+        &:hover {
+          transform: translateY(-3px);
+          box-shadow: $shadow-glow-stronger;
+        }
+
+        .total-label {
+          display: block;
           color: rgba(255, 255, 255, 0.7);
+          font-size: 0.9rem;
           margin-bottom: 0.5rem;
         }
 
-        .stat-value {
-          font-size: 1.5rem;
+        .total-value {
+          display: block;
+          font-size: 1.4rem;
           font-weight: 600;
-
-          &[data-value-type="positive"] {
-            color: #10f0b0;
-          }
-
-          &[data-value-type="negative"] {
-            color: #ff5a5a;
-          }
+          color: #fff;
         }
 
-        // Borrow limit bar
-        .limit-bar {
-          width: 100%;
-          height: 6px;
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 3px;
-          margin: 0.5rem 0;
-          overflow: hidden;
-
-          .limit-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00e7ff, #a15ffe);
-            border-radius: 3px;
-            transition: width 0.3s ease-out;
-
-            &[data-status="warning"] {
-              background: #ff9900;
-            }
-          }
-        }
-
-        .limit-text {
-          display: flex;
-          justify-content: space-between;
-          font-size: 0.85rem;
-          margin-bottom: 0.25rem;
-        }
-
-        .limit-percentage {
-          font-size: 0.85rem;
-          align-self: flex-end;
-        }
-      }
-    }
-
-    .user-positions-section {
-      margin-bottom: 1.5rem;
-
-      h3 {
-        font-size: 1.1rem;
-        margin-bottom: 1rem;
-        font-weight: 600;
-        color: rgba(255, 255, 255, 0.9);
-      }
-
-      .positions-table {
-        overflow-x: auto;
-
-        table {
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
-
-          th {
-            padding: 1rem;
-            text-align: left;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.7);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            border-bottom: 1px solid rgba(75, 85, 99, 0.3);
-
-            &.align-right {
-              text-align: right;
-            }
-
-            &.actions-column {
-              text-align: right;
-            }
-          }
-
-          td {
-            padding: 1rem;
-            border-bottom: 1px solid rgba(75, 85, 99, 0.2);
-
-            &.align-right {
-              text-align: right;
-            }
-
-            &.actions-cell {
-              text-align: right;
-            }
-          }
-        }
-
-        .asset-cell {
-          .asset-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-          }
-        }
-
-        .balance-info {
-          .secondary-text {
-            font-size: 0.85rem;
-            color: rgba(255, 255, 255, 0.5);
-            margin-top: 0.25rem;
-          }
-        }
-
-        .apy-value {
-          font-weight: 600;
-          font-size: 1rem;
-
-          &.positive {
-            color: #10f0b0;
-          }
-
-          &.negative {
-            color: #ff5a5a;
-          }
-        }
-
-        .status-badge {
-          display: inline-block;
-          padding: 0.25rem 0.75rem;
-          border-radius: 99px;
+        .total-note {
+          display: block;
           font-size: 0.8rem;
-          font-weight: 600;
-
-          &.success {
-            background: rgba(16, 240, 176, 0.1);
-            color: #10f0b0;
-            border: 1px solid rgba(16, 240, 176, 0.3);
-          }
-
-          &.warning {
-            background: rgba(255, 165, 0, 0.1);
-            color: #ffa500;
-            border: 1px solid rgba(255, 165, 0, 0.3);
-          }
-        }
-
-        .health-factor {
-          font-weight: 600;
-
-          &.safe {
-            color: #10f0b0;
-          }
-
-          &.warning {
-            color: #ffa500;
-          }
-
-          &.danger {
-            color: #ff5a5a;
-          }
-        }
-
-        .action-buttons {
-          display: flex;
-          gap: 0.5rem;
-          justify-content: flex-end;
+          margin-top: 0.5rem;
+          color: rgba(255, 255, 255, 0.6);
         }
       }
     }
-  }
 
-  // Connect wallet prompt
-  .connect-wallet-prompt {
-    margin-bottom: 2rem;
-    background: rgba(15, 25, 40, 0.5);
-    border-radius: 12px;
-    border: 1px solid rgba(75, 85, 99, 0.3);
-    padding: 2rem;
-    text-align: center;
-
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem;
-
-      .empty-icon {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-      }
+    .assets-summary {
+      margin-top: 1.5rem;
 
       h3 {
-        font-size: 1.5rem;
+        font-size: 1.2rem;
         margin-bottom: 1rem;
-      }
-
-      p {
-        color: rgba(255, 255, 255, 0.7);
-        margin-bottom: 1.5rem;
-        max-width: 400px;
-      }
-    }
-  }
-
-  // Tab navigation
-  .tabs-navigation {
-    display: flex;
-    border-bottom: 1px solid rgba(75, 85, 99, 0.3);
-    margin-bottom: 1.5rem;
-
-    .tab-button {
-      background: none;
-      border: none;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 1.1rem;
-      font-weight: 600;
-      padding: 1rem 2rem;
-      position: relative;
-      cursor: pointer;
-      transition: color 0.3s ease;
-
-      &:hover {
-        color: #ffffff;
-      }
-
-      &.active {
-        color: #00e7ff;
+        color: rgba(255, 255, 255, 0.9);
+        position: relative;
+        padding-bottom: 0.5rem;
 
         &::after {
           content: "";
           position: absolute;
-          bottom: -1px;
+          bottom: 0;
           left: 0;
-          width: 100%;
-          height: 3px;
-          background: linear-gradient(90deg, #00e7ff, #a15ffe);
-          border-radius: 3px 3px 0 0;
-          box-shadow: 0 0 10px rgba(0, 231, 255, 0.5),
-            0 0 10px rgba(161, 95, 254, 0.5);
-        }
-      }
-    }
-  }
-
-  // Markets table
-  .markets-table-container {
-    background: rgba(15, 25, 40, 0.5);
-    border-radius: 12px;
-    border: 1px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
-      )
-      1;
-    overflow: hidden;
-    margin-bottom: 2rem;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.05),
-      0 8px 32px rgba(255, 0, 255, 0.05);
-
-    table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-
-      thead {
-        background: rgba(10, 20, 35, 0.8);
-
-        th {
-          padding: 1.25rem 1rem;
-          font-size: 0.85rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: rgba(255, 255, 255, 0.7);
-          text-align: left;
-          border-bottom: 1px solid rgba(75, 85, 99, 0.3);
-
-          &.align-right {
-            text-align: right;
-          }
-
-          &.actions-column {
-            text-align: right;
-          }
+          width: 50px;
+          height: 2px;
+          background: $text-gradient;
+          border-radius: 2px;
         }
       }
 
-      tbody {
-        tr.market-row {
+      .assets-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+
+        .asset-item {
+          background: rgba(15, 25, 40, 0.7);
+          padding: 0.8rem;
+          border-radius: 8px;
+          text-align: center;
+          border: 1px solid;
+          border-image: $border-gradient 1;
           transition: all 0.2s ease;
 
           &:hover {
-            background: rgba(30, 40, 55, 0.4);
+            transform: translateY(-2px);
+            box-shadow: $shadow-glow;
           }
 
-          td {
-            padding: 1.25rem 1rem;
-            border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+          .asset-symbol {
+            display: block;
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.3rem;
+            color: #fff;
+          }
 
-            &.align-right {
-              text-align: right;
+          .asset-amount {
+            display: block;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 0.2rem;
+          }
+
+          .asset-value {
+            display: block;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+          }
+        }
+      }
+    }
+  }
+
+  // Selected obligation banner
+  .selected-obligation-banner {
+    background: $background-lighter;
+    border-radius: 16px;
+    padding: 1.2rem;
+    margin: 1rem 0;
+    color: white;
+    box-shadow: $shadow-glow;
+    border: 1px solid;
+    border-image: $border-gradient 1;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    .selected-obligation-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+
+      .obligation-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+
+        .label {
+          font-size: 0.9rem;
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        .value {
+          font-weight: 600;
+          background: $text-gradient;
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: transparent;
+        }
+
+        .locked-indicator {
+          background: rgba(244, 67, 54, 0.2);
+          color: #f44336;
+          padding: 0.2rem 0.5rem;
+          border-radius: 4px;
+          font-size: 0.8rem;
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
+
+        .change-btn {
+          padding: 0.3rem 0.7rem;
+          background: rgba(0, 0, 0, 0.3);
+          border: 1px solid;
+          border-image: $border-gradient 1;
+          border-radius: 6px;
+          color: white;
+          font-size: 0.8rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(0, 0, 0, 0.5);
+            transform: translateY(-2px);
+          }
+        }
+      }
+
+      .obligation-summary {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+
+        .summary-item {
+          .summary-label {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+          }
+
+          .summary-value {
+            font-weight: 600;
+
+            &.ltv-low {
+              color: $green; // Changed to green from other pages
             }
 
-            &.actions-cell {
-              text-align: right;
+            &.ltv-medium {
+              color: #ff9800;
+            }
+
+            &.ltv-high {
+              color: #f44336;
+            }
+
+            &.risk-low {
+              color: $green; // Changed to green from other pages
+            }
+
+            &.risk-medium {
+              color: #ff9800;
+            }
+
+            &.risk-high {
+              color: #f44336;
             }
           }
         }
       }
     }
 
-    .asset-cell {
-      min-width: 150px;
-
-      .asset-info {
+    .obligation-details-preview {
+      .warning-message {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        padding: 0.7rem 1rem;
+        margin-bottom: 1rem;
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 0.7rem;
 
-        .token-logo-sm {
-          width: 28px;
-          height: 28px;
+        &.locked {
+          border-left: 3px solid #f44336;
+
+          .icon {
+            color: #f44336;
+          }
+        }
+
+        &.empty {
+          border-left: 3px solid #ff9800;
+
+          .icon {
+            color: #ff9800;
+          }
+        }
+
+        .action-btn {
+          margin-left: auto;
+          padding: 0.3rem 0.8rem;
+          border-radius: 6px;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &.unlock-btn {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+
+            &:hover {
+              background: rgba(244, 67, 54, 0.3);
+            }
+          }
+
+          &.add-collateral-btn {
+            background: rgba(255, 152, 0, 0.2);
+            border: 1px solid #ff9800;
+            color: #ff9800;
+
+            &:hover {
+              background: rgba(255, 152, 0, 0.3);
+            }
+          }
+        }
+      }
+
+      .assets-preview {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+
+        .collateral-preview,
+        .borrows-preview {
+          flex: 1;
+          min-width: 250px;
+
+          h4 {
+            font-size: 1rem;
+            margin-bottom: 0.7rem;
+            color: rgba(255, 255, 255, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.3rem;
+          }
+
+          .assets-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+
+            .asset-item {
+              font-size: 0.9rem;
+              color: rgba(255, 255, 255, 0.9);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Error/Warning messages
+  .error-message {
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    border-left: 3px solid #f44336;
+  }
+
+  .obligation-prompt {
+    background: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    border-left: 3px solid #ff9800;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+
+    p {
+      margin: 0;
+    }
+
+    .select-tab-btn {
+      padding: 0.5rem 1rem;
+      background: rgba(255, 152, 0, 0.2);
+      border: 1px solid #ff9800;
+      border-radius: 6px;
+      color: #ff9800;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(255, 152, 0, 0.3);
+        transform: translateY(-2px);
+      }
+    }
+  }
+
+  // Rewards banner
+  .rewards-banner {
+    background: linear-gradient(
+      135deg,
+      rgba(0, 255, 128, 0.1) 0%,
+      // Changed to green from other pages
+      rgba(255, 235, 59, 0.1) 100%
+    );
+    border-radius: 16px;
+    padding: 1.2rem;
+    margin: 1rem 0;
+    border: 1px solid rgba(0, 255, 128, 0.3); // Changed to green from other pages
+    position: relative;
+
+    h3 {
+      font-size: 1.2rem;
+      color: $green; // Changed to green from other pages
+      margin-top: 0;
+      margin-bottom: 1rem;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+
+      li {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.5rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+    }
+
+    .claim-btn {
+      background: $green; // Changed to green from other pages
+      color: black; // Changed to black for better contrast
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: darken($green, 5%); // Slightly darker shade on hover
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0, 255, 128, 0.3); // Changed to green from other pages
+      }
+    }
+  }
+
+  // User position cards
+  .user-positions-summary {
+    margin: 2rem 0;
+
+    h3 {
+      font-size: 1.3rem;
+      margin-bottom: 1.5rem;
+      color: rgba(255, 255, 255, 0.9);
+      position: relative;
+      padding-bottom: 0.5rem;
+
+      &::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 70px;
+        height: 2px;
+        background: $text-gradient;
+        border-radius: 2px;
+      }
+    }
+
+    .user-positions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+
+      .user-position-card {
+        background: $card-background;
+        border-radius: 12px;
+        border: 1px solid;
+        border-image: $border-gradient 1;
+        padding: 1.2rem;
+        box-shadow: $shadow-glow;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: translateY(-3px);
+          box-shadow: $shadow-glow-stronger;
+        }
+
+        &.collateral {
+          border-image: linear-gradient(
+              45deg,
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3) // Changed to green
+            )
+            1;
+        }
+
+        &.borrowed {
+          border-image: linear-gradient(
+              45deg,
+              rgba(255, 87, 34, 0.3),
+              rgba(196, 92, 242, 0.3) // Changed to purple
+            )
+            1;
+        }
+
+        .position-icon {
+          width: 48px;
+          height: 48px;
           border-radius: 50%;
+          background: rgba(0, 0, 0, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
-          background-color: #1e293b;
-          border: 2px solid #0f172a;
           position: relative;
-          overflow: hidden;
-          font-weight: bold;
-          color: white;
-          font-size: 0.75rem;
 
-          img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+          &::before {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            border-radius: 50%;
+            padding: 2px;
+            background: $text-gradient;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box,
+              linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+          }
+
+          .coin-icon {
+            width: 28px;
+            height: 28px;
+          }
+        }
+
+        .position-details {
+          flex: 1;
+
+          h4 {
+            font-size: 1.1rem;
+            margin-top: 0;
+            margin-bottom: 0.8rem;
+            background: $text-gradient;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            font-weight: 600;
+          }
+
+          .position-values {
+            margin-bottom: 1rem;
+
+            div {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 0.4rem;
+
+              .label {
+                font-size: 0.9rem;
+                color: rgba(255, 255, 255, 0.7);
+              }
+
+              .value {
+                font-weight: 600;
+                font-size: 0.9rem;
+
+                &.positive {
+                  color: $green; // Changed to green from other pages
+                }
+
+                &.negative {
+                  color: #f44336;
+                }
+              }
+            }
+          }
+
+          .position-actions {
+            display: flex;
+            gap: 0.5rem;
+
+            button {
+              flex: 1;
+              padding: 0.5rem;
+              font-size: 0.8rem;
+              border-radius: 6px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              background: rgba(0, 0, 0, 0.3);
+              border: 1px solid;
+              color: white;
+
+              &:hover:not(:disabled) {
+                transform: translateY(-2px);
+              }
+
+              &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+              }
+
+              &.deposit-btn,
+              &.deposit-collateral-btn {
+                border-color: $green; // Changed to green from other pages
+                color: $green; // Changed to green from other pages
+
+                &:hover:not(:disabled) {
+                  background: rgba(
+                    0,
+                    255,
+                    128,
+                    0.1
+                  ); // Changed to green from other pages
+                }
+              }
+
+              &.withdraw-btn,
+              &.withdraw-collateral-btn {
+                border-color: #ff9800;
+                color: #ff9800;
+
+                &:hover:not(:disabled) {
+                  background: rgba(255, 152, 0, 0.1);
+                }
+              }
+
+              &.borrow-btn {
+                border-color: $neon-blue; // Changed to neon blue
+                color: $neon-blue; // Changed to neon blue
+
+                &:hover:not(:disabled) {
+                  background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+                }
+              }
+
+              &.repay-btn {
+                border-color: $purple; // Changed to purple
+                color: $purple; // Changed to purple
+
+                &:hover:not(:disabled) {
+                  background: rgba(196, 92, 242, 0.1); // Changed to purple
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Tab styling
+  .tabs {
+    display: flex;
+    gap: 1px;
+    margin: 2rem 0 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    button {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.8rem 1.5rem;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s ease;
+
+      &:hover {
+        color: white;
+      }
+
+      &.active {
+        color: $neon-blue; // Changed to neon blue
+        background: rgba(30, 144, 255, 0.05); // Changed to neon blue
+
+        &::after {
+          content: "";
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background: $text-gradient;
+          box-shadow: 0 0 10px rgba(30, 144, 255, 0.7); // Changed to neon blue
+        }
+      }
+    }
+  }
+
+  // Lending table styling with updated colors
+  .lending-table-container {
+    margin: 1.5rem 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid;
+    border-image: $border-gradient 1;
+    background: $card-background;
+    box-shadow: $shadow-glow;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    .lending-table {
+      width: 100%;
+      border-collapse: collapse;
+
+      th {
+        background: rgba(10, 20, 35, 0.8);
+        text-align: left;
+        padding: 1rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.7);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+
+        // Right-align numeric columns
+        &:nth-child(2),
+        &:nth-child(3),
+        &:nth-child(4),
+        &:nth-child(5),
+        &:nth-child(6) {
+          text-align: right;
+        }
+      }
+
+      td {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+        vertical-align: middle;
+
+        // Right-align numeric columns
+        &:nth-child(2),
+        &:nth-child(3),
+        &:nth-child(4),
+        &:nth-child(5),
+        &:nth-child(6) {
+          text-align: right;
+        }
+      }
+
+      tr:hover {
+        background: rgba(30, 40, 55, 0.4);
+      }
+
+      .asset-cell {
+        .asset-with-logo {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+
+          .token-logo {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+          }
+
+          .asset-text {
+            font-weight: 600;
+          }
+        }
+      }
+
+      .apy-cell {
+        font-weight: 600;
+
+        .positive {
+          color: $green; // Changed to green from other pages
+        }
+
+        .negative {
+          color: #f44336;
+        }
+      }
+
+      .user-value {
+        font-weight: 600;
+        color: $neon-blue; // Changed to neon blue
+      }
+
+      .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+
+        button {
+          padding: 0.4rem 0.8rem;
+          font-size: 0.8rem;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background: rgba(0, 0, 0, 0.3);
+          border: 1px solid;
+
+          &:hover:not(:disabled) {
+            transform: translateY(-2px);
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+
+          &.deposit-btn,
+          &.deposit-collateral-btn {
+            border-color: $green; // Changed to green from other pages
+            color: $green; // Changed to green from other pages
+
+            &:hover:not(:disabled) {
+              background: rgba(
+                0,
+                255,
+                128,
+                0.1
+              ); // Changed to green from other pages
+            }
+          }
+
+          &.withdraw-btn,
+          &.withdraw-collateral-btn {
+            border-color: #ff9800;
+            color: #ff9800;
+
+            &:hover:not(:disabled) {
+              background: rgba(255, 152, 0, 0.1);
+            }
+          }
+
+          &.borrow-btn {
+            border-color: $neon-blue; // Changed to neon blue
+            color: $neon-blue; // Changed to neon blue
+
+            &:hover:not(:disabled) {
+              background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+            }
+          }
+
+          &.repay-btn {
+            border-color: $purple; // Changed to purple
+            color: $purple; // Changed to purple
+
+            &:hover:not(:disabled) {
+              background: rgba(196, 92, 242, 0.1); // Changed to purple
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Obligations tab styling
+  .obligations-tab-container {
+    margin: 1rem 0;
+
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      background: $text-gradient;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      font-weight: bold;
+    }
+
+    .create-obligation-container {
+      display: flex;
+      justify-content: center;
+      margin: 1.5rem 0;
+
+      .create-obligation-btn {
+        padding: 0.8rem 1.5rem;
+        background: linear-gradient(
+          45deg,
+          $neon-blue,
+          $purple
+        ); // Changed to neon blue and purple
+        color: black;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 15px rgba(30, 144, 255, 0.3),
+          // Changed to neon blue
+          0 0 15px rgba(196, 92, 242, 0.3); // Changed to purple
+
+        &:hover:not(:disabled) {
+          transform: translateY(-3px);
+          box-shadow: 0 5px 20px rgba(30, 144, 255, 0.4),
+            // Changed to neon blue
+            0 5px 20px rgba(196, 92, 242, 0.4); // Changed to purple
+        }
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+      }
+    }
+
+    .no-obligations-message {
+      background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+      margin: 1rem 0;
+      border: 1px solid rgba(30, 144, 255, 0.2); // Changed to neon blue
+
+      p {
+        margin: 0 0 1rem;
+        color: rgba(255, 255, 255, 0.8);
+      }
+    }
+
+    .result-message {
+      margin: 1rem 0;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+
+      &.success {
+        background: rgba(0, 255, 128, 0.1); // Changed to green from other pages
+        border: 1px solid rgba(0, 255, 128, 0.2); // Changed to green from other pages
+        color: $green; // Changed to green from other pages
+      }
+
+      &.error {
+        background: rgba(244, 67, 54, 0.1);
+        border: 1px solid rgba(244, 67, 54, 0.2);
+        color: #f44336;
+      }
+
+      .tx-link {
+        display: inline-block;
+        margin-top: 0.5rem;
+        color: $neon-blue; // Changed to neon blue
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+
+    .obligations-list {
+      h3 {
+        font-size: 1.3rem;
+        margin: 2rem 0 1rem;
+        color: white;
+      }
+
+      .obligations-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 2rem;
+        background: rgba(15, 25, 40, 0.5);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid;
+        border-image: $border-gradient 1;
+
+        th {
+          background: rgba(10, 20, 35, 0.8);
+          text-align: left;
+          padding: 0.8rem 1rem;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.7);
+          text-transform: uppercase;
+        }
+
+        td {
+          padding: 0.8rem 1rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+          &.id-cell {
+            font-family: monospace;
+            font-size: 0.9rem;
+          }
+
+          &.status-cell {
+            .locked-status {
+              color: #f44336;
+            }
+            .empty-status,
+            .active-status {
+              color: $green; // Changed to green from other pages
+            }
+          }
+
+          &.ltv-cell {
+            &.ltv-low {
+              color: $green; // Changed to green from other pages
+            }
+            &.ltv-medium {
+              color: #ff9800;
+            }
+            &.ltv-high {
+              color: #f44336;
+            }
+          }
+
+          &.actions-cell {
+            display: flex;
+            gap: 0.5rem;
+
+            button {
+              padding: 0.4rem 0.8rem;
+              font-size: 0.8rem;
+              border-radius: 6px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              background: rgba(0, 0, 0, 0.3);
+              border: 1px solid;
+
+              &:hover:not(:disabled) {
+                transform: translateY(-2px);
+              }
+
+              &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                transform: none;
+              }
+
+              &.select-btn {
+                border-color: $neon-blue; // Changed to neon blue
+                color: $neon-blue; // Changed to neon blue
+              }
+
+              &.deselect-btn {
+                border-color: #ff9800;
+                color: #ff9800;
+              }
+
+              &.unlock-btn {
+                border-color: #f44336;
+                color: #f44336;
+              }
+
+              &.add-collateral-btn {
+                border-color: $green; // Changed to green from other pages
+                color: $green; // Changed to green from other pages
+              }
+            }
+          }
+        }
+
+        tr {
+          &.selected {
+            background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+            position: relative;
+
+            &::before {
+              content: "";
+              position: absolute;
+              left: 0;
+              top: 0;
+              bottom: 0;
+              width: 3px;
+              background: $neon-blue; // Changed to neon blue
+            }
+          }
+
+          &.locked {
+            background: rgba(244, 67, 54, 0.05);
+          }
+
+          &.empty {
+            background: rgba(
+              0,
+              255,
+              128,
+              0.05
+            ); // Changed to green from other pages
+          }
+
+          &:hover:not(.selected) {
+            background: rgba(30, 40, 55, 0.4);
           }
         }
       }
     }
 
-    .balance-info {
-      .secondary-text {
-        font-size: 0.85rem;
-        color: rgba(255, 255, 255, 0.5);
-        margin-top: 0.25rem;
-      }
-    }
+    // Selected obligation details styling
+    .selected-obligation-details {
+      margin: 2rem 0;
 
-    .apy-value {
-      font-weight: 600;
-      font-size: 1rem;
-
-      &.positive {
-        color: #10f0b0;
+      h3 {
+        font-size: 1.3rem;
+        margin-bottom: 1rem;
+        color: white;
       }
 
-      &.negative {
-        color: #ff5a5a;
-      }
-    }
+      .obligation-detail-card {
+        background: rgba(15, 25, 40, 0.5);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid;
+        border-image: $border-gradient 1;
 
-    .utilization-wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.25rem;
+        .obligation-header {
+          margin-bottom: 1rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          padding-bottom: 0.8rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
 
-      .utilization-bar {
-        width: 100%;
-        max-width: 120px;
-        height: 6px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-        overflow: hidden;
+          h4 {
+            font-size: 1.2rem;
+            margin: 0;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
 
-        .utilization-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #00e7ff, #a15ffe);
-          border-radius: 3px;
-          transition: width 0.3s ease-out;
+            .locked-badge {
+              font-size: 0.8rem;
+              background: rgba(244, 67, 54, 0.2);
+              color: #f44336;
+              padding: 0.25rem 0.5rem;
+              border-radius: 4px;
+              font-weight: normal;
+            }
+          }
+        }
+
+        .obligation-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+
+          .stat-item {
+            background: rgba(10, 20, 35, 0.5);
+            padding: 0.8rem;
+            border-radius: 8px;
+
+            .stat-label {
+              font-size: 0.85rem;
+              color: rgba(255, 255, 255, 0.7);
+              margin-bottom: 0.4rem;
+              display: block;
+            }
+
+            .stat-value {
+              font-size: 1.1rem;
+              font-weight: 600;
+              display: block;
+
+              &.ltv {
+                &.ltv-low {
+                  color: $green; // Changed to green from other pages
+                }
+                &.ltv-medium {
+                  color: #ff9800;
+                }
+                &.ltv-high {
+                  color: #f44336;
+                }
+              }
+
+              &.risk-low {
+                color: $green; // Changed to green from other pages
+              }
+              &.risk-medium {
+                color: #ff9800;
+              }
+              &.risk-high,
+              &.risk-extreme {
+                color: #f44336;
+              }
+            }
+          }
+        }
+
+        .collateral-list,
+        .borrows-list {
+          margin-bottom: 1.5rem;
+
+          h5 {
+            font-size: 1.1rem;
+            margin-bottom: 0.8rem;
+            color: rgba(255, 255, 255, 0.9);
+          }
+
+          ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.8rem;
+
+            li {
+              background: rgba(10, 20, 35, 0.5);
+              padding: 0.7rem 1rem;
+              border-radius: 6px;
+              font-size: 0.9rem;
+            }
+          }
+        }
+
+        .unlock-container,
+        .add-collateral-container {
+          margin-top: 1.5rem;
+          text-align: center;
+
+          button {
+            padding: 0.7rem 1.5rem;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 0.8rem;
+
+            &.unlock-btn {
+              background: rgba(244, 67, 54, 0.2);
+              border: 1px solid #f44336;
+              color: #f44336;
+
+              &:hover:not(:disabled) {
+                background: rgba(244, 67, 54, 0.3);
+                transform: translateY(-2px);
+              }
+            }
+
+            &.add-collateral-btn {
+              background: linear-gradient(
+                45deg,
+                $neon-blue,
+                $green
+              ); // Changed to neon blue and green
+              border: none;
+              color: black;
+              box-shadow: 0 0 15px rgba(30, 144, 255, 0.3),
+                // Changed to neon blue
+                0 0 15px rgba(0, 255, 128, 0.3); // Changed to green
+
+              &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 20px rgba(30, 144, 255, 0.4),
+                  // Changed to neon blue
+                  0 5px 20px rgba(0, 255, 128, 0.4); // Changed to green
+              }
+            }
+          }
+
+          .info-text {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+          }
+
+          .lock-info {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+          }
         }
       }
-
-      .utilization-text {
-        font-size: 0.85rem;
-        color: rgba(255, 255, 255, 0.7);
-      }
-    }
-
-    // Action buttons
-    .action-buttons {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: flex-end;
     }
   }
 
-  // Loading state
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-
-    .spinner {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 50%;
-      border: 3px solid rgba(0, 255, 255, 0.15);
-      border-top-color: #00ffff;
-      border-right-color: #ff00ff;
-      animation: spin 1.2s linear infinite;
-      margin-bottom: 1.5rem;
-    }
-
-    .loading-text {
-      font-size: 1.1rem;
-      color: rgba(255, 255, 255, 0.7);
-    }
+  // Mini token logo style
+  .mini-token-logo {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 6px;
+    object-fit: cover;
   }
 
-  // Button styles - Keep consistent with app
-  .btn {
-    display: inline-block;
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: none;
+  // Last updated timestamp
+  .last-updated {
+    text-align: center;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
 
-    &--primary {
-      background: linear-gradient(45deg, #00ffff, #ff00ff);
-      color: #000;
-      border: none;
-      box-shadow: 0 0 15px rgba(0, 255, 255, 0.2),
-        0 0 15px rgba(255, 0, 255, 0.2);
-
-      &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3),
-          0 5px 20px rgba(255, 0, 255, 0.3);
-      }
-    }
-
-    &--secondary {
-      background: rgba(15, 25, 40, 0.7);
-      border: 1px solid;
-      border-image: linear-gradient(
-          45deg,
-          rgba(0, 255, 255, 0.6),
-          rgba(255, 0, 255, 0.6)
-        )
-        1;
-      color: #fff;
-
-      &:hover:not(:disabled) {
-        background: rgba(25, 35, 50, 0.8);
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 255, 255, 0.1),
-          0 5px 15px rgba(255, 0, 255, 0.1);
-      }
-    }
-
-    &--accent {
-      background: linear-gradient(45deg, #00ffff, #a15ffe);
-      color: #000;
-      box-shadow: 0 0 15px rgba(0, 231, 255, 0.2),
-        0 0 15px rgba(161, 95, 254, 0.2);
-
-      &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(0, 231, 255, 0.3),
-          0 5px 20px rgba(161, 95, 254, 0.3);
-      }
-    }
-
-    &--sm {
-      padding: 0.4rem 0.8rem;
-      font-size: 0.8rem;
-    }
-
-    &:disabled {
+  // Animation for pulsating glow effects
+  @keyframes pulsate {
+    0% {
       opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-      box-shadow: none !important;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.8;
+      transform: scale(1.2);
     }
   }
 
-  // Animation for spinner
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
+  // Improved responsive styling
+  @media screen and (max-width: 1200px) {
+    .selected-obligation-banner {
+      .selected-obligation-header {
+        flex-direction: column;
+        align-items: flex-start;
 
-  // Responsive adjustments
-  @media (max-width: 768px) {
-    .dashboard-stats {
-      grid-template-columns: 1fr 1fr !important;
+        .obligation-summary {
+          margin-top: 1rem;
+          width: 100%;
+        }
+      }
     }
 
-    .positions-table,
-    .markets-table-container {
+    .lending-table-container {
       overflow-x: auto;
     }
   }
 
-  @media (max-width: 576px) {
-    .dashboard-stats {
-      grid-template-columns: 1fr !important;
+  @media screen and (max-width: 768px) {
+    padding: 1.5rem 1rem;
+
+    h1 {
+      font-size: 2rem;
+    }
+
+    .action-section {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .wallet-status {
+      .connected-status,
+      .disconnected-status {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+
+    .market-summary {
+      .summary-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .wallet-totals-summary {
+      .totals-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .tabs {
+      button {
+        flex: 1;
+        padding: 0.8rem 0.5rem;
+        font-size: 0.9rem;
+      }
+    }
+
+    .selected-obligation-details {
+      .obligation-detail-card {
+        .obligation-stats {
+          grid-template-columns: 1fr;
+        }
+      }
+    }
+  }
+
+  @media screen and (max-width: 480px) {
+    padding: 1rem 0.75rem;
+
+    h1 {
+      font-size: 1.8rem;
+    }
+
+    .tabs {
+      button {
+        font-size: 0.8rem;
+        padding: 0.6rem 0.25rem;
+      }
+    }
+
+    .actions-cell {
+      flex-direction: column;
+
+      button {
+        width: 100%;
+      }
     }
   }
 }

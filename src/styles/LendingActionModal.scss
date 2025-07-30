@@ -1,23 +1,28 @@
 // src/styles/LendingActionModal.scss
-// Last updated: 2025-06-21 23:27:36 UTC by jake1318
+// Last updated: 2025-07-23 19:10:44 UTC by jake1318
 
-// Variables for consistent styling
-$cyan: #00ffff;
-$magenta: #ff00ff;
-$background-dark: rgba(5, 15, 30, 0.95);
-$background-medium: rgba(10, 20, 40, 0.9);
-$background-lighter: rgba(15, 25, 40, 0.8);
-$card-background: rgba(5, 15, 30, 0.7);
+// Variables for consistent styling with the Home page color scheme
+$background-dark: #020314;
+$background-surface: #030924;
+$neon-blue: #4da2ff; // Primary color (Sui blue)
+$neon-green: #1ed760; // Neon green from Home page
+$neon-magenta: #ff00ff; // Magenta accent
+$text-primary: #ffffff;
+$text-secondary: #b1a5c8;
+$text-muted: #3f4c60;
+$border-dark: rgba(255, 255, 255, 0.05);
+
+// Gradient definitions
+$text-gradient: linear-gradient(90deg, $neon-blue 50%, $neon-magenta 100%);
 $border-gradient: linear-gradient(
   45deg,
-  rgba(0, 255, 255, 0.2),
-  rgba(255, 0, 255, 0.2)
+  rgba($neon-blue, 0.2),
+  rgba($neon-magenta, 0.2)
 );
-$text-gradient: linear-gradient(90deg, #00ffff, #ff00ff);
-$shadow-glow: 0 8px 32px rgba(0, 255, 255, 0.08),
-  0 8px 32px rgba(255, 0, 255, 0.08);
-$shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
-  0 8px 32px rgba(255, 0, 255, 0.15);
+$glow-shadow: 0 8px 32px rgba($neon-blue, 0.08),
+  0 8px 32px rgba($neon-magenta, 0.08);
+$glow-shadow-stronger: 0 8px 32px rgba($neon-blue, 0.15),
+  0 8px 32px rgba($neon-magenta, 0.15);
 
 .modal-overlay {
   position: fixed;
@@ -47,9 +52,9 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 .modal-container {
   width: 100%;
   max-width: 500px;
-  background: $background-medium;
+  background: $background-surface;
   border-radius: 16px;
-  box-shadow: $shadow-glow-stronger;
+  box-shadow: $glow-shadow-stronger;
   overflow: hidden;
   position: relative;
   border: 1px solid;
@@ -69,7 +74,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
     position: absolute;
     width: 200px;
     height: 200px;
-    background: rgba(0, 255, 255, 0.08);
+    background: rgba($neon-blue, 0.08);
     border-radius: 50%;
     filter: blur(50px);
     top: -100px;
@@ -82,7 +87,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
     position: absolute;
     width: 200px;
     height: 200px;
-    background: rgba(255, 0, 255, 0.08);
+    background: rgba($neon-magenta, 0.08);
     border-radius: 50%;
     filter: blur(50px);
     bottom: -100px;
@@ -99,8 +104,8 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
   border-bottom: 1px solid;
   border-image: linear-gradient(
       90deg,
-      rgba(0, 255, 255, 0.1),
-      rgba(255, 0, 255, 0.1)
+      rgba($neon-blue, 0.1),
+      rgba($neon-magenta, 0.1)
     )
     1;
   position: relative;
@@ -143,7 +148,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
   padding: 2rem;
   position: relative;
   z-index: 1;
-  color: #fff;
+  color: $text-primary;
 
   // Loading state
   .loading-container {
@@ -159,7 +164,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
       height: 50px;
       margin-bottom: 1.5rem;
       border: 4px solid;
-      border-color: rgba(0, 255, 255, 0.3) rgba(255, 0, 255, 0.3) transparent
+      border-color: rgba($neon-blue, 0.3) rgba($neon-magenta, 0.3) transparent
         transparent;
       border-radius: 50%;
       animation: spin 1.2s linear infinite;
@@ -174,7 +179,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 
     .small-text {
       font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.6);
+      color: $text-secondary;
       text-align: center;
     }
   }
@@ -200,7 +205,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 
     &.success {
       h3 {
-        color: #4caf50;
+        color: $neon-green;
       }
     }
 
@@ -222,16 +227,17 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
     }
 
     .tx-details {
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba($background-dark, 0.5);
       padding: 1rem;
       border-radius: 8px;
       width: 100%;
       margin-bottom: 1.5rem;
+      border: 1px solid rgba($neon-blue, 0.2);
 
       p {
         margin: 0 0 0.5rem;
         font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.8);
+        color: $text-secondary;
       }
 
       .tx-hash {
@@ -239,16 +245,19 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
         background: rgba(255, 255, 255, 0.1);
         padding: 0.2rem 0.4rem;
         border-radius: 4px;
+        color: $text-primary;
       }
 
       .tx-link {
-        color: #2196f3;
+        color: $neon-blue;
         text-decoration: none;
         display: inline-block;
         margin-top: 0.5rem;
+        transition: all 0.2s ease;
 
         &:hover {
           text-decoration: underline;
+          color: lighten($neon-blue, 10%);
         }
       }
     }
@@ -266,16 +275,16 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
         transition: all 0.3s ease;
 
         &.primary-btn {
-          background: linear-gradient(45deg, #00ffff, #ff00ff);
+          background: linear-gradient(45deg, $neon-blue, $neon-magenta);
           color: #000;
           border: none;
-          box-shadow: 0 0 20px rgba(0, 255, 255, 0.2),
-            0 0 20px rgba(255, 0, 255, 0.2);
+          box-shadow: 0 0 20px rgba($neon-blue, 0.2),
+            0 0 20px rgba($neon-magenta, 0.2);
 
           &:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3),
-              0 5px 20px rgba(255, 0, 255, 0.3);
+            box-shadow: 0 5px 20px rgba($neon-blue, 0.3),
+              0 5px 20px rgba($neon-magenta, 0.3);
           }
         }
 
@@ -283,7 +292,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
           background: rgba(0, 0, 0, 0.3);
           border: 2px solid;
           border-image: $border-gradient 1;
-          color: #fff;
+          color: $text-primary;
 
           &:hover {
             background: rgba(0, 0, 0, 0.5);
@@ -300,7 +309,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 
     .label {
       font-size: 1rem;
-      color: rgba(255, 255, 255, 0.8);
+      color: $text-secondary;
       margin-bottom: 0.8rem;
       display: block;
     }
@@ -310,19 +319,18 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 
       .amount-input {
         width: 100%;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid;
-        border-image: $border-gradient 1;
+        background: rgba($background-dark, 0.7);
+        border: 1px solid rgba($neon-blue, 0.3);
         padding: 1rem;
         border-radius: 8px;
         font-size: 1.2rem;
-        color: #fff;
+        color: $text-primary;
         outline: none;
         transition: all 0.2s ease;
 
         &:focus {
-          box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.2),
-            0 0 0 2px rgba(255, 0, 255, 0.2);
+          border-color: $neon-blue;
+          box-shadow: 0 0 0 2px rgba($neon-blue, 0.2);
         }
 
         &::placeholder {
@@ -345,24 +353,26 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
           transition: all 0.2s ease;
 
           &.max-btn {
-            background: rgba(33, 150, 243, 0.1);
-            border: 1px solid #2196f3;
-            color: #2196f3;
+            background: rgba($neon-blue, 0.1);
+            border: 1px solid $neon-blue;
+            color: $neon-blue;
 
             &:hover {
-              background: rgba(33, 150, 243, 0.2);
+              background: rgba($neon-blue, 0.2);
               transform: translateY(-2px);
+              box-shadow: 0 0 10px rgba($neon-blue, 0.2);
             }
           }
 
           &.safe-amount-btn {
-            background: rgba(76, 175, 80, 0.1);
-            border: 1px solid #4caf50;
-            color: #4caf50;
+            background: rgba($neon-green, 0.1);
+            border: 1px solid $neon-green;
+            color: $neon-green;
 
             &:hover {
-              background: rgba(76, 175, 80, 0.2);
+              background: rgba($neon-green, 0.2);
               transform: translateY(-2px);
+              box-shadow: 0 0 10px rgba($neon-green, 0.2);
             }
           }
         }
@@ -372,17 +382,18 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 
   // Info section styling
   .info-section {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba($background-dark, 0.5);
     padding: 1rem;
     border-radius: 8px;
     margin-bottom: 1.5rem;
+    border: 1px solid rgba($neon-blue, 0.1);
 
     .info-row {
       display: flex;
       align-items: center;
       gap: 0.8rem;
       margin-bottom: 0.8rem;
-      color: rgba(255, 255, 255, 0.8);
+      color: $text-secondary;
       font-size: 0.9rem;
 
       &:last-child {
@@ -391,7 +402,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 
       svg {
         flex-shrink: 0;
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba($neon-blue, 0.6);
       }
     }
   }
@@ -405,14 +416,14 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
       align-items: center;
       gap: 0.5rem;
       font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.7);
+      color: $text-secondary;
 
       .status-dot {
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: #4caf50;
-        box-shadow: 0 0 8px #4caf50;
+        background: $neon-green;
+        box-shadow: 0 0 8px $neon-green;
       }
     }
   }
@@ -437,29 +448,29 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
     transition: all 0.3s ease;
 
     &.deposit-btn {
-      background: linear-gradient(45deg, #00ffff, #4caf50);
+      background: linear-gradient(45deg, $neon-blue, $neon-green);
       color: #000;
       border: none;
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
-        0 0 20px rgba(76, 175, 80, 0.3);
+      box-shadow: 0 0 20px rgba($neon-blue, 0.3),
+        0 0 20px rgba($neon-green, 0.3);
 
       &:hover:not(:disabled) {
         transform: translateY(-3px);
-        box-shadow: 0 5px 25px rgba(0, 255, 255, 0.4),
-          0 5px 25px rgba(76, 175, 80, 0.4);
+        box-shadow: 0 5px 25px rgba($neon-blue, 0.4),
+          0 5px 25px rgba($neon-green, 0.4);
       }
     }
 
     &.withdraw-btn {
-      background: linear-gradient(45deg, #ff00ff, #ff9800);
+      background: linear-gradient(45deg, $neon-magenta, #ff9800);
       color: #000;
       border: none;
-      box-shadow: 0 0 20px rgba(255, 0, 255, 0.3),
+      box-shadow: 0 0 20px rgba($neon-magenta, 0.3),
         0 0 20px rgba(255, 152, 0, 0.3);
 
       &:hover:not(:disabled) {
         transform: translateY(-3px);
-        box-shadow: 0 5px 25px rgba(255, 0, 255, 0.4),
+        box-shadow: 0 5px 25px rgba($neon-magenta, 0.4),
           0 5px 25px rgba(255, 152, 0, 0.4);
       }
     }
@@ -478,7 +489,7 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
 
   .disclaimer {
     font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: $text-secondary;
     text-align: center;
     margin: 0;
     line-height: 1.5;
@@ -532,6 +543,15 @@ $shadow-glow-stronger: 0 8px 32px rgba(0, 255, 255, 0.15),
   to {
     transform: translateY(30px);
     opacity: 0;
+  }
+}
+
+@keyframes gradient-slide {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
   }
 }
 

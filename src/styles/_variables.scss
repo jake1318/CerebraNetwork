@@ -1,0 +1,20 @@
+/* Neon theme palette */
+$bg-deep: #020314;
+$bg-surface: #050a1e;
+$grid-line: rgba(#4da2ff, 0.05);
+
+$neon-blue: #4da2ff;
+$neon-green: #1ed760;
+$neon-pink: #ff00ff;
+$neon-purple: #6c5ce7; /* keep for spinners */
+
+$txt-primary: #ffffff;
+$txt-muted: #7c8aa4;
+
+$border-glass: rgba(#ffffff, 0.07);
+
+/* Shared drop‑shadows */
+$glow-blue: 0 0 12px rgba($neon-blue, 0.35);
+$glow-green: 0 0 12px rgba($neon-green, 0.35);
+
+$radius: 12px;

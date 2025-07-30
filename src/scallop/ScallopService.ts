@@ -1,5 +1,5 @@
 // src/scallop/ScallopService.ts
-// Last Updated: 2025-07-24 01:28:44 UTC by jake1318
+// Last Updated: 2025-07-25 04:54:10 UTC by jake1318
 
 import { SuiClient } from "@mysten/sui.js/client";
 import { Scallop } from "@scallop-io/sui-scallop-sdk";
@@ -567,14 +567,14 @@ export async function fetchUserPositions(address: string) {
         // skip zero balances
         if (!l.suppliedCoin || Number(l.suppliedCoin) === 0) continue;
 
-        // symbol can be "wsui", "wusdc", etc.  Strip leading "w" to match pool.
+        // FIX #2: Only strip 'w' from known wrapped tokens, not from tokens that start with W
         const rawSymbol = (l.symbol || "").toLowerCase();
-        const symbol = rawSymbol.startsWith("w")
+        const symbol = /^w(sui|usdc|usdt|btc|eth|busd)/.test(rawSymbol) // only known wrapped tokens
           ? rawSymbol.slice(1)
           : rawSymbol;
 
         const decimals = Number(l.coinDecimals || 9);
-        const amount = Number(l.suppliedCoin) / 10 ** decimals; // human units
+        const amount = Number(l.suppliedCoin); // already human units
         const price = Number(l.coinPrice || 0);
 
         suppliedAssets.push({
@@ -704,12 +704,11 @@ async function fetchUserPositionsLegacy(userAddress: string) {
           if (!coin || !coin.symbol || !Number(coin.suppliedCoin)) continue;
 
           // Try to match with pool
-          let poolKey = coin.symbol.toLowerCase();
-
-          // If this is a wrapped symbol (wsui, wusdc), strip the "w" prefix
-          if (poolKey.startsWith("w")) {
-            poolKey = poolKey.slice(1); // Use "sui" instead of "wsui" to match pool
-          }
+          // FIX: Only strip 'w' prefix from known wrapped tokens
+          const rawSymbol = coin.symbol.toLowerCase();
+          const poolKey = /^w(sui|usdc|usdt|btc|eth|busd)/.test(rawSymbol)
+            ? rawSymbol.slice(1)
+            : rawSymbol;
 
           const pool = (pools as any)[poolKey];
 
@@ -1017,8 +1016,14 @@ export async function withdraw(
     const query = await scallop.createScallopQuery();
     await query.init();
 
-    // if this is a MAX withdrawal, pull the exact sCoin balance (base units)
-    let withdrawBase: bigint;
+    // Create a builder instance for the transaction
+    const builder = await scallop.createScallopBuilder();
+    const tx = builder.createTxBlock();
+    tx.setSender(sender);
+
+    let coin;
+
+    // if this is a MAX withdrawal, use the existing MAX logic path
     if (isMax) {
       console.log(`[withdraw] MAX withdrawal requested for ${poolKey}`);
       const sCoinAmountStr = await query.getSCoinAmount(poolKey, sender);
@@ -1034,29 +1039,86 @@ export async function withdraw(
           ? BigInt(Math.floor(0.001 * 10 ** decimals))
           : 0n;
 
-      withdrawBase = sCoinBase > DUST_BUFFER ? sCoinBase - DUST_BUFFER : 0n;
+      const withdrawBase =
+        sCoinBase > DUST_BUFFER ? sCoinBase - DUST_BUFFER : 0n;
       if (withdrawBase === 0n) {
         throw new Error("Withdrawal amount is too small after buffer");
       }
 
-      // for logging / UI display you can still compute human amount:
+      // for logging / UI display you can still compute human amount
       amount = Number(withdrawBase) / 10 ** decimals;
+
+      // withdrawQuick takes the **sCoin** base-unit amount as its first argument
+      coin = await tx.withdrawQuick(Number(withdrawBase), poolKey);
+      console.log(
+        `[withdraw] MAX withdraw: using withdrawQuick with ${withdrawBase} sCoin units`
+      );
     } else {
-      // partial withdrawal: convert underlying human amount → base units
-      withdrawBase = BigInt(Math.floor(amount * 10 ** decimals));
+      // ---- MANUAL CONVERSION because SDK ≤ 2.2.x ----
+      const market = await query.queryMarket();
+      const poolInfo = market.pools?.[poolKey] || {};
+
+      // Comprehensive approach to get exchange rate from multiple possible sources
+      let exRateBig = BigInt(
+        poolInfo.marketToCoinExchangeRate ?? // std. for wrapped pools
+          poolInfo.exchangeRate ?? // legacy snapshots
+          poolInfo.sharePrice ?? // fixed-rate pools (WAL)
+          1_000_000_000_000_000_000n // last-resort: assume 1·10¹⁸ (1:1)
+      );
+
+      // Final fallback for query API - still works on 2.2.x
+      if (
+        exRateBig === 0n &&
+        typeof (query as any).getExchangeRate === "function"
+      ) {
+        console.log(
+          `[withdraw] Falling back to query.getExchangeRate for ${poolKey}`
+        );
+        const r = await (query as any).getExchangeRate(poolKey);
+        if (r) exRateBig = BigInt(r);
+      }
+
+      // Log which approach was used to get the rate
+      if (poolInfo.marketToCoinExchangeRate) {
+        console.log(
+          `[withdraw] Using marketToCoinExchangeRate for ${poolKey}: ${exRateBig}`
+        );
+      } else if (poolInfo.exchangeRate) {
+        console.log(
+          `[withdraw] Using exchangeRate for ${poolKey}: ${exRateBig}`
+        );
+      } else if (poolInfo.sharePrice) {
+        console.log(`[withdraw] Using sharePrice for ${poolKey}: ${exRateBig}`);
+      } else if (exRateBig === 1_000_000_000_000_000_000n) {
+        console.log(
+          `[withdraw] Using default 1:1 fixed rate (1e18) for ${poolKey}`
+        );
+      } else {
+        console.log(
+          `[withdraw] Using rate from getExchangeRate for ${poolKey}: ${exRateBig}`
+        );
+      }
+
+      // Convert amount in underlying to sCoin base units
+      const sCoinUnits = BigInt(
+        Math.floor((amount * 10 ** decimals * 1e18) / Number(exRateBig))
+      );
+
+      console.log(
+        `[withdraw] Converting ${amount} ${poolKey} (${
+          amount * 10 ** decimals
+        } base units) to ${sCoinUnits} sCoin units using exchange rate ${exRateBig}`
+      );
+
+      // withdrawQuick takes the sCoin base-unit amount
+      coin = await tx.withdrawQuick(Number(sCoinUnits), poolKey);
     }
-    console.log(`[withdraw] base units to redeem:`, withdrawBase);
 
-    // now let the builder redeem those sCoins for the underlying asset
-    const builder = await scallop.createScallopBuilder();
-    const tx = builder.createTxBlock();
-    tx.setSender(sender);
-
-    // withdrawQuick takes the **sCoin** base-unit amount as its first argument
-    const coin = await tx.withdrawQuick(Number(withdrawBase), poolKey);
+    // Transfer the withdrawn coin to the sender and set gas budget
     tx.transferObjects([coin], sender);
     tx.setGasBudget(30_000_000);
 
+    // Sign and execute the transaction
     const res = await wallet.signAndExecuteTransactionBlock({
       transactionBlock: tx.txBlock,
       options: { showEffects: true, showEvents: true },
@@ -1695,6 +1757,10 @@ const scallopService = {
   getObligationBorrowData,
   // Export client for other components that might need it
   client,
+  // Export constants
+  SCALLOP_PACKAGE_ID,
+  SCALLOP_VERSION_OBJECT,
+  CANON_SUI,
 };
 
 export default scallopService;

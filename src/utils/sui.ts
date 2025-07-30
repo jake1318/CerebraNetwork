@@ -1,11 +1,12 @@
 // src/utils/sui.ts
-// Last Updated: 2025-07-15 17:18:45 UTC by jake1318
+// Updated: 2025-07-16 23:05:08 UTC by jake1318
 
 import { fromB64 } from "@mysten/sui.js/utils";
+import { TransactionBlock } from "@mysten/sui.js/transactions";
 
 /**
  * Utility function to sign and execute transaction blocks received as base64 strings
- * Converts base64 strings to Uint8Array before sending to wallet
+ * Creates a new TransactionBlock from the base64 data for Suiet wallet compatibility
  *
  * @param wallet The wallet instance from useWallet()
  * @param base64 The base64-encoded transaction bytes
@@ -28,12 +29,13 @@ export async function signAndExecuteBase64(
   }
 
   try {
-    // Convert the base64 string to Uint8Array, which is what the wallet SDK expects
-    const bytes = fromB64(base64);
+    // IMPORTANT: For Suiet wallet compatibility, we need to create a TransactionBlock
+    // from the base64 string rather than passing raw bytes
+    const txBlock = TransactionBlock.from(base64);
 
-    // Pass the bytes directly to the wallet
+    // Pass the TransactionBlock instance to the wallet
     return wallet.signAndExecuteTransactionBlock({
-      transactionBlock: bytes,
+      transactionBlock: txBlock,
       options: options || { showEffects: true },
     });
   } catch (error) {

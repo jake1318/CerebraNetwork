@@ -1,5 +1,5 @@
 // src/services/birdeyeService.ts
-// Last Updated: 2025-07-09 23:27:19 UTC by jake1318
+// Last Updated: 2025-07-15 00:01:44 UTC by jake1318
 
 import axios from "axios";
 
@@ -21,6 +21,16 @@ export function canonicaliseSuiAddress(addr: string): string {
   const full = "0x" + raw.padStart(64, "0");
 
   return rest.length ? [full, ...rest].join("::") : full;
+}
+
+/**
+ * BirdEye needs the *object id* only (66‑char 0x… string).
+ * stripTypeTag("0x2::sui::SUI") → "0x000…0002"
+ */
+export function stripTypeTag(addr: string): string {
+  // grab the part *before* the first '::' and canonicalise it
+  const [head] = addr.split("::");
+  return canonicaliseSuiAddress(head);
 }
 
 export interface BirdeyeTrendingToken {
@@ -394,7 +404,7 @@ export const birdeyeService = {
     try {
       const resp = await axios.get(`${API_BASE}/price_volume/single`, {
         headers: { "x-chain": chain },
-        params: { address: canonicaliseSuiAddress(address), type },
+        params: { address: stripTypeTag(address), type },
       });
 
       // Enhanced logging to debug response format
@@ -437,7 +447,7 @@ export const birdeyeService = {
       const resp = await axios.get(`${API_BASE}/history_price`, {
         headers: { "x-chain": chain },
         params: {
-          address: canonicaliseSuiAddress(address),
+          address: stripTypeTag(address),
           address_type: "token",
           type,
           time_from,
