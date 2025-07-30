@@ -1,8 +1,8 @@
 // src/components/portfolio/MarketNews.tsx
-// Last Updated: 2025-07-12 22:00:01 UTC by jake1318
+// Last Updated: 2025-07-30 00:53:37 UTC by jake1318
 
 import React, { useState } from "react";
-import { useFinanceNews } from "../../hooks/useFinanceNews";
+import { useFinanceNews, formatRelativeDate } from "../../hooks/useFinanceNews";
 import "./MarketNews.scss";
 
 interface MarketNewsProps {
@@ -16,20 +16,12 @@ const MarketNews: React.FC<MarketNewsProps> = ({ defaultQuery = "" }) => {
   // Predefined categories for quick filtering
   const categories = [
     { id: "crypto", label: "Crypto", query: "CRYPTO" },
+    { id: "cointelegraph", label: "Cointelegraph", query: "COINTELEGRAPH" },
     { id: "sui", label: "SUI", query: "SUI" },
     { id: "bitcoin", label: "Bitcoin", query: "BTC-USD" },
     { id: "stocks", label: "Stocks", query: "STOCK" },
     { id: "markets", label: "Markets", query: "MARKET" },
   ];
-
-  // Simplified date formatter that just returns the existing date string
-  // SerpAPI already provides nicely formatted relative dates like "1 day ago"
-  const formatDate = (dateString: string): string => {
-    if (!dateString) return "Recent";
-
-    // Simply return the already-formatted date from the API
-    return dateString;
-  };
 
   const handleRefresh = () => {
     refetch();
@@ -98,24 +90,35 @@ const MarketNews: React.FC<MarketNewsProps> = ({ defaultQuery = "" }) => {
             <div className="news-list">
               {data.news.map((newsItem: any, index: number) => (
                 <a
-                  key={index}
-                  className="news-item"
+                  key={`${newsItem.link}-${index}`}
+                  className={`news-item ${newsItem.rss ? "rss-item" : ""}`}
                   href={newsItem.link}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   {newsItem.thumbnail && (
                     <div className="news-thumbnail">
-                      <img src={newsItem.thumbnail} alt={newsItem.title} />
+                      <img
+                        src={newsItem.thumbnail}
+                        alt={newsItem.title}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
                     </div>
                   )}
 
                   <div className="news-details">
                     <h3 className="news-title">{newsItem.title}</h3>
                     <div className="news-meta">
-                      <span className="news-source">{newsItem.source}</span>
+                      <span className="news-source">
+                        {newsItem.rss && (
+                          <span className="source-badge">RSS</span>
+                        )}
+                        {newsItem.source}
+                      </span>
                       <span className="news-date">
-                        {formatDate(newsItem.date)}
+                        {formatRelativeDate(newsItem.isoDate || newsItem.date)}
                       </span>
                     </div>
                     {newsItem.snippet && (
