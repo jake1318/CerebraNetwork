@@ -1,5 +1,5 @@
 /* src/pages/Portfolio/Portfolio.scss */
-/* Last Updated: 2025-07-30 03:27:31 UTC by jake1318 */
+/* Last Updated: 2025-07-18 23:26:35 UTC by jake1318 */
 
 // Variables for consistent colors - matching Home.scss
 $background-dark: #020314;
@@ -1001,37 +1001,101 @@ html {
     }
 
     h3 {
-      font-size: 1.3rem;
+      font-size: 1.5rem;
+      font-weight: 600;
       margin-bottom: 1rem;
-      color: $text-primary;
+      color: #ff5252;
     }
 
     p {
       color: $text-secondary;
-      margin-bottom: 1.5rem;
+      margin-bottom: 2rem;
       max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
     }
 
     .retry-button {
       display: inline-flex;
       align-items: center;
       gap: 0.75rem;
-      padding: 0.75rem 1.5rem;
-      background: rgba(#ff5252, 0.2);
+      padding: 0.75rem 2rem;
+      background: rgba(255, 82, 82, 0.15);
       color: #ff5252;
-      border: 1px solid rgba(#ff5252, 0.4);
-      border-radius: 12px;
       font-weight: 600;
-      font-size: 1rem;
+      border: 1px solid rgba(255, 82, 82, 0.4);
+      border-radius: 12px;
+      font-size: 0.9rem;
       cursor: pointer;
       transition: all 0.3s ease;
 
       &:hover {
+        background: rgba(255, 82, 82, 0.25);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(255, 82, 82, 0.2);
+      }
+
+      .button-icon {
+        font-size: 1rem;
+      }
+    }
+  }
+
+  // Empty state styling
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+    text-align: center;
+    min-height: 50vh;
+
+    .empty-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(
+        90deg,
+        $neon-blue 50%,
+        $neon-green 80%,
+        $neon-magenta 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: 0 0 15px rgba($neon-blue, 0.3);
+    }
+
+    h3 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: $text-primary;
+    }
+
+    p {
+      color: $text-secondary;
+      margin-bottom: 2rem;
+      max-width: 600px;
+    }
+
+    .action-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.9rem 2.2rem;
+      background: $neon-blue; // Blue primary button
+      color: #000; // Dark text for contrast
+      box-shadow: 0 0 20px rgba($neon-blue, 0.3);
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s ease;
+
+      &:hover {
         transform: translateY(-3px);
-        box-shadow: 0 5px 25px rgba(#ff5252, 0.3);
-        background: rgba(#ff5252, 0.3);
+        box-shadow: 0 5px 25px rgba($neon-blue, 0.5);
       }
 
       .button-icon {
@@ -1040,398 +1104,754 @@ html {
     }
   }
 
-  // Activity view styling
-  .activity-page {
-    .activity-filters {
-      margin-bottom: 1.5rem;
-      background: rgba($background-surface, 0.3);
-      border: 1px solid $card-border;
-      border-radius: 12px;
-      padding: 1rem;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+  // Token icon styling
+  .token-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $background-dark;
+    border: 2px solid rgba($border-dark, 0.8);
 
-      .filter-toggle {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        background: none;
-        border: none;
-        color: $text-primary;
-        font-size: 0.9rem;
-        font-weight: 500;
-        cursor: pointer;
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
 
-        .icon-sm {
-          transition: transform 0.3s ease;
+    .token-letter {
+      font-weight: bold;
+      color: $text-primary;
+    }
 
-          &.expanded {
-            transform: rotate(180deg);
-          }
-        }
-      }
+    &-sm {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+    }
 
-      .filter-options {
-        margin-top: 1rem;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
+    &-md {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      min-height: 32px;
 
-        .filter-group {
-          label {
-            display: block;
-            font-size: 0.8rem;
-            color: $text-secondary;
-            margin-bottom: 0.5rem;
-          }
-
-          .date-filters {
-            display: flex;
-            gap: 0.5rem;
-
-            .date-input {
-              position: relative;
-              flex: 1;
-
-              input {
-                width: 100%;
-                padding: 0.5rem 0.5rem 0.5rem 2rem;
-                background: rgba($background-dark, 0.5);
-                border: 1px solid $border-dark;
-                border-radius: 8px;
-                color: $text-primary;
-                font-size: 0.9rem;
-
-                &:focus {
-                  border-color: rgba($neon-blue, 0.5);
-                  outline: none;
-                }
-              }
-
-              .input-icon {
-                position: absolute;
-                top: 50%;
-                left: 0.75rem;
-                transform: translateY(-50%);
-                color: $text-secondary;
-                font-size: 0.8rem;
-              }
-            }
-          }
-
-          .token-pair-filter {
-            position: relative;
-
-            select {
-              width: 100%;
-              padding: 0.5rem 0.5rem 0.5rem 2rem;
-              background: rgba($background-dark, 0.5);
-              border: 1px solid $border-dark;
-              border-radius: 8px;
-              color: $text-primary;
-              font-size: 0.9rem;
-              appearance: none;
-
-              &:focus {
-                border-color: rgba($neon-blue, 0.5);
-                outline: none;
-              }
-            }
-
-            .input-icon {
-              position: absolute;
-              top: 50%;
-              left: 0.75rem;
-              transform: translateY(-50%);
-              color: $text-secondary;
-              font-size: 0.8rem;
-            }
-
-            &::after {
-              content: "▼";
-              position: absolute;
-              top: 50%;
-              right: 0.75rem;
-              transform: translateY(-50%);
-              color: $text-secondary;
-              font-size: 0.7rem;
-              pointer-events: none;
-            }
-          }
-        }
-
-        .clear-filters {
-          background: none;
-          border: 1px solid $border-dark;
-          border-radius: 8px;
-          color: $text-secondary;
-          padding: 0.5rem 1rem;
-          font-size: 0.9rem;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          align-self: end;
-
-          &:hover {
-            border-color: rgba($neon-blue, 0.3);
-            color: $neon-blue;
-          }
-        }
+      .token-letter {
+        font-size: 14px;
       }
     }
 
-    .activity-list {
-      display: flex;
-      flex-direction: column;
+    &-lg {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+
+      .token-letter {
+        font-size: 18px;
+      }
+    }
+  }
+
+  // Add colorful glows to the page
+  .page-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.2;
+    z-index: -1;
+
+    &--blue {
+      background: $neon-blue;
+      width: 300px;
+      height: 300px;
+      top: -100px;
+      left: 10%;
+      animation: pulse 10s infinite alternate;
+    }
+
+    &--green {
+      background: $neon-green;
+      width: 200px;
+      height: 200px;
+      bottom: -100px;
+      right: 10%;
+      animation: pulse 12s infinite alternate-reverse;
+      opacity: 0.15;
+    }
+
+    &--magenta {
+      background: $neon-magenta;
+      width: 150px;
+      height: 150px;
+      bottom: 100px;
+      right: 30%;
+      animation: pulse 8s infinite alternate;
+      opacity: 0.12;
+    }
+  }
+
+  // Animations
+  @keyframes spinner {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes pulse {
+    0% {
+      opacity: 0.2;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.3;
+      transform: scale(1.2);
+    }
+  }
+
+  // Media queries for responsiveness
+  @media (max-width: 1200px) {
+    .dashboard-grid {
       gap: 1rem;
+    }
 
-      .activity-card {
-        background: rgba($background-surface, 0.3);
-        border: 1px solid $card-border;
-        border-radius: 12px;
-        overflow: hidden;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+    .position-card {
+      &__header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+    }
+  }
 
-        &:hover {
-          transform: translateY(-3px);
-          box-shadow: $glow-blue;
-          border-color: rgba($neon-blue, 0.2);
-        }
+  @media (max-width: 991px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
 
-        &__header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1rem;
-          border-bottom: 1px solid $border-dark;
+    .dashboard-card {
+      &--hero {
+        grid-column: span 1;
+      }
+    }
+  }
 
-          .activity-type {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 600;
+  @media (max-width: 768px) {
+    .positions-grid {
+      grid-template-columns: 1fr;
+    }
 
-            &.swap {
-              color: $neon-blue;
-            }
-          }
+    .assets-grid {
+      grid-template-columns: 1fr;
+    }
 
-          .activity-status {
-            .status-badge {
-              padding: 0.25rem 0.5rem;
-              border-radius: 8px;
-              font-size: 0.8rem;
-              font-weight: 500;
-
-              &.completed {
-                background: rgba($neon-green, 0.1);
-                color: $neon-green;
-              }
-
-              &.pending {
-                background: rgba($neon-blue, 0.1);
-                color: $neon-blue;
-              }
-
-              &.failed {
-                background: rgba(#ff5252, 0.1);
-                color: #ff5252;
-              }
-            }
-          }
-        }
-
-        &__body {
-          padding: 1rem;
-
-          .swap-details {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-            text-align: center;
-
-            .token-from,
-            .token-to {
-              width: 100%;
-
-              .token-amount {
-                font-size: 1.1rem;
-                font-weight: 600;
-                color: $text-primary;
-              }
-            }
-
-            .swap-arrow {
-              color: $text-secondary;
-              height: 24px;
-              display: flex;
-              align-items: center;
-            }
-
-            .price-impact {
-              margin-top: 0.5rem;
-              font-size: 0.85rem;
-              color: $text-secondary;
-
-              .warning {
-                color: #ff9900;
-              }
-
-              .normal {
-                color: $neon-green;
-              }
-            }
-          }
-        }
-
-        &__footer {
-          padding: 1rem;
-          background: rgba($background-dark, 0.2);
-          border-top: 1px solid $border-dark;
-
-          .activity-meta {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-
-            .activity-time {
-              font-size: 0.85rem;
-              color: $text-secondary;
-            }
-
-            .explorer-link {
-              font-size: 0.85rem;
-              color: $neon-blue;
-              text-decoration: none;
-              display: flex;
-              align-items: center;
-              gap: 0.3rem;
-
-              &:hover {
-                text-decoration: underline;
-              }
-
-              .icon-sm {
-                font-size: 0.75rem;
-              }
-            }
-          }
-        }
+    .wallet-assets {
+      .wallet-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
       }
     }
 
-    .empty-activity {
-      text-align: center;
-      padding: 3rem 2rem;
-      background: rgba($background-surface, 0.3);
-      border-radius: 16px;
-      border: 1px solid $card-border;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      box-shadow: $card-shadow;
+    .portfolio-value-card {
+      .value-container {
+        flex-direction: column;
+        align-items: flex-start;
 
-      .empty-icon {
-        font-size: 3rem;
-        margin-bottom: 1.5rem;
-        color: $text-secondary;
+        .value-label {
+          margin-bottom: 0.5rem;
+        }
+
+        .total-value {
+          font-size: 2.2rem;
+        }
       }
 
-      h3 {
-        font-size: 1.3rem;
+      .value-metrics {
+        gap: 1.5rem;
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    .dashboard-card {
+      padding: 1.25rem;
+
+      &__header {
         margin-bottom: 1rem;
-        color: $text-primary;
-      }
 
-      p {
-        color: $text-secondary;
-        margin-bottom: 1.5rem;
-        max-width: 600px;
-        margin-left: auto;
-        margin-right: auto;
-      }
-    }
-
-    .load-more-container {
-      text-align: center;
-      margin-top: 1rem;
-      margin-bottom: 2rem;
-
-      .load-more-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.6rem 1.5rem;
-        background: rgba($neon-blue, 0.1);
-        border: 1px solid rgba($neon-blue, 0.3);
-        color: $neon-blue;
-        border-radius: 12px;
-        font-weight: 500;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-
-        &:hover {
-          background: rgba($neon-blue, 0.15);
-          transform: translateY(-2px);
-        }
-
-        &:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .button-spinner {
-          width: 16px;
-          height: 16px;
-          border: 2px solid transparent;
-          border-top-color: $neon-blue;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          margin-left: 0.5rem;
+        .card-title {
+          font-size: 1rem;
         }
       }
     }
 
-    .loading-more {
-      text-align: center;
-      padding: 1rem 0;
+    .portfolio-value-card {
+      .value-container {
+        .total-value {
+          font-size: 2rem;
+        }
+      }
+
+      .value-metrics {
+        flex-direction: column;
+        gap: 1rem;
+      }
+    }
+
+    .position-card {
+      &__body {
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    }
+  }
+}
+
+// Mobile sidebar styles
+@media (max-width: 991px) {
+  .app-layout {
+    .sidebar {
+      transform: translateX(-100%);
+      position: fixed;
+      top: var(--navbar-h); // Keep the top offset for navbar
+      bottom: 0;
+      height: calc(100% - var(--navbar-h)); // Adjust height for navbar
+      z-index: 1000;
+
+      &.active {
+        transform: translateX(0);
+      }
+
+      &__mobile-toggle {
+        display: flex;
+      }
+    }
+
+    .main-content {
+      padding-left: 0; // No padding when sidebar is hidden on mobile
+    }
+  }
+}
+
+// Fix z-index footer stacking
+footer,
+.footer {
+  position: relative;
+  z-index: 101; // Higher than sidebar to ensure it's always visible
+  margin-top: auto; // Push to the bottom
+  flex-shrink: 0;
+}
+
+// Modified scrollbar styles to preserve main scrolling
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba($neon-blue, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba($neon-blue, 0.5);
+}
+
+// Add smooth scrolling for mobile
+html,
+body {
+  -webkit-overflow-scrolling: touch;
+}
+
+// Activity specific styles
+.activity-page {
+  width: 100%;
+  position: relative;
+  overflow-y: visible !important; // Fix for nested scrolling issues
+
+  // Activity filters
+  .activity-filters {
+    margin-bottom: 1.5rem;
+
+    .filter-toggle {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 0.5rem;
+      padding: 0.6rem 1rem;
+      background: rgba($background-dark, 0.3);
+      border: 1px solid rgba($border-dark, 0.8);
+      border-radius: 8px;
       color: $text-secondary;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
 
-      .loading-spinner-small {
+      &:hover {
+        background: rgba($background-dark, 0.5);
+        color: $text-primary;
+      }
+
+      .icon-sm {
+        font-size: 0.8rem;
+        transition: transform 0.3s ease;
+
+        &.expanded {
+          transform: rotate(180deg);
+        }
+      }
+    }
+
+    .filter-options {
+      margin-top: 1rem;
+      padding: 1.25rem;
+      background: rgba($background-surface, 0.3);
+      border: 1px solid rgba($border-dark, 0.8);
+      border-radius: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 1rem;
+      align-items: end;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-group {
+        label {
+          display: block;
+          font-size: 0.85rem;
+          color: $text-secondary;
+          margin-bottom: 0.5rem;
+        }
+
+        .date-filters {
+          display: flex;
+          gap: 0.75rem;
+
+          @media (max-width: 480px) {
+            flex-direction: column;
+            gap: 0.5rem;
+          }
+        }
+
+        .date-input,
+        .token-pair-filter {
+          position: relative;
+
+          .input-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: $text-muted;
+            pointer-events: none;
+          }
+
+          input,
+          select {
+            width: 100%;
+            padding: 0.6rem 0.75rem 0.6rem 2.25rem;
+            background: rgba($background-dark, 0.5);
+            border: 1px solid rgba($border-dark, 0.8);
+            border-radius: 8px;
+            color: $text-primary;
+            font-family: "Inter", sans-serif;
+            font-size: 0.9rem;
+
+            &:focus {
+              outline: none;
+              border-color: rgba($neon-blue, 0.5);
+            }
+
+            &::placeholder {
+              color: $text-muted;
+            }
+          }
+
+          select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23B1A5C8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: calc(100% - 0.75rem) center;
+            padding-right: 2rem;
+          }
+        }
+      }
+
+      .clear-filters {
+        background: none;
+        border: none;
+        color: $neon-blue;
+        font-family: "Inter", sans-serif;
+        font-size: 0.85rem;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        height: fit-content;
+
+        &:hover {
+          background: rgba($neon-blue, 0.1);
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+
+  // Activity list styling
+  .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  // Activity card styling
+  .activity-card {
+    background: rgba($background-surface, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba($border-dark, 0.8);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 10px rgba($neon-blue, 0.1);
+    }
+
+    &__header {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba($background-dark, 0.2);
+      border-bottom: 1px solid rgba($border-dark, 0.8);
+
+      .activity-type {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+
+        &.swap {
+          color: $neon-blue;
+
+          svg {
+            filter: drop-shadow(0 0 5px rgba($neon-blue, 0.5));
+          }
+        }
+
+        &.add-liquidity {
+          color: $neon-green;
+
+          svg {
+            filter: drop-shadow(0 0 5px rgba($neon-green, 0.5));
+          }
+        }
+
+        &.remove-liquidity {
+          color: $neon-magenta;
+
+          svg {
+            filter: drop-shadow(0 0 5px rgba($neon-magenta, 0.5));
+          }
+        }
+      }
+
+      .activity-status {
+        .status-badge {
+          padding: 0.25rem 0.65rem;
+          border-radius: 20px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: capitalize;
+
+          &.success,
+          &.completed {
+            background: rgba($neon-green, 0.15);
+            color: $neon-green;
+          }
+
+          &.pending {
+            background: rgba(#ff9500, 0.15);
+            color: #ff9500;
+          }
+
+          &.failed {
+            background: rgba(#ff5252, 0.15);
+            color: #ff5252;
+          }
+        }
+      }
+    }
+
+    &__body {
+      padding: 1.25rem;
+
+      .swap-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: center;
+
+        .token-from,
+        .token-to {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          gap: 1rem;
+
+          .token-amount {
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+          }
+        }
+
+        .swap-arrow {
+          color: $text-secondary;
+          margin: 0.25rem 0;
+
+          svg {
+            font-size: 1.2rem;
+          }
+        }
+
+        .price-impact {
+          margin-top: 0.75rem;
+          font-size: 0.85rem;
+          color: $text-secondary;
+
+          span {
+            &.warning {
+              color: #ff9500;
+            }
+
+            &.normal {
+              color: $text-primary;
+            }
+          }
+        }
+      }
+    }
+
+    &__footer {
+      padding: 0.75rem 1.25rem;
+      background: rgba($background-dark, 0.1);
+      border-top: 1px solid rgba($border-dark, 0.8);
+
+      .activity-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        .activity-time {
+          font-size: 0.85rem;
+          color: $text-secondary;
+        }
+
+        .explorer-link {
+          font-size: 0.85rem;
+          color: $neon-blue;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          transition: all 0.3s ease;
+
+          &:hover {
+            text-decoration: underline;
+            color: lighten($neon-blue, 10%);
+          }
+
+          .icon-sm {
+            font-size: 0.75rem;
+          }
+        }
+      }
+    }
+  }
+
+  // Empty activity styling
+  .empty-activity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    text-align: center;
+
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(90deg, $neon-blue 50%, $neon-green 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    h3 {
+      font-size: 1.3rem;
+      margin-bottom: 0.75rem;
+      color: $text-primary;
+    }
+
+    p {
+      color: $text-secondary;
+      margin-bottom: 1.5rem;
+      max-width: 500px;
+    }
+
+    .action-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.5rem;
+      background: $neon-blue;
+      color: #000;
+      box-shadow: 0 0 20px rgba($neon-blue, 0.3);
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 25px rgba($neon-blue, 0.5);
+      }
+
+      .button-icon {
+        font-size: 1rem;
+      }
+    }
+  }
+
+  // Load more button
+  .load-more-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+
+    .load-more-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: rgba($neon-blue, 0.1);
+      border: 1px solid rgba($neon-blue, 0.3);
+      border-radius: 8px;
+      color: $neon-blue;
+      font-family: "Inter", sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: rgba($neon-blue, 0.15);
+        border-color: rgba($neon-blue, 0.5);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .button-spinner {
         width: 16px;
         height: 16px;
-        border: 2px solid transparent;
+        border: 2px solid rgba($neon-blue, 0.3);
         border-top-color: $neon-blue;
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+        animation: spinner 1s linear infinite;
       }
+    }
+  }
+
+  // Loading more indicator
+  .loading-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    color: $text-secondary;
+    font-size: 0.9rem;
+
+    .loading-spinner-small {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba($text-secondary, 0.2);
+      border-top-color: $text-secondary;
+      border-radius: 50%;
+      animation: spinner 1s linear infinite;
     }
   }
 }
 
-@keyframes spinner {
-  to {
-    transform: rotate(360deg);
+// Dashboard page styling
+.dashboard-page {
+  .coming-soon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+
+    .coming-soon-icon {
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(
+        90deg,
+        $neon-blue 50%,
+        $neon-green 80%,
+        $neon-magenta 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    h3 {
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+      color: $text-primary;
+    }
+
+    p {
+      color: $text-secondary;
+      margin-bottom: 2rem;
+      max-width: 600px;
+    }
   }
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 0.2;
-    transform: scale(0.8);
-  }
-  100% {
-    opacity: 0.3;
-    transform: scale(1.2);
-  }
+// Small utility for smaller icon sizes
+.icon-sm {
+  font-size: 0.8rem;
 }
 
+// Animations for pulsating effects
 @keyframes pulsate {
   0% {
     opacity: 0.5;
@@ -1442,79 +1862,204 @@ html {
     transform: scale(1.2);
   }
 }
+// Additional CSS for position-card component
+.position-card {
+  transition: all 0.3s ease;
 
-/* Make sure all scrollbars are visible only at the root level */
-html {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  &--expanded {
+    max-height: none;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  &__details {
+    padding: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .details-header {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #ffffff;
+    }
+
+    .details-subheader {
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin: 0.75rem 0 0.5rem;
+      color: #b1a5c8;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+
+      .detail-label {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .detail-value {
+        color: #ffffff;
+        font-weight: 500;
+      }
+    }
+
+    .reward-row {
+      background: rgba(30, 215, 96, 0.1);
+      border-radius: 6px;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .reward-token {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .reward-amount {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+
+      .reward-value {
+        font-size: 0.8rem;
+        color: #1ed760;
+      }
+    }
+
+    .out-of-range-warning {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      color: #ff5252;
+      background: rgba(255, 82, 82, 0.1);
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+  }
 }
 
+// Update the stats-grid to handle the rewards column
+.position-card .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+
+// Update rewards stat styling
+.position-card .stat-value.rewards {
+  color: #1ed760;
+  text-shadow: 0 0 10px rgba(30, 215, 96, 0.3);
+}
+// Additional CSS for position-card component
+.position-card {
+  transition: all 0.3s ease;
+
+  &--expanded {
+    max-height: none;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  &__details {
+    padding: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .details-header {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #ffffff;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+
+      .detail-label {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .detail-value {
+        color: #ffffff;
+        font-weight: 500;
+      }
+    }
+
+    .out-of-range-warning {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      color: #ff5252;
+      background: rgba(255, 82, 82, 0.1);
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+  }
+}
+
+// Keep the standard stats grid
+.position-card .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+/* src/pages/Portfolio/Portfolio.scss-fix */
+/* Last Updated: 2025-07-30 03:07:56 UTC by jake1318 */
+
+/* This file contains fixes to be appended to the end of the Portfolio.scss file */
+
+/* Override any hidden overflow settings */
 body {
   overflow-y: auto !important;
-  overflow-x: hidden !important;
-  height: 100% !important;
 }
 
-/* Remove scrollbars from all components except the main document */
-.app-layout,
-.main-content,
-.portfolio-page,
-.market-news,
-.market-news .news-content,
-.sidebar,
-.sidebar__content {
-  overflow-y: visible !important;
-  scrollbar-width: none !important;
-}
-
-/* Hide WebKit scrollbars for all components */
-.app-layout::-webkit-scrollbar,
-.main-content::-webkit-scrollbar,
-.portfolio-page::-webkit-scrollbar,
-.market-news::-webkit-scrollbar,
-.market-news .news-content::-webkit-scrollbar,
-.sidebar::-webkit-scrollbar,
-.sidebar__content::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
-/* Show scrollbar only on the root html element */
+/* Fix hidden scrollbars globally */
+body::-webkit-scrollbar,
 html::-webkit-scrollbar {
   display: block !important;
   width: 10px !important;
 }
 
-html::-webkit-scrollbar-track {
-  background: rgba(2, 3, 20, 0.3);
-  border-radius: 5px;
-}
-
-html::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #4da2ff, rgba(255, 0, 255, 0.8));
-  border-radius: 5px;
-}
-
-html::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #4da2ff, #ff00ff);
-}
-
-/* Ensure padding at the bottom of content */
+/* Ensure the main-content can scroll */
 .main-content {
+  overflow-y: auto !important;
   padding-bottom: 100px !important;
+  height: auto !important;
+  min-height: 100vh !important;
 }
 
-.market-news .news-content {
-  padding-bottom: 100px !important;
+/* Fix for the app layout */
+.app-layout {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 100vh !important;
 }
 
-/* Make sure the market dashboard table doesn't create scrollbars */
-.market-dashboard .table-container {
+/* Fix the portfolio page overflow */
+.portfolio-page {
   overflow-y: visible !important;
 }
 
-/* Remove the body hidden overflow rule from MarketDashboard.scss */
-body {
+/* Allow scrollbars in the news content area */
+.market-news .news-content {
   overflow-y: auto !important;
+  max-height: calc(100vh - 150px) !important;
+  padding-bottom: 50px !important;
+}
+
+/* Add space at the bottom of the news list */
+.market-news .news-content .news-list {
+  margin-bottom: 50px !important;
 }
