@@ -1,5 +1,5 @@
 // src/pages/Portfolio/MarketDashboard.tsx
-// Last Updated: 2025-07-15 17:41:57 UTC by jake1318
+// Last Updated: 2025-07-30 06:23:49 UTC by jake1318
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -32,6 +32,26 @@ const FULL_SUI_ADDRESS =
   "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
 const SHORT_SUI_ADDRESS = "0x2::sui::SUI";
 
+// Define tokens to exclude from display
+const EXCLUDED_TOKEN_SYMBOLS = ["BUSDC", "BSUI", "BUSDT", "BWAL", "TBTC"];
+const EXCLUDED_TOKEN_NAMES = [
+  "bToken USDC",
+  "bToken SUI",
+  "bToken USDT",
+  "bToken WAL",
+  "tBTC v2",
+];
+
+// OKX Wrapped BTC address
+const XBTC_ADDRESS =
+  "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC";
+
+// Number of tokens to display - changed from 40 to 30
+const MAX_TOKENS = 30;
+
+// Number of retries for fetching token data
+const MAX_RETRIES = 3;
+
 // Token interface to represent the combined data from both APIs
 interface TokenData {
   rank: number;
@@ -49,6 +69,10 @@ interface TokenData {
   totalSupply: number;
   // Add a status field to track token loading state
   status: "loading" | "loaded" | "error";
+  // Track retry attempts
+  retries?: number;
+  // Check if missing critical data
+  hasMissingData?: boolean;
 }
 
 // Enum for sorting columns
@@ -152,6 +176,27 @@ function filterTokens(tokens: TokenData[], searchTerm: string): TokenData[] {
   );
 }
 
+// Function to check if a token should be excluded
+function shouldExcludeToken(token: TokenData): boolean {
+  return (
+    EXCLUDED_TOKEN_SYMBOLS.includes(token.symbol) ||
+    EXCLUDED_TOKEN_NAMES.includes(token.name)
+  );
+}
+
+// Function to check if token has missing data
+function tokenHasMissingData(token: TokenData): boolean {
+  return (
+    token.status === "loaded" &&
+    (isNaN(token.fdv) ||
+      token.fdv === 0 ||
+      isNaN(token.circulatingSupply) ||
+      token.circulatingSupply === 0 ||
+      isNaN(token.totalSupply) ||
+      token.totalSupply === 0)
+  );
+}
+
 // Specific address for haSui token
 const HASUI_ADDRESS =
   "0x5855451d273efbc5cd8cda16c10378aaf82d2ae4a1b2192e07beccc680e66c0::hasui::HASUI";
@@ -189,6 +234,11 @@ const LoadingRow: React.FC<{ token: TokenData }> = ({ token }) => (
           const target = e.target as HTMLImageElement;
           if (token.symbol === "HASUI" || token.address === HASUI_ADDRESS) {
             target.src = "/haSui.webp";
+          } else if (
+            token.symbol === "XBTC" ||
+            token.address === XBTC_ADDRESS
+          ) {
+            target.src = "/okx.webp";
           } else {
             target.src = "/assets/images/unknown-token.png";
           }
@@ -256,82 +306,133 @@ function MarketDashboard() {
   // Ref to prevent overlapping refreshes (mutex)
   const inFlight = useRef<boolean>(false);
 
-  // Initial load of token list from Birdeye
-  const loadTokenList = useCallback(async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setRefreshing(true);
-    setInitialLoading(true);
+  // Retry queue for tokens with missing data
+  const retryQueue = useRef<string[]>([]);
+  const isProcessingRetries = useRef<boolean>(false);
 
+  // Function to load a single token's data - used for retries
+  const loadSingleTokenData = useCallback(async (tokenId: string) => {
     try {
-      console.log("Fetching token list from Birdeye API...");
-      const birdeyeTokens = await birdeyeService.getTokenList(
-        "sui",
-        50,
-        0,
-        500_000
-      );
+      console.log(`Retrying data fetch for token: ${tokenId}`);
 
-      // Initialize tokens with loading state
-      const initialTokens: TokenData[] = birdeyeTokens.map((t, i) => {
-        // Check for haSui and use local logo
-        let logoURI = t.logoURI;
-        if (t.symbol === "HASUI" || t.address === HASUI_ADDRESS) {
-          logoURI = "/haSui.webp";
-          console.log("Using local logo for haSui token");
-        }
+      // Use direct API call for single token
+      const data = await blockvisionService.getCoinMarketDataPro(tokenId);
 
-        // Normalize SUI address
-        const address = normalizeAddress(t.address);
+      if (!data) {
+        throw new Error(`No data returned for ${tokenId}`);
+      }
 
-        return {
-          rank: i + 1,
-          address: address,
-          name: t.name ?? "Unknown",
-          symbol: t.symbol ?? "UNKNOWN",
-          logoURI: logoURI ?? "",
-          price: t.price || 0,
-          priceChange24h: 0,
-          volume24h: t.v24hUSD || 0,
-          marketCap: 0,
-          liquidity: t.liquidity || 0,
-          fdv: 0,
-          circulatingSupply: 0,
-          totalSupply: 0,
-          status: "loading",
-        };
+      // Update the token with fetched data
+      setTokens((prev) => {
+        const updatedTokens = [...prev];
+        const tokenIndex = updatedTokens.findIndex(
+          (t) =>
+            t.address === tokenId || t.address === normalizeAddress(tokenId)
+        );
+
+        if (tokenIndex === -1) return prev;
+
+        const token = updatedTokens[tokenIndex];
+
+        // Update with new data
+        token.price = safeParseFloat(data.priceInUsd);
+        token.priceChange24h = safeParseFloat(
+          data.market?.hour24?.priceChange ?? 0
+        );
+        token.volume24h = safeParseFloat(data.volume24H);
+        token.marketCap = safeParseFloat(data.marketCap);
+        token.liquidity = safeParseFloat(data.liquidityInUsd);
+        token.fdv = safeParseFloat(data.fdvInUsd);
+        token.circulatingSupply = safeParseFloat(data.circulating);
+        token.totalSupply = safeParseFloat(data.supply);
+        token.status = "loaded";
+        token.hasMissingData = false; // Reset missing data flag
+
+        console.log(`Successfully updated token ${token.symbol} with retry`);
+
+        // Resort by market cap after updating
+        const sorted = [...updatedTokens].sort(
+          (a, b) => b.marketCap - a.marketCap
+        );
+        sorted.forEach((t, idx) => (t.rank = idx + 1));
+
+        return sorted;
       });
 
-      // Sort by market cap (using Birdeye's data initially)
-      initialTokens.sort((a, b) => b.marketCap - a.marketCap);
-      initialTokens.forEach((t, idx) => (t.rank = idx + 1));
-
-      setTokens(initialTokens);
-      setFilteredTokens(initialTokens);
-
-      // Load the first batch of token data immediately
-      const initialBatch = initialTokens
-        .slice(0, INITIAL_LOAD_COUNT)
-        .map((t) => t.address);
-      await loadTokensData(initialBatch);
-
-      setInitialLoading(false);
-      setLastUpdated(new Date().toLocaleTimeString());
-
-      // Load the rest of the tokens in the background
-      const remainingBatch = initialTokens
-        .slice(INITIAL_LOAD_COUNT)
-        .map((t) => t.address);
-      loadTokensData(remainingBatch);
-    } catch (e: any) {
-      console.error("Failed to load token list:", e);
-      setError(e.message ?? "Failed to load token list");
-      setInitialLoading(false);
-    } finally {
-      setRefreshing(false);
-      inFlight.current = false;
+      return true;
+    } catch (error) {
+      console.error(`Single token fetch failed for ${tokenId}:`, error);
+      return false;
     }
   }, []);
+
+  // Process retry queue one by one
+  const processRetryQueue = useCallback(async () => {
+    if (isProcessingRetries.current || retryQueue.current.length === 0) return;
+
+    isProcessingRetries.current = true;
+
+    try {
+      // Process one token at a time with delay to avoid rate limits
+      while (retryQueue.current.length > 0) {
+        const tokenId = retryQueue.current.shift();
+        if (!tokenId) continue;
+
+        await loadSingleTokenData(tokenId);
+        // Add a small delay between requests
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    } finally {
+      isProcessingRetries.current = false;
+    }
+  }, [loadSingleTokenData]);
+
+  // Check for tokens with missing data and retry them
+  const checkAndRetryMissingData = useCallback(() => {
+    setTokens((prev) => {
+      const tokensNeedingRetry = prev.filter((token) => {
+        // Check if the token has missing data and hasn't exceeded retry attempts
+        const needsRetry =
+          tokenHasMissingData(token) &&
+          (!token.retries || token.retries < MAX_RETRIES);
+
+        if (needsRetry) {
+          console.log(
+            `Token ${token.symbol} has missing data, queueing for retry`
+          );
+          // Add to retry queue if not already in it
+          if (!retryQueue.current.includes(token.address)) {
+            retryQueue.current.push(token.address);
+          }
+        }
+
+        return needsRetry;
+      });
+
+      if (tokensNeedingRetry.length > 0) {
+        console.log(
+          `Found ${tokensNeedingRetry.length} tokens with missing data`
+        );
+
+        // Update retry count for tokens
+        return prev.map((token) => {
+          if (tokenHasMissingData(token)) {
+            return {
+              ...token,
+              retries: (token.retries || 0) + 1,
+              hasMissingData: true,
+            };
+          }
+          return token;
+        });
+      }
+
+      return prev;
+    });
+
+    // Process the retry queue
+    processRetryQueue();
+  }, [processRetryQueue]);
 
   // Function to load tokens market data using our service
   const loadTokensData = useCallback(async (tokenIds: string[]) => {
@@ -376,6 +477,9 @@ function MarketDashboard() {
           token.circulatingSupply = safeParseFloat(data.circulating);
           token.totalSupply = safeParseFloat(data.supply);
           token.status = "loaded";
+
+          // Check if token has missing critical data
+          token.hasMissingData = tokenHasMissingData(token);
         });
 
         // Resort by market cap after updating
@@ -411,6 +515,103 @@ function MarketDashboard() {
     }
   }, []);
 
+  // Initial load of token list from Birdeye
+  const loadTokenList = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setRefreshing(true);
+    setInitialLoading(true);
+
+    try {
+      console.log("Fetching token list from Birdeye API...");
+      // Fetch more tokens than needed since we'll be filtering some out
+      const birdeyeTokens = await birdeyeService.getTokenList(
+        "sui",
+        MAX_TOKENS + 15, // Fetch extra tokens to account for excluded ones
+        0,
+        500_000
+      );
+
+      // Filter out excluded tokens and limit to MAX_TOKENS
+      let initialTokens: TokenData[] = birdeyeTokens
+        .filter(
+          (t) =>
+            !EXCLUDED_TOKEN_SYMBOLS.includes(t.symbol) &&
+            !EXCLUDED_TOKEN_NAMES.includes(t.name)
+        )
+        .slice(0, MAX_TOKENS) // Limit to top 30 tokens
+        .map((t, i) => {
+          // Set appropriate logo
+          let logoURI = t.logoURI;
+
+          // Check for XBTC and use local logo
+          if (t.symbol === "XBTC" || t.address === XBTC_ADDRESS) {
+            logoURI = "/okx.webp";
+            console.log("Using local logo for OKX Wrapped BTC (XBTC)");
+          }
+          // Check for haSui and use local logo
+          else if (t.symbol === "HASUI" || t.address === HASUI_ADDRESS) {
+            logoURI = "/haSui.webp";
+            console.log("Using local logo for haSui token");
+          }
+
+          // Normalize SUI address
+          const address = normalizeAddress(t.address);
+
+          return {
+            rank: i + 1,
+            address: address,
+            name: t.name ?? "Unknown",
+            symbol: t.symbol ?? "UNKNOWN",
+            logoURI: logoURI ?? "",
+            price: t.price || 0,
+            priceChange24h: 0,
+            volume24h: t.v24hUSD || 0,
+            marketCap: 0,
+            liquidity: t.liquidity || 0,
+            fdv: 0,
+            circulatingSupply: 0,
+            totalSupply: 0,
+            status: "loading",
+            retries: 0,
+            hasMissingData: false,
+          };
+        });
+
+      // Sort by market cap (using Birdeye's data initially)
+      initialTokens.sort((a, b) => b.marketCap - a.marketCap);
+      initialTokens.forEach((t, idx) => (t.rank = idx + 1));
+
+      setTokens(initialTokens);
+      setFilteredTokens(initialTokens);
+
+      // Load the first batch of token data immediately
+      const initialBatch = initialTokens
+        .slice(0, INITIAL_LOAD_COUNT)
+        .map((t) => t.address);
+      await loadTokensData(initialBatch);
+
+      setInitialLoading(false);
+      setLastUpdated(new Date().toLocaleTimeString());
+
+      // Load the rest of the tokens in the background
+      const remainingBatch = initialTokens
+        .slice(INITIAL_LOAD_COUNT)
+        .map((t) => t.address);
+      await loadTokensData(remainingBatch);
+
+      // After loading all tokens, check for missing data and retry if necessary
+      setTimeout(checkAndRetryMissingData, 1000);
+    } catch (e: any) {
+      console.error("Failed to load token list:", e);
+      setError(e.message ?? "Failed to load token list");
+      setInitialLoading(false);
+    } finally {
+      setRefreshing(false);
+      inFlight.current = false;
+    }
+  }, [loadTokensData, checkAndRetryMissingData]);
+
   // Initial data load
   useEffect(() => {
     loadTokenList();
@@ -441,7 +642,13 @@ function MarketDashboard() {
 
   // Filter tokens on search
   useEffect(() => {
-    setFilteredTokens(filterTokens(tokens, searchTerm));
+    const filtered = filterTokens(tokens, searchTerm);
+    // Remove excluded tokens
+    const finalFiltered = filtered.filter(
+      (token) => !shouldExcludeToken(token)
+    );
+
+    setFilteredTokens(finalFiltered);
     // Reset visible count when search changes
     setVisibleCount(INITIAL_LOAD_COUNT);
   }, [tokens, searchTerm]);
@@ -492,7 +699,9 @@ function MarketDashboard() {
   };
 
   // Calculate market summary stats based on loaded tokens only
-  const loadedTokens = tokens.filter((t) => t.status === "loaded");
+  const loadedTokens = tokens.filter(
+    (t) => t.status === "loaded" && !shouldExcludeToken(t)
+  );
   const marketStats = {
     totalMarketCap: loadedTokens.reduce(
       (sum, token) => sum + token.marketCap,
@@ -502,7 +711,7 @@ function MarketDashboard() {
       (sum, token) => sum + token.volume24h,
       0
     ),
-    totalTokens: tokens.length,
+    totalTokens: filteredTokens.length, // Use filtered count instead of all tokens
     loadedTokens: loadedCount,
     averagePriceChange:
       loadedTokens.length > 0
@@ -514,6 +723,8 @@ function MarketDashboard() {
   // Handle refresh click
   const handleRefresh = () => {
     if (!refreshing) {
+      // Clear retry queue before refreshing
+      retryQueue.current = [];
       loadTokenList();
     }
   };
@@ -522,12 +733,29 @@ function MarketDashboard() {
   const getTokenLogo = (token: TokenData) => {
     if (token.symbol === "HASUI" || token.address === HASUI_ADDRESS) {
       return "/haSui.webp";
+    } else if (token.symbol === "XBTC" || token.address === XBTC_ADDRESS) {
+      return "/okx.webp";
     }
     return token.logoURI;
   };
 
   // Visible tokens for lazy loading
   const visibleTokens = filteredTokens.slice(0, visibleCount);
+
+  // Function to retry loading data for a specific token
+  const handleRetryToken = async (token: TokenData) => {
+    if (token.status === "error" || token.hasMissingData) {
+      // Mark as loading to show spinner
+      setTokens((prev) =>
+        prev.map((t) =>
+          t.address === token.address ? { ...t, status: "loading" } : t
+        )
+      );
+
+      // Try to load the data again
+      await loadSingleTokenData(token.address);
+    }
+  };
 
   return (
     <div className="market-dashboard">
@@ -566,8 +794,8 @@ function MarketDashboard() {
               {initialLoading ? (
                 <span className="sk-box long" style={{ height: "18px" }} />
               ) : (
-                // Replace "40/40 loaded" with "The Sui 40"
-                "The Sui 40"
+                // Updated to show "The Sui 30" instead of "The Sui 40"
+                "The Sui 30"
               )}
             </div>
           </div>
@@ -711,6 +939,11 @@ function MarketDashboard() {
                 </tr>
               ) : (
                 visibleTokens.map((token) => {
+                  // Skip excluded tokens
+                  if (shouldExcludeToken(token)) {
+                    return null;
+                  }
+
                   // If token data is still loading, show loading row
                   if (token.status === "loading") {
                     return <LoadingRow key={token.address} token={token} />;
@@ -730,12 +963,17 @@ function MarketDashboard() {
                             console.log(
                               `Failed to load logo for ${token.symbol}, using fallback`
                             );
-                            // Try a second time with haSui local logo if applicable
+                            // Try appropriate fallback logos based on token
                             if (
                               token.symbol === "HASUI" ||
                               token.address === HASUI_ADDRESS
                             ) {
                               target.src = "/haSui.webp";
+                            } else if (
+                              token.symbol === "XBTC" ||
+                              token.address === XBTC_ADDRESS
+                            ) {
+                              target.src = "/okx.webp";
                             } else {
                               target.src = "/assets/images/unknown-token.png";
                             }
@@ -768,18 +1006,113 @@ function MarketDashboard() {
                       <td className="liquidity-col">
                         {formatDollarValue(token.liquidity)}
                       </td>
-                      <td className="fdv-col">
-                        {token.fdv ? formatDollarValue(token.fdv) : "N/A"}
+                      <td
+                        className={`fdv-col ${
+                          token.hasMissingData ? "missing-data" : ""
+                        }`}
+                        onClick={
+                          token.hasMissingData
+                            ? () => handleRetryToken(token)
+                            : undefined
+                        }
+                        title={
+                          token.hasMissingData
+                            ? "Click to retry loading this data"
+                            : ""
+                        }
+                        style={
+                          token.hasMissingData
+                            ? { cursor: "pointer", color: "#ff5252" }
+                            : {}
+                        }
+                      >
+                        {token.fdv ? (
+                          formatDollarValue(token.fdv)
+                        ) : token.hasMissingData ? (
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            N/A <FaSync style={{ fontSize: "0.8em" }} />
+                          </span>
+                        ) : (
+                          "N/A"
+                        )}
                       </td>
-                      <td className="supply-col">
-                        {token.circulatingSupply
-                          ? formatNumber(token.circulatingSupply)
-                          : "N/A"}
+                      <td
+                        className={`supply-col ${
+                          token.hasMissingData ? "missing-data" : ""
+                        }`}
+                        onClick={
+                          token.hasMissingData
+                            ? () => handleRetryToken(token)
+                            : undefined
+                        }
+                        title={
+                          token.hasMissingData
+                            ? "Click to retry loading this data"
+                            : ""
+                        }
+                        style={
+                          token.hasMissingData
+                            ? { cursor: "pointer", color: "#ff5252" }
+                            : {}
+                        }
+                      >
+                        {token.circulatingSupply ? (
+                          formatNumber(token.circulatingSupply)
+                        ) : token.hasMissingData ? (
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            N/A <FaSync style={{ fontSize: "0.8em" }} />
+                          </span>
+                        ) : (
+                          "N/A"
+                        )}
                       </td>
-                      <td className="supply-col">
-                        {token.totalSupply
-                          ? formatNumber(token.totalSupply)
-                          : "N/A"}
+                      <td
+                        className={`supply-col ${
+                          token.hasMissingData ? "missing-data" : ""
+                        }`}
+                        onClick={
+                          token.hasMissingData
+                            ? () => handleRetryToken(token)
+                            : undefined
+                        }
+                        title={
+                          token.hasMissingData
+                            ? "Click to retry loading this data"
+                            : ""
+                        }
+                        style={
+                          token.hasMissingData
+                            ? { cursor: "pointer", color: "#ff5252" }
+                            : {}
+                        }
+                      >
+                        {token.totalSupply ? (
+                          formatNumber(token.totalSupply)
+                        ) : token.hasMissingData ? (
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            N/A <FaSync style={{ fontSize: "0.8em" }} />
+                          </span>
+                        ) : (
+                          "N/A"
+                        )}
                       </td>
                     </tr>
                   );
