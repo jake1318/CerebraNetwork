@@ -2015,3 +2015,51 @@ body {
   gap: 1rem;
   width: 100%;
 }
+/* src/pages/Portfolio/Portfolio.scss-fix */
+/* Last Updated: 2025-07-30 03:07:56 UTC by jake1318 */
+
+/* This file contains fixes to be appended to the end of the Portfolio.scss file */
+
+/* Override any hidden overflow settings */
+body {
+  overflow-y: auto !important;
+}
+
+/* Fix hidden scrollbars globally */
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
+  display: block !important;
+  width: 10px !important;
+}
+
+/* Ensure the main-content can scroll */
+.main-content {
+  overflow-y: auto !important;
+  padding-bottom: 100px !important;
+  height: auto !important;
+  min-height: 100vh !important;
+}
+
+/* Fix for the app layout */
+.app-layout {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 100vh !important;
+}
+
+/* Fix the portfolio page overflow */
+.portfolio-page {
+  overflow-y: visible !important;
+}
+
+/* Allow scrollbars in the news content area */
+.market-news .news-content {
+  overflow-y: auto !important;
+  max-height: calc(100vh - 150px) !important;
+  padding-bottom: 50px !important;
+}
+
+/* Add space at the bottom of the news list */
+.market-news .news-content .news-list {
+  margin-bottom: 50px !important;
+}
