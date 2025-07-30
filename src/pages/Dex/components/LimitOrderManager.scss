@@ -1,9 +1,9 @@
 /* src/pages/Dex/components/LimitOrderManager.scss */
-/* Last Updated: 2025-07-07 00:44:50 UTC by jake1318 */
+/* Last Updated: 2025-07-13 21:33:31 UTC by jake1318 */
 
 .limit-order-manager {
   position: relative; // make parent a positioning context
-  background: rgba(5, 15, 30, 0.7);
+  background: rgba(2, 2, 2, 0.7); // Darker background to match swap page
   border-radius: 16px;
   height: 100%;
   display: flex;
@@ -14,17 +14,18 @@
   border-image: linear-gradient(
       45deg,
       rgba(0, 255, 255, 0.2),
-      rgba(255, 0, 255, 0.2)
+      rgba(196, 92, 242, 0.2)
     )
     1;
-  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
-    0 8px 32px rgba(255, 0, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
+    0 8px 32px rgba(0, 255, 128, 0.04), 0 8px 32px rgba(196, 92, 242, 0.04);
   overflow: hidden;
   animation: fadeIn 0.5s ease-out;
 
   &:hover {
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-      0 8px 32px rgba(255, 0, 255, 0.15);
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.12),
+      0 8px 32px rgba(0, 255, 128, 0.06), 0 8px 32px rgba(196, 92, 242, 0.06);
   }
 
   // Status message styling
@@ -40,24 +41,24 @@
     -webkit-backdrop-filter: blur(8px);
 
     &.success {
-      background-color: rgba(0, 255, 136, 0.1);
-      border: 1px solid rgba(0, 255, 136, 0.3);
-      color: #00ff88;
-      box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+      background-color: rgba(30, 215, 96, 0.1);
+      border: 1px solid rgba(30, 215, 96, 0.3);
+      color: #1ed760;
+      box-shadow: 0 0 15px rgba(30, 215, 96, 0.2);
     }
 
     &.error {
-      background-color: rgba(255, 77, 109, 0.1);
-      border: 1px solid rgba(255, 77, 109, 0.3);
-      color: #ff4d6d;
-      box-shadow: 0 0 15px rgba(255, 77, 109, 0.2);
+      background-color: rgba(255, 68, 68, 0.1);
+      border: 1px solid rgba(255, 68, 68, 0.3);
+      color: #ff4444;
+      box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
     }
 
     &.info {
-      background-color: rgba(0, 174, 255, 0.1);
-      border: 1px solid rgba(0, 174, 255, 0.3);
-      color: #00aeff;
-      box-shadow: 0 0 15px rgba(0, 174, 255, 0.2);
+      background-color: rgba(0, 255, 255, 0.1);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      color: #00ffff; // Cyan from swap page
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
     }
 
     .close-btn {
@@ -85,9 +86,15 @@
 
     button {
       flex: 1;
-      background: rgba(5, 15, 30, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.8);
+      background: rgba(2, 2, 2, 0.3); /* Darker background to match Swap */
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(196, 92, 242, 0.2)
+        )
+        1;
+      color: #b1a5c8;
       padding: 12px 0;
       border-radius: 10px 10px 0 0;
       font-size: 15px;
@@ -98,19 +105,19 @@
       border-bottom: none;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(2, 2, 2, 0.6);
+        color: #ffffff;
       }
 
       &.active {
         background: linear-gradient(
           45deg,
           rgba(0, 255, 255, 0.2),
-          rgba(255, 0, 255, 0.2)
+          rgba(196, 92, 242, 0.2)
         );
-        color: #fff;
+        color: #00ffff; // Cyan from swap page
         text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-        box-shadow: 0 -5px 15px rgba(0, 255, 255, 0.15),
-          0 -5px 15px rgba(255, 0, 255, 0.15);
+        box-shadow: 0 -5px 15px rgba(0, 255, 255, 0.1);
       }
     }
 
@@ -119,9 +126,15 @@
       right: 22px;
       top: 50%;
       transform: translateY(-50%);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.7);
+      background: rgba(2, 2, 2, 0.4); // Darker background
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(196, 92, 242, 0.2)
+        )
+        1;
+      color: #b1a5c8; // Text-secondary from swap page
       width: 32px;
       height: 32px;
       border-radius: 50%;
@@ -134,10 +147,10 @@
       flex: 0;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(2, 2, 2, 0.6);
         transform: translateY(-50%) rotate(180deg);
-        color: #00aeff;
-        box-shadow: 0 0 15px rgba(0, 174, 255, 0.3);
+        color: #00ffff; // Cyan from swap page
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
       }
 
       &:disabled {
@@ -168,8 +181,9 @@
     &::-webkit-scrollbar-thumb {
       background: linear-gradient(
         180deg,
-        rgba(0, 255, 255, 0.3),
-        rgba(255, 0, 255, 0.3)
+        rgba(0, 255, 255, 0.5),
+        rgba(0, 255, 128, 0.3),
+        rgba(196, 92, 242, 0.5)
       );
       border-radius: 3px;
     }
@@ -177,18 +191,19 @@
     &::-webkit-scrollbar-thumb:hover {
       background: linear-gradient(
         180deg,
-        rgba(0, 255, 255, 0.5),
-        rgba(255, 0, 255, 0.5)
+        rgba(0, 255, 255, 0.7),
+        rgba(0, 255, 128, 0.5),
+        rgba(196, 92, 242, 0.7)
       );
     }
 
     p {
       margin: 16px 0;
-      color: rgba(255, 255, 255, 0.7);
+      color: #b1a5c8; // Text-secondary from swap page
     }
 
     .error {
-      color: #ff4d6d;
+      color: #ff4444; // Error color
     }
 
     // Content wrapper with hidden scrollbar
@@ -241,21 +256,20 @@
       background: linear-gradient(
         90deg,
         rgba(0, 255, 255, 0.7),
-        /* Cyan gradient start */ rgba(255, 0, 255, 0.7)
-          /* Magenta gradient end */
+        rgba(0, 255, 128, 0.4),
+        rgba(196, 92, 242, 0.7)
       );
       border-radius: 4px; /* Rounded corners */
       border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3),
-        0 0 10px rgba(255, 0, 255, 0.3); /* Neon glow effect */
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); /* Neon glow effect */
     }
 
     &::-webkit-scrollbar-thumb:hover {
       background: linear-gradient(
         90deg,
         rgba(0, 255, 255, 0.9),
-        /* Brighter cyan on hover */ rgba(255, 0, 255, 0.9)
-          /* Brighter magenta on hover */
+        rgba(0, 255, 128, 0.6),
+        rgba(196, 92, 242, 0.9)
       );
     }
 
@@ -274,7 +288,8 @@
         90deg,
         transparent,
         rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2),
+        rgba(0, 255, 128, 0.1),
+        rgba(196, 92, 242, 0.2),
         transparent
       );
       opacity: 0.5;
@@ -296,25 +311,19 @@
     td {
       padding: 12px;
       text-align: left;
-      color: rgba(255, 255, 255, 0.9);
+      color: #ffffff;
       font-size: 14px;
     }
 
     thead {
       tr {
-        background: rgba(0, 0, 0, 0.2);
+        background: rgba(2, 2, 2, 0.3); // Darker background
 
         th {
           font-weight: 600;
-          color: rgba(255, 255, 255, 0.7);
+          color: #b1a5c8; // Text-secondary from swap page
           letter-spacing: 0.5px;
-          border-bottom: 1px solid;
-          border-image: linear-gradient(
-              90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
-            )
-            1;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
           padding: 14px 12px;
 
           &:first-child {
@@ -333,7 +342,7 @@
         transition: all 0.3s ease;
 
         &:hover {
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(2, 2, 2, 0.4); // Darker background
           transform: translateY(-2px);
         }
 
@@ -346,16 +355,16 @@
         }
 
         td {
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
           &:first-child {
-            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
             border-top-left-radius: 6px;
             border-bottom-left-radius: 6px;
           }
 
           &:last-child {
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
             border-top-right-radius: 6px;
             border-bottom-right-radius: 6px;
           }
@@ -363,7 +372,7 @@
           // Order ID style
           &:nth-child(5) {
             font-family: monospace;
-            color: rgba(255, 255, 255, 0.6);
+            color: #b1a5c8; // Text-secondary from swap page
             font-size: 13px;
           }
 
@@ -376,21 +385,26 @@
             font-weight: 500;
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(2, 2, 2, 0.6); // Darker background
             border: 1px solid;
             border-image: linear-gradient(
                 45deg,
-                rgba(0, 255, 255, 0.3),
-                rgba(255, 0, 255, 0.3)
+                rgba(0, 255, 255, 0.2),
+                rgba(196, 92, 242, 0.2)
               )
               1;
             color: #fff;
 
             &:hover:not(:disabled) {
               transform: translateY(-2px);
-              background: rgba(0, 0, 0, 0.5);
-              box-shadow: 0 5px 15px rgba(0, 255, 255, 0.15),
-                0 5px 15px rgba(255, 0, 255, 0.15);
+              background: rgba(2, 2, 2, 0.8);
+              box-shadow: 0 5px 15px rgba(0, 255, 255, 0.15);
+              border-image: linear-gradient(
+                  45deg,
+                  rgba(0, 255, 255, 0.4),
+                  rgba(196, 92, 242, 0.4)
+                )
+                1;
             }
 
             &:disabled {
@@ -410,7 +424,8 @@
     background: linear-gradient(
       45deg,
       rgba(0, 255, 255, 0.2),
-      rgba(255, 0, 255, 0.2)
+      rgba(0, 255, 128, 0.1),
+      rgba(196, 92, 242, 0.2)
     );
     border: none;
     border-radius: 10px;
@@ -424,8 +439,13 @@
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(0, 255, 255, 0.15),
-        0 8px 16px rgba(255, 0, 255, 0.15);
+      box-shadow: 0 8px 16px rgba(0, 255, 255, 0.15);
+      background: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.3),
+        rgba(0, 255, 128, 0.15),
+        rgba(196, 92, 242, 0.3)
+      );
     }
 
     &:disabled {
@@ -482,15 +502,15 @@
 @keyframes scrollGlow {
   0% {
     opacity: 0.3;
-    box-shadow: 0 0 5px rgba(0, 255, 255, 0.3), 0 0 5px rgba(255, 0, 255, 0.3);
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
   }
   50% {
     opacity: 0.6;
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.5), 0 0 15px rgba(255, 0, 255, 0.5);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
   }
   100% {
     opacity: 0.3;
-    box-shadow: 0 0 5px rgba(0, 255, 255, 0.3), 0 0 5px rgba(255, 0, 255, 0.3);
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
   }
 }
 

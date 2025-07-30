@@ -1,30 +1,24 @@
 /* src/pages/Dex/components/MyOrders.scss */
-/* Last Updated: 2025-07-07 00:50:29 UTC by jake1318 */
+/* Last Updated: 2025-07-13 19:17:24 UTC by jake1318 */
 
 .my-orders {
-  background: rgba(5, 15, 30, 0.7);
+  background: rgba(2, 2, 2, 0.7);
   border-radius: 16px;
   height: 100%;
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid;
-  border-image: linear-gradient(
-      45deg,
-      rgba(0, 255, 255, 0.2),
-      rgba(255, 0, 255, 0.2)
-    )
-    1;
+  border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
   position: relative;
   animation: fadeIn 0.5s ease-out;
-  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-    0 8px 32px rgba(255, 0, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(77, 162, 255, 0.08),
+    0 8px 32px rgba(30, 215, 96, 0.04), 0 8px 32px rgba(255, 0, 255, 0.04);
 
   &:hover {
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-      0 8px 32px rgba(255, 0, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(77, 162, 255, 0.12),
+      0 8px 32px rgba(30, 215, 96, 0.06), 0 8px 32px rgba(255, 0, 255, 0.06);
   }
 
   // Glowing scan effect
@@ -36,7 +30,7 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(0, 255, 255, 0.5),
+      rgba(77, 162, 255, 0.5),
       transparent
     );
     top: 50%;
@@ -44,7 +38,7 @@
     transform: translateY(-50%);
     animation: horizonScan 15s linear infinite;
     z-index: 1;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 20px rgba(77, 162, 255, 0.5);
     opacity: 0.3;
     pointer-events: none;
   }
@@ -54,23 +48,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid;
-    border-image: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
-      )
-      1;
-    background: rgba(5, 15, 30, 0.9);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(2, 2, 2, 0.9);
 
     h3 {
       font-size: 1.2rem;
-      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      background: linear-gradient(90deg, #4da2ff, #ff00ff);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
       color: transparent;
-      text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+      text-shadow: 0 0 10px rgba(77, 162, 255, 0.3);
       font-weight: bold;
       letter-spacing: 0.5px;
     }
@@ -82,7 +70,7 @@
       button {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.7);
+        color: #b1a5c8;
         padding: 0.3rem 0.8rem;
         border-radius: 8px;
         font-size: 0.9rem;
@@ -97,13 +85,13 @@
         &.active {
           background: linear-gradient(
             45deg,
-            rgba(0, 255, 255, 0.3),
-            rgba(255, 0, 255, 0.3)
+            rgba(77, 162, 255, 0.3),
+            rgba(30, 215, 96, 0.15),
+            rgba(255, 0, 255, 0.15)
           );
           border-color: rgba(255, 255, 255, 0.2);
           color: #fff;
-          box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
-            0 0 15px rgba(255, 0, 255, 0.15);
+          box-shadow: 0 0 15px rgba(77, 162, 255, 0.15);
         }
       }
     }
@@ -111,7 +99,7 @@
     .refresh-button {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.7);
+      color: #b1a5c8;
       width: 32px;
       height: 32px;
       border-radius: 50%;
@@ -125,8 +113,8 @@
       &:hover {
         background: rgba(255, 255, 255, 0.1);
         transform: rotate(180deg);
-        color: #00ffff;
-        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        color: #4da2ff;
+        box-shadow: 0 0 10px rgba(77, 162, 255, 0.3);
       }
 
       &:disabled {
@@ -149,24 +137,24 @@
     -webkit-backdrop-filter: blur(8px);
 
     &.success {
-      background-color: rgba(0, 255, 136, 0.1);
-      border: 1px solid rgba(0, 255, 136, 0.3);
-      color: #00ff88;
-      box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+      background-color: rgba(30, 215, 96, 0.1);
+      border: 1px solid rgba(30, 215, 96, 0.3);
+      color: #1ed760;
+      box-shadow: 0 0 15px rgba(30, 215, 96, 0.2);
     }
 
     &.error {
-      background-color: rgba(255, 77, 109, 0.1);
-      border: 1px solid rgba(255, 77, 109, 0.3);
-      color: #ff4d6d;
-      box-shadow: 0 0 15px rgba(255, 77, 109, 0.2);
+      background-color: rgba(255, 68, 68, 0.1);
+      border: 1px solid rgba(255, 68, 68, 0.3);
+      color: #ff4444;
+      box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
     }
 
     &.info {
-      background-color: rgba(0, 174, 255, 0.1);
-      border: 1px solid rgba(0, 174, 255, 0.3);
-      color: #00aeff;
-      box-shadow: 0 0 15px rgba(0, 174, 255, 0.2);
+      background-color: rgba(77, 162, 255, 0.1);
+      border: 1px solid rgba(77, 162, 255, 0.3);
+      color: #4da2ff;
+      box-shadow: 0 0 15px rgba(77, 162, 255, 0.2);
     }
 
     .close-btn {
@@ -193,20 +181,20 @@
   }
 
   .error-message {
-    color: #ff4d6d;
+    color: #ff4444;
     padding: 1rem;
     text-align: center;
-    background: rgba(255, 77, 109, 0.1);
+    background: rgba(255, 68, 68, 0.1);
     margin: 0.5rem;
     border-radius: 6px;
-    border: 1px solid rgba(255, 77, 109, 0.3);
-    box-shadow: 0 0 15px rgba(255, 77, 109, 0.1);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    box-shadow: 0 0 15px rgba(255, 68, 68, 0.1);
   }
 
   .connect-message,
   .loading-message,
   .no-orders-message {
-    color: rgba(255, 255, 255, 0.7);
+    color: #b1a5c8;
     flex: 1;
     display: flex;
     align-items: center;
@@ -227,14 +215,8 @@
       padding: 0.5rem 1rem;
       background: rgba(0, 0, 0, 0.2);
       font-size: 0.8rem;
-      color: rgba(255, 255, 255, 0.6);
-      border-bottom: 1px solid;
-      border-image: linear-gradient(
-          90deg,
-          rgba(0, 255, 255, 0.2),
-          rgba(255, 0, 255, 0.2)
-        )
-        1;
+      color: #b1a5c8;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .order-rows {
@@ -253,7 +235,8 @@
       &::-webkit-scrollbar-thumb {
         background: linear-gradient(
           180deg,
-          rgba(0, 255, 255, 0.3),
+          rgba(77, 162, 255, 0.5),
+          rgba(30, 215, 96, 0.3),
           rgba(255, 0, 255, 0.3)
         );
         border-radius: 3px;
@@ -262,7 +245,8 @@
       &::-webkit-scrollbar-thumb:hover {
         background: linear-gradient(
           180deg,
-          rgba(0, 255, 255, 0.5),
+          rgba(77, 162, 255, 0.7),
+          rgba(30, 215, 96, 0.5),
           rgba(255, 0, 255, 0.5)
         );
       }
@@ -301,7 +285,7 @@
       }
 
       .order-type {
-        color: rgba(255, 255, 255, 0.6);
+        color: #b1a5c8;
         text-transform: capitalize;
       }
 
@@ -315,13 +299,13 @@
         font-weight: 500;
 
         &.status-filled {
-          color: #00ff88;
-          text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+          color: #1ed760;
+          text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
         }
 
         &.status-cancelled {
-          color: #ff4d6d;
-          text-shadow: 0 0 10px rgba(255, 77, 109, 0.4);
+          color: #ff4444;
+          text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
         }
 
         &.status-expired {
@@ -330,7 +314,7 @@
         }
 
         &.status-closed {
-          color: rgba(255, 255, 255, 0.6);
+          color: #b1a5c8;
         }
       }
 
@@ -347,26 +331,26 @@
           transition: all 0.3s ease;
 
           &.cancel-button {
-            background: rgba(255, 77, 109, 0.2);
-            border: 1px solid rgba(255, 77, 109, 0.4);
-            color: #ff4d6d;
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid rgba(255, 68, 68, 0.4);
+            color: #ff4444;
 
             &:hover:not(:disabled) {
-              background: rgba(255, 77, 109, 0.3);
+              background: rgba(255, 68, 68, 0.3);
               transform: translateY(-2px);
-              box-shadow: 0 4px 12px rgba(255, 77, 109, 0.2);
+              box-shadow: 0 4px 12px rgba(255, 68, 68, 0.2);
             }
           }
 
           &.claim-button {
-            background: rgba(0, 255, 136, 0.2);
-            border: 1px solid rgba(0, 255, 136, 0.4);
-            color: #00ff88;
+            background: rgba(30, 215, 96, 0.2);
+            border: 1px solid rgba(30, 215, 96, 0.4);
+            color: #1ed760;
 
             &:hover:not(:disabled) {
-              background: rgba(0, 255, 136, 0.3);
+              background: rgba(30, 215, 96, 0.3);
               transform: translateY(-2px);
-              box-shadow: 0 4px 12px rgba(0, 255, 136, 0.2);
+              box-shadow: 0 4px 12px rgba(30, 215, 96, 0.2);
             }
           }
 
@@ -390,8 +374,9 @@
       border-radius: 8px;
       background: linear-gradient(
         45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
+        rgba(77, 162, 255, 0.2),
+        rgba(30, 215, 96, 0.1),
+        rgba(255, 0, 255, 0.1)
       );
       border: none;
       color: white;
@@ -400,13 +385,17 @@
       cursor: pointer;
       transition: all 0.3s ease;
       letter-spacing: 0.5px;
-      box-shadow: 0 4px 12px rgba(0, 255, 255, 0.1),
-        0 4px 12px rgba(255, 0, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(77, 162, 255, 0.1);
 
       &:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(0, 255, 255, 0.2),
-          0 8px 16px rgba(255, 0, 255, 0.2);
+        box-shadow: 0 8px 16px rgba(77, 162, 255, 0.2);
+        background: linear-gradient(
+          45deg,
+          rgba(77, 162, 255, 0.3),
+          rgba(30, 215, 96, 0.15),
+          rgba(255, 0, 255, 0.15)
+        );
       }
 
       &:disabled {
@@ -499,7 +488,7 @@
             left: 0;
             width: 38%;
             font-weight: 500;
-            color: rgba(255, 255, 255, 0.6);
+            color: #b1a5c8;
           }
         }
 

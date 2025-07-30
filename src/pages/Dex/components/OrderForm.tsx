@@ -4,6 +4,12 @@ import { placeLimitOrder } from "@7kprotocol/sdk-ts";
 import { useWallet } from "@suiet/wallet-kit";
 import "./OrderForm.scss";
 
+// Add the commission configuration (30 bps = 0.30%)
+const COMMISSION = {
+  partner: "0xc4a6782bda928c118a336a581aaa24f3a0418fdeebe1b7a053b9bf5890fd691e",
+  commissionBps: 30,
+};
+
 const TOKEN_DECIMALS: Record<string, number> = {
   SUI: 9,
   USDC: 6,
@@ -60,6 +66,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
     success: boolean;
     message: string;
   } | null>(null);
+
+  // Add state for transaction digest
+  const [txDigest, setTxDigest] = useState<string | null>(null);
 
   // Which coinType is being spent?
   const payCoinType =
@@ -142,11 +151,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setAmount(a.toString());
   };
 
+  const closeSuccess = () => setTxDigest(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (orderMode === "market") return;
 
     setOrderStatus(null);
+    setTxDigest(null);
     const p = parseFloat(price);
     const a = parseFloat(amount);
     if (!connected || !walletAddress || !p || !a) {
@@ -183,6 +195,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
       const expireTs = BigInt(Date.now() + 7 * 24 * 3600 * 1000);
       const slippage = BigInt(100);
 
+      // Include the 30bps commission in the placeLimitOrder call
       const tx = await placeLimitOrder({
         accountAddress: walletAddress,
         payCoinType,
@@ -193,12 +206,20 @@ const OrderForm: React.FC<OrderFormProps> = ({
         rate,
         slippage,
         devInspect: false,
+        commission: COMMISSION, // Add the commission parameter
       });
 
       if (!signAndExecuteTransactionBlock) {
         throw new Error("Wallet signer unavailable");
       }
-      await signAndExecuteTransactionBlock({ transactionBlock: tx });
+      const result = await signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+      });
+
+      // Store the transaction digest
+      if (result.digest) {
+        setTxDigest(result.digest);
+      }
 
       setOrderStatus({ success: true, message: "Limit order placed!" });
       fetchBalances(walletAddress);
@@ -307,6 +328,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 {pair.quoteAsset}
               </div>
             </div>
+
+            {/* Fee information */}
           </>
         )}
 
@@ -316,7 +339,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
           </div>
         )}
 
-        {orderStatus && (
+        {orderStatus && !txDigest && (
           <div
             className={`order-status ${
               orderStatus.success ? "success" : "error"
@@ -344,6 +367,38 @@ const OrderForm: React.FC<OrderFormProps> = ({
             : `${orderType === "buy" ? "Buy" : "Sell"} Market`}
         </button>
       </form>
+
+      {/* Transaction Success Modal - Similar to SwapForm */}
+      {txDigest && (
+        <div className="tx-success-modal">
+          <div className="tx-success-content">
+            <h3>🎉 Order Placed Successfully!</h3>
+            <p>
+              Transaction:&nbsp;
+              <a
+                href={`https://suiscan.xyz/tx/${txDigest}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {txDigest.slice(0, 6)}…{txDigest.slice(-6)}
+              </a>
+            </p>
+            <button className="tx-close-button" onClick={closeSuccess}>
+              Close
+            </button>
+            <div className="powered-by">
+              Limit orders powered by{" "}
+              <a
+                href="https://port.7k.ag/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                7K Protocol
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

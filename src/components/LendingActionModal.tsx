@@ -1,9 +1,9 @@
 // src/components/LendingActionModal.tsx
-// Last updated: 2025-07-24 01:18:31 UTC by jake1318
+// Last Updated: 2025-07-25 01:55:14 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
-import scallopService from "../scallop/ScallopService";
+import scallopService, { SCALLOP_PACKAGE_ID } from "../scallop/ScallopService";
 import blockvisionService from "../services/blockvisionService";
 import "../styles/LendingActionModal.scss";
 
@@ -55,6 +55,8 @@ function getTotalCoinBalance(coins: any[], coinConfig: any): number {
 
   // Check each possible coin type for the symbol and sum their balances
   for (const coinType of coinConfig.coinTypes) {
+    if (!coinType) continue; // Skip null/undefined entries
+
     const matchingCoins = coins.filter((coin) => {
       // Normalize coin types for comparison (SUI especially)
       const normalizedCoinType = coinType.toLowerCase();
@@ -124,33 +126,80 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
   // Track whether the modal should be rendered
   const [shouldRender, setShouldRender] = useState<boolean>(false);
 
-  // One-time: pull every pool once the modal is ever opened
+  // FIX #1: Check if registry is ready with useMemo
+  const registryReady = useMemo(
+    () => Object.keys(registry).length > 0,
+    [registry]
+  );
+
+  // FIX #1: Build registry once at app start with the real s-coin types from the pool info directly
   useEffect(() => {
-    if (Object.keys(registry).length) return; // already done
     (async () => {
-      const assets = await scallopService.fetchMarketAssets();
-      const map: CoinRegistry = {};
-      assets.forEach((a: any) => {
-        map[a.symbol.toUpperCase()] = {
-          symbol: a.symbol.toUpperCase(),
-          name: a.symbol.toLowerCase(),
-          decimals: a.decimals ?? 9,
-          icon: `/icons/${a.symbol.toLowerCase()}-icon.svg`,
-          coinTypes: [a.coinType], // ← canonical type
-        };
-      });
-      // (optional) add aliases that are not returned by the pool list,
-      // e.g. wrapped vs. underlying – here is where you'd merge arrays
-      setRegistry(map);
+      if (registryReady) return;
+
+      try {
+        // Get basic market assets
+        const list = await scallopService.fetchMarketAssets();
+
+        // Get the SDK query object for fetching market data
+        const sdk = await scallopService.getSDKInstance();
+        const q = await sdk.createScallopQuery();
+        await q.init();
+
+        // Get full market data
+        const market = await q.queryMarket();
+        console.log("Market data fetched:", market);
+
+        const map: CoinRegistry = {};
+
+        list.forEach((p) => {
+          const sym = p.symbol.toUpperCase();
+          const poolKey = p.symbol.toLowerCase();
+          const poolInfo = market.pools?.[poolKey] ?? {};
+
+          // Use directly available fields from the pool object
+          const sCoin =
+            poolInfo.marketCoinType || // v2.2.2 canonical
+            poolInfo.sCoinType || // some older snapshots
+            null; // last-resort: null
+
+          map[sym] = {
+            symbol: sym,
+            name: poolKey, // what the SDK expects (lowercase)
+            decimals: p.decimals ?? 9,
+            icon: `/icons/${poolKey}-icon.svg`,
+            coinTypes: [
+              p.coinType, // underlying
+              `${SCALLOP_PACKAGE_ID}::lending::PoolCoin<${p.coinType}>`, // legacy format
+              sCoin, // the real s-coin type
+            ].filter(Boolean), // Remove null/undefined entries
+          };
+
+          console.log(`Registry for ${sym}:`, {
+            symbol: sym,
+            underlying: p.coinType,
+            legacy: `${SCALLOP_PACKAGE_ID}::lending::PoolCoin<${p.coinType}>`,
+            sCoin: sCoin,
+          });
+        });
+
+        setRegistry(map);
+        console.log("Complete coin registry built:", map);
+      } catch (error) {
+        console.error("Error building coin registry:", error);
+      }
     })();
-  }, []);
+  }, [registryReady]);
 
   useEffect(() => {
     if (open) {
       setShouldRender(true);
-      fetchWalletData();
+      // FIX #2: Only fetch wallet data when registry is ready
+      if (registryReady && wallet.connected && asset?.symbol) {
+        fetchWalletData();
+      }
     }
-  }, [open, asset?.symbol, wallet.connected]);
+  }, [open, registryReady, wallet.connected, asset?.symbol]);
 
   // Animation end handler
   const handleAnimationEnd = () => {
@@ -174,7 +223,7 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
           wallet.address
         );
 
-        // ❶ **NEW – robust rule for human‑readable amount**
+        // Find the supplied asset - match by symbol
         const suppliedAsset =
           userPositions.suppliedAssets?.find(
             (a: any) => a.symbol.toLowerCase() === asset.symbol.toLowerCase()
@@ -186,33 +235,17 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
           );
 
         if (suppliedAsset) {
-          const {
-            suppliedCoin,
-            amount: sdkIndex,
-            coinDecimals = 9,
-          } = suppliedAsset as any;
-
-          // a) normal case – SDK already gives the human amount
-          if (suppliedCoin !== undefined && Number(suppliedCoin) > 0) {
-            setCurrentSupply(Number(suppliedCoin));
-            console.log(
-              `[supply] using suppliedCoin → ${Number(suppliedCoin)} ${
-                asset.symbol
-              }`
-            );
-          }
-          // b) fallback – only the tiny index is present; scale it up
-          else if (sdkIndex !== undefined) {
-            const human = Number(sdkIndex) * Math.pow(10, coinDecimals);
-            setCurrentSupply(human);
-            console.log(
-              `[supply] scaled SDK index (${sdkIndex}) × 10^${coinDecimals} → ${human} ${asset.symbol}`
-            );
-          } else {
-            setCurrentSupply(0);
-          }
+          // FIX #3: Read the amount field that we actually stored
+          const supplyAmount = Number(
+            suppliedAsset.amount ?? suppliedAsset.suppliedCoin
+          );
+          setCurrentSupply(supplyAmount);
+          console.log(
+            `[supply] Found supplied asset for ${asset.symbol} → ${supplyAmount}`
+          );
         } else {
           setCurrentSupply(0);
+          console.log(`[supply] No supplied asset found for ${asset.symbol}`);
         }
       }
 
@@ -228,18 +261,12 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
         console.log(`Retrieved ${coins.length} coins from BlockVision`);
         setAccountCoins(coins);
 
-        // Debug: Log all coins received
-        console.log(
-          "All coins from BlockVision:",
-          coins.map((c) => `${c.symbol} (${c.coinType}): ${c.balance}`)
-        );
-
         // Match the asset with its coin config
-        const assetSymbol = asset.symbol.toLowerCase();
+        const assetSymbol = asset.symbol.toUpperCase();
         console.log(`Looking for coin config for symbol: ${assetSymbol}`);
 
         const coinConfig = Object.values(registry).find(
-          (coin) => coin.symbol.toLowerCase() === assetSymbol
+          (coin) => coin.symbol === assetSymbol
         );
 
         if (coinConfig) {
@@ -253,9 +280,10 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
           setWalletBalance(balance);
 
           // Debug: Log the matching coins that were found
-          const matchedCoins = coins.filter((coin) => {
+          const matchingCoins = coins.filter((coin) => {
             const normalizedCoin = coin.coinType.toLowerCase();
             return coinConfig.coinTypes.some((coinType) => {
+              if (!coinType) return false;
               const normalizedCoinType = coinType.toLowerCase();
               return (
                 normalizedCoin === normalizedCoinType ||
@@ -269,7 +297,7 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
 
           console.log(
             `Matched coins for ${assetSymbol}:`,
-            matchedCoins.map(
+            matchingCoins.map(
               (c) =>
                 `${c.symbol} (${c.coinType}): ${c.balance} (decimals: ${c.decimals})`
             )
@@ -279,7 +307,7 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
 
           // As fallback, try to find by matching symbol directly
           const matchingCoin = coins.find(
-            (c) => c.symbol.toLowerCase() === assetSymbol
+            (c) => c.symbol.toUpperCase() === assetSymbol
           );
 
           if (matchingCoin) {
@@ -344,6 +372,11 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
       return false;
     }
 
+    // FIX #5: Allow MAX withdrawals with any amount
+    if (action === "withdraw" && useMaxWithdraw) {
+      return true;
+    }
+
     if (!amount || parseFloat(amount) <= 0) {
       setError("Please enter a valid amount");
       return false;
@@ -389,7 +422,7 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
 
       // Find the correct coin configuration
       const coinConfig = Object.values(registry).find(
-        (coin) => coin.symbol.toLowerCase() === asset.symbol.toLowerCase()
+        (coin) => coin.symbol === asset.symbol.toUpperCase()
       );
 
       if (!coinConfig) {
@@ -408,11 +441,12 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
           baseUnits
         );
       } else if (action === "withdraw") {
+        // FIX: Use the underlying Move type instead of just the name
         result = await scallopService.withdrawAsset(
           wallet,
-          coinConfig.name,
+          coinConfig.coinTypes[0], // Pass the full Move type (e.g., 0x356a…::wal::WAL)
           baseUnits,
-          useMaxWithdraw // pass the flag
+          useMaxWithdraw
         );
       }
 
@@ -606,7 +640,11 @@ const LendingActionModal: React.FC<LendingActionModalProps> = ({
               <button
                 className={`action-btn ${action}-btn`}
                 onClick={handleSubmit}
-                disabled={!wallet.connected || isLoading || amount === ""}
+                disabled={
+                  !wallet.connected ||
+                  isLoading ||
+                  (!useMaxWithdraw && amount === "")
+                }
               >
                 {action === "deposit" ? "Deposit" : "Withdraw"} {asset?.symbol}
               </button>

@@ -1,5 +1,5 @@
 /* src/pages/Dex/Dex.scss */
-/* Last Updated: 2025-07-07 01:02:10 UTC by jake1318 */
+/* Last Updated: 2025-07-14 23:38:04 UTC by jake1318 */
 
 /* DEX container */
 .dex-container {
@@ -8,29 +8,28 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  // Updated background to match home page styling
+  // Updated background with neon blue instead of cyan
   background: radial-gradient(
       circle at top left,
-      rgba(0, 255, 255, 0.15) 0%,
-      rgba(5, 15, 30, 0.5) 40%
+      rgba(30, 144, 255, 0.15) 0%,
+      // Changed to neon blue from navbar
+      rgba(2, 2, 2, 0.8) 40%
     ),
     radial-gradient(
       circle at bottom right,
-      rgba(255, 0, 255, 0.15) 0%,
-      rgba(5, 15, 30, 0.5) 40%
+      rgba(196, 92, 242, 0.15) 0%,
+      rgba(2, 2, 2, 0.8) 40%
     ),
-    linear-gradient(
-      135deg,
-      rgba(5, 5, 15, 0.95) 0%,
-      rgba(10, 10, 30, 0.95) 100%
-    );
+    linear-gradient(135deg, rgba(2, 2, 2, 0.95) 0%, rgba(5, 5, 15, 0.95) 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: center, center, center;
   color: #ffffff;
   position: relative;
   padding-top: var(--navbar-h); /* Add padding equal to navbar height */
   box-sizing: border-box; /* Ensure padding is included in height calculation */
   margin-top: 0; /* Remove negative margin */
 
-  // Grid overlay similar to home page
+  // Removed the grid overlay from the &::before pseudo-element
   &::before {
     content: "";
     position: absolute;
@@ -38,72 +37,71 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(
-        90deg,
-        rgba(0, 255, 255, 0.05) 1px,
-        transparent 1px
-      ),
-      linear-gradient(180deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(180deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
-    background-position: 0 0, 0 0, 10px 10px, 10px 10px;
+    // Grid pattern removed
     pointer-events: none;
     z-index: 0;
   }
 
-  // Variables
-  $accent-color: #00ffff;
-  $accent-gradient: linear-gradient(45deg, #00ffff, #0088ff);
-  $positive-color: #4caf50;
-  $negative-color: #ff3b30;
-  $panel-bg: rgba(5, 15, 30, 0.7);
-  $panel-header: rgba(5, 15, 30, 0.9);
-  $panel-border: rgba(255, 255, 255, 0.1);
+  // Variables updated with neon blue
+  $accent-color: #1e90ff; // Changed to neon blue
+  $accent-purple: #c45cf2;
+  $accent-green: #00ff80;
+  $positive-color: #1ed760;
+  $negative-color: #ff4444;
+  $panel-bg: rgba(2, 2, 2, 0.7);
+  $panel-header: rgba(2, 2, 2, 0.9);
+  $panel-border: rgba(255, 255, 255, 0.05);
+  $text-secondary: #b1a5c8;
+  $text-muted: #3f4c60;
 
-  // Scanning horizontal line
+  // Scanning horizontal line (neon blue)
   &::after {
     content: "";
     position: absolute;
     width: 100vw;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #00ffff, transparent);
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      #1e90ff,
+      transparent
+    ); // Changed to neon blue
     top: 50%;
-    left: 0;
-    transform: translateY(-50%);
+    left: 50%;
+    transform: translateX(-50%);
     animation: horizonScan 15s linear infinite;
     z-index: 1;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 20px rgba(30, 144, 255, 0.5); // Changed to neon blue
     pointer-events: none;
     opacity: 0.5;
   }
 
-  // Vertical scan line
+  // Vertical scan line (neon purple)
   .vertical-scan {
     content: "";
     position: absolute;
-    width: 1px;
+    width: 2px;
     height: 100vh;
-    background: linear-gradient(180deg, transparent, #ff00ff, transparent);
+    background: linear-gradient(180deg, transparent, #c45cf2, transparent);
     left: 50%;
-    top: 0;
-    transform: translateX(-50%);
+    top: 50%;
+    transform: translateY(-50%);
     animation: verticalScan 15s linear infinite;
     z-index: 1;
-    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+    box-shadow: 0 0 20px rgba(196, 92, 242, 0.5);
     pointer-events: none;
     opacity: 0.5;
   }
 
-  // Add glow effects
+  // Add glow effects with neon blue
   .glow-1 {
     position: absolute;
     width: 300px;
     height: 300px;
-    background: rgba(0, 255, 255, 0.1);
+    background: rgba(30, 144, 255, 0.12); // Changed to neon blue
     border-radius: 50%;
     filter: blur(70px);
-    top: 10%;
+    top: -100px;
     left: 10%;
     z-index: 0;
     animation: pulsate 8s ease-in-out infinite alternate;
@@ -114,13 +112,28 @@
     position: absolute;
     width: 300px;
     height: 300px;
-    background: rgba(255, 0, 255, 0.1);
+    background: rgba(196, 92, 242, 0.12);
     border-radius: 50%;
     filter: blur(80px);
-    bottom: 10%;
+    bottom: -100px;
     right: 10%;
     z-index: 0;
     animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    pointer-events: none;
+  }
+
+  // Add a green glow element to match swap page
+  .glow-3 {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba(0, 255, 128, 0.12);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 60%;
+    left: 70%;
+    z-index: 0;
+    animation: pulsate 9s ease-in-out infinite;
     pointer-events: none;
   }
 
@@ -142,8 +155,9 @@
       border-bottom: 1px solid;
       border-image: linear-gradient(
           90deg,
-          rgba(0, 255, 255, 0.2),
-          rgba(255, 0, 255, 0.2)
+          rgba(30, 144, 255, 0.2),
+          // Changed to neon blue
+          rgba(196, 92, 242, 0.2)
         )
         1;
 
@@ -155,8 +169,9 @@
         border-right: 1px solid;
         border-image: linear-gradient(
             180deg,
-            rgba(0, 255, 255, 0.2),
-            rgba(255, 0, 255, 0.2)
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
           )
           1;
 
@@ -166,12 +181,18 @@
           justify-content: space-between;
           align-items: center;
           padding: 0 16px;
-          background-color: $panel-header;
+          background-color: rgba(
+            2,
+            2,
+            2,
+            0.8
+          ); /* Darker background to match Swap */
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
           height: 50px; /* Increased height to accommodate all content */
@@ -202,12 +223,16 @@
               font-weight: 600;
               margin-right: 12px;
               white-space: nowrap;
-              background: linear-gradient(90deg, #00ffff, #ff00ff);
+              background: linear-gradient(
+                90deg,
+                #1e90ff,
+                #c45cf2
+              ); // Changed to neon blue
               -webkit-background-clip: text;
               background-clip: text;
               -webkit-text-fill-color: transparent;
               color: transparent;
-              text-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
+              text-shadow: 0 0 8px rgba(30, 144, 255, 0.2); // Changed to neon blue
             }
 
             .pair-price {
@@ -226,13 +251,13 @@
               white-space: nowrap;
 
               &.positive {
-                color: $positive-color;
-                text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+                color: #1ed760; /* Positive color */
+                text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
               }
 
               &.negative {
-                color: $negative-color;
-                text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+                color: #ff4444; /* Negative color */
+                text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
               }
             }
 
@@ -250,14 +275,14 @@
 
                 .stat-label {
                   font-size: 12px;
-                  color: rgba(255, 255, 255, 0.6);
+                  color: #b1a5c8; /* Text-secondary color */
                   margin-right: 6px;
                 }
 
                 .stat-value {
                   font-family: "Orbitron", monospace;
                   font-size: 14px;
-                  color: rgba(255, 255, 255, 0.9);
+                  color: #ffffff;
                 }
               }
             }
@@ -270,17 +295,22 @@
 
             .chart-label {
               font-size: 14px;
-              color: $accent-color;
+              color: #1e90ff; // Changed to neon blue
               padding: 4px 10px;
               border-radius: 8px;
-              background-color: rgba(0, 255, 255, 0.1);
-              border: 1px solid rgba(0, 255, 255, 0.3);
+              background-color: rgba(30, 144, 255, 0.1); // Changed to neon blue
+              border: 1px solid rgba(30, 144, 255, 0.3); // Changed to neon blue
               white-space: nowrap;
               transition: all 0.3s ease;
 
               &:hover {
-                background-color: rgba(0, 255, 255, 0.2);
-                box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+                background-color: rgba(
+                  30,
+                  144,
+                  255,
+                  0.2
+                ); // Changed to neon blue
+                box-shadow: 0 0 10px rgba(30, 144, 255, 0.3); // Changed to neon blue
               }
             }
           }
@@ -291,12 +321,13 @@
           display: none; /* Hidden by default, shown in media query */
           flex-wrap: wrap;
           padding: 8px 16px;
-          background-color: rgba(0, 0, 0, 0.2);
+          background-color: rgba(2, 2, 2, 0.7); /* Darker background */
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
 
@@ -308,21 +339,21 @@
 
             .stat-label {
               font-size: 12px;
-              color: rgba(255, 255, 255, 0.6);
+              color: #b1a5c8; /* Text-secondary color */
               margin-right: 6px;
             }
 
             .stat-value {
               font-family: "Orbitron", monospace;
               font-size: 14px;
-              color: rgba(255, 255, 255, 0.9);
+              color: #ffffff;
             }
           }
         }
 
         .chart-container {
           flex: 1;
-          background-color: $panel-bg;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
           position: relative;
           overflow: hidden;
           backdrop-filter: blur(12px);
@@ -339,8 +370,9 @@
         border: 1px solid transparent;
         border-image: linear-gradient(
             45deg,
-            rgba(0, 255, 255, 0.2),
-            rgba(255, 0, 255, 0.2)
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
           )
           1;
         border-top: none;
@@ -352,13 +384,14 @@
           justify-content: space-between;
           align-items: center;
           padding: 0 16px;
-          background-color: $panel-header;
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
           height: 50px; /* Match height with pair-header */
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
           flex-shrink: 0;
@@ -368,7 +401,11 @@
           .panel-title {
             font-size: 15px;
             font-weight: 500;
-            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            background: linear-gradient(
+              90deg,
+              #1e90ff,
+              #c45cf2
+            ); // Changed to neon blue
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -377,7 +414,7 @@
 
           .refresh-btn {
             background: transparent;
-            color: #8a8a8a;
+            color: #b1a5c8; /* Text-secondary color */
             border: none;
             font-size: 14px;
             cursor: pointer;
@@ -391,8 +428,8 @@
             transition: all 0.3s ease;
 
             &:hover {
-              color: $accent-color;
-              background: rgba(0, 255, 255, 0.1);
+              color: #1e90ff; // Changed to neon blue
+              background: rgba(30, 144, 255, 0.1); // Changed to neon blue
               transform: rotate(180deg);
             }
 
@@ -406,7 +443,7 @@
         .panel-content {
           flex: 1;
           overflow: auto;
-          background-color: $panel-bg;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
 
@@ -415,15 +452,16 @@
             border-bottom: 1px solid;
             border-image: linear-gradient(
                 90deg,
-                rgba(0, 255, 255, 0.2),
-                rgba(255, 0, 255, 0.2)
+                rgba(30, 144, 255, 0.2),
+                // Changed to neon blue
+                rgba(196, 92, 242, 0.2)
               )
               1;
 
             .search-input {
               width: 100%;
-              background-color: rgba(0, 0, 0, 0.2);
-              border: 1px solid rgba(0, 255, 255, 0.1);
+              background-color: rgba(2, 2, 2, 0.3); /* Darker background */
+              border: 1px solid rgba(30, 144, 255, 0.1); // Changed to neon blue
               color: #ffffff;
               padding: 8px 12px;
               font-size: 13px;
@@ -435,16 +473,19 @@
                 border: 1px solid;
                 border-image: linear-gradient(
                     45deg,
-                    rgba(0, 255, 255, 0.5),
-                    rgba(255, 0, 255, 0.5)
+                    rgba(30, 144, 255, 0.5),
+                    // Changed to neon blue
+                    rgba(196, 92, 242, 0.5)
                   )
                   1;
-                box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
-                  0 0 10px rgba(255, 0, 255, 0.2);
+                box-shadow: 0 0 10px rgba(30, 144, 255, 0.2),
+                  // Changed to neon blue
+                  0 0 10px rgba(196, 92, 242, 0.2);
               }
 
               &::placeholder {
-                color: #8a8a8a;
+                color: #b1a5c8;
+                opacity: 0.6;
               }
             }
           }
@@ -460,8 +501,10 @@
           &::-webkit-scrollbar-thumb {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.3),
-              rgba(255, 0, 255, 0.3)
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
             );
             border-radius: 3px;
           }
@@ -469,8 +512,10 @@
           &::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.5),
-              rgba(255, 0, 255, 0.5)
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
             );
           }
         }
@@ -494,20 +539,22 @@
         border-right: 1px solid;
         border-image: linear-gradient(
             180deg,
-            rgba(0, 255, 255, 0.2),
-            rgba(255, 0, 255, 0.2)
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
           )
           1;
 
         .panel-header {
-          background-color: $panel-header;
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
           padding: 0;
           height: 40px;
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
           flex-shrink: 0;
@@ -521,7 +568,7 @@
             .tab-btn {
               background-color: transparent;
               border: none;
-              color: #8a8a8a;
+              color: #b1a5c8; /* Text-secondary color */
               font-size: 14px;
               padding: 0 16px;
               height: 100%;
@@ -532,11 +579,12 @@
               &.active {
                 background: linear-gradient(
                   45deg,
-                  rgba(0, 255, 255, 0.2),
-                  rgba(255, 0, 255, 0.2)
+                  rgba(30, 144, 255, 0.2),
+                  // Changed to neon blue
+                  rgba(196, 92, 242, 0.2)
                 );
                 color: #ffffff;
-                text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+                text-shadow: 0 0 10px rgba(30, 144, 255, 0.5); // Changed to neon blue
 
                 &::after {
                   content: "";
@@ -545,15 +593,20 @@
                   left: 0;
                   width: 100%;
                   height: 2px;
-                  background: linear-gradient(90deg, #00ffff, #ff00ff);
-                  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
-                    0 0 10px rgba(255, 0, 255, 0.5);
+                  background: linear-gradient(
+                    90deg,
+                    #1e90ff,
+                    #c45cf2
+                  ); // Changed to neon blue
+                  box-shadow: 0 0 10px rgba(30, 144, 255, 0.5),
+                    // Changed to neon blue
+                    0 0 10px rgba(196, 92, 242, 0.5);
                 }
               }
 
               &:hover:not(.active) {
                 color: #ffffff;
-                background: rgba(255, 255, 255, 0.05);
+                background-color: rgba(255, 255, 255, 0.05);
               }
             }
           }
@@ -562,7 +615,7 @@
         .panel-content {
           flex: 1;
           overflow: auto;
-          background-color: $panel-bg;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
 
@@ -577,8 +630,10 @@
           &::-webkit-scrollbar-thumb {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.3),
-              rgba(255, 0, 255, 0.3)
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
             );
             border-radius: 3px;
           }
@@ -586,8 +641,10 @@
           &::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.5),
-              rgba(255, 0, 255, 0.5)
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
             );
           }
         }
@@ -602,20 +659,22 @@
         border-right: 1px solid;
         border-image: linear-gradient(
             180deg,
-            rgba(0, 255, 255, 0.2),
-            rgba(255, 0, 255, 0.2)
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
           )
           1;
 
         .panel-header {
-          background-color: $panel-header;
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
           padding: 0 16px;
           height: 40px;
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
           flex-shrink: 0;
@@ -627,7 +686,11 @@
           .panel-title {
             font-size: 15px;
             font-weight: 500;
-            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            background: linear-gradient(
+              90deg,
+              #1e90ff,
+              #c45cf2
+            ); // Changed to neon blue
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -638,7 +701,7 @@
         .panel-content {
           flex: 1;
           overflow: auto;
-          background-color: $panel-bg;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
 
@@ -653,8 +716,10 @@
           &::-webkit-scrollbar-thumb {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.3),
-              rgba(255, 0, 255, 0.3)
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
             );
             border-radius: 3px;
           }
@@ -662,8 +727,10 @@
           &::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.5),
-              rgba(255, 0, 255, 0.5)
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
             );
           }
         }
@@ -681,13 +748,14 @@
           justify-content: space-between;
           align-items: center;
           padding: 0 16px;
-          background-color: $panel-header;
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
           height: 40px;
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
           flex-shrink: 0;
@@ -697,7 +765,11 @@
           .panel-title {
             font-size: 15px;
             font-weight: 500;
-            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            background: linear-gradient(
+              90deg,
+              #1e90ff,
+              #c45cf2
+            ); // Changed to neon blue
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -708,7 +780,7 @@
         .panel-content {
           flex: 1;
           overflow: auto;
-          background-color: $panel-bg;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
 
@@ -723,8 +795,10 @@
           &::-webkit-scrollbar-thumb {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.3),
-              rgba(255, 0, 255, 0.3)
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
             );
             border-radius: 3px;
           }
@@ -732,8 +806,10 @@
           &::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(
               180deg,
-              rgba(0, 255, 255, 0.5),
-              rgba(255, 0, 255, 0.5)
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
             );
           }
         }
@@ -746,16 +822,16 @@
     bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(255, 59, 48, 0.1);
-    border: 1px solid rgba(255, 59, 48, 0.3);
-    color: $negative-color;
+    background: rgba(255, 68, 68, 0.1);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    color: #ff4444; /* Error red */
     padding: 12px 20px;
     border-radius: 8px;
     font-size: 14px;
     max-width: 80%;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 0 15px rgba(255, 59, 48, 0.2);
+    box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
     animation: fadeIn 0.3s ease-in-out;
     z-index: 100;
   }
@@ -781,15 +857,16 @@
     border-bottom: 1px solid;
     border-image: linear-gradient(
         90deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
+        rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.2)
       )
       1;
 
     .search-input {
       width: 100%;
-      background-color: rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(0, 255, 255, 0.1);
+      background-color: rgba(2, 2, 2, 0.3); /* Darker background */
+      border: 1px solid rgba(30, 144, 255, 0.1); // Changed to neon blue
       color: #ffffff;
       padding: 8px 12px;
       font-size: 13px;
@@ -801,16 +878,19 @@
         border: 1px solid;
         border-image: linear-gradient(
             45deg,
-            rgba(0, 255, 255, 0.5),
-            rgba(255, 0, 255, 0.5)
+            rgba(30, 144, 255, 0.5),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.5)
           )
           1;
-        box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
-          0 0 10px rgba(255, 0, 255, 0.2);
+        box-shadow: 0 0 10px rgba(30, 144, 255, 0.2),
+          // Changed to neon blue
+          0 0 10px rgba(196, 92, 242, 0.2);
       }
 
       &::placeholder {
-        color: #8a8a8a;
+        color: #b1a5c8;
+        opacity: 0.6;
       }
     }
   }
@@ -826,13 +906,14 @@
       padding: 8px 16px;
       font-size: 13px;
       font-weight: 500;
-      color: rgba(255, 255, 255, 0.6);
-      background-color: rgba(0, 0, 0, 0.2);
+      color: #b1a5c8; /* Text-secondary color */
+      background-color: rgba(2, 2, 2, 0.4); /* Darker background */
       border-bottom: 1px solid;
       border-image: linear-gradient(
           90deg,
-          rgba(0, 255, 255, 0.2),
-          rgba(255, 0, 255, 0.2)
+          rgba(30, 144, 255, 0.2),
+          // Changed to neon blue
+          rgba(196, 92, 242, 0.2)
         )
         1;
 
@@ -871,8 +952,10 @@
     &::-webkit-scrollbar-thumb {
       background: linear-gradient(
         180deg,
-        rgba(0, 255, 255, 0.3),
-        rgba(255, 0, 255, 0.3)
+        rgba(30, 144, 255, 0.3),
+        // Changed to neon blue
+        rgba(0, 255, 128, 0.2),
+        rgba(196, 92, 242, 0.3)
       );
       border-radius: 3px;
     }
@@ -880,15 +963,17 @@
     &::-webkit-scrollbar-thumb:hover {
       background: linear-gradient(
         180deg,
-        rgba(0, 255, 255, 0.5),
-        rgba(255, 0, 255, 0.5)
+        rgba(30, 144, 255, 0.5),
+        // Changed to neon blue
+        rgba(0, 255, 128, 0.3),
+        rgba(196, 92, 242, 0.5)
       );
     }
 
     .no-pairs-found {
       padding: 20px;
       text-align: center;
-      color: rgba(255, 255, 255, 0.5);
+      color: #b1a5c8; /* Text-secondary color */
       font-style: italic;
     }
   }
@@ -902,8 +987,9 @@
   border-bottom: 1px solid;
   border-image: linear-gradient(
       90deg,
-      rgba(0, 255, 255, 0.1),
-      rgba(255, 0, 255, 0.1)
+      rgba(30, 144, 255, 0.1),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.1)
     )
     1;
   cursor: pointer;
@@ -915,12 +1001,13 @@
   }
 
   &.selected {
-    background: rgba(0, 255, 255, 0.05);
+    background: rgba(30, 144, 255, 0.05); // Changed to neon blue
     border-left: 2px solid;
     border-image: linear-gradient(
         180deg,
-        rgba(0, 255, 255, 0.5),
-        rgba(255, 0, 255, 0.5)
+        rgba(30, 144, 255, 0.5),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.5)
       )
       1 0 1 1;
   }
@@ -935,8 +1022,9 @@
       height: 24px;
       border-radius: 50%;
       margin-right: 8px;
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
-        0 0 10px rgba(255, 0, 255, 0.2);
+      box-shadow: 0 0 10px rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        0 0 10px rgba(196, 92, 242, 0.2);
     }
 
     .token-placeholder {
@@ -945,8 +1033,9 @@
       border-radius: 50%;
       background: linear-gradient(
         45deg,
-        rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
+        rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.2)
       );
       margin-right: 8px;
     }
@@ -978,13 +1067,13 @@
       font-weight: 600;
 
       &.positive {
-        color: #4caf50;
-        text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+        color: #1ed760;
+        text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
       }
 
       &.negative {
-        color: #ff3b30;
-        text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+        color: #ff4444;
+        text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
       }
     }
   }
@@ -1005,19 +1094,20 @@
 
     &:hover {
       background-color: rgba(255, 255, 255, 0.03);
+      transform: translateY(-1px);
     }
 
     .price {
       width: 100px;
 
       &.buy {
-        color: #4caf50;
-        text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+        color: #1ed760;
+        text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
       }
 
       &.sell {
-        color: #ff3b30;
-        text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+        color: #ff4444;
+        text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
       }
     }
 
@@ -1029,7 +1119,7 @@
     .time {
       width: 80px;
       text-align: right;
-      color: #8a8a8a;
+      color: #b1a5c8; /* Text-secondary color */
     }
   }
 }
@@ -1045,36 +1135,37 @@
   text-align: center;
   transition: all 0.3s ease;
   cursor: pointer;
+  letter-spacing: 0.5px;
 
   &--primary {
-    background: linear-gradient(45deg, #00ffff, #ff00ff);
+    background: linear-gradient(
+      45deg,
+      #1e90ff,
+      #c45cf2
+    ); // Changed to neon blue
     color: #000;
     border: none;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 20px rgba(255, 0, 255, 0.3);
+    box-shadow: 0 0 20px rgba(30, 144, 255, 0.3),
+      // Changed to neon blue
+      0 0 20px rgba(196, 92, 242, 0.3);
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 5px 25px rgba(0, 255, 255, 0.4),
-        0 5px 25px rgba(255, 0, 255, 0.4);
+      box-shadow: 0 5px 25px rgba(30, 144, 255, 0.4),
+        // Changed to neon blue
+        0 5px 25px rgba(196, 92, 242, 0.4);
     }
   }
 
   &--secondary {
-    background: rgba(0, 0, 0, 0.3);
-    border: 2px solid;
-    border-image: linear-gradient(
-        45deg,
-        rgba(0, 255, 255, 0.6),
-        rgba(255, 0, 255, 0.6)
-      )
-      1;
+    background: rgba(2, 2, 2, 0.3);
+    border: 1px solid #00ff80; /* Green from swap page */
     color: #fff;
 
     &:hover {
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(2, 2, 2, 0.5);
       transform: translateY(-2px);
-      box-shadow: 0 5px 25px rgba(0, 255, 255, 0.2),
-        0 5px 25px rgba(255, 0, 255, 0.2);
+      box-shadow: 0 5px 25px rgba(0, 255, 128, 0.2);
     }
   }
 }
@@ -1120,8 +1211,9 @@
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
 
@@ -1160,8 +1252,9 @@
           border-bottom: 1px solid;
           border-image: linear-gradient(
               90deg,
-              rgba(0, 255, 255, 0.2),
-              rgba(255, 0, 255, 0.2)
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
             )
             1;
 
@@ -1245,19 +1338,19 @@
 /* Animations */
 @keyframes horizonScan {
   0% {
-    transform: translateX(-150vw) translateY(-50%);
+    transform: translateX(-150vw);
   }
   100% {
-    transform: translateX(150vw) translateY(-50%);
+    transform: translateX(150vw);
   }
 }
 
 @keyframes verticalScan {
   0% {
-    transform: translateX(-50%) translateY(-150vh);
+    transform: translateY(-150vh);
   }
   100% {
-    transform: translateX(-50%) translateY(150vh);
+    transform: translateY(150vh);
   }
 }
 

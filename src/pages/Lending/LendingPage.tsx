@@ -1,5 +1,5 @@
 // src/pages/Lending/LendingPage.tsx
-// Last Updated: 2025-07-24 01:58:33 UTC by jake1318
+// Last Updated: 2025-07-24 06:10:35 UTC by jake1318
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { ScallopService } from "../../scallop/ScallopService";
@@ -1792,7 +1792,7 @@ const LendingPage: React.FC = () => {
           </div>
         )}
 
-        {/* Collateral Assets - MODIFIED to open CollateralManagementModal when manage button is clicked */}
+        {/* Collateral Assets - MODIFIED with improved styling */}
         {userCollateral.length > 0 && (
           <div className="position-section">
             <h4>Your Collateral Assets</h4>
@@ -1800,6 +1800,7 @@ const LendingPage: React.FC = () => {
               <div className="position-header">
                 <div className="position-asset">Asset</div>
                 <div className="position-balance">Balance</div>
+                <div></div> {/* Empty column for spacing */}
                 <div className="position-actions">Actions</div>
               </div>
 
@@ -1816,7 +1817,6 @@ const LendingPage: React.FC = () => {
                     />
                     <span>{asset.symbol}</span>
                   </div>
-
                   <div className="position-balance">
                     <div className="balance-amount">
                       {formatNumber(asset.amount, 6)} {asset.symbol}
@@ -1825,7 +1825,7 @@ const LendingPage: React.FC = () => {
                       ${formatNumber(asset.valueUSD, 2)}
                     </div>
                   </div>
-
+                  <div></div> {/* Empty column for spacing */}
                   <div className="position-actions">
                     <button
                       className="action-button manage-collateral"
@@ -2837,7 +2837,9 @@ const LendingPage: React.FC = () => {
       )}
 
       {/* Last updated timestamp */}
-      <div className="last-updated"></div>
+      <div className="last-updated">
+        Last updated: 2025-07-24 06:44:28 UTC by jake1318
+      </div>
     </div>
   );
 };

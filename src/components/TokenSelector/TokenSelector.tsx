@@ -1,5 +1,5 @@
 // src/components/TokenSelector/TokenSelector.tsx
-// Last Updated: 2025-05-16 21:40:19 UTC by jake1318
+// Last Updated: 2025-07-13 18:43:58 UTC by jake1318
 
 import React, {
   useState,
@@ -18,6 +18,22 @@ import { getTokenMetadata } from "../../services/birdeyeService";
 import { getTokenDetailsFromCoingecko } from "../../services/coinGeckoService";
 import { FixedSizeList as List } from "react-window";
 import "./TokenSelector.scss";
+
+// Define SUI address constants to use consistently across the codebase
+const FULL_SUI_ADDRESS =
+  "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+const SHORT_SUI_ADDRESS = "0x2::sui::SUI";
+
+// Function to normalize addresses (especially SUI)
+const normalizeAddress = (address: string): string => {
+  if (!address) return address;
+
+  // If this is the abbreviated SUI address, replace with full version
+  if (address === SHORT_SUI_ADDRESS) {
+    return FULL_SUI_ADDRESS;
+  }
+  return address;
+};
 
 // Using existing token metadata cache from birdeyeService.ts
 // We don't need to redefine it here since it's maintained in the service
@@ -111,6 +127,9 @@ export default function TokenSelector({
 
   // Format token address for display
   const formatTokenAddress = (address: string, symbol: string): string => {
+    // First normalize the address (especially for SUI)
+    address = normalizeAddress(address);
+
     const parts = address.split("::");
     // If we have a complete address with ::, show first part + symbol
     if (parts.length >= 3) {
@@ -152,6 +171,9 @@ export default function TokenSelector({
   const fetchTokenLogo = async (
     tokenAddress: string
   ): Promise<string | null> => {
+    // Normalize the address first
+    tokenAddress = normalizeAddress(tokenAddress);
+
     // Skip if we're already fetching this token or have it in cache
     if (
       pendingLogoFetches.has(tokenAddress) ||
@@ -237,6 +259,9 @@ export default function TokenSelector({
 
   // Get logo URL with fallbacks - prioritizing BirdEye
   const getTokenLogo = (token: { address: string; logo?: string }): string => {
+    // Normalize the address first
+    const normalizedAddress = normalizeAddress(token.address);
+
     // Try primary sources first
     if (
       token.logo &&
@@ -247,19 +272,19 @@ export default function TokenSelector({
     }
 
     // Then try BirdEye first (changed order)
-    const birdeyeLogo = tokenLogoCache[token.address];
+    const birdeyeLogo = tokenLogoCache[normalizedAddress];
     if (birdeyeLogo && !failedLogoUrls.has(birdeyeLogo)) {
       return birdeyeLogo;
     }
 
     // Then our cached fallback logos
-    const fbLogo = fallbackLogos[token.address];
+    const fbLogo = fallbackLogos[normalizedAddress];
     if (fbLogo && !failedLogoUrls.has(fbLogo)) {
       return fbLogo;
     }
 
     // Then CoinGecko (if not IPFS)
-    const cgLogo = coingeckoLogoCache[token.address];
+    const cgLogo = coingeckoLogoCache[normalizedAddress];
     if (cgLogo && !failedLogoUrls.has(cgLogo) && !isIPFSUrl(cgLogo)) {
       return cgLogo;
     }
@@ -274,19 +299,22 @@ export default function TokenSelector({
   const walletTokens = useMemo<TokenData[]>(
     () =>
       walletState.balances.map((b) => {
-        const logoFromMetadata = tokenMetadata[b.coinType]?.logo;
+        // Normalize the address
+        const normalizedCoinType = normalizeAddress(b.coinType);
+
+        const logoFromMetadata = tokenMetadata[normalizedCoinType]?.logo;
         // Changed order to prioritize BirdEye
         const logoFromFallback =
-          tokenLogoCache[b.coinType] &&
-          !failedLogoUrls.has(tokenLogoCache[b.coinType])
-            ? tokenLogoCache[b.coinType]
-            : fallbackLogos[b.coinType] &&
-              !failedLogoUrls.has(fallbackLogos[b.coinType])
-            ? fallbackLogos[b.coinType]
-            : coingeckoLogoCache[b.coinType] &&
-              !failedLogoUrls.has(coingeckoLogoCache[b.coinType]) &&
-              !isIPFSUrl(coingeckoLogoCache[b.coinType])
-            ? coingeckoLogoCache[b.coinType]
+          tokenLogoCache[normalizedCoinType] &&
+          !failedLogoUrls.has(tokenLogoCache[normalizedCoinType])
+            ? tokenLogoCache[normalizedCoinType]
+            : fallbackLogos[normalizedCoinType] &&
+              !failedLogoUrls.has(fallbackLogos[normalizedCoinType])
+            ? fallbackLogos[normalizedCoinType]
+            : coingeckoLogoCache[normalizedCoinType] &&
+              !failedLogoUrls.has(coingeckoLogoCache[normalizedCoinType]) &&
+              !isIPFSUrl(coingeckoLogoCache[normalizedCoinType])
+            ? coingeckoLogoCache[normalizedCoinType]
             : null;
 
         const logo =
@@ -297,14 +325,14 @@ export default function TokenSelector({
             : DEFAULT_ICON;
 
         return {
-          address: b.coinType,
+          address: normalizedCoinType,
           symbol: b.symbol,
           name: b.name,
           logo,
           decimals: b.decimals,
-          price: tokenMetadata[b.coinType]?.price || 0,
+          price: tokenMetadata[normalizedCoinType]?.price || 0,
           balance: Number(b.balance) / 10 ** b.decimals,
-          shortAddress: formatTokenAddress(b.coinType, b.symbol),
+          shortAddress: formatTokenAddress(normalizedCoinType, b.symbol),
         };
       }),
     [
@@ -318,24 +346,29 @@ export default function TokenSelector({
 
   // helper: turn a Birdeye TokenData into our TokenData
   const fromBirdeye = (t: BirdToken): TokenData => {
-    const onChain = walletState.balances.find((b) => b.coinType === t.address);
+    // Normalize the address
+    const normalizedAddress = normalizeAddress(t.address);
+
+    const onChain = walletState.balances.find(
+      (b) => normalizeAddress(b.coinType) === normalizedAddress
+    );
 
     // Logo resolution with validation - prioritizing BirdEye
     let logoUrl = t.logo;
 
     if (!logoUrl || logoUrl === DEFAULT_ICON || failedLogoUrls.has(logoUrl)) {
       // Try BirdEye first
-      const beLogo = tokenLogoCache[t.address];
+      const beLogo = tokenLogoCache[normalizedAddress];
       if (beLogo && !failedLogoUrls.has(beLogo)) {
         logoUrl = beLogo;
       } else {
         // Then fallbacks
-        const fbLogo = fallbackLogos[t.address];
+        const fbLogo = fallbackLogos[normalizedAddress];
         if (fbLogo && !failedLogoUrls.has(fbLogo)) {
           logoUrl = fbLogo;
         } else {
           // Then CoinGecko (if not IPFS)
-          const cgLogo = coingeckoLogoCache[t.address];
+          const cgLogo = coingeckoLogoCache[normalizedAddress];
           if (cgLogo && !failedLogoUrls.has(cgLogo) && !isIPFSUrl(cgLogo)) {
             logoUrl = cgLogo;
           }
@@ -349,14 +382,14 @@ export default function TokenSelector({
     }
 
     return {
-      address: t.address,
+      address: normalizedAddress,
       symbol: t.symbol,
       name: t.name,
       logo: logoUrl,
       decimals: t.decimals,
       price: t.price,
       balance: onChain ? Number(onChain.balance) / 10 ** onChain.decimals : 0,
-      shortAddress: formatTokenAddress(t.address, t.symbol),
+      shortAddress: formatTokenAddress(normalizedAddress, t.symbol),
       isTrending: t.isTrending,
     };
   };
@@ -368,12 +401,16 @@ export default function TokenSelector({
     walletTokens.forEach((t) => map.set(t.address, t));
     // then full tokenList
     tokenList.forEach((t) => {
-      if (!map.has(t.address)) map.set(t.address, fromBirdeye(t));
+      const normalizedAddress = normalizeAddress(t.address);
+      if (!map.has(normalizedAddress))
+        map.set(normalizedAddress, fromBirdeye(t));
     });
     // finally flag trending
     trendingTokens.forEach((t) => {
-      if (!map.has(t.address)) map.set(t.address, fromBirdeye(t));
-      else map.get(t.address)!.isTrending = true;
+      const normalizedAddress = normalizeAddress(t.address);
+      if (!map.has(normalizedAddress))
+        map.set(normalizedAddress, fromBirdeye(t));
+      else map.get(normalizedAddress)!.isTrending = true;
     });
     return Array.from(map.values());
   }, [
@@ -389,7 +426,12 @@ export default function TokenSelector({
   const filtered = useMemo(
     () =>
       merged.filter((t) => {
-        if (excludeAddresses.includes(t.address)) return false;
+        // Normalize excluded addresses
+        const normalizedExcludeAddresses =
+          excludeAddresses.map(normalizeAddress);
+        if (normalizedExcludeAddresses.includes(normalizeAddress(t.address)))
+          return false;
+
         const q = searchQuery.toLowerCase().trim();
         if (!q) return true;
         return (
@@ -462,19 +504,25 @@ export default function TokenSelector({
         return [];
       case "wallet":
         return smartSortTokens(
-          walletTokens.filter((t) => !excludeAddresses.includes(t.address))
+          walletTokens.filter(
+            (t) => !excludeAddresses.includes(normalizeAddress(t.address))
+          )
         );
       case "trending":
         // Show wallet tokens + trending (without duplicates)
         const walletsForDisplay = walletTokens.filter(
-          (t) => !excludeAddresses.includes(t.address)
+          (t) => !excludeAddresses.includes(normalizeAddress(t.address))
         );
         const trendingForDisplay = trendingTokens
-          .filter(
-            (t) =>
-              !excludeAddresses.includes(t.address) &&
-              !walletTokens.some((w) => w.address === t.address)
-          )
+          .filter((t) => {
+            const normalizedAddress = normalizeAddress(t.address);
+            return (
+              !excludeAddresses.includes(normalizedAddress) &&
+              !walletTokens.some(
+                (w) => normalizeAddress(w.address) === normalizedAddress
+              )
+            );
+          })
           .map(fromBirdeye);
         return smartSortTokens([...walletsForDisplay, ...trendingForDisplay]);
       case "all":
@@ -496,25 +544,27 @@ export default function TokenSelector({
   // Batch fetch missing logos for tokens - with BirdEye prioritized
   const fetchMissingLogos = useCallback(
     async (tokens: TokenData[]) => {
-      const tokensNeedingLogos = tokens.filter(
-        (token) =>
+      const tokensNeedingLogos = tokens.filter((token) => {
+        const normalizedAddress = normalizeAddress(token.address);
+        return (
           (!token.logo ||
             token.logo === DEFAULT_ICON ||
             failedLogoUrls.has(token.logo)) &&
           !(
-            tokenLogoCache[token.address] &&
-            !failedLogoUrls.has(tokenLogoCache[token.address])
+            tokenLogoCache[normalizedAddress] &&
+            !failedLogoUrls.has(tokenLogoCache[normalizedAddress])
           ) &&
           !(
-            fallbackLogos[token.address] &&
-            !failedLogoUrls.has(fallbackLogos[token.address])
+            fallbackLogos[normalizedAddress] &&
+            !failedLogoUrls.has(fallbackLogos[normalizedAddress])
           ) &&
           !(
-            coingeckoLogoCache[token.address] &&
-            !failedLogoUrls.has(coingeckoLogoCache[token.address])
+            coingeckoLogoCache[normalizedAddress] &&
+            !failedLogoUrls.has(coingeckoLogoCache[normalizedAddress])
           ) &&
-          !pendingLogoFetches.has(token.address)
-      );
+          !pendingLogoFetches.has(normalizedAddress)
+        );
+      });
 
       if (tokensNeedingLogos.length === 0) return;
 
@@ -523,7 +573,9 @@ export default function TokenSelector({
       // Add all tokens to pending set
       setPendingLogoFetches((prev) => {
         const newSet = new Set([...prev]);
-        tokensNeedingLogos.forEach((token) => newSet.add(token.address));
+        tokensNeedingLogos.forEach((token) =>
+          newSet.add(normalizeAddress(token.address))
+        );
         return newSet;
       });
 
@@ -538,26 +590,28 @@ export default function TokenSelector({
         await Promise.all(
           batch.map(async (token) => {
             try {
+              const normalizedAddress = normalizeAddress(token.address);
+
               // Try BirdEye first (changed order)
-              const metadata = await getTokenMetadata(token.address);
+              const metadata = await getTokenMetadata(normalizedAddress);
               if (metadata?.logo_uri) {
                 const validatedUrl = validateLogoUrl(metadata.logo_uri);
                 if (validatedUrl !== DEFAULT_ICON) {
-                  newLogos[token.address] = validatedUrl;
-                  tokenLogoCache[token.address] = validatedUrl;
+                  newLogos[normalizedAddress] = validatedUrl;
+                  tokenLogoCache[normalizedAddress] = validatedUrl;
                   return; // If successful, don't try CoinGecko
                 }
               }
 
               // If BirdEye failed, try CoinGecko but avoid IPFS URLs
               const cgDetails = await getTokenDetailsFromCoingecko(
-                token.address
+                normalizedAddress
               );
               if (cgDetails?.image_url && !isIPFSUrl(cgDetails.image_url)) {
                 const validatedUrl = validateLogoUrl(cgDetails.image_url);
                 if (validatedUrl !== DEFAULT_ICON) {
-                  newLogos[token.address] = validatedUrl;
-                  coingeckoLogoCache[token.address] = validatedUrl;
+                  newLogos[normalizedAddress] = validatedUrl;
+                  coingeckoLogoCache[normalizedAddress] = validatedUrl;
                 }
               }
             } catch (err) {
@@ -578,14 +632,16 @@ export default function TokenSelector({
       // Remove all processed tokens from pending set
       setPendingLogoFetches((prev) => {
         const newSet = new Set([...prev]);
-        tokensNeedingLogos.forEach((token) => newSet.delete(token.address));
+        tokensNeedingLogos.forEach((token) =>
+          newSet.delete(normalizeAddress(token.address))
+        );
         return newSet;
       });
     },
     [fallbackLogos, pendingLogoFetches, tokenLogoCache, coingeckoLogoCache]
   );
 
-  // Token item renderer for virtualization
+  // Token item renderer for virtualization - fixed to prevent flickering
   const TokenItem = ({
     index,
     style,
@@ -596,40 +652,48 @@ export default function TokenSelector({
     const token = tokensToDisplay[index];
     if (!token) return null;
 
-    // Get logo with fallbacks
-    const [logoUrl, setLogoUrl] = useState<string>(getTokenLogo(token));
+    // Get logo with fallbacks - but store it in a ref to prevent re-renders
+    const normalizedAddress = normalizeAddress(token.address);
+    const logoUrlRef = useRef<string>(getTokenLogo(token));
     const [imgFailed, setImgFailed] = useState(false);
 
-    // When image fails, track it and try to fetch from fallbacks if we haven't already
+    // IMPORTANT: Only try to fetch a logo once per component instance
+    const attemptedFetchRef = useRef<boolean>(false);
+
+    // When image fails, track it and try to fetch from fallbacks ONCE
     useEffect(() => {
-      if (imgFailed) {
-        if (logoUrl !== DEFAULT_ICON) {
+      if (imgFailed && !attemptedFetchRef.current) {
+        // Set the flag to prevent multiple attempts
+        attemptedFetchRef.current = true;
+
+        if (logoUrlRef.current !== DEFAULT_ICON) {
           // Add to failed URLs set
-          failedLogoUrls.add(logoUrl);
+          failedLogoUrls.add(logoUrlRef.current);
         }
 
+        // Only make a single attempt to fetch the logo
         if (
-          token.address &&
+          normalizedAddress &&
           !(
-            tokenLogoCache[token.address] &&
-            !failedLogoUrls.has(tokenLogoCache[token.address])
+            tokenLogoCache[normalizedAddress] &&
+            !failedLogoUrls.has(tokenLogoCache[normalizedAddress])
           ) &&
           !(
-            fallbackLogos[token.address] &&
-            !failedLogoUrls.has(fallbackLogos[token.address])
+            fallbackLogos[normalizedAddress] &&
+            !failedLogoUrls.has(fallbackLogos[normalizedAddress])
           ) &&
           !(
-            coingeckoLogoCache[token.address] &&
-            !failedLogoUrls.has(coingeckoLogoCache[token.address])
+            coingeckoLogoCache[normalizedAddress] &&
+            !failedLogoUrls.has(coingeckoLogoCache[normalizedAddress])
           ) &&
-          !pendingLogoFetches.has(token.address)
+          !pendingLogoFetches.has(normalizedAddress)
         ) {
-          fetchTokenLogo(token.address).then((logo) => {
-            if (logo) setLogoUrl(logo);
+          fetchTokenLogo(normalizedAddress).then((logo) => {
+            if (logo) logoUrlRef.current = logo;
           });
         }
       }
-    }, [imgFailed, token.address, logoUrl]);
+    }, [imgFailed, normalizedAddress]);
 
     return (
       <div style={style}>
@@ -637,7 +701,7 @@ export default function TokenSelector({
           className={`token-item${token.isTrending ? " trending" : ""}`}
           onClick={() => {
             // Include the better logo URL if we've found one
-            const bestLogo = getTokenLogo(token);
+            const bestLogo = logoUrlRef.current;
             onSelect({
               ...token,
               logo: bestLogo,
@@ -646,13 +710,15 @@ export default function TokenSelector({
         >
           <div className="token-info">
             <img
-              src={logoUrl}
+              src={logoUrlRef.current}
               alt={token.symbol}
               className="token-logo"
               onError={(e) => {
                 // If the logo fails, try default icon and trigger fetch
-                setImgFailed(true);
-                (e.target as HTMLImageElement).src = DEFAULT_ICON;
+                if (!imgFailed) {
+                  setImgFailed(true);
+                  (e.target as HTMLImageElement).src = DEFAULT_ICON;
+                }
               }}
             />
             <div className="token-details">
@@ -723,9 +789,12 @@ export default function TokenSelector({
     loadData();
   }, [isOpen, account?.address]);
 
-  // Fetch missing logos when tokens are displayed
+  // Fetch missing logos when tokens are displayed - but limit to initial load
+  const initialLoadRef = useRef<boolean>(false);
+
   useEffect(() => {
-    if (tokensToDisplay.length > 0) {
+    if (tokensToDisplay.length > 0 && !initialLoadRef.current) {
+      initialLoadRef.current = true;
       fetchMissingLogos(tokensToDisplay);
     }
   }, [tokensToDisplay, fetchMissingLogos]);
@@ -735,6 +804,9 @@ export default function TokenSelector({
   return (
     <div className="token-selector-modal">
       <div className="token-selector-content">
+        {/* Add green glow element for 25% green distribution */}
+        <div className="green-glow"></div>
+
         <header className="token-selector-header">
           <h2>Select Token</h2>
           <button onClick={onClose} className="close-button">

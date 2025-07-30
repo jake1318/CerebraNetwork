@@ -1,3 +1,6 @@
+/* Updated Search.tsx - removing YouTube URL address */
+/* Last Updated: 2025-07-13 23:08:58 UTC by jake1318 */
+
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import "./SearchPage.scss";
@@ -23,6 +26,8 @@ const Search: React.FC = () => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [maxScroll, setMaxScroll] = useState(0);
+  const [currentVideoSlide, setCurrentVideoSlide] = useState(0);
+  const [maxVideoSlides, setMaxVideoSlides] = useState(1);
 
   // For AI answer collapsible functionality
   const [aiExpanded, setAiExpanded] = useState(false);
@@ -70,9 +75,10 @@ const Search: React.FC = () => {
     }
   }, [results.aiAnswer]);
 
-  // Update scroll position indicator
+  // Update scroll position indicator for carousel
   useEffect(() => {
-    if (!carouselRef.current) return;
+    if (!carouselRef.current || !results.videos || !results.videos.length)
+      return;
 
     const updateScrollIndicator = () => {
       if (!carouselRef.current) return;
@@ -85,6 +91,18 @@ const Search: React.FC = () => {
       const scrollPercent =
         maxScrollValue === 0 ? 0 : (scrollLeft / maxScrollValue) * 100;
       setScrollPosition(scrollPercent);
+
+      // Calculate current slide
+      const cardWidth = 220; // card width + margin
+      const visibleCards = Math.floor(clientWidth / cardWidth);
+      const slidesCount = Math.ceil(results.videos.length / visibleCards);
+      setMaxVideoSlides(slidesCount);
+
+      const currentIndex = Math.min(
+        Math.floor(scrollLeft / (cardWidth * visibleCards)),
+        slidesCount - 1
+      );
+      setCurrentVideoSlide(currentIndex);
     };
 
     // Initial update
@@ -94,13 +112,15 @@ const Search: React.FC = () => {
     const carousel = carouselRef.current;
     carousel.addEventListener("scroll", updateScrollIndicator);
 
-    // Resize observer to recalculate when container dimensions change
-    const resizeObserver = new ResizeObserver(updateScrollIndicator);
-    resizeObserver.observe(carousel);
+    // Recalculate on window resize
+    const handleResize = () => {
+      updateScrollIndicator();
+    };
+    window.addEventListener("resize", handleResize);
 
     return () => {
       carousel.removeEventListener("scroll", updateScrollIndicator);
-      resizeObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
     };
   }, [results.videos]);
 
@@ -184,18 +204,40 @@ const Search: React.FC = () => {
 
   // Scroll carousel by a specific amount
   const scrollCarousel = (direction: "left" | "right") => {
-    if (carouselRef.current) {
-      const scrollAmount = 320; // Width of a card + margin
-      const currentScroll = carouselRef.current.scrollLeft;
+    if (!carouselRef.current) return;
 
-      carouselRef.current.scrollTo({
-        left:
-          direction === "left"
-            ? currentScroll - scrollAmount
-            : currentScroll + scrollAmount,
-        behavior: "smooth",
-      });
-    }
+    const containerWidth = carouselRef.current.clientWidth;
+    const currentScroll = carouselRef.current.scrollLeft;
+
+    carouselRef.current.scrollTo({
+      left:
+        direction === "left"
+          ? Math.max(0, currentScroll - containerWidth)
+          : currentScroll + containerWidth,
+      behavior: "smooth",
+    });
+
+    // Update current slide
+    setCurrentVideoSlide((prev) =>
+      direction === "left"
+        ? Math.max(0, prev - 1)
+        : Math.min(maxVideoSlides - 1, prev + 1)
+    );
+  };
+
+  // Scroll to specific dot/slide
+  const scrollToDot = (index: number) => {
+    if (!carouselRef.current) return;
+
+    const containerWidth = carouselRef.current.clientWidth;
+    const targetScroll = containerWidth * index;
+
+    carouselRef.current.scrollTo({
+      left: targetScroll,
+      behavior: "smooth",
+    });
+
+    setCurrentVideoSlide(index);
   };
 
   // Scroll carousel to a specific position using the progress bar
@@ -230,6 +272,12 @@ const Search: React.FC = () => {
 
   return (
     <div className="search-page">
+      {/* Background effects */}
+      <div className="vertical-scan"></div>
+      <div className="glow-1"></div>
+      <div className="glow-2"></div>
+      <div className="glow-3"></div>
+
       <div className="container">
         <div className="search-form">
           <div className="input-group">
@@ -256,6 +304,7 @@ const Search: React.FC = () => {
 
         {results && (
           <div className="search-results">
+            {/* AI Answer Section */}
             {results.aiAnswer && (
               <div className="result-card">
                 <div className="result-header">
@@ -285,7 +334,7 @@ const Search: React.FC = () => {
                 </div>
                 {showToggle && (
                   <button
-                    className="toggle-btn"
+                    className="show-more"
                     onClick={() => setAiExpanded((prev) => !prev)}
                     aria-expanded={aiExpanded}
                     aria-controls="aiAnswerText"
@@ -296,81 +345,98 @@ const Search: React.FC = () => {
               </div>
             )}
 
+            {/* Video Carousel Section */}
             {results.videos && results.videos.length > 0 && (
-              <div className="result-card video-result-card">
+              <div className="result-card">
                 <div className="result-header">
                   <h2>Video Resources</h2>
                 </div>
 
-                {/* Carousel Navigation */}
-                <div className="carousel-controls">
-                  <button
-                    className="carousel-button carousel-prev"
-                    onClick={() => scrollCarousel("left")}
-                    aria-label="Previous videos"
-                  >
-                    <span>&#10094;</span>
-                  </button>
-                  <button
-                    className="carousel-button carousel-next"
-                    onClick={() => scrollCarousel("right")}
-                    aria-label="Next videos"
-                  >
-                    <span>&#10095;</span>
-                  </button>
-                </div>
+                <div className="video-carousel">
+                  <div className="carousel-container">
+                    {/* Left navigation button */}
+                    <button
+                      className={`carousel-nav-button prev ${
+                        currentVideoSlide === 0 ? "disabled" : ""
+                      }`}
+                      onClick={() => scrollCarousel("left")}
+                      disabled={currentVideoSlide === 0}
+                      aria-label="Previous videos"
+                    >
+                      <i className="arrow left"></i>
+                    </button>
 
-                {/* Video Carousel */}
-                <div className="video-carousel-container">
-                  <div className="video-carousel" ref={carouselRef}>
-                    {results.videos.map((video: any, index: number) => (
-                      <div
-                        key={`${video.videoId}-${index}`}
-                        className="video-card"
-                      >
-                        <a
-                          href={`https://youtu.be/${video.videoId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                    {/* Scrollable carousel track */}
+                    <div className="carousel-track" ref={carouselRef}>
+                      {results.videos.map((video: any, index: number) => (
+                        <div
+                          key={`${video.videoId || index}`}
+                          className="video-card"
                         >
-                          <div className="thumbnail-container">
-                            <img src={video.thumbnail} alt={video.title} />
-                            <div className="play-icon">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                              >
-                                <path d="M8 5v14l11-7z" />
-                              </svg>
-                            </div>
+                          <div className="video-thumbnail">
+                            <a
+                              href={`https://youtu.be/${video.videoId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <img src={video.thumbnail} alt={video.title} />
+                            </a>
                           </div>
-                          <h3>{video.title}</h3>
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                          <h3 className="video-title">
+                            <a
+                              href={`https://youtu.be/${video.videoId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {video.title}
+                            </a>
+                          </h3>
+                          <div className="video-channel">
+                            {video.channel || "YouTube"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
-                {/* Interactive Progress Bar */}
-                <div className="carousel-progress">
-                  <div
-                    className="progress-bar"
-                    onClick={handleProgressBarClick}
-                    title="Drag to navigate videos"
-                  >
+                    {/* Right navigation button */}
+                    <button
+                      className={`carousel-nav-button next ${
+                        currentVideoSlide === maxVideoSlides - 1
+                          ? "disabled"
+                          : ""
+                      }`}
+                      onClick={() => scrollCarousel("right")}
+                      disabled={currentVideoSlide === maxVideoSlides - 1}
+                      aria-label="Next videos"
+                    >
+                      <i className="arrow right"></i>
+                    </button>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="carousel-progress">
                     <div
-                      className="progress-indicator"
+                      className="progress-bar"
                       style={{ width: `${scrollPosition}%` }}
                     ></div>
-                    <div
-                      className="progress-handle"
-                      style={{ left: `${scrollPosition}%` }}
-                    ></div>
                   </div>
-                  <div className="progress-text">
-                    {results.videos.length} videos
-                  </div>
+
+                  {/* Dots navigation */}
+                  {maxVideoSlides > 1 && (
+                    <div className="carousel-dots">
+                      {Array.from({ length: maxVideoSlides }).map(
+                        (_, index) => (
+                          <div
+                            key={index}
+                            className={`dot ${
+                              currentVideoSlide === index ? "active" : ""
+                            }`}
+                            onClick={() => scrollToDot(index)}
+                          ></div>
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Load More Videos Button */}
@@ -394,6 +460,7 @@ const Search: React.FC = () => {
               </div>
             )}
 
+            {/* Web Results Section */}
             {results.webResults && results.webResults.length > 0 && (
               <div className="result-card">
                 <div className="result-header">

@@ -1,5 +1,5 @@
 // src/components/CollateralManagementModal.tsx
-// Updated: 2025-07-22 07:09:03 UTC by jake1318
+// Last Updated: 2025-07-24 04:49:10 UTC by jake1318
 
 import React, { useState, useEffect } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -11,7 +11,7 @@ import { withdrawCollateralQuick } from "../scallop/ScallopWithdrawService";
 import "../styles/CollateralManagementModal.scss";
 
 // Constants for coin configuration with improved coin type handling
-const COINS = {
+const COINS: Record<string, any> = {
   SUI: {
     symbol: "SUI",
     decimals: 9,
@@ -39,6 +39,18 @@ const COINS = {
   },
 };
 
+/** build a config for any asset that is not in COINS */
+function getCoinConfig(sym: string, coinType: string, decimals: number) {
+  const preset = COINS[sym as keyof typeof COINS];
+  if (preset) return preset;
+  return {
+    symbol: sym,
+    name: sym.toLowerCase(),
+    decimals,
+    coinTypes: [coinType], // fall back to the exact type we got from the table
+  };
+}
+
 // Function to get total balance across multiple coin types
 function getTotalCoinBalance(coins: any[], coinConfig: any): number {
   if (!coins || !coinConfig || !coinConfig.coinTypes) return 0;
@@ -47,12 +59,20 @@ function getTotalCoinBalance(coins: any[], coinConfig: any): number {
 
   // Check each possible coin type for the symbol and sum their balances
   for (const coinType of coinConfig.coinTypes) {
-    const matchingCoins = coins.filter((coin) => coin.coinType === coinType);
+    const normT = coinType.toLowerCase();
+    const matchingCoins = coins.filter((coin) => {
+      const normC = coin.coinType.toLowerCase();
+      return (
+        normC === normT || // exact
+        normC.endsWith(normT) || // …abcd::sui::SUI
+        normC.includes(`::${normT.split("::").pop()}`) // any address but same module/struct
+      );
+    });
 
     for (const coin of matchingCoins) {
       if (coin && coin.balance) {
         // Apply correct decimals (from coin.decimals if available, otherwise from coinConfig)
-        const decimals = coin.decimals || coinConfig.decimals;
+        const decimals = coin.decimals ?? coinConfig.decimals;
         totalBalance += Number(coin.balance) / Math.pow(10, decimals);
       }
     }
@@ -308,7 +328,11 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
   const updateWalletBalance = (coins: any[] = accountCoins) => {
     if (!coins.length) return;
 
-    const coinConfig = COINS[asset.symbol as keyof typeof COINS];
+    const coinConfig = getCoinConfig(
+      asset.symbol,
+      asset.coinType,
+      asset.decimals
+    );
     if (!coinConfig) {
       console.error(`[updateWalletBalance] Unknown coin type: ${asset.symbol}`);
       setWalletBalance(0);
@@ -483,8 +507,8 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
       try {
         if (action === "deposit-collateral") {
           setProcessingStep("Depositing collateral...");
-          // Use scallopBorrowService.depositCollateral directly with the specific obligation ID
-          txResult = await scallopBorrowService.depositCollateral(
+          // Use scallopBorrowService.rawDeposit directly with the specific obligation ID
+          txResult = await scallopBorrowService.rawDeposit(
             wallet,
             obligationId,
             asset.symbol.toLowerCase() as "usdc" | "sui" | "usdt",
@@ -498,7 +522,7 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
               : "Processing withdrawal transaction..."
           );
 
-          // Use the new withdrawCollateralQuick function with proper error handling
+          // Use the withdrawCollateralQuick function with proper error handling
           txResult = await withdrawCollateralQuick(
             wallet,
             obligationId,
@@ -1004,19 +1028,34 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
                   <h5>Matching Coins:</h5>
                   <div style={{ maxHeight: "150px", overflowY: "auto" }}>
                     {accountCoins
-                      .filter(
-                        (coin) =>
-                          coin.balance !== "0" &&
-                          (coin.symbol === asset.symbol ||
-                            COINS[
-                              asset.symbol as keyof typeof COINS
-                            ]?.coinTypes.some((type) => coin.coinType === type))
-                      )
+                      .filter((coin) => {
+                        if (coin.balance === "0") return false;
+
+                        const coinConfig = getCoinConfig(
+                          asset.symbol,
+                          asset.coinType,
+                          asset.decimals
+                        );
+
+                        if (!coinConfig.coinTypes) return false;
+
+                        const normC = coin.coinType.toLowerCase();
+                        return coinConfig.coinTypes.some((type) => {
+                          const normT = type.toLowerCase();
+                          return (
+                            normC === normT ||
+                            normC.endsWith(normT) ||
+                            normC.includes(`::${normT.split("::").pop()}`)
+                          );
+                        });
+                      })
                       .map((coin, idx) => {
-                        const decimals =
-                          coin.decimals ||
-                          COINS[asset.symbol as keyof typeof COINS]?.decimals ||
-                          9;
+                        const coinConfig = getCoinConfig(
+                          asset.symbol,
+                          asset.coinType,
+                          asset.decimals
+                        );
+                        const decimals = coin.decimals ?? coinConfig.decimals;
                         const humanReadable =
                           Number(coin.balance) / Math.pow(10, decimals);
 
@@ -1041,44 +1080,42 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
 
                   <h5>Implementation Details:</h5>
                   <p>
-                    Using the new ScallopWithdrawService with atomic transaction
-                    approach:
+                    Using the robust addCollateral function that works with
+                    fragmented coins:
                   </p>
                   <ol>
                     <li>
-                      Single atomic transaction combines price update, unlock,
-                      withdraw, and transfer operations
+                      Converts amount to BigInt to avoid JavaScript number
+                      precision issues
                     </li>
                     <li>
-                      Properly handles both Boost-Pool and Borrow-Incentive
-                      locks automatically
+                      Uses addCollateral instead of addCollateralQuick to handle
+                      fragmented coins
                     </li>
                     <li>
-                      Uses SDK helpers first, with manual fallbacks only when
+                      Properly selects and merges multiple coin objects as
                       needed
                     </li>
-                    <li>Sets appropriate gas budget for complex operations</li>
                     <li>
-                      Adds both borrow-incentive and boost unstake operations to
-                      handle all lock scenarios
+                      Works with any coin balance distribution in the wallet
+                    </li>
+                    <li>
+                      Correctly handles all transaction parameters and argument
+                      types
                     </li>
                   </ol>
-                  <p>Benefits of the atomic approach:</p>
+                  <p>When calling depositCollateral:</p>
                   <ul>
                     <li>
-                      No intermediate state where obligation is unlocked but
-                      collateral not withdrawn
+                      Using scallopBorrowService.rawDeposit directly to ensure
+                      correct parameter order
                     </li>
                     <li>
-                      No need for waiting periods or multiple transactions
+                      Passing the obligation ID, coin type, amount and decimals
+                      explicitly
                     </li>
                     <li>
-                      Either everything succeeds or everything fails
-                      (transactional safety)
-                    </li>
-                    <li>
-                      Aligns with the same successful pattern used in the
-                      deposit flow
+                      Improved error handling for various error conditions
                     </li>
                   </ul>
                 </div>
@@ -1089,7 +1126,7 @@ const CollateralManagementModal: React.FC<CollateralManagementModalProps> = ({
 
         {/* Last updated timestamp */}
         <div className="last-updated">
-          Last updated: 2025-07-22 07:09:03 UTC by jake1318
+          Last updated: 2025-07-24 04:49:10 UTC by jake1318
         </div>
       </div>
     </div>

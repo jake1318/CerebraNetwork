@@ -1,5 +1,5 @@
 // src/components/WithdrawModal.tsx
-// Last Updated: 2025-07-15 05:20:12 UTC by jake1318
+// Updated: 2025-07-18 02:56:22 UTC by jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useWallet } from "@suiet/wallet-kit";
@@ -133,17 +133,18 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
       console.log("Transaction result:", result);
 
       if (result.success) {
+        // Store all transaction digests
+        setTxDigests(result.digests);
+
         // Set success notification
         setTxNotification({
           message: closePosition
             ? "Position successfully closed"
             : `Withdrew ${withdrawPercent}% liquidity`,
           isSuccess: true,
-          txDigest: result.digests.length === 1 ? result.digests[0] : undefined,
+          txDigest: result.digests.length > 0 ? result.digests[0] : undefined,
           pairName: pairNameMemo,
         });
-        // For multiple txs we still show success but list links below
-        setTxDigests(result.digests);
       } else {
         throw new Error("Transaction failed");
       }
@@ -166,6 +167,11 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
     onClose();
   };
 
+  // Function to format digest for display
+  const formatTxDigest = (digest: string) => {
+    return `${digest.slice(0, 8)}...${digest.slice(-6)}`;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -173,7 +179,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
       <div className="withdraw-modal">
         <div className="modal-header">
           <h3>
-            {txNotification?.txDigest
+            {txNotification?.isSuccess
               ? closePosition
                 ? "Close Position"
                 : "Withdraw Liquidity"
@@ -241,43 +247,60 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
               {isBluefin && " (Bluefin)"}
             </p>
 
-            {/* Transaction ID - Matching the deposit modal */}
-            {txNotification.txDigest && (
-              <p className="transaction-id">
-                Transaction ID: {txNotification.txDigest}
-              </p>
-            )}
-
-            {/* Multiple transaction digests */}
-            {txDigests.length > 1 && (
-              <ul className="tx-list">
-                {txDigests.map((d) => (
-                  <li key={d}>
-                    <a
-                      href={`https://suivision.xyz/txblock/${d}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {d.slice(0, 10)}…{d.slice(-6)}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Action Buttons - Matching the deposit modal */}
-            <div className="success-actions">
-              {txNotification.txDigest && (
-                <a
-                  href={`https://suivision.xyz/txblock/${txNotification.txDigest}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="view-tx-link"
-                >
-                  View on SuiVision
-                </a>
+            {/* Transaction digests section - IMPROVED */}
+            <div className="transaction-digests">
+              <h4>Transaction{txDigests.length > 1 ? "s" : ""}:</h4>
+              {txDigests.length > 0 ? (
+                <ul className="tx-list">
+                  {txDigests.map((digest, index) => (
+                    <li key={digest}>
+                      <a
+                        href={`https://suivision.xyz/txblock/${digest}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="tx-link"
+                      >
+                        {index + 1}. {formatTxDigest(digest)}
+                        <svg
+                          className="external-link-icon"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M15 3h6v6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M10 14L21 3"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No transaction details available</p>
               )}
+            </div>
 
+            {/* Action Buttons - Simplified for clarity */}
+            <div className="success-actions">
               <button className="done-button" onClick={handleModalClose}>
                 Done
               </button>
@@ -555,7 +578,56 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({
         )}
       </div>
 
-      <style jsx>{``}</style>
+      <style jsx>{`
+        .transaction-digests {
+          margin-top: 1rem;
+          width: 100%;
+        }
+
+        .transaction-digests h4 {
+          margin-bottom: 0.5rem;
+          font-size: 1rem;
+          color: #a0a0c0;
+        }
+
+        .tx-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          width: 100%;
+        }
+
+        .tx-list li {
+          margin-bottom: 0.5rem;
+          padding: 0.5rem;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+        }
+
+        .tx-link {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          text-decoration: none;
+          color: #64e3ff;
+          font-family: monospace;
+          transition: color 0.2s;
+          width: 100%;
+        }
+
+        .tx-link:hover {
+          color: #ffffff;
+        }
+
+        .external-link-icon {
+          opacity: 0.6;
+          margin-left: 4px;
+        }
+
+        .tx-link:hover .external-link-icon {
+          opacity: 1;
+        }
+      `}</style>
     </div>
   );
 };

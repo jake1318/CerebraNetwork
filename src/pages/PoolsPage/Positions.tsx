@@ -1,5 +1,5 @@
 // src/pages/PoolsPage/Positions.tsx
-// Updated: 2025-07-17 01:58:12 UTC by jake1318
+// Updated: 2025-07-19 05:28:35 UTC by jake1318
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -88,16 +88,11 @@ interface PortfolioMetrics {
 // Default token icon for fallbacks
 const DEFAULT_TOKEN_ICON = "/assets/token-placeholder.png";
 
-// In Positions.tsx, update the HARDCODED_LOGOS constant around line 62-75:
-
 // Map of token addresses for well-known tokens (Sui mainnet)
 const TOKEN_ADDRESSES: Record<string, string> = {
   SUI: "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
   // Add other tokens as needed
 };
-
-// Hardcoded token logos for fallbacks - use local files for SUI and haSUI
-// In Positions.tsx, update the HARDCODED_LOGOS constant around line 62-75:
 
 // Hardcoded token logos for fallbacks
 const HARDCODED_LOGOS: Record<string, string> = {
@@ -235,7 +230,7 @@ function sanitizeLogoUrl(url: string): string {
   return url;
 }
 
-// Enhanced token icon component with fallbacks
+// Enhanced token icon component that uses BirdEye API for SUI token
 function EnhancedTokenIcon({
   symbol,
   logoUrl,
@@ -254,10 +249,65 @@ function EnhancedTokenIcon({
   const safeSymbol = symbol || "?";
   const normalizedSymbol = normalizeSymbol(safeSymbol);
 
+  // Full SUI token address
+  const SUI_ADDRESS =
+    "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+
   // Decide which logo URL to use with priority order
   useEffect(() => {
     const getLogoUrl = async () => {
-      // 1. First try metadata from props if available
+      // SPECIAL CASE FOR SUI: Always fetch from BirdEye API
+      if (normalizedSymbol === "SUI") {
+        try {
+          console.log("Fetching SUI token metadata from BirdEye API");
+          // Check cache first
+          if (tokenMetadataCache[SUI_ADDRESS]) {
+            const cachedMetadata = tokenMetadataCache[SUI_ADDRESS];
+            const cachedLogo =
+              cachedMetadata.logo_uri ||
+              cachedMetadata.logoUrl ||
+              cachedMetadata.logoURI ||
+              cachedMetadata.logo;
+            if (cachedLogo) {
+              setCurrentUrl(sanitizeLogoUrl(cachedLogo));
+              return;
+            }
+          }
+
+          // Fetch SUI token metadata from BirdEye API
+          const tokenMetadata = await birdeyeService.getTokenMetadata(
+            SUI_ADDRESS
+          );
+          if (tokenMetadata) {
+            tokenMetadataCache[SUI_ADDRESS] = tokenMetadata;
+            const apiLogo =
+              tokenMetadata.logo_uri ||
+              tokenMetadata.logoUrl ||
+              tokenMetadata.logoURI ||
+              tokenMetadata.logo;
+            if (apiLogo) {
+              setCurrentUrl(sanitizeLogoUrl(apiLogo));
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch SUI metadata:`, err);
+          // Fallback to default SUI logo
+          setCurrentUrl(HARDCODED_LOGOS.SUI);
+          return;
+        }
+      }
+
+      // For haSUI, prioritize the local file we know works
+      if (normalizedSymbol === "HASUI" || normalizedSymbol === "HA-SUI") {
+        console.log("Using local haSUI token image");
+        setCurrentUrl("/haSui.webp");
+        return;
+      }
+
+      // For all other tokens, use the standard resolution logic
+
+      // 1. Try metadata from props if available
       if (
         metadata?.logo_uri ||
         metadata?.logoUrl ||
@@ -369,9 +419,22 @@ function EnhancedTokenIcon({
     getLogoUrl();
   }, [symbol, logoUrl, address, metadata, normalizedSymbol]);
 
-  // Handle image load error
+  // Handle image load error - make this more robust
   const handleError = () => {
-    console.warn(`Failed to load logo for ${symbol}: ${currentUrl}`);
+    console.warn(
+      `Failed to load logo for ${safeSymbol} from URL: ${currentUrl}`
+    );
+
+    // For SUI token, try a hardcoded URL as last resort
+    if (normalizedSymbol === "SUI") {
+      const fallbackUrl =
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6/logo.png";
+      console.log(`Trying fallback URL for SUI: ${fallbackUrl}`);
+      setCurrentUrl(fallbackUrl);
+      return;
+    }
+
+    // For all other tokens, show fallback letter
     setImgFailed(true);
   };
 
@@ -399,6 +462,7 @@ function EnhancedTokenIcon({
       className={`token-icon ${sizeClass} ${
         !currentUrl || imgFailed ? "token-fallback" : ""
       } ${tokenClass}`}
+      data-symbol={normalizedSymbol} // Add data attribute for debugging
     >
       {currentUrl && !imgFailed ? (
         <img src={currentUrl} alt={safeSymbol} onError={handleError} />
@@ -1151,6 +1215,11 @@ function Positions() {
           }
         });
 
+        // Also add the SUI token address specifically
+        tokenAddresses.add(
+          "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+        );
+
         console.log(
           "Fetching metadata for tokens:",
           Array.from(tokenAddresses)
@@ -1202,6 +1271,28 @@ function Positions() {
   useEffect(() => {
     fetchScallopData();
   }, [fetchScallopData]);
+
+  // Force fetch SUI token metadata on component mount
+  useEffect(() => {
+    const fetchSuiMetadata = async () => {
+      const SUI_ADDRESS =
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+      try {
+        console.log("Pre-fetching SUI token metadata from BirdEye API");
+        const tokenMetadata = await birdeyeService.getTokenMetadata(
+          SUI_ADDRESS
+        );
+        if (tokenMetadata) {
+          tokenMetadataCache[SUI_ADDRESS] = tokenMetadata;
+          console.log("SUI metadata pre-fetched successfully:", tokenMetadata);
+        }
+      } catch (err) {
+        console.warn("Failed to pre-fetch SUI token metadata:", err);
+      }
+    };
+
+    fetchSuiMetadata();
+  }, []);
 
   // Helper function to check if a position has zero liquidity
   const hasZeroLiquidity = (position: NormalizedPosition): boolean => {
@@ -2846,7 +2937,7 @@ function Positions() {
                                     </table>
                                   </div>
 
-                                  {/* Unclaimed rewards section - FIXED IMPLEMENTATION */}
+                                  {/* Unclaimed rewards section */}
                                   {poolPosition.positions.some(
                                     (pos) =>
                                       pos.rewards &&

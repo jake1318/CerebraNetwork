@@ -1,3 +1,6 @@
+// src/components/Navbar/Navbar.tsx
+// Last Updated: 2025-07-25  (with logo update)
+
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useWallet, ConnectButton } from "@suiet/wallet-kit";
@@ -6,13 +9,12 @@ import "./Navbar.scss";
 
 const Navbar: React.FC = () => {
   const location = useLocation();
-  const { connected, account, disconnect } = useWallet();
+  const { connected, account, disconnect, select, availableWallets } =
+    useWallet();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [yieldDropdown, setYieldDropdown] = useState(false);
   const [bridgeDropdown, setBridgeDropdown] = useState(false);
-  const yieldRef = useRef<HTMLDivElement>(null);
   const bridgeRef = useRef<HTMLDivElement>(null);
 
   // scroll effect
@@ -22,12 +24,9 @@ const Navbar: React.FC = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // close any dropdown when clicking outside
+  // close dropdown when clicking outside
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (yieldRef.current && !yieldRef.current.contains(e.target as Node)) {
-        setYieldDropdown(false);
-      }
       if (bridgeRef.current && !bridgeRef.current.contains(e.target as Node)) {
         setBridgeDropdown(false);
       }
@@ -36,23 +35,42 @@ const Navbar: React.FC = () => {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  const handleConnectWallet = async () => {
+    try {
+      if (availableWallets && availableWallets.length > 0) {
+        await select(availableWallets[0].name);
+      }
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+    }
+  };
+
   const fmtAddr = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`;
+  const navbarClass = `navbar ${isScrolled ? "scrolled" : ""}`;
 
   return (
-    <nav className={`navbar ${isScrolled ? "scrolled" : ""}`}>
+    <nav className={navbarClass}>
       <div className="navbar__container">
-        <Link to="/" className="navbar__logo">
-          Cerebra Network
-        </Link>
+        <div className="navbar__logo">
+          <Link to="/">
+            {/* NEW logo image */}
+            <img
+              src="/Cerebra.jpg"
+              alt="Cerebra Network logo"
+              className="logo-img"
+            />
+            <span className="logo-text">Cerebra</span>
+            <span className="logo-network">Network</span>
+          </Link>
+        </div>
 
         {/* desktop links */}
-        <div className="navbar__links">
-          <Link to="/" className={location.pathname === "/" ? "active" : ""}>
-            Home
-          </Link>
+        <div className="navbar__links desktop-only">
           <Link
             to="/search"
-            className={location.pathname === "/search" ? "active" : ""}
+            className={`${
+              location.pathname === "/search" ? "active" : ""
+            } search-link`}
           >
             Search
           </Link>
@@ -62,47 +80,26 @@ const Navbar: React.FC = () => {
           >
             Swap
           </Link>
-
-          {/* DEX link - moved to be after Swap and before Yield */}
           <Link
             to="/dex"
             className={location.pathname === "/dex" ? "active" : ""}
           >
             DEX
           </Link>
-
-          {/* Yield dropdown - now without Portfolio */}
-          <div
-            className="dropdown"
-            ref={yieldRef}
-            onMouseEnter={() => setYieldDropdown(true)}
-            onMouseLeave={() => setYieldDropdown(false)}
+          <Link
+            to="/pools"
+            className={location.pathname.startsWith("/pools") ? "active" : ""}
           >
-            <button
-              className={`dropdown-toggle ${yieldDropdown ? "open" : ""}`}
-            >
-              Yield
-            </button>
-            {yieldDropdown && (
-              <div className="dropdown-menu">
-                <Link to="/pools" className="dropdown-item">
-                  Pools
-                </Link>
-                <Link to="/positions" className="dropdown-item">
-                  Positions
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Portfolio as a standalone link */}
+            Yield
+          </Link>
           <Link
             to="/portfolio"
-            className={location.pathname === "/portfolio" ? "active" : ""}
+            className={`${
+              location.pathname === "/portfolio" ? "active" : ""
+            } suifolio-link`}
           >
-            Portfolio
+            SuiFolio
           </Link>
-
           <Link
             to="/lending"
             className={location.pathname === "/lending" ? "active" : ""}
@@ -155,27 +152,29 @@ const Navbar: React.FC = () => {
         <div className="navbar__actions">
           {connected && account ? (
             <div className="wallet-info">
-              <span>{fmtAddr(account.address)}</span>
-              <button onClick={() => disconnect()}>Disconnect</button>
+              <span className="wallet-address">{fmtAddr(account.address)}</span>
+              <button
+                onClick={() => disconnect()}
+                className="disconnect-button"
+              >
+                Disconnect
+              </button>
             </div>
           ) : (
-            <ConnectButton className="connect-button">
+            <ConnectButton className="btn btn--connect">
               Connect Wallet
             </ConnectButton>
           )}
-        </div>
 
-        {/* mobile toggle */}
-        <button
-          className="navbar__mobile-toggle"
-          onClick={() => setMobileOpen((o) => !o)}
-        >
-          <div className={`hamburger ${mobileOpen ? "active" : ""}`}>
-            <span />
-            <span />
-            <span />
-          </div>
-        </button>
+          <button
+            className="mobile-menu-toggle mobile-only"
+            onClick={() => setMobileOpen((o) => !o)}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
       </div>
 
       {/* mobile menu */}
@@ -185,48 +184,34 @@ const Navbar: React.FC = () => {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* primary links */}
           {[
-            { to: "/", label: "Home" },
-            { to: "/search", label: "Search" },
+            { to: "/search", label: "Search", className: "search-link" },
             { to: "/swap", label: "Swap" },
-            { to: "/dex", label: "DEX" }, // DEX moved here in mobile view too
-          ].map(({ to, label }) => (
+            { to: "/dex", label: "DEX" },
+            { to: "/pools", label: "Yield" },
+          ].map(({ to, label, className }) => (
             <Link
               key={to}
               to={to}
-              className={location.pathname === to ? "active" : ""}
+              className={`${location.pathname === to ? "active" : ""} ${
+                className || ""
+              }`}
               onClick={() => setMobileOpen(false)}
             >
               {label}
             </Link>
           ))}
 
-          {/* mobile Yield - now without Portfolio */}
-          <div className="mobile-dropdown">
-            <div className="mobile-dropdown-header">Yield</div>
-            <div className="mobile-dropdown-items">
-              {[
-                { to: "/pools", label: "Pools" },
-                { to: "/positions", label: "Positions" },
-              ].map(({ to, label }) => (
-                <Link key={to} to={to} onClick={() => setMobileOpen(false)}>
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Portfolio link */}
           <Link
             to="/portfolio"
-            className={location.pathname === "/portfolio" ? "active" : ""}
+            className={`${
+              location.pathname === "/portfolio" ? "active" : ""
+            } suifolio-link`}
             onClick={() => setMobileOpen(false)}
           >
-            Portfolio
+            SuiFolio
           </Link>
 
-          {/* rest of links - DEX removed from here since it's moved above */}
           {[
             { to: "/lending", label: "Lending" },
             { to: "/perpetual", label: "Perps" },
@@ -241,7 +226,6 @@ const Navbar: React.FC = () => {
             </Link>
           ))}
 
-          {/* mobile Bridge */}
           <div className="mobile-dropdown">
             <div className="mobile-dropdown-header">Bridge</div>
             <div className="mobile-dropdown-items">
@@ -264,11 +248,12 @@ const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* wallet mobile */}
           {connected && account ? (
             <>
               <div className="wallet-info-mobile">
-                {fmtAddr(account.address)}
+                <span className="wallet-address">
+                  {fmtAddr(account.address)}
+                </span>
               </div>
               <button
                 className="disconnect-button mobile"
@@ -282,7 +267,7 @@ const Navbar: React.FC = () => {
             </>
           ) : (
             <ConnectButton
-              className="connect-button mobile"
+              className="btn btn--connect mobile"
               onClick={() => setMobileOpen(false)}
             >
               Connect Wallet

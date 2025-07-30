@@ -1,5 +1,5 @@
 // src/components/DepositModal.tsx
-// Current Date and Time (UTC): 2025-07-25 19:26:19
+// Current Date and Time (UTC): 2025-07-26 00:23:02
 // Current User's Login: jake1318
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -25,6 +25,8 @@ import {
 } from "../services/cetusVaultService";
 import "../styles/components/DepositModal.scss";
 import { useTokenMeta } from "../hooks/useTokenMeta";
+// Import BP_DENOMINATOR from cetusService
+import { BP_DENOMINATOR } from "../services/cetusService";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -57,6 +59,8 @@ const TOKEN_PLACEHOLDER = "/assets/token-placeholder.png";
 
 // Fee configuration for Cetus pool deposits
 const FEE_BP = 30; // 30 basis points = 0.30%
+// Add a fallback BP_DENOMINATOR in case the import fails
+const LOCAL_BP_DENOMINATOR = 10_000;
 
 const DepositModal: React.FC<DepositModalProps> = ({
   isOpen,
@@ -1330,9 +1334,12 @@ const DepositModal: React.FC<DepositModalProps> = ({
     setTxNotification({ message: "Processing deposit…", isSuccess: true });
 
     try {
+      // Use the imported BP_DENOMINATOR from cetusService or fallback to LOCAL_BP_DENOMINATOR
+      const bp_denominator = BP_DENOMINATOR || LOCAL_BP_DENOMINATOR;
+
       // Display fee information
-      const feeA = Number(amountA) * (FEE_BP / BP_DENOMINATOR);
-      const feeB = Number(amountB) * (FEE_BP / BP_DENOMINATOR);
+      const feeA = Number(amountA) * (FEE_BP / bp_denominator);
+      const feeB = Number(amountB) * (FEE_BP / bp_denominator);
       const poolAmountA = Number(amountA) - feeA;
       const poolAmountB = Number(amountB) - feeB;
 
@@ -1390,6 +1397,9 @@ const DepositModal: React.FC<DepositModalProps> = ({
       } else if (msg.includes("Cannot convert NaN to a BigInt")) {
         msg =
           "Invalid price range values. Please refresh the page and try again.";
+      } else if (msg.includes("BP_DENOMINATOR is not defined")) {
+        msg =
+          "BP_DENOMINATOR error. Please try refreshing the page and try again.";
       }
 
       setTxNotification({

@@ -1,12 +1,12 @@
 /* src/pages/Dex/components/PairSelector.scss */
-/* Last Updated: 2025-07-07 00:50:29 UTC by jake1318 */
+/* Last Updated: 2025-07-13 21:33:31 UTC by jake1318 */
 
 .pair-selector-container {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: rgba(5, 15, 30, 0.7);
+  background: rgba(2, 2, 2, 0.7); // Darker background to match swap page
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 16px;
@@ -14,17 +14,18 @@
   border-image: linear-gradient(
       45deg,
       rgba(0, 255, 255, 0.2),
-      rgba(255, 0, 255, 0.2)
+      rgba(196, 92, 242, 0.2)
     )
     1;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
-    0 8px 32px rgba(255, 0, 255, 0.08);
+    0 8px 32px rgba(0, 255, 128, 0.04), 0 8px 32px rgba(196, 92, 242, 0.04);
   animation: fadeIn 0.5s ease-out;
 
   &:hover {
-    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
-      0 8px 32px rgba(255, 0, 255, 0.15);
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.12),
+      0 8px 32px rgba(0, 255, 128, 0.06), 0 8px 32px rgba(196, 92, 242, 0.06);
   }
 
   .pair-search {
@@ -33,36 +34,35 @@
     border-image: linear-gradient(
         90deg,
         rgba(0, 255, 255, 0.2),
-        rgba(255, 0, 255, 0.2)
+        rgba(196, 92, 242, 0.2)
       )
       1;
-    background: rgba(5, 15, 30, 0.9);
+    background: rgba(2, 2, 2, 0.9); // Darker background
 
     input {
       width: 100%;
       padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(2, 2, 2, 0.3); // Darker background
+      border: 1px solid rgba(0, 255, 255, 0.1); // Cyan border
       border-radius: 8px;
-      color: #e0e0e0;
+      color: #ffffff;
       font-size: 0.9rem;
       transition: all 0.3s ease;
 
       &:focus {
         outline: none;
-        border: 1px solid;
         border-image: linear-gradient(
             45deg,
             rgba(0, 255, 255, 0.5),
-            rgba(255, 0, 255, 0.5)
+            rgba(196, 92, 242, 0.5)
           )
           1;
         box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
-          0 0 10px rgba(255, 0, 255, 0.2);
+          0 0 10px rgba(196, 92, 242, 0.2);
       }
 
       &::placeholder {
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(177, 165, 200, 0.4); // text-secondary with opacity
       }
     }
   }
@@ -72,15 +72,15 @@
     grid-template-columns: 2fr 1.5fr 1fr 1.5fr;
     padding: 10px 12px;
     font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: #b1a5c8; // Text-secondary from swap page
     border-bottom: 1px solid;
     border-image: linear-gradient(
         90deg,
-        rgba(0, 255, 255, 0.1),
-        rgba(255, 0, 255, 0.1)
+        rgba(0, 255, 255, 0.2),
+        rgba(196, 92, 242, 0.2)
       )
       1;
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: rgba(2, 2, 2, 0.3); // Darker background
 
     .column {
       cursor: pointer;
@@ -89,11 +89,15 @@
       transition: all 0.2s ease;
 
       &:hover {
-        color: #e0e0e0;
+        color: #ffffff;
       }
 
       &.sorted {
-        background: linear-gradient(90deg, #00ffff, #ff00ff);
+        background: linear-gradient(
+          90deg,
+          #00ffff,
+          #c45cf2
+        ); // Cyan to purple gradient
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -111,13 +115,13 @@
         }
 
         &.asc::after {
-          border-bottom: 4px solid #00ffff;
+          border-bottom: 4px solid #00ffff; // Cyan from swap page
           box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
         }
 
         &.desc::after {
-          border-top: 4px solid #ff00ff;
-          box-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+          border-top: 4px solid #c45cf2; // Purple from swap page
+          box-shadow: 0 0 5px rgba(196, 92, 242, 0.5);
         }
       }
     }
@@ -138,8 +142,9 @@
     &::-webkit-scrollbar-thumb {
       background: linear-gradient(
         180deg,
-        rgba(0, 255, 255, 0.3),
-        rgba(255, 0, 255, 0.3)
+        rgba(0, 255, 255, 0.5),
+        rgba(0, 255, 128, 0.3),
+        rgba(196, 92, 242, 0.5)
       );
       border-radius: 3px;
     }
@@ -147,8 +152,9 @@
     &::-webkit-scrollbar-thumb:hover {
       background: linear-gradient(
         180deg,
-        rgba(0, 255, 255, 0.5),
-        rgba(255, 0, 255, 0.5)
+        rgba(0, 255, 255, 0.7),
+        rgba(0, 255, 128, 0.5),
+        rgba(196, 92, 242, 0.7)
       );
     }
 
@@ -160,7 +166,7 @@
       border-image: linear-gradient(
           90deg,
           rgba(0, 255, 255, 0.1),
-          rgba(255, 0, 255, 0.1)
+          rgba(196, 92, 242, 0.1)
         )
         1;
       font-size: 0.9rem;
@@ -168,7 +174,7 @@
       transition: all 0.2s ease;
 
       &:hover {
-        background-color: rgba(255, 255, 255, 0.05);
+        background-color: rgba(2, 2, 2, 0.5); // Darker background hover
         transform: translateY(-1px);
       }
 
@@ -178,11 +184,10 @@
         border-image: linear-gradient(
             180deg,
             rgba(0, 255, 255, 0.5),
-            rgba(255, 0, 255, 0.5)
+            rgba(196, 92, 242, 0.5)
           )
           1 0 1 1;
-        box-shadow: 0 0 15px rgba(0, 255, 255, 0.1),
-          0 0 15px rgba(255, 0, 255, 0.1);
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.1);
       }
 
       .pair-name {
@@ -194,9 +199,9 @@
           height: 24px;
           margin-right: 0.5rem;
           border-radius: 50%;
-          background-color: rgba(0, 0, 0, 0.3);
-          box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
-            0 0 10px rgba(255, 0, 255, 0.2);
+          background-color: rgba(2, 2, 2, 0.5);
+          box-shadow: 0 0 10px rgba(0, 255, 255, 0.1),
+            0 0 10px rgba(196, 92, 242, 0.1);
         }
       }
 
@@ -208,18 +213,18 @@
         font-weight: 500;
 
         &.positive {
-          color: #4caf50;
-          text-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+          color: #1ed760; // Green for buy
+          text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
         }
 
         &.negative {
-          color: #ff3b30;
-          text-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+          color: #ff4444; // Red for sell
+          text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
         }
       }
 
       .pair-volume {
-        color: rgba(255, 255, 255, 0.6);
+        color: #b1a5c8; // Text-secondary from swap page
         text-align: right;
       }
     }
@@ -229,7 +234,7 @@
       align-items: center;
       justify-content: center;
       height: 100px;
-      color: rgba(255, 255, 255, 0.5);
+      color: #b1a5c8; // Text-secondary from swap page
       font-style: italic;
     }
   }

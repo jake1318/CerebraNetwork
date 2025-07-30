@@ -1,5 +1,5 @@
 // src/pages/Dex/components/Chart.tsx
-// Last Updated: 2025-06-25 07:16:02 UTC by jake1318
+// Last Updated: 2025-07-15 00:09:51 UTC by jake1318
 
 import React, { useEffect, useState, useRef } from "react";
 import ReactApexChart from "react-apexcharts";
@@ -41,6 +41,7 @@ interface EnhancedMarketData {
   logo?: string;
 }
 
+// Keeping all the time frames exactly as requested
 const TIME_FRAMES = {
   "1m": "1m",
   "5m": "5m",
@@ -58,22 +59,18 @@ interface Props {
 }
 
 const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
-  const [lineData, setLineData] = useState<ChartPoint[]>([]);
   const [candlestickData, setCandlestickData] = useState<CandlestickPoint[]>(
     []
   );
   const [timeFrame, setTimeFrame] = useState<string>("15m");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [chartType, setChartType] = useState<"line" | "candlestick">(
-    "candlestick"
-  );
   const chartRef = useRef<HTMLDivElement>(null);
 
-  // Base chart options
-  const baseOptions: ApexOptions = {
+  // Chart options for candlestick chart
+  const chartOptions: ApexOptions = {
     chart: {
-      type: chartType,
+      type: "candlestick",
       background: "transparent",
       toolbar: {
         show: false,
@@ -135,6 +132,17 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
         },
       },
     },
+    plotOptions: {
+      candlestick: {
+        colors: {
+          upward: "#4caf50",
+          downward: "#ff3b30",
+        },
+        wick: {
+          useFillColor: true,
+        },
+      },
+    },
     responsive: [
       {
         breakpoint: 576,
@@ -147,49 +155,6 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
         },
       },
     ],
-  };
-
-  // Line chart specific options
-  const lineChartOptions: ApexOptions = {
-    ...baseOptions,
-    chart: {
-      ...baseOptions.chart,
-      type: "line",
-    },
-    stroke: {
-      curve: "smooth",
-      width: 2,
-    },
-    colors: ["#00c2ff"],
-    fill: {
-      type: "gradient",
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.15,
-        opacityTo: 0.05,
-        stops: [0, 100],
-      },
-    },
-  };
-
-  // Candlestick chart specific options
-  const candlestickChartOptions: ApexOptions = {
-    ...baseOptions,
-    chart: {
-      ...baseOptions.chart,
-      type: "candlestick",
-    },
-    plotOptions: {
-      candlestick: {
-        colors: {
-          upward: "#4caf50",
-          downward: "#ff3b30",
-        },
-        wick: {
-          useFillColor: true,
-        },
-      },
-    },
   };
 
   // Function to transform API interval to chart interval
@@ -210,7 +175,7 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
       case "1d":
         return "1d";
       case "1Y":
-        return "1w";
+        return "1w"; // Map 1Y to 1w for API call
       default:
         return "15m";
     }
@@ -236,7 +201,7 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
       case "1d":
         return now - 60 * 60 * 24 * 30; // 30 days
       case "1Y":
-        return now - 60 * 60 * 24 * 365; // 365 days
+        return now - 60 * 60 * 24 * 365; // 365 days for 1Y
       default:
         return now - 60 * 60 * 12; // 12 hours
     }
@@ -261,16 +226,9 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
 
       if (!data || data.length === 0) {
         setError("No chart data available");
-        setLineData([]);
         setCandlestickData([]);
         return;
       }
-
-      // Format data for line chart
-      const linePoints = data.map((point) => ({
-        x: point.timestamp * 1000,
-        y: point.close,
-      }));
 
       // Format data for candlestick chart
       const candlePoints = data.map((point) => ({
@@ -278,7 +236,6 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
         y: [point.open, point.high, point.low, point.close],
       }));
 
-      setLineData(linePoints);
       setCandlestickData(candlePoints);
     } catch (err) {
       console.error("Failed to fetch chart data:", err);
@@ -310,22 +267,7 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
           ))}
         </div>
 
-        <div className="chart-type-buttons">
-          <button
-            className={`chart-type-btn ${chartType === "line" ? "active" : ""}`}
-            onClick={() => setChartType("line")}
-          >
-            Line
-          </button>
-          <button
-            className={`chart-type-btn ${
-              chartType === "candlestick" ? "active" : ""
-            }`}
-            onClick={() => setChartType("candlestick")}
-          >
-            Candles
-          </button>
-        </div>
+        {/* Removed the chart type toggle buttons */}
       </div>
 
       <div className="chart-area">
@@ -347,15 +289,9 @@ const Chart: React.FC<Props> = ({ pair, enhancedData }) => {
         )}
 
         <ReactApexChart
-          options={
-            chartType === "line" ? lineChartOptions : candlestickChartOptions
-          }
-          series={
-            chartType === "line"
-              ? [{ name: "Price", data: lineData }]
-              : [{ name: "Price", data: candlestickData }]
-          }
-          type={chartType}
+          options={chartOptions}
+          series={[{ name: "Price", data: candlestickData }]}
+          type="candlestick"
           height="100%"
           width="100%"
         />
