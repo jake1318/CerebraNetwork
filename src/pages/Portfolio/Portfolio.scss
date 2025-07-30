@@ -1862,3 +1862,156 @@ body {
     transform: scale(1.2);
   }
 }
+// Additional CSS for position-card component
+.position-card {
+  transition: all 0.3s ease;
+
+  &--expanded {
+    max-height: none;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  &__details {
+    padding: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .details-header {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #ffffff;
+    }
+
+    .details-subheader {
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin: 0.75rem 0 0.5rem;
+      color: #b1a5c8;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+
+      .detail-label {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .detail-value {
+        color: #ffffff;
+        font-weight: 500;
+      }
+    }
+
+    .reward-row {
+      background: rgba(30, 215, 96, 0.1);
+      border-radius: 6px;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .reward-token {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .reward-amount {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+
+      .reward-value {
+        font-size: 0.8rem;
+        color: #1ed760;
+      }
+    }
+
+    .out-of-range-warning {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      color: #ff5252;
+      background: rgba(255, 82, 82, 0.1);
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+  }
+}
+
+// Update the stats-grid to handle the rewards column
+.position-card .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+
+// Update rewards stat styling
+.position-card .stat-value.rewards {
+  color: #1ed760;
+  text-shadow: 0 0 10px rgba(30, 215, 96, 0.3);
+}
+// Additional CSS for position-card component
+.position-card {
+  transition: all 0.3s ease;
+
+  &--expanded {
+    max-height: none;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  &__details {
+    padding: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .details-header {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #ffffff;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+
+      .detail-label {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .detail-value {
+        color: #ffffff;
+        font-weight: 500;
+      }
+    }
+
+    .out-of-range-warning {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      color: #ff5252;
+      background: rgba(255, 82, 82, 0.1);
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+  }
+}
+
+// Keep the standard stats grid
+.position-card .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}

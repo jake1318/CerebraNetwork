@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-18 23:08:20 UTC by jake1318
+// Last Updated: 2025-07-29 23:51:49 UTC by jake1318
 
 import React, {
   useState,
@@ -810,8 +810,16 @@ function DistributionChartCard({
 
 // Position card component for displaying individual position data
 function PositionCard({ position }: { position: PoolGroup }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const toggleDetails = () => {
+    setExpanded(!expanded);
+  };
+
   return (
-    <div className="position-card">
+    <div
+      className={`position-card ${expanded ? "position-card--expanded" : ""}`}
+    >
       <div className="position-card__header">
         <div className="protocol-badge">{position.protocol}</div>
         <PoolPair
@@ -835,12 +843,73 @@ function PositionCard({ position }: { position: PoolGroup }) {
           </div>
         </div>
       </div>
+
+      {/* Expanded details section */}
+      {expanded && (
+        <div className="position-card__details">
+          <div className="details-header">Position Details</div>
+
+          {/* Position ID */}
+          <div className="detail-row">
+            <div className="detail-label">Position ID</div>
+            <div className="detail-value">
+              {formatAddress(position.positions?.[0]?.id || "")}
+            </div>
+          </div>
+
+          {/* Removed the Liquidity line as requested */}
+
+          {/* Balances */}
+          {position.positions?.[0]?.balanceA && (
+            <div className="detail-row">
+              <div className="detail-label">
+                {position.tokenASymbol} Balance
+              </div>
+              <div className="detail-value">
+                {formatTokenBalance(position.positions[0].balanceA)}
+              </div>
+            </div>
+          )}
+
+          {position.positions?.[0]?.balanceB && (
+            <div className="detail-row">
+              <div className="detail-label">
+                {position.tokenBSymbol} Balance
+              </div>
+              <div className="detail-value">
+                {formatTokenBalance(position.positions[0].balanceB)}
+              </div>
+            </div>
+          )}
+
+          {/* Position Type */}
+          <div className="detail-row">
+            <div className="detail-label">Type</div>
+            <div className="detail-value">
+              {position.positions?.[0]?.positionType || "Unknown"}
+            </div>
+          </div>
+
+          {/* Out of Range Warning (for LP positions) */}
+          {position.positions?.[0]?.isOutOfRange && (
+            <div className="out-of-range-warning">
+              <FaExclamationTriangle /> This position is out of range
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="position-card__footer">
-        <button className="action-button">
-          <FaChartLine style={{ marginRight: "4px" }} /> Details
-        </button>
-        <button className="action-button action-button--green">
-          <FaPlus style={{ marginRight: "4px" }} /> Add More
+        <button className="action-button" onClick={toggleDetails}>
+          {expanded ? (
+            <>
+              <FaChevronUp style={{ marginRight: "4px" }} /> Hide Details
+            </>
+          ) : (
+            <>
+              <FaChartLine style={{ marginRight: "4px" }} /> Details
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -1786,7 +1855,7 @@ function Portfolio() {
         setPoolPositions(positions);
 
         // Calculate the total value of all positions
-        const positionValue = positions.reduce(
+        const totalPositionValue = positions.reduce(
           (sum, p) => sum + p.totalValueUsd,
           0
         );
@@ -1804,10 +1873,11 @@ function Portfolio() {
         );
 
         // Generate portfolio data
-        const portfolioTotalValue = positionValue + scallopValue + walletValue;
+        const portfolioTotalValue =
+          totalPositionValue + scallopValue + walletValue;
         setPortfolioData({
           positions,
-          positionValue,
+          positionValue: totalPositionValue,
           scallopValue,
           walletValue,
           totalValue: portfolioTotalValue,
