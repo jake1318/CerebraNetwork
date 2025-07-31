@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-31 04:33:50 UTC by jake1318
+// Last Updated: 2025-07-31 19:08:30 UTC by jake1318
 
 import React, {
   useState,
@@ -65,7 +65,7 @@ import MarketNews from "../../components/portfolio/MarketNews";
 import ProtocolBadge from "../PoolsPage/ProtocolBadge";
 import PhantomWallet from "./PhantomWallet"; // Import PhantomWallet component
 import SlushWallet from "./SlushWallet"; // Import SlushWallet component
-import PhantomProvider from "../../components/PhantomProvider"; // Import the PhantomProvider
+// Note: PhantomProvider is now loaded at the App level, so we don't import it here
 
 // keep TOKEN_ADDRESSES – we still use it inside TokenIcon for fall‑back
 const TOKEN_ADDRESSES: Record<string, string> = {
@@ -337,7 +337,23 @@ function Sidebar({
                 {/* Phantom Wallet button */}
                 <button
                   className="nav-link"
-                  onClick={() => setActiveWallet("phantom")}
+                  onClick={() => {
+                    // Log the status before opening
+                    console.log(
+                      "[Portfolio] Checking wallet status before opening modal:",
+                      {
+                        phantom: !!window.phantom,
+                        phantomSui: !!window.phantom?.sui,
+                        cerebraWallet: !!window.cerebraWallet,
+                        cerebraShow: !!window.cerebraWallet?.show,
+                        container: !!document.getElementById(
+                          "phantom-wallet-container"
+                        ),
+                        origin: window.location.origin,
+                      }
+                    );
+                    setActiveWallet("phantom");
+                  }}
                 >
                   <span className="nav-icon">
                     <FaGhost />
@@ -390,8 +406,11 @@ function TokenIcon({ symbol, address, size = "sm" }: TokenIconProps) {
   const [logoUrl, setLogoUrl] = React.useState<string | null>(
     logoCache[id] ?? null
   );
+  const isMountedRef = useRef(true);
 
   React.useEffect(() => {
+    isMountedRef.current = true;
+
     let cancelled = false;
     (async () => {
       // Special case for haSUI - use local logo
@@ -399,8 +418,10 @@ function TokenIcon({ symbol, address, size = "sm" }: TokenIconProps) {
         symbol.toLowerCase() === "hasui" ||
         (address && address.toLowerCase().includes("hasui"))
       ) {
-        setLogoUrl("/haSui.webp");
-        logoCache[id] = "/haSui.webp";
+        if (isMountedRef.current) {
+          setLogoUrl("/haSui.webp");
+          logoCache[id] = "/haSui.webp";
+        }
         return;
       }
 
@@ -419,13 +440,15 @@ function TokenIcon({ symbol, address, size = "sm" }: TokenIconProps) {
       const url =
         md?.logoURI || md?.logo_uri || md?.logoUrl || md?.logo || null;
 
-      if (url && !cancelled) {
+      if (url && !cancelled && isMountedRef.current) {
         logoCache[id] = url;
         setLogoUrl(url);
       }
     })();
+
     return () => {
       cancelled = true;
+      isMountedRef.current = false;
     };
   }, [id, address, symbol, logoUrl]);
 
@@ -946,9 +969,15 @@ function PositionCard({ position }: { position: PoolGroup }) {
 // Function to fetch historical portfolio data
 async function fetchPortfolioHistory(
   address: string,
-  timeframe: "7d" | "30d" | "1yr" = "30d"
+  timeframe: "7d" | "30d" | "1yr" = "30d",
+  abortSignal?: AbortSignal
 ): Promise<{ dates: string[]; values: number[] }> {
   try {
+    // Check if the operation was aborted
+    if (abortSignal?.aborted) {
+      throw new Error("Operation was aborted");
+    }
+
     // Use SUI price history as a proxy for portfolio history
     const suiToken = "0x2::sui::SUI";
 
@@ -971,10 +1000,20 @@ async function fetchPortfolioHistory(
     // Check if getLineChartData function exists before calling it
     if (typeof birdeyeService.getLineChartData === "function") {
       try {
+        // Check for abort
+        if (abortSignal?.aborted) {
+          throw new Error("Operation was aborted");
+        }
+
         const historyData = await birdeyeService.getLineChartData(
           suiToken,
           interval
         );
+
+        // Check for abort again after async operation
+        if (abortSignal?.aborted) {
+          throw new Error("Operation was aborted");
+        }
 
         // Check if we got valid data
         if (
@@ -1014,6 +1053,11 @@ async function fetchPortfolioHistory(
           return { dates, values };
         }
       } catch (err) {
+        // If aborted, rethrow
+        if (abortSignal?.aborted) {
+          throw err;
+        }
+
         console.error("Error in getLineChartData:", err);
         // Fall through to the fallback below
       }
@@ -1021,6 +1065,11 @@ async function fetchPortfolioHistory(
       console.warn(
         "birdeyeService.getLineChartData is not available, using fallback data"
       );
+    }
+
+    // Check for abort
+    if (abortSignal?.aborted) {
+      throw new Error("Operation was aborted");
     }
 
     // If we get here, either:
@@ -1066,6 +1115,11 @@ async function fetchPortfolioHistory(
 
     return { dates, values };
   } catch (error) {
+    // If aborted, rethrow
+    if (abortSignal?.aborted) {
+      throw error;
+    }
+
     console.error("Error fetching portfolio history:", error);
     // Return a minimal dataset in case of error
     return { dates: [], values: [] };
@@ -1282,10 +1336,25 @@ function ActivityView({ wallet }: { wallet: any }) {
     hasMore: true,
   });
 
+  // Ref to track component mounted state
+  const isMountedRef = useRef(true);
+  // Ref to keep track of fetch controller
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Updated loadSwapHistory function with better error handling and debugging
   const loadSwapHistory = useCallback(
     async (reset = false) => {
       if (!connected || !account?.address) return;
+      if (!isMountedRef.current) return;
+
+      // Cancel any existing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create a new abort controller
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
       setLoading(true);
       setError(null);
@@ -1326,7 +1395,13 @@ function ActivityView({ wallet }: { wallet: any }) {
             limit: pagination.limit,
             tokenPair: tokenPairFilter || undefined,
           }),
+          signal: abortController.signal,
         });
+
+        // Check if we've been aborted
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
 
         if (!response.ok) {
           // Handle backend errors
@@ -1342,6 +1417,11 @@ function ActivityView({ wallet }: { wallet: any }) {
 
         // Parse the response data
         const result = await response.json();
+
+        // Check if we've been aborted after the async operation
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
 
         if (!result.success) {
           throw new Error(result.message || "Failed to load swap history");
@@ -1383,6 +1463,11 @@ function ActivityView({ wallet }: { wallet: any }) {
           }
         }
 
+        // Check if we've been aborted or component unmounted after filtering
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
+
         // Update state with the new history data
         setSwaps((prev) =>
           reset ? filteredHistory : [...prev, ...filteredHistory]
@@ -1402,6 +1487,17 @@ function ActivityView({ wallet }: { wallet: any }) {
           }`
         );
       } catch (err) {
+        // Check if the error is due to abortion
+        if (err instanceof DOMException && err.name === "AbortError") {
+          console.log("[Portfolio] Swap history fetch was aborted");
+          return;
+        }
+
+        // Check if component is still mounted
+        if (!isMountedRef.current) {
+          return;
+        }
+
         console.error("Failed to load swap history:", err);
 
         // Show error message unless it's just an empty result
@@ -1420,15 +1516,36 @@ function ActivityView({ wallet }: { wallet: any }) {
           );
         }
       } finally {
-        setLoading(false);
+        // Only update loading state if component is still mounted
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+
+        // Clear the abort controller reference if it's the same one
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
       }
     },
     [connected, account, pagination.limit, pagination.offset, filters]
   );
 
-  // Initial load
+  // Setup and cleanup
   useEffect(() => {
+    isMountedRef.current = true;
+
+    // Initial load
     loadSwapHistory(true);
+
+    return () => {
+      isMountedRef.current = false;
+
+      // Abort any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, [loadSwapHistory]);
 
   // Handle filter changes
@@ -1555,6 +1672,7 @@ function EmptyPositions({ activeTab }: { activeTab: string }) {
 }
 
 function Portfolio() {
+  console.log("Portfolio component initializing");
   const wallet = useWallet();
   const { connected, account } = wallet;
   const [poolPositions, setPoolPositions] = useState<PoolGroup[]>([]);
@@ -1589,19 +1707,48 @@ function Portfolio() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Initialize the PhantomProvider
-  useEffect(() => {
-    // Make sure to only add the PhantomProvider once
-    if (!document.getElementById("phantom-provider-root")) {
-      const phantomProviderRoot = document.createElement("div");
-      phantomProviderRoot.id = "phantom-provider-root";
-      document.body.appendChild(phantomProviderRoot);
+  // Refs for handling async operations and unmounting
+  const isMountedRef = useRef(true);
+  const loadPositionsControllerRef = useRef<AbortController | null>(null);
+  const loadScallopControllerRef = useRef<AbortController | null>(null);
+  const loadWalletTokensControllerRef = useRef<AbortController | null>(null);
+  const loadHistoryControllerRef = useRef<AbortController | null>(null);
 
-      // We're just creating a placeholder element here.
-      // In a real implementation, you would render <PhantomProvider /> using ReactDOM.render
-      // But since we can't modify the global app structure, we'll import it as a component below
-      console.log("PhantomProvider initialized");
-    }
+  // Log the wallet integration status when the component mounts
+  useEffect(() => {
+    // Set mounted flag
+    isMountedRef.current = true;
+
+    // Check for wallet providers in a consistent way for debugging
+    console.log("[Portfolio] Initial wallet provider status:", {
+      phantom: !!window.phantom,
+      phantomSui: !!window.phantom?.sui,
+      cerebraWallet: !!window.cerebraWallet,
+      cerebraShow: !!window.cerebraWallet?.show,
+      container: !!document.getElementById("phantom-wallet-container"),
+      origin: window.location.origin,
+      isLocalhost: window.location.hostname === "localhost",
+      protocol: window.location.protocol,
+    });
+
+    // Cleanup function
+    return () => {
+      console.log("Portfolio component unmounting, cleaning up...");
+      isMountedRef.current = false;
+
+      // Abort any in-flight requests
+      [
+        loadPositionsControllerRef,
+        loadScallopControllerRef,
+        loadWalletTokensControllerRef,
+        loadHistoryControllerRef,
+      ].forEach((ref) => {
+        if (ref.current) {
+          ref.current.abort();
+          ref.current = null;
+        }
+      });
+    };
   }, []);
 
   // Set initial view based on URL if provided
@@ -1632,7 +1779,16 @@ function Portfolio() {
   // Fetch portfolio history data
   const loadPortfolioHistory = useCallback(
     async (currentValue: number) => {
-      if (!connected || !account?.address) return;
+      if (!connected || !account?.address || !isMountedRef.current) return;
+
+      // Cancel any previous history fetch
+      if (loadHistoryControllerRef.current) {
+        loadHistoryControllerRef.current.abort();
+      }
+
+      // Create a new abort controller
+      const abortController = new AbortController();
+      loadHistoryControllerRef.current = abortController;
 
       try {
         // Store current portfolio value in session storage for reference
@@ -1642,23 +1798,16 @@ function Portfolio() {
         );
 
         // Fetch real historical data based on selected timeframe
-        const days = (() => {
-          switch (selectedTimeframe) {
-            case "7d":
-              return 7;
-            case "30d":
-              return 30;
-            case "1yr":
-              return 365;
-            default:
-              return 30;
-          }
-        })();
-
         const history = await fetchPortfolioHistory(
           account.address,
-          selectedTimeframe
+          selectedTimeframe,
+          abortController.signal
         );
+
+        // Check if aborted or component unmounted
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
 
         if (history.dates.length > 0 && history.values.length > 0) {
           setPortfolioHistory(history);
@@ -1671,12 +1820,27 @@ function Portfolio() {
           const changePercent =
             yesterdayValue > 0 ? (changeValue / yesterdayValue) * 100 : 0;
 
-          setPortfolioChange24h({
-            value: changeValue,
-            percent: changePercent,
-          });
+          if (isMountedRef.current) {
+            setPortfolioChange24h({
+              value: changeValue,
+              percent: changePercent,
+            });
+          }
         } else {
           // Fallback to a simple timeline with current value
+          const days = (() => {
+            switch (selectedTimeframe) {
+              case "7d":
+                return 7;
+              case "30d":
+                return 30;
+              case "1yr":
+                return 365;
+              default:
+                return 30;
+            }
+          })();
+
           const dates: string[] = [];
           const values: number[] = [];
           const today = new Date();
@@ -1692,6 +1856,11 @@ function Portfolio() {
             values.push(parseFloat((currentValue * factor).toFixed(2)));
           }
 
+          // Check if aborted or component unmounted
+          if (abortController.signal.aborted || !isMountedRef.current) {
+            return;
+          }
+
           setPortfolioHistory({ dates, values });
 
           // Calculate fallback 24h change
@@ -1702,14 +1871,30 @@ function Portfolio() {
             const changePercent =
               yesterdayValue > 0 ? (changeValue / yesterdayValue) * 100 : 0;
 
-            setPortfolioChange24h({
-              value: changeValue,
-              percent: changePercent,
-            });
+            if (isMountedRef.current) {
+              setPortfolioChange24h({
+                value: changeValue,
+                percent: changePercent,
+              });
+            }
           }
         }
       } catch (error) {
-        console.error("Failed to load portfolio history:", error);
+        // Check if the error is due to abortion
+        if (error instanceof DOMException && error.name === "AbortError") {
+          console.log("[Portfolio] Portfolio history fetch was aborted");
+          return;
+        }
+
+        // Only log if the component is still mounted
+        if (isMountedRef.current) {
+          console.error("Failed to load portfolio history:", error);
+        }
+      } finally {
+        // Clear the abort controller reference if it's the same one
+        if (loadHistoryControllerRef.current === abortController) {
+          loadHistoryControllerRef.current = null;
+        }
       }
     },
     [connected, account, selectedTimeframe]
@@ -1717,22 +1902,57 @@ function Portfolio() {
 
   // Fetch Scallop data only - separate from main portfolio loading
   const fetchScallopData = useCallback(async () => {
-    if (!connected || !account?.address) return;
+    if (!connected || !account?.address || !isMountedRef.current) return;
 
-    setLoadingScallop(true);
+    // Cancel any previous scallop data fetch
+    if (loadScallopControllerRef.current) {
+      loadScallopControllerRef.current.abort();
+    }
+
+    // Create a new abort controller
+    const abortController = new AbortController();
+    loadScallopControllerRef.current = abortController;
+
+    if (isMountedRef.current) {
+      setLoadingScallop(true);
+    }
+
     try {
       console.log("Fetching Scallop data for:", account.address);
       const data = await getScallopPortfolioData(account.address);
+
+      // Check if aborted or component unmounted
+      if (abortController.signal.aborted || !isMountedRef.current) {
+        return;
+      }
+
       console.log("Scallop data received:", data);
 
       // Make sure we have valid data before setting it
-      if (data) {
+      if (data && isMountedRef.current) {
         setScallopData(data);
       }
     } catch (err) {
-      console.error("Error fetching Scallop data:", err);
+      // Check if the error is due to abortion
+      if (err instanceof DOMException && err.name === "AbortError") {
+        console.log("[Portfolio] Scallop data fetch was aborted");
+        return;
+      }
+
+      // Only log if the component is still mounted
+      if (isMountedRef.current) {
+        console.error("Error fetching Scallop data:", err);
+      }
     } finally {
-      setLoadingScallop(false);
+      // Only update loading state if component is still mounted
+      if (isMountedRef.current) {
+        setLoadingScallop(false);
+      }
+
+      // Clear the abort controller reference if it's the same one
+      if (loadScallopControllerRef.current === abortController) {
+        loadScallopControllerRef.current = null;
+      }
     }
   }, [connected, account]);
 
@@ -1872,12 +2092,28 @@ function Portfolio() {
 
   // Load positions - similar to the Positions page approach that works
   const loadPositions = useCallback(async () => {
-    if (connected && account?.address) {
-      setLoading(true);
-      setError(null);
+    if (connected && account?.address && isMountedRef.current) {
+      // Cancel any previous positions fetch
+      if (loadPositionsControllerRef.current) {
+        loadPositionsControllerRef.current.abort();
+      }
+
+      // Create a new abort controller
+      const abortController = new AbortController();
+      loadPositionsControllerRef.current = abortController;
+
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
 
       try {
         console.log("Loading positions for Portfolio:", account.address);
+
+        // Check if aborted or component unmounted
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
 
         // Get all positions in one call (excluding wallet assets)
         const positions = await blockvisionService.getDefiPortfolio(
@@ -1885,6 +2121,11 @@ function Portfolio() {
           undefined, // No specific protocol filter
           false // Exclude wallet assets
         );
+
+        // Check if aborted or component unmounted after async call
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
 
         console.log(`Loaded ${positions.length} positions`);
 
@@ -1898,8 +2139,12 @@ function Portfolio() {
           }
         });
 
-        // Set positions in state
-        setPoolPositions(positions);
+        // Set positions in state if component still mounted
+        if (isMountedRef.current) {
+          setPoolPositions(positions);
+        } else {
+          return;
+        }
 
         // Calculate the total value of all positions
         const totalPositionValue = positions.reduce(
@@ -1919,46 +2164,113 @@ function Portfolio() {
           0
         );
 
+        // Check if aborted or component unmounted
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
+
         // Generate portfolio data
         const portfolioTotalValue =
           totalPositionValue + scallopValue + walletValue;
-        setPortfolioData({
-          positions,
-          positionValue: totalPositionValue,
-          scallopValue,
-          walletValue,
-          totalValue: portfolioTotalValue,
-        });
+
+        if (isMountedRef.current) {
+          setPortfolioData({
+            positions,
+            positionValue: totalPositionValue,
+            scallopValue,
+            walletValue,
+            totalValue: portfolioTotalValue,
+          });
+        } else {
+          return;
+        }
 
         // Load real portfolio history
         await loadPortfolioHistory(portfolioTotalValue);
       } catch (err) {
-        console.error("Failed to load positions:", err);
-        setError("Failed to load your positions. Please try again.");
+        // Check if the error is due to abortion
+        if (err instanceof DOMException && err.name === "AbortError") {
+          console.log("[Portfolio] Positions fetch was aborted");
+          return;
+        }
+
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          console.error("Failed to load positions:", err);
+          setError("Failed to load your positions. Please try again.");
+        }
       } finally {
-        setLoading(false);
+        // Only update loading state if component is still mounted
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+
+        // Clear the abort controller reference if it's the same one
+        if (loadPositionsControllerRef.current === abortController) {
+          loadPositionsControllerRef.current = null;
+        }
       }
     }
-  }, [connected, account, scallopData, walletTokens, loadPortfolioHistory]);
+  }, [
+    connected,
+    account,
+    scallopData,
+    walletTokens,
+    loadPortfolioHistory,
+    isMountedRef,
+  ]);
 
   // Use separate effect for loading wallet tokens to avoid rate limiting
   const loadWalletTokens = useCallback(async () => {
-    if (connected && account?.address) {
+    if (connected && account?.address && isMountedRef.current) {
+      // Cancel any previous wallet tokens fetch
+      if (loadWalletTokensControllerRef.current) {
+        loadWalletTokensControllerRef.current.abort();
+      }
+
+      // Create a new abort controller
+      const abortController = new AbortController();
+      loadWalletTokensControllerRef.current = abortController;
+
       try {
         // Attempt to get wallet tokens but don't block main loading if it fails
         const walletTokensResponse = await blockvisionService.getWalletValue(
           account.address
         );
-        if (walletTokensResponse && walletTokensResponse.coins) {
+
+        // Check if aborted or component unmounted
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return;
+        }
+
+        if (
+          walletTokensResponse &&
+          walletTokensResponse.coins &&
+          isMountedRef.current
+        ) {
           setWalletTokens(walletTokensResponse.coins || []);
         }
       } catch (err) {
-        console.warn("Could not load wallet tokens:", err);
-        // Non-fatal error, continue without wallet tokens
-        setWalletTokens([]);
+        // Check if the error is due to abortion
+        if (err instanceof DOMException && err.name === "AbortError") {
+          console.log("[Portfolio] Wallet tokens fetch was aborted");
+          return;
+        }
+
+        // Only log if component is still mounted
+        if (isMountedRef.current) {
+          console.warn("Could not load wallet tokens:", err);
+          // Non-fatal error, continue without wallet tokens
+          setWalletTokens([]);
+        }
+      } finally {
+        // Clear the abort controller reference if it's the same one
+        if (loadWalletTokensControllerRef.current === abortController) {
+          loadWalletTokensControllerRef.current = null;
+        }
       }
     }
-  }, [connected, account]);
+  }, [connected, account, isMountedRef]);
 
   // First fetch Scallop data
   useEffect(() => {
@@ -2436,15 +2748,29 @@ function Portfolio() {
     }
   };
 
+  // Apply the style fix for the footer issue and check wallet provider status
+  useEffect(() => {
+    // Check SDK/wallet status every time the wallet modals are toggled
+    if (activeWallet) {
+      console.log("[Portfolio] Wallet modal opened, checking SDK status:", {
+        walletType: activeWallet,
+        phantom: !!window.phantom,
+        phantomSui: !!window.phantom?.sui,
+        cerebraWallet: !!window.cerebraWallet,
+        cerebraShow: !!window.cerebraWallet?.show,
+        container: !!document.getElementById("phantom-wallet-container"),
+        origin: window.location.origin,
+        protocol: window.location.protocol,
+      });
+    }
+  }, [activeWallet]);
+
   // Apply the style fix for the footer issue
   return (
     <div
       className="app-layout"
       style={{ overflowX: "hidden", position: "relative" }}
     >
-      {/* Include PhantomProvider at the top level */}
-      <PhantomProvider />
-
       {/* Sidebar Navigation with position categories */}
       <Sidebar
         activeView={activeView}
@@ -2466,6 +2792,31 @@ function Portfolio() {
 
             {/* Render the active view */}
             {renderActiveView()}
+
+            {/* Development Origin Notice */}
+            {window.location.protocol !== "https:" &&
+              window.location.hostname !== "localhost" && (
+                <div
+                  style={{
+                    position: "fixed",
+                    bottom: "10px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    backgroundColor: "rgba(255, 69, 0, 0.9)",
+                    color: "white",
+                    padding: "10px 20px",
+                    borderRadius: "5px",
+                    zIndex: 1000,
+                    fontSize: "14px",
+                    maxWidth: "90%",
+                    textAlign: "center",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  <strong>Warning:</strong> Phantom Wallet requires HTTPS or
+                  localhost. Current origin: {window.location.origin}
+                </div>
+              )}
           </div>
         </div>
       </div>
