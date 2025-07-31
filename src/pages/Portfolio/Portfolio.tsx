@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-29 23:51:49 UTC by jake1318
+// Last Updated: 2025-07-31 04:33:50 UTC by jake1318
 
 import React, {
   useState,
@@ -47,6 +47,8 @@ import {
   FaCalendarAlt,
   FaSortAmountDown,
   FaNewspaper,
+  FaGhost, // Added for Phantom icon
+  FaWater, // Added for Slush icon
 } from "react-icons/fa";
 import { getSwapHistory } from "@7kprotocol/sdk-ts";
 
@@ -61,6 +63,9 @@ import MarketNews from "../../components/portfolio/MarketNews";
 
 // Import components
 import ProtocolBadge from "../PoolsPage/ProtocolBadge";
+import PhantomWallet from "./PhantomWallet"; // Import PhantomWallet component
+import SlushWallet from "./SlushWallet"; // Import SlushWallet component
+import PhantomProvider from "../../components/PhantomProvider"; // Import the PhantomProvider
 
 // keep TOKEN_ADDRESSES – we still use it inside TokenIcon for fall‑back
 const TOKEN_ADDRESSES: Record<string, string> = {
@@ -113,6 +118,7 @@ function Sidebar({
   activeTab,
   setActiveTab,
   categoryData,
+  setActiveWallet, // Updated prop
 }: {
   activeView: string;
   setActiveView: (tab: string) => void;
@@ -126,6 +132,7 @@ function Sidebar({
     lending: { count: number; value: number };
     staking: { count: number; value: number };
   };
+  setActiveWallet: (wallet: "phantom" | "slush" | null) => void; // Updated prop
 }) {
   const [sidebarActive, setSidebarActive] = useState(false);
 
@@ -327,6 +334,26 @@ function Sidebar({
                   </span>
                   <span className="nav-label">Explorer</span>
                 </Link>
+                {/* Phantom Wallet button */}
+                <button
+                  className="nav-link"
+                  onClick={() => setActiveWallet("phantom")}
+                >
+                  <span className="nav-icon">
+                    <FaGhost />
+                  </span>
+                  <span className="nav-label">Phantom Wallet</span>
+                </button>
+                {/* Slush Wallet button */}
+                <button
+                  className="nav-link"
+                  onClick={() => setActiveWallet("slush")}
+                >
+                  <span className="nav-icon">
+                    <FaWater />
+                  </span>
+                  <span className="nav-label">Slush Wallet</span>
+                </button>
                 <Link to="/settings" className="nav-link">
                   <span className="nav-icon">
                     <FaCog />
@@ -1553,9 +1580,29 @@ function Portfolio() {
   const [activeView, setActiveView] = useState<string>("portfolio");
   const [activeTab, setActiveTab] = useState<string>("all");
 
+  // State for controlling the visibility of wallet modals - using single state to track which is active
+  const [activeWallet, setActiveWallet] = useState<"phantom" | "slush" | null>(
+    null
+  );
+
   // URL handling for direct access to sections
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Initialize the PhantomProvider
+  useEffect(() => {
+    // Make sure to only add the PhantomProvider once
+    if (!document.getElementById("phantom-provider-root")) {
+      const phantomProviderRoot = document.createElement("div");
+      phantomProviderRoot.id = "phantom-provider-root";
+      document.body.appendChild(phantomProviderRoot);
+
+      // We're just creating a placeholder element here.
+      // In a real implementation, you would render <PhantomProvider /> using ReactDOM.render
+      // But since we can't modify the global app structure, we'll import it as a component below
+      console.log("PhantomProvider initialized");
+    }
+  }, []);
 
   // Set initial view based on URL if provided
   useEffect(() => {
@@ -2389,8 +2436,15 @@ function Portfolio() {
     }
   };
 
+  // Apply the style fix for the footer issue
   return (
-    <div className="app-layout">
+    <div
+      className="app-layout"
+      style={{ overflowX: "hidden", position: "relative" }}
+    >
+      {/* Include PhantomProvider at the top level */}
+      <PhantomProvider />
+
       {/* Sidebar Navigation with position categories */}
       <Sidebar
         activeView={activeView}
@@ -2398,6 +2452,7 @@ function Portfolio() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         categoryData={categoryData}
+        setActiveWallet={setActiveWallet}
       />
 
       {/* Main Content */}
@@ -2414,6 +2469,15 @@ function Portfolio() {
           </div>
         </div>
       </div>
+
+      {/* Wallet Modals - only one can be active at a time */}
+      {activeWallet === "phantom" && (
+        <PhantomWallet onClose={() => setActiveWallet(null)} />
+      )}
+
+      {activeWallet === "slush" && (
+        <SlushWallet onClose={() => setActiveWallet(null)} />
+      )}
     </div>
   );
 }
