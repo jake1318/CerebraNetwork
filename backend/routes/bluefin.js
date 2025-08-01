@@ -1,5 +1,5 @@
 // routes/bluefin.js
-// Updated: 2025-07-17 01:12:04 UTC by jake1318
+// Updated: 2025-07-18 00:57:50 UTC by jake1318
 
 import express from "express";
 import * as bluefinService from "../services/bluefinService.js";
@@ -317,17 +317,35 @@ router.post("/get-force-close-params", async (req, res) => {
  *  BUILD + SERIALISE (all return { txb64 }) - SIMPLIFIED
  * ──────────────────────────────────────────────────────────*/
 
-// Modified to return a proper JSON response with txBytes field
+// Modified to better handle error cases and support both txBytes and tx fields for backward compatibility
 const buildAndReturn = (builder) => async (req, res, next) => {
   try {
-    const txb64 = await builder(req.body);
-    // CHANGED: Return JSON object with txBytes field instead of raw string
-    res.json({ success: true, txBytes: txb64 });
+    const result = await builder(req.body);
+
+    // Handle special cases for complex return values
+    if (result && typeof result === "object" && result.hasOwnProperty("tx")) {
+      // For functions that return {tx, hasLiquidity} like buildRemoveLiquidityTx
+      res.json({
+        success: true,
+        txBytes: result.tx, // New standard field
+        tx: result.tx, // For backwards compatibility
+        ...result, // Include any other properties like hasLiquidity
+      });
+    } else {
+      // Standard case - just return the tx in both field formats
+      res.json({
+        success: true,
+        txBytes: result, // New standard field
+        tx: result, // For backwards compatibility
+      });
+    }
   } catch (e) {
     console.error("Builder error:", e);
     jsonError(res, 500, e.message);
   }
 };
+
+// --- BUILD TRANSACTION ENDPOINTS ---
 
 router.post(
   "/create-deposit-tx",
@@ -338,7 +356,12 @@ router.post(
       amountB,
       lowerTickFactor,
       upperTickFactor,
+      lowerTick,
+      upperTick,
+      isFullRange,
+      slippagePct,
       walletAddress,
+      fixedCoinOverride,
     }) =>
       buildDepositTx({
         poolId,
@@ -346,22 +369,65 @@ router.post(
         amountB,
         lowerTickFactor,
         upperTickFactor,
+        lowerTick,
+        upperTick,
+        isFullRange,
+        slippagePct,
         walletAddress,
+        fixedCoinOverride,
       })
   )
 );
 
-router.post(
-  "/create-remove-liquidity-tx",
-  buildAndReturn(({ poolId, positionId, percent, walletAddress }) =>
-    buildRemoveLiquidityTx({
+router.post("/create-remove-liquidity-tx", async (req, res) => {
+  try {
+    const { poolId, positionId, percent, walletAddress } = req.body;
+
+    if (!poolId || !positionId || !walletAddress) {
+      return jsonError(
+        res,
+        400,
+        "Missing required parameters: poolId, positionId, or walletAddress"
+      );
+    }
+
+    console.log("Removing liquidity for position:", {
       poolId,
       positionId,
-      percent,
+      percent: percent || 100,
       walletAddress,
-    })
-  )
-);
+    });
+
+    // Build the transaction
+    const result = await buildRemoveLiquidityTx({
+      poolId,
+      positionId,
+      percent: percent || 100,
+      walletAddress,
+    });
+
+    // Return information about whether there is liquidity to remove
+    if (!result.hasLiquidity) {
+      return res.json({
+        success: true,
+        tx: null,
+        txBytes: null,
+        hasLiquidity: false,
+        message: "No liquidity to remove for this position",
+      });
+    }
+
+    return res.json({
+      success: true,
+      tx: result.tx,
+      txBytes: result.tx,
+      hasLiquidity: true,
+    });
+  } catch (error) {
+    console.error("Error creating remove liquidity transaction:", error);
+    return jsonError(res, 500, error.message || "Unknown error");
+  }
+});
 
 router.post(
   "/create-collect-fees-tx",
@@ -372,15 +438,20 @@ router.post(
 
 router.post(
   "/create-collect-rewards-tx",
-  buildAndReturn(({ poolId, positionId, walletAddress }) =>
-    buildCollectRewardsTx({ poolId, positionId, walletAddress })
+  buildAndReturn(({ poolId, positionId, walletAddress, rewardCoinType }) =>
+    buildCollectRewardsTx({ poolId, positionId, walletAddress, rewardCoinType })
   )
 );
 
 router.post(
   "/create-collect-fees-and-rewards-tx",
-  buildAndReturn(({ poolId, positionId, walletAddress }) =>
-    buildCollectFeesAndRewardsTx({ poolId, positionId, walletAddress })
+  buildAndReturn(({ poolId, positionId, walletAddress, rewardCoinTypes }) =>
+    buildCollectFeesAndRewardsTx({
+      poolId,
+      positionId,
+      walletAddress,
+      rewardCoinTypes,
+    })
   )
 );
 

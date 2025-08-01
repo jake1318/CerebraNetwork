@@ -1,11 +1,15 @@
 // server.js
+// Last Updated: 2025-07-11 22:01:07 UTC by jake1318
+
 import express from "express";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import dotenv from "dotenv";
 import searchRouter from "./routes/search.js";
-import bluefinRouter from "./routes/bluefin.js"; // Import the Bluefin router
+import bluefinRouter from "./routes/bluefin.js";
+import swapHistoryRouter from "./routes/swapHistory.js";
+import financeRouter from "./routes/finance.js";
 
 dotenv.config();
 
@@ -38,6 +42,36 @@ const bluefinLimiter = rateLimit({
   message: { success: false, message: "Too many requests to Bluefin API" },
 });
 
+// 7K API rate limiter
+const k7Limiter = rateLimit({
+  windowMs: 1000,
+  max: 10, // More conservative limit for 7K API
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests to 7K API" },
+});
+
+// BlockVision API rate limiter - strict CU limit
+const blockVisionLimiter = rateLimit({
+  windowMs: 1000,
+  max: 5, // Increased to 5 per second for Pro key (300 CU endpoints)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests to BlockVision API" },
+});
+
+// BlockVision batch API rate limiter - allow more requests with Pro key
+const blockVisionBatchLimiter = rateLimit({
+  windowMs: 1000,
+  max: 15, // Allow 15 batch requests per second (15 * 100 CU = 1500 CUPS < 2000 ceiling)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many batch requests to BlockVision API",
+  },
+});
+
 // shared axios client for Birdeye
 const birdeye = axios.create({
   baseURL: BIRDEYE_BASE,
@@ -46,6 +80,10 @@ const birdeye = axios.create({
     "X-API-KEY": BIRDEYE_KEY,
   },
 });
+
+// Initialize memory cache for BlockVision responses
+const bvCache = new Map();
+const CACHE_TTL = 60_000; // 1 minute cache
 
 app.use(cors());
 app.use(express.json());
@@ -58,6 +96,11 @@ app.use("/api/search", searchRouter);
 
 // mount Bluefin endpoints under `/api/bluefin` with a separate rate limiter
 app.use("/api/bluefin", bluefinLimiter, bluefinRouter);
+
+// mount 7K swap history endpoints under `/api/7k` with its own rate limiter
+app.use("/api/7k", k7Limiter, swapHistoryRouter);
+// Add this to your existing middleware setup
+app.use("/api/finance", financeRouter);
 
 /**
  * Forwards the incoming request to Birdeye under the same query params + x‑chain header
@@ -92,6 +135,144 @@ app.get("/api/ohlcv", (req, res) => forwardToBirdeye(req, res, "/defi/ohlcv"));
 app.get("/api/history_price", (req, res) =>
   forwardToBirdeye(req, res, "/defi/history_price")
 );
+
+// Proxy endpoint for BlockVision coin market data with caching
+app.get("/api/coin/market/pro", blockVisionLimiter, async (req, res) => {
+  try {
+    const coinType = req.query.coinType;
+    if (!coinType) {
+      return res
+        .status(400)
+        .json({ success: false, message: "coinType parameter is required" });
+    }
+
+    // Check cache first
+    const cacheKey = `market_pro_${coinType}`;
+    const cached = bvCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`Cache hit for ${coinType}`);
+      return res.json(cached.data);
+    }
+
+    const response = await axios.get(
+      `https://api.blockvision.org/v2/sui/coin/market/pro`,
+      {
+        params: { coinType },
+        headers: {
+          accept: "application/json",
+          "x-api-key": process.env.VITE_BLOCKVISION_API_KEY,
+        },
+      }
+    );
+
+    // Cache the successful response
+    if (response.data.success) {
+      bvCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: response.data,
+      });
+    }
+
+    return res.json(response.data);
+  } catch (err) {
+    // Handle rate limit errors specially
+    if (err.response?.status === 429) {
+      // Extract retry-after header if available
+      const retryAfter = err.response.headers["retry-after"];
+      res
+        .status(429)
+        .header("Retry-After", retryAfter || "5")
+        .json({
+          success: false,
+          message: "Rate limit exceeded",
+          retryAfter: retryAfter || 5,
+        });
+      return;
+    }
+
+    if (err.response?.data) {
+      return res.status(err.response.status).json(err.response.data);
+    }
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Proxy endpoint for BlockVision batch coin prices with caching
+app.get("/api/coin/price/batch", blockVisionBatchLimiter, async (req, res) => {
+  try {
+    const tokenIds = req.query.tokenIds;
+    const show24hChange = req.query.show24hChange || "true";
+
+    if (!tokenIds) {
+      return res
+        .status(400)
+        .json({ success: false, message: "tokenIds parameter is required" });
+    }
+
+    // Check cache first
+    const cacheKey = `price_batch_${tokenIds}_${show24hChange}`;
+    const cached = bvCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`Cache hit for batch ${tokenIds.substring(0, 20)}...`);
+      return res.json(cached.data);
+    }
+
+    const response = await axios.get(
+      `https://api.blockvision.org/v2/sui/coin/price/list`,
+      {
+        params: {
+          tokenIds,
+          show24hChange,
+        },
+        headers: {
+          accept: "application/json",
+          "x-api-key": process.env.VITE_BLOCKVISION_API_KEY,
+        },
+      }
+    );
+
+    // Cache the successful response
+    if (response.data.success) {
+      bvCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: response.data,
+      });
+    }
+
+    return res.json(response.data);
+  } catch (err) {
+    // Handle rate limit errors specially
+    if (err.response?.status === 429) {
+      // Extract retry-after header if available
+      const retryAfter = err.response.headers["retry-after"];
+      res
+        .status(429)
+        .header("Retry-After", retryAfter || "5")
+        .json({
+          success: false,
+          message: "Rate limit exceeded",
+          retryAfter: retryAfter || 5,
+        });
+      return;
+    }
+
+    // Handle other errors
+    if (err.response?.data) {
+      return res.status(err.response.status).json(err.response.data);
+    }
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Add a cleanup function to periodically remove old cache entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of bvCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      bvCache.delete(key);
+    }
+  }
+}, 60000); // Clean up every minute
 
 // 404 for anything else under /api
 app.use("/api/*", (_req, res) =>
