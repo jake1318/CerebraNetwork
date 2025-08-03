@@ -1,5 +1,5 @@
 // src/services/birdeyeService.ts
-// Last Updated: 2025-07-15 00:01:44 UTC by jake1318
+// Last Updated: 2025-07-31 22:56:58 UTC by jake1318
 
 import axios from "axios";
 
@@ -90,7 +90,8 @@ export interface TokenMetadata {
   logo?: string;
 }
 
-const BIRDEYE_API_KEY = "22430f5885a74d3b97e7cbd01c2140aa";
+// Get API key from environment variables
+const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY || "";
 const BIRDEYE_BASE_URL = "https://public-api.birdeye.so/defi/v3";
 // Updated to use the new higher rate limit (with safety margin)
 const MAX_REQUESTS_PER_SECOND = 45; // Using 45 out of 50 to leave some safety margin

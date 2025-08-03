@@ -1,5 +1,5 @@
 // src/services/coinGeckoService.ts
-// Last Updated: 2025-05-19 01:55:45 UTC by jake1318
+// Last Updated: 2025-07-31 23:01:19 UTC by jake1318
 
 import { TokenMetadata } from "./birdeyeService";
 import * as birdeyeService from "./birdeyeService";
@@ -38,7 +38,8 @@ export interface PoolInfo {
 const COINGECKO_API_URL = "https://pro-api.coingecko.com/api/v3";
 const POOLS_ENDPOINT = "/onchain/pools/megafilter";
 const SEARCH_ENDPOINT = "/onchain/search/pools";
-const COINGECKO_API_KEY = "CG-RsxinQSgFE2ti5oXgH9CUZgp"; // Your API key from the fetch example
+// Get API key from environment variables
+const COINGECKO_API_KEY = import.meta.env.VITE_GECKO_API_KEY || "";
 
 // Default token icon placeholder
 const DEFAULT_TOKEN_ICON = "/assets/token-placeholder.png";
@@ -277,7 +278,7 @@ async function enrichPoolsWithMetadata(pools: PoolInfo[]): Promise<PoolInfo[]> {
 
 /**
  * Get default pools from CoinGecko Pro API
- * Last Updated: 2025-05-19 01:55:45 UTC by jake1318
+ * Last Updated: 2025-07-31 23:01:19 UTC by jake1318
  */
 export async function getDefaultPools(): Promise<PoolInfo[]> {
   try {
@@ -401,7 +402,7 @@ export async function getDefaultPools(): Promise<PoolInfo[]> {
 
 /**
  * Search pools using CoinGecko API - using the dedicated search endpoint
- * Last Updated: 2025-05-19 01:55:45 UTC by jake1318
+ * Last Updated: 2025-07-31 23:01:19 UTC by jake1318
  */
 export async function searchPools(
   query: string,
@@ -576,7 +577,7 @@ export async function searchPools(
 /**
  * Get pools by DEX
  * Fetches top pools for a specific DEX
- * Last Updated: 2025-05-19 01:55:45 UTC by jake1318
+ * Last Updated: 2025-07-31 23:01:19 UTC by jake1318
  */
 export async function getPoolsByDex(
   dex: string,
@@ -711,7 +712,7 @@ export async function getPoolsByDex(
 
 /**
  * Get pools by addresses
- * Last Updated: 2025-05-19 01:55:45 UTC by jake1318
+ * Last Updated: 2025-07-31 23:01:19 UTC by jake1318
  */
 export async function getPoolsByAddresses(
   addresses: string[]
@@ -728,7 +729,7 @@ export async function getPoolsByAddresses(
 /**
  * Get aggregate statistics for all supported DEXes
  * Calculates total TVL, total pool count, and highest APR
- * Last Updated: 2025-05-19 01:55:45 UTC by jake1318
+ * Last Updated: 2025-07-31 23:01:19 UTC by jake1318
  */
 export async function getAggregatePoolStats(): Promise<{
   totalTvlUsd: number;
@@ -874,7 +875,7 @@ export interface CoinGeckoTokenDetails {
 /**
  * Get token details from CoinGecko API
  * This function can be used as a fallback when BirdEye doesn't provide token metadata
- * Last Updated: 2025-05-19 01:55:45 UTC by jake1318
+ * Last Updated: 2025-07-31 23:01:19 UTC by jake1318
  */
 export async function getTokenDetailsFromCoingecko(
   tokenAddress: string

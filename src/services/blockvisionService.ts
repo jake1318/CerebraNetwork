@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-13 03:26:54 UTC by jake1318
+// Last Updated: 2025-07-31 23:10:03 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -10,8 +10,7 @@ import processDefiPortfolioData from "./blockvisionDataProcessor";
 import { getCoinMeta } from "./suiMetadataService";
 
 const BLOCKVISION_API_BASE_URL = "https://api.blockvision.org";
-const BLOCKVISION_API_KEY =
-  import.meta.env.VITE_BLOCKVISION_API_KEY || "2ugIlviim3ywrgFI0BMniB9wdzU";
+const BLOCKVISION_API_KEY = import.meta.env.VITE_BLOCKVISION_API_KEY || "";
 
 // Add this new constant for the list endpoint limit
 const LIST_LIMIT = 20;
@@ -1303,7 +1302,7 @@ export function clearVaultApyCache(): void {
 
 // ---------------------------------------------------------------------------
 //  BlockVision – *extra* market‑data helpers (PRO endpoints)
-//  last‑updated: 2025‑07‑13 03:26:54 UTC by jake1318
+//  last‑updated: 2025‑07‑31 23:10:03 UTC by jake1318
 // ---------------------------------------------------------------------------
 
 /** One point returned by /coin/ohlcv                                         */
@@ -1356,11 +1355,7 @@ export interface MarketWindow {
 /*  Shared low‑level helper                                                 */
 
 const BLOCKVISION_BASE = "https://api.blockvision.org/v2/sui";
-const BV_API_KEY =
-  import.meta.env.VITE_BLOCKVISION_API_KEY || // ← Vite
-  process.env.REACT_APP_BLOCKVISION_API_KEY || // ← CRA
-  process.env.NEXT_PUBLIC_BLOCKVISION_API_KEY || // ← Next
-  "YOUR_API_KEY_HERE"; //  Fallback
+const BV_API_KEY = import.meta.env.VITE_BLOCKVISION_API_KEY || "";
 
 async function bvGet<T>(
   path: string,
@@ -2852,7 +2847,7 @@ export const blockvisionService = {
               headers: {
                 accept: "application/json",
                 "x-chain": "sui",
-                "X-API-KEY": "22430f5885a74d3b97e7cbd01c2140aa",
+                "X-API-KEY": import.meta.env.VITE_BIRDEYE_API_KEY || "",
               },
             }
           );
