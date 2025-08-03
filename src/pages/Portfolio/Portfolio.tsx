@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-07-31 19:08:30 UTC by jake1318
+// Last Updated: 2025-08-01 01:17:09 UTC by jake1318
 
 import React, {
   useState,
@@ -748,7 +748,7 @@ function PortfolioValueCard({
   );
 }
 
-// Distribution chart card
+// Distribution chart card - Updated to fix single color issue
 function DistributionChartCard({
   title,
   icon,
@@ -763,12 +763,23 @@ function DistributionChartCard({
     totalValue: number;
   };
 }) {
+  // Ensure we have data to display
+  const hasData = data.series.length > 0 && data.labels.length > 0;
+
+  // Format series to be at least 0.01 to ensure visibility
+  const formattedSeries = data.series.map(
+    (value) => Math.max(value, data.totalValue * 0.0001) // Ensure minimum slice size
+  );
+
   // Chart options
   const chartOptions: ApexOptions = {
     chart: {
       type: "donut",
       background: "transparent",
       fontFamily: "Inter, sans-serif",
+      animations: {
+        enabled: false, // Disable animations for stability
+      },
     },
     colors: data.colors,
     labels: data.labels,
@@ -796,6 +807,7 @@ function DistributionChartCard({
     },
     plotOptions: {
       pie: {
+        expandOnClick: false,
         donut: {
           size: "70%",
           background: "transparent",
@@ -821,6 +833,18 @@ function DistributionChartCard({
         },
       },
     },
+    states: {
+      hover: {
+        filter: {
+          type: "none",
+        },
+      },
+      active: {
+        filter: {
+          type: "none",
+        },
+      },
+    },
   };
 
   return (
@@ -832,13 +856,22 @@ function DistributionChartCard({
         </h3>
       </div>
       <div className="dashboard-card__content">
-        <div className="chart-container">
-          <ReactApexChart
-            options={chartOptions}
-            series={data.series}
-            type="donut"
-            height={220}
-          />
+        <div
+          className="chart-container"
+          id={`chart-${title.replace(/\s+/g, "-").toLowerCase()}`}
+        >
+          {hasData ? (
+            <ReactApexChart
+              key={`chart-${title}-${data.series.join("-")}`}
+              options={chartOptions}
+              series={formattedSeries}
+              type="donut"
+              height={220}
+              width="100%"
+            />
+          ) : (
+            <div className="no-data-message">No data available</div>
+          )}
         </div>
         <div className="chart-legend">
           {data.labels.map((label, index) => (
@@ -850,6 +883,9 @@ function DistributionChartCard({
                 }}
               ></div>
               <div className="legend-label">{label}</div>
+              <div className="legend-value">
+                ${data.series[index].toFixed(2)}
+              </div>
             </div>
           ))}
         </div>
@@ -1111,6 +1147,11 @@ async function fetchPortfolioHistory(
       // For fallback, simulate a slight uptrend
       const factor = 0.9 + (i / days) * 0.2;
       values.push(parseFloat((currentPortfolioValue * factor).toFixed(2)));
+    }
+
+    // Check if aborted or component unmounted
+    if (abortSignal?.aborted) {
+      throw new Error("Operation was aborted");
     }
 
     return { dates, values };
@@ -2501,7 +2542,7 @@ function Portfolio() {
 
   const visiblePositions = getVisiblePositions();
 
-  // Create protocol distribution data
+  // Create protocol distribution data - UPDATED for pie chart fix
   const protocolDistributionData = useMemo(() => {
     // Calculate wallet value
     const walletValue = walletTokens.reduce(
@@ -2553,15 +2594,34 @@ function Portfolio() {
         }
       });
 
+    // Calculate total
+    const totalValue = series.reduce((sum, val) => sum + val, 0);
+
+    // Debug logging
+    console.log("[Portfolio] Protocol Distribution Data:", {
+      labels,
+      series,
+      colors,
+      totalValue,
+    });
+
+    // Ensure we have at least two data points for the chart to render properly
+    if (series.length === 1) {
+      // Add a tiny "Other" section just to make the chart display properly
+      labels.push("Other");
+      series.push(0.01);
+      colors.push("#999999");
+    }
+
     return {
       series,
       labels,
       colors,
-      totalValue: Object.values(protocolMap).reduce((sum, val) => sum + val, 0),
+      totalValue,
     };
   }, [allPositions, walletTokens]);
 
-  // Create category distribution data
+  // Create category distribution data - UPDATED for pie chart fix
   const categoryDistributionData = useMemo(() => {
     // Calculate wallet value
     const walletValue = walletTokens.reduce(
@@ -2618,11 +2678,30 @@ function Portfolio() {
         }
       });
 
+    // Calculate total
+    const totalValue = series.reduce((sum, val) => sum + val, 0);
+
+    // Debug logging
+    console.log("[Portfolio] Category Distribution Data:", {
+      labels,
+      series,
+      colors,
+      totalValue,
+    });
+
+    // Ensure we have at least two data points for the chart to render properly
+    if (series.length === 1) {
+      // Add a tiny "Other" section just to make the chart display properly
+      labels.push("Other");
+      series.push(0.01);
+      colors.push("#999999");
+    }
+
     return {
       series,
       labels,
       colors,
-      totalValue: Object.values(categories).reduce((sum, val) => sum + val, 0),
+      totalValue,
     };
   }, [categorizedPositions, walletTokens]);
 

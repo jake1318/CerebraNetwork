@@ -1135,11 +1135,9 @@ function MarketDashboard() {
           <div className="data-attribution">
             <div className="attribution-item">
               <FaChartBar className="attribution-icon" />
-              Data from Birdeye and BlockVision APIs
             </div>
             <div className="update-frequency">
               <FaSync className="update-icon" />
-              Data refreshed manually. Click Refresh for latest data.
             </div>
           </div>
         </div>

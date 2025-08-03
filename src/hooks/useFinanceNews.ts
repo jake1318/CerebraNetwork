@@ -1,7 +1,8 @@
 // src/hooks/useFinanceNews.ts
-// Last Updated: 2025-07-12 22:01:15 UTC by jake1318
+// Last Updated: 2025-07-30 00:53:37 UTC by jake1318
 
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
+import { formatDistanceToNow, parseISO } from "date-fns";
 
 // Define proper TypeScript interfaces for our data
 interface NewsItem {
@@ -10,9 +11,11 @@ interface NewsItem {
   link: string;
   source: string;
   date: string;
+  isoDate?: string;
   snippet: string;
   thumbnail?: string;
   favicon?: string;
+  rss?: boolean;
 }
 
 interface NewsData {
@@ -29,6 +32,31 @@ interface ApiResponse {
 }
 
 /**
+ * Helper to format relative time strings
+ */
+export function formatRelativeDate(dateString: string): string {
+  if (!dateString) return "Recent";
+
+  try {
+    // If it's already a relative date (like "2 days ago"), return as is
+    if (
+      dateString.includes("ago") ||
+      dateString.includes("hour") ||
+      dateString.includes("day")
+    ) {
+      return dateString;
+    }
+
+    // Try to parse the date string
+    const date = parseISO(dateString);
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch (e) {
+    // If parsing fails, return the original string
+    return dateString;
+  }
+}
+
+/**
  * React hook to fetch financial news data
  * @param query - Optional ticker or keyword to get specific news (e.g. "SUI", "BTC-USD")
  * @param options - Additional options for useQuery
@@ -40,9 +68,16 @@ export function useFinanceNews(
   return useQuery<NewsData, Error>({
     queryKey: ["finance-news", query],
     queryFn: async () => {
+      // Include RSS feeds by default for CRYPTO and COINTELEGRAPH queries
+      const includeRss =
+        query === "CRYPTO" || query === "COINTELEGRAPH" || !query;
+
       const url = `/api/finance/news${
         query ? `?q=${encodeURIComponent(query)}` : ""
+      }${
+        includeRss ? (query ? "&include_rss=true" : "?include_rss=true") : ""
       }`;
+
       const res = await fetch(url);
 
       if (!res.ok) {
@@ -55,8 +90,18 @@ export function useFinanceNews(
         throw new Error(json.error || "Failed to fetch finance news");
       }
 
-      // No need to process dates anymore since they're already in a good format
-      return json.data;
+      // Process and enhance news items
+      const processedNews = json.data.news.map((item) => ({
+        ...item,
+        // Ensure we have both date formats
+        date: item.date || "Recent",
+        isoDate: item.isoDate || item.date || new Date().toISOString(),
+      }));
+
+      return {
+        ...json.data,
+        news: processedNews,
+      };
     },
     staleTime: 30 * 60 * 1000, // 30 minutes
     refetchOnWindowFocus: false,
