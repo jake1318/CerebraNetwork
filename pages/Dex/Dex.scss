@@ -1,0 +1,1377 @@
+/* src/pages/Dex/Dex.scss */
+/* Last Updated: 2025-07-14 23:38:04 UTC by jake1318 */
+
+/* DEX container */
+.dex-container {
+  height: 100vh; /* Full viewport height */
+  width: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  // Updated background with neon blue instead of cyan
+  background: radial-gradient(
+      circle at top left,
+      rgba(30, 144, 255, 0.15) 0%,
+      // Changed to neon blue from navbar
+      rgba(2, 2, 2, 0.8) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(196, 92, 242, 0.15) 0%,
+      rgba(2, 2, 2, 0.8) 40%
+    ),
+    linear-gradient(135deg, rgba(2, 2, 2, 0.95) 0%, rgba(5, 5, 15, 0.95) 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: center, center, center;
+  color: #ffffff;
+  position: relative;
+  padding-top: var(--navbar-h); /* Add padding equal to navbar height */
+  box-sizing: border-box; /* Ensure padding is included in height calculation */
+  margin-top: 0; /* Remove negative margin */
+
+  // Removed the grid overlay from the &::before pseudo-element
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    // Grid pattern removed
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  // Variables updated with neon blue
+  $accent-color: #1e90ff; // Changed to neon blue
+  $accent-purple: #c45cf2;
+  $accent-green: #00ff80;
+  $positive-color: #1ed760;
+  $negative-color: #ff4444;
+  $panel-bg: rgba(2, 2, 2, 0.7);
+  $panel-header: rgba(2, 2, 2, 0.9);
+  $panel-border: rgba(255, 255, 255, 0.05);
+  $text-secondary: #b1a5c8;
+  $text-muted: #3f4c60;
+
+  // Scanning horizontal line (neon blue)
+  &::after {
+    content: "";
+    position: absolute;
+    width: 100vw;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      #1e90ff,
+      transparent
+    ); // Changed to neon blue
+    top: 50%;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(30, 144, 255, 0.5); // Changed to neon blue
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  // Vertical scan line (neon purple)
+  .vertical-scan {
+    content: "";
+    position: absolute;
+    width: 2px;
+    height: 100vh;
+    background: linear-gradient(180deg, transparent, #c45cf2, transparent);
+    left: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+    animation: verticalScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(196, 92, 242, 0.5);
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  // Add glow effects with neon blue
+  .glow-1 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(30, 144, 255, 0.12); // Changed to neon blue
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -100px;
+    left: 10%;
+    z-index: 0;
+    animation: pulsate 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(196, 92, 242, 0.12);
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: 10%;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    pointer-events: none;
+  }
+
+  // Add a green glow element to match swap page
+  .glow-3 {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba(0, 255, 128, 0.12);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 60%;
+    left: 70%;
+    z-index: 0;
+    animation: pulsate 9s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .dex-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Take full height of container */
+    width: 100%;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 2;
+
+    /* Top section with chart and pair selector */
+    .top-section {
+      display: flex;
+      height: 45vh; /* 45% of viewport height */
+      max-height: 400px; /* Maximum height */
+      min-height: 280px; /* Minimum height */
+      border-bottom: 1px solid;
+      border-image: linear-gradient(
+          90deg,
+          rgba(30, 144, 255, 0.2),
+          // Changed to neon blue
+          rgba(196, 92, 242, 0.2)
+        )
+        1;
+
+      /* Main chart area */
+      .dex-main-chart {
+        flex: 3;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid;
+        border-image: linear-gradient(
+            180deg,
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
+          )
+          1;
+
+        /* Updated pair header for single-line layout */
+        .pair-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0 16px;
+          background-color: rgba(
+            2,
+            2,
+            2,
+            0.8
+          ); /* Darker background to match Swap */
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+          height: 50px; /* Increased height to accommodate all content */
+          box-sizing: border-box;
+          flex-shrink: 0;
+          overflow: hidden;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          /* Left side containing pair info and stats */
+          .header-left {
+            display: flex;
+            align-items: center;
+            flex: 1;
+            overflow-x: auto;
+            white-space: nowrap;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+
+            /* Hide scrollbar for Chrome, Safari and Opera */
+            &::-webkit-scrollbar {
+              display: none;
+            }
+
+            /* Pair name/price/change */
+            .pair-name {
+              font-size: 16px;
+              font-weight: 600;
+              margin-right: 12px;
+              white-space: nowrap;
+              background: linear-gradient(
+                90deg,
+                #1e90ff,
+                #c45cf2
+              ); // Changed to neon blue
+              -webkit-background-clip: text;
+              background-clip: text;
+              -webkit-text-fill-color: transparent;
+              color: transparent;
+              text-shadow: 0 0 8px rgba(30, 144, 255, 0.2); // Changed to neon blue
+            }
+
+            .pair-price {
+              font-family: "Orbitron", monospace;
+              font-size: 15px;
+              margin-right: 8px;
+              white-space: nowrap;
+            }
+
+            .pair-change {
+              font-size: 14px;
+              font-weight: 600;
+              padding: 2px 6px;
+              border-radius: 3px;
+              margin-right: 24px; /* Extra space before stats */
+              white-space: nowrap;
+
+              &.positive {
+                color: #1ed760; /* Positive color */
+                text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
+              }
+
+              &.negative {
+                color: #ff4444; /* Negative color */
+                text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+              }
+            }
+
+            /* Stats on the same line */
+            .header-stats {
+              display: flex;
+              flex: 1;
+              align-items: center;
+              gap: 20px; /* Space between stat items */
+
+              .stat-item {
+                display: flex;
+                align-items: center;
+                white-space: nowrap;
+
+                .stat-label {
+                  font-size: 12px;
+                  color: #b1a5c8; /* Text-secondary color */
+                  margin-right: 6px;
+                }
+
+                .stat-value {
+                  font-family: "Orbitron", monospace;
+                  font-size: 14px;
+                  color: #ffffff;
+                }
+              }
+            }
+          }
+
+          /* Right side with chart type */
+          .header-right {
+            margin-left: 12px;
+            flex-shrink: 0;
+
+            .chart-label {
+              font-size: 14px;
+              color: #1e90ff; // Changed to neon blue
+              padding: 4px 10px;
+              border-radius: 8px;
+              background-color: rgba(30, 144, 255, 0.1); // Changed to neon blue
+              border: 1px solid rgba(30, 144, 255, 0.3); // Changed to neon blue
+              white-space: nowrap;
+              transition: all 0.3s ease;
+
+              &:hover {
+                background-color: rgba(
+                  30,
+                  144,
+                  255,
+                  0.2
+                ); // Changed to neon blue
+                box-shadow: 0 0 10px rgba(30, 144, 255, 0.3); // Changed to neon blue
+              }
+            }
+          }
+        }
+
+        /* Mobile stats row - hidden on desktop, shown on mobile */
+        .mobile-stats-row {
+          display: none; /* Hidden by default, shown in media query */
+          flex-wrap: wrap;
+          padding: 8px 16px;
+          background-color: rgba(2, 2, 2, 0.7); /* Darker background */
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+
+          .stat-item {
+            display: flex;
+            align-items: center;
+            width: 50%;
+            margin-bottom: 8px;
+
+            .stat-label {
+              font-size: 12px;
+              color: #b1a5c8; /* Text-secondary color */
+              margin-right: 6px;
+            }
+
+            .stat-value {
+              font-family: "Orbitron", monospace;
+              font-size: 14px;
+              color: #ffffff;
+            }
+          }
+        }
+
+        .chart-container {
+          flex: 1;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
+          position: relative;
+          overflow: hidden;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+      }
+
+      /* Pair selector */
+      .pair-selector-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid transparent;
+        border-image: linear-gradient(
+            45deg,
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
+          )
+          1;
+        border-top: none;
+        border-bottom: none;
+        border-right: none;
+
+        .panel-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0 16px;
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
+          height: 50px; /* Match height with pair-header */
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+          flex-shrink: 0;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          .panel-title {
+            font-size: 15px;
+            font-weight: 500;
+            background: linear-gradient(
+              90deg,
+              #1e90ff,
+              #c45cf2
+            ); // Changed to neon blue
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+          }
+
+          .refresh-btn {
+            background: transparent;
+            color: #b1a5c8; /* Text-secondary color */
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+
+            &:hover {
+              color: #1e90ff; // Changed to neon blue
+              background: rgba(30, 144, 255, 0.1); // Changed to neon blue
+              transform: rotate(180deg);
+            }
+
+            &:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+            }
+          }
+        }
+
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          .search-box {
+            padding: 10px;
+            border-bottom: 1px solid;
+            border-image: linear-gradient(
+                90deg,
+                rgba(30, 144, 255, 0.2),
+                // Changed to neon blue
+                rgba(196, 92, 242, 0.2)
+              )
+              1;
+
+            .search-input {
+              width: 100%;
+              background-color: rgba(2, 2, 2, 0.3); /* Darker background */
+              border: 1px solid rgba(30, 144, 255, 0.1); // Changed to neon blue
+              color: #ffffff;
+              padding: 8px 12px;
+              font-size: 13px;
+              border-radius: 8px;
+              transition: all 0.3s ease;
+
+              &:focus {
+                outline: none;
+                border: 1px solid;
+                border-image: linear-gradient(
+                    45deg,
+                    rgba(30, 144, 255, 0.5),
+                    // Changed to neon blue
+                    rgba(196, 92, 242, 0.5)
+                  )
+                  1;
+                box-shadow: 0 0 10px rgba(30, 144, 255, 0.2),
+                  // Changed to neon blue
+                  0 0 10px rgba(196, 92, 242, 0.2);
+              }
+
+              &::placeholder {
+                color: #b1a5c8;
+                opacity: 0.6;
+              }
+            }
+          }
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
+            );
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
+            );
+          }
+        }
+      }
+    }
+
+    /* Bottom section with order form, order manager, and recent trades */
+    .bottom-section {
+      display: flex;
+      height: 35vh; /* 35% of viewport height */
+      max-height: 350px; /* Maximum height */
+      min-height: 250px; /* Minimum height */
+      overflow: hidden; /* Hide horizontal scrollbar */
+
+      /* Order form panel */
+      .order-form-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-right: 1px solid;
+        border-image: linear-gradient(
+            180deg,
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
+          )
+          1;
+
+        .panel-header {
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
+          padding: 0;
+          height: 40px;
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+          flex-shrink: 0;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          .tab-buttons {
+            display: flex;
+            height: 100%;
+
+            .tab-btn {
+              background-color: transparent;
+              border: none;
+              color: #b1a5c8; /* Text-secondary color */
+              font-size: 14px;
+              padding: 0 16px;
+              height: 100%;
+              cursor: pointer;
+              position: relative;
+              transition: all 0.3s ease;
+
+              &.active {
+                background: linear-gradient(
+                  45deg,
+                  rgba(30, 144, 255, 0.2),
+                  // Changed to neon blue
+                  rgba(196, 92, 242, 0.2)
+                );
+                color: #ffffff;
+                text-shadow: 0 0 10px rgba(30, 144, 255, 0.5); // Changed to neon blue
+
+                &::after {
+                  content: "";
+                  position: absolute;
+                  bottom: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 2px;
+                  background: linear-gradient(
+                    90deg,
+                    #1e90ff,
+                    #c45cf2
+                  ); // Changed to neon blue
+                  box-shadow: 0 0 10px rgba(30, 144, 255, 0.5),
+                    // Changed to neon blue
+                    0 0 10px rgba(196, 92, 242, 0.5);
+                }
+              }
+
+              &:hover:not(.active) {
+                color: #ffffff;
+                background-color: rgba(255, 255, 255, 0.05);
+              }
+            }
+          }
+        }
+
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
+            );
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
+            );
+          }
+        }
+      }
+
+      /* Order manager panel */
+      .orders-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-right: 1px solid;
+        border-image: linear-gradient(
+            180deg,
+            rgba(30, 144, 255, 0.2),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.2)
+          )
+          1;
+
+        .panel-header {
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
+          padding: 0 16px;
+          height: 40px;
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+          flex-shrink: 0;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          display: flex;
+          align-items: center;
+
+          .panel-title {
+            font-size: 15px;
+            font-weight: 500;
+            background: linear-gradient(
+              90deg,
+              #1e90ff,
+              #c45cf2
+            ); // Changed to neon blue
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+          }
+        }
+
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
+            );
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
+            );
+          }
+        }
+      }
+
+      /* Recent trades panel */
+      .recent-trades-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+
+        .panel-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0 16px;
+          background-color: rgba(2, 2, 2, 0.8); /* Darker background */
+          height: 40px;
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+          flex-shrink: 0;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          .panel-title {
+            font-size: 15px;
+            font-weight: 500;
+            background: linear-gradient(
+              90deg,
+              #1e90ff,
+              #c45cf2
+            ); // Changed to neon blue
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+          }
+        }
+
+        .panel-content {
+          flex: 1;
+          overflow: auto;
+          background-color: rgba(2, 2, 2, 0.6); /* Darker background */
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.3),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.2),
+              rgba(196, 92, 242, 0.3)
+            );
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(
+              180deg,
+              rgba(30, 144, 255, 0.5),
+              // Changed to neon blue
+              rgba(0, 255, 128, 0.3),
+              rgba(196, 92, 242, 0.5)
+            );
+          }
+        }
+      }
+    }
+  }
+
+  .error-message {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 68, 68, 0.1);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    color: #ff4444; /* Error red */
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    max-width: 80%;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
+    animation: fadeIn 0.3s ease-in-out;
+    z-index: 100;
+  }
+
+  /* Hide the horizontal scrollbar at the bottom of the page */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* For Firefox */
+  scrollbar-width: none;
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Custom styling for the PairSelector component */
+.pair-selector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  .search-box {
+    padding: 10px;
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+
+    .search-input {
+      width: 100%;
+      background-color: rgba(2, 2, 2, 0.3); /* Darker background */
+      border: 1px solid rgba(30, 144, 255, 0.1); // Changed to neon blue
+      color: #ffffff;
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+
+      &:focus {
+        outline: none;
+        border: 1px solid;
+        border-image: linear-gradient(
+            45deg,
+            rgba(30, 144, 255, 0.5),
+            // Changed to neon blue
+            rgba(196, 92, 242, 0.5)
+          )
+          1;
+        box-shadow: 0 0 10px rgba(30, 144, 255, 0.2),
+          // Changed to neon blue
+          0 0 10px rgba(196, 92, 242, 0.2);
+      }
+
+      &::placeholder {
+        color: #b1a5c8;
+        opacity: 0.6;
+      }
+    }
+  }
+
+  .pair-list {
+    flex: 1;
+    overflow: auto;
+
+    /* Header styling */
+    .pair-header {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #b1a5c8; /* Text-secondary color */
+      background-color: rgba(2, 2, 2, 0.4); /* Darker background */
+      border-bottom: 1px solid;
+      border-image: linear-gradient(
+          90deg,
+          rgba(30, 144, 255, 0.2),
+          // Changed to neon blue
+          rgba(196, 92, 242, 0.2)
+        )
+        1;
+
+      /* Match the layout of pair items */
+      .header-pair {
+        width: 40%;
+        text-align: left;
+      }
+
+      .header-data {
+        width: 60%;
+        display: flex;
+        justify-content: flex-end;
+
+        .header-price {
+          width: 90px;
+          text-align: right;
+          margin-right: 16px;
+        }
+
+        .header-change {
+          width: 70px;
+          text-align: right;
+        }
+      }
+    }
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(
+        180deg,
+        rgba(30, 144, 255, 0.3),
+        // Changed to neon blue
+        rgba(0, 255, 128, 0.2),
+        rgba(196, 92, 242, 0.3)
+      );
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(
+        180deg,
+        rgba(30, 144, 255, 0.5),
+        // Changed to neon blue
+        rgba(0, 255, 128, 0.3),
+        rgba(196, 92, 242, 0.5)
+      );
+    }
+
+    .no-pairs-found {
+      padding: 20px;
+      text-align: center;
+      color: #b1a5c8; /* Text-secondary color */
+      font-style: italic;
+    }
+  }
+}
+
+.pair-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid;
+  border-image: linear-gradient(
+      90deg,
+      rgba(30, 144, 255, 0.1),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.1)
+    )
+    1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    transform: translateY(-1px);
+  }
+
+  &.selected {
+    background: rgba(30, 144, 255, 0.05); // Changed to neon blue
+    border-left: 2px solid;
+    border-image: linear-gradient(
+        180deg,
+        rgba(30, 144, 255, 0.5),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.5)
+      )
+      1 0 1 1;
+  }
+
+  .pair-token {
+    display: flex;
+    align-items: center;
+    width: 40%;
+
+    img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      margin-right: 8px;
+      box-shadow: 0 0 10px rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        0 0 10px rgba(196, 92, 242, 0.2);
+    }
+
+    .token-placeholder {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(
+        45deg,
+        rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.2)
+      );
+      margin-right: 8px;
+    }
+
+    .token-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+  }
+
+  .pair-data {
+    display: flex;
+    align-items: center;
+    width: 60%;
+    justify-content: flex-end;
+
+    .price {
+      font-family: "Orbitron", monospace;
+      font-size: 13px;
+      width: 90px;
+      text-align: right;
+      margin-right: 16px;
+    }
+
+    .change {
+      font-size: 13px;
+      width: 70px;
+      text-align: right;
+      font-weight: 600;
+
+      &.positive {
+        color: #1ed760;
+        text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
+      }
+
+      &.negative {
+        color: #ff4444;
+        text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      }
+    }
+  }
+}
+
+/* Custom styling for Trading History component */
+.trade-list {
+  width: 100%;
+
+  .trade-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-family: "Orbitron", monospace;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.03);
+      transform: translateY(-1px);
+    }
+
+    .price {
+      width: 100px;
+
+      &.buy {
+        color: #1ed760;
+        text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
+      }
+
+      &.sell {
+        color: #ff4444;
+        text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      }
+    }
+
+    .amount {
+      width: 80px;
+      text-align: right;
+    }
+
+    .time {
+      width: 80px;
+      text-align: right;
+      color: #b1a5c8; /* Text-secondary color */
+    }
+  }
+}
+
+/* Button styling */
+.btn {
+  display: inline-block;
+  padding: 0.6rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+
+  &--primary {
+    background: linear-gradient(
+      45deg,
+      #1e90ff,
+      #c45cf2
+    ); // Changed to neon blue
+    color: #000;
+    border: none;
+    box-shadow: 0 0 20px rgba(30, 144, 255, 0.3),
+      // Changed to neon blue
+      0 0 20px rgba(196, 92, 242, 0.3);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 25px rgba(30, 144, 255, 0.4),
+        // Changed to neon blue
+        0 5px 25px rgba(196, 92, 242, 0.4);
+    }
+  }
+
+  &--secondary {
+    background: rgba(2, 2, 2, 0.3);
+    border: 1px solid #00ff80; /* Green from swap page */
+    color: #fff;
+
+    &:hover {
+      background: rgba(2, 2, 2, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 5px 25px rgba(0, 255, 128, 0.2);
+    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .dex-container .dex-content {
+    .top-section {
+      .dex-main-chart {
+        flex: 2;
+
+        /* Adjust spacing in header for smaller screens */
+        .pair-header {
+          .header-left {
+            .pair-change {
+              margin-right: 16px; /* Less margin before stats */
+            }
+
+            .header-stats {
+              gap: 12px; /* Less space between stats */
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/* Mobile layout - show stats under the pair info */
+@media (max-width: 992px) {
+  .dex-container {
+    height: auto;
+
+    .dex-content {
+      .top-section {
+        flex-direction: column;
+        height: auto;
+
+        .dex-main-chart {
+          flex: none;
+          height: 350px;
+          border-right: none;
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+
+          .pair-header {
+            height: auto; /* Auto height to accommodate wrapped content */
+
+            .header-left {
+              .header-stats {
+                display: none; /* Hide stats in header on mobile */
+              }
+            }
+          }
+
+          /* Show mobile stats row on smaller screens */
+          .mobile-stats-row {
+            display: flex;
+          }
+        }
+
+        .pair-selector-panel {
+          flex: none;
+          height: 300px;
+        }
+      }
+
+      .bottom-section {
+        flex-direction: column;
+        height: auto;
+
+        .order-form-panel,
+        .orders-panel,
+        .recent-trades-panel {
+          flex: none;
+          height: 300px;
+          border-right: none;
+          border-bottom: 1px solid;
+          border-image: linear-gradient(
+              90deg,
+              rgba(30, 144, 255, 0.2),
+              // Changed to neon blue
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+
+          &:last-child {
+            border-bottom: none;
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .dex-container {
+    .dex-content {
+      .top-section {
+        .dex-main-chart {
+          height: 280px;
+
+          .pair-header {
+            .header-left {
+              flex-wrap: wrap;
+
+              .pair-name {
+                margin-right: 8px;
+                font-size: 15px;
+              }
+
+              .pair-price {
+                font-size: 14px;
+              }
+
+              .pair-change {
+                font-size: 13px;
+              }
+            }
+          }
+
+          /* Smaller text on very small screens */
+          .mobile-stats-row {
+            .stat-item {
+              .stat-label {
+                font-size: 11px;
+              }
+
+              .stat-value {
+                font-size: 13px;
+              }
+            }
+          }
+        }
+
+        .pair-selector-panel {
+          height: 250px;
+        }
+      }
+
+      .bottom-section {
+        .order-form-panel,
+        .orders-panel,
+        .recent-trades-panel {
+          height: 280px;
+        }
+      }
+    }
+  }
+}
+
+/* Additional style for the Chart component to ensure it fills the container properly */
+.chart-component {
+  width: 100%;
+  height: 100%;
+
+  /* Fix for TradingView charts */
+  > div {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/* Animations */
+@keyframes horizonScan {
+  0% {
+    transform: translateX(-150vw);
+  }
+  100% {
+    transform: translateX(150vw);
+  }
+}
+
+@keyframes verticalScan {
+  0% {
+    transform: translateY(-150vh);
+  }
+  100% {
+    transform: translateY(150vh);
+  }
+}
+
+@keyframes pulsate {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

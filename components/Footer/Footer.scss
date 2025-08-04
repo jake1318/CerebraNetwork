@@ -1,0 +1,343 @@
+// src/components/Footer.scss
+// Last Updated: 2025-07-16 00:55:34 UTC by jake1318
+
+// Variables for consistent colors - Adjusted to match Home.scss
+$background-dark: #020314;
+$background-surface: #030924;
+$neon-blue: #4da2ff; // Primary color (Sui blue) - 50%
+$neon-green: #1ed760; // Darker neon green - 30%
+$neon-magenta: #ff00ff; // New magenta accent - 20%
+$text-primary: #ffffff;
+$text-secondary: #b1a5c8;
+$text-muted: #3f4c60;
+$border-dark: rgba(255, 255, 255, 0.05);
+
+.footer {
+  background: rgba($background-dark, 0.9);
+  padding: 4rem 0 2rem;
+  position: relative;
+  overflow: hidden;
+
+  // Remove grid background
+
+  // Add gradient border at the top
+  border-top: 1px solid;
+  border-image: linear-gradient(
+      90deg,
+      rgba($neon-blue, 0.3) 50%,
+      rgba($neon-green, 0.3) 80%,
+      rgba($neon-magenta, 0.3) 100%
+    )
+    1;
+
+  // Add glow effects
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: -150px;
+    right: 10%;
+    width: 300px;
+    height: 300px;
+    background: rgba($neon-magenta, 0.1);
+    filter: blur(100px);
+    border-radius: 50%;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate;
+  }
+
+  .container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 2fr 3fr;
+    gap: 4rem;
+    margin-bottom: 4rem;
+
+    @media (max-width: 991px) {
+      grid-template-columns: 1fr;
+      gap: 3rem;
+    }
+  }
+
+  &__brand {
+    .footer-logo {
+      display: inline-block;
+      text-decoration: none;
+      margin-bottom: 1.5rem;
+
+      .logo-text {
+        color: $neon-blue;
+        text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .logo-network {
+        color: $text-primary;
+        opacity: 0.7;
+        font-size: 1.5rem;
+        margin-left: 0.25rem;
+      }
+    }
+
+    p {
+      color: $text-secondary;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+      font-size: 1.05rem;
+    }
+
+    .social-links {
+      display: flex;
+      gap: 1rem;
+
+      a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba($background-surface, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: $text-secondary;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+
+        &:hover {
+          transform: translateY(-3px);
+        }
+
+        // Assign different colors to different social icons
+        &:nth-child(1):hover {
+          color: $neon-blue;
+          border-color: $neon-blue;
+          box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+        }
+
+        &:nth-child(2):hover {
+          color: $neon-magenta;
+          border-color: $neon-magenta;
+          box-shadow: 0 0 15px rgba($neon-magenta, 0.3);
+        }
+
+        &:nth-child(3):hover {
+          color: $neon-green;
+          border-color: $neon-green;
+          box-shadow: 0 0 15px rgba($neon-green, 0.3);
+        }
+
+        &:nth-child(4):hover {
+          color: $neon-blue;
+          border-color: $neon-blue;
+          box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+        }
+      }
+    }
+  }
+
+  &__links {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+
+    @media (max-width: 768px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 480px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__link-group {
+    h4 {
+      color: $text-primary;
+      margin-bottom: 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      position: relative;
+      display: inline-block;
+
+      // Add subtle underline effect like section titles
+      &::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        left: 0;
+        width: 40px;
+        height: 2px;
+        border-radius: 2px;
+        background: linear-gradient(
+          90deg,
+          $neon-blue 50%,
+          $neon-green 80%,
+          $neon-magenta 100%
+        );
+      }
+    }
+
+    a {
+      display: block;
+      color: $text-secondary;
+      text-decoration: none;
+      margin-bottom: 0.75rem;
+      transition: all 0.3s ease;
+      font-size: 1rem;
+
+      &:hover {
+        transform: translateX(5px);
+      }
+    }
+
+    // Color variations for different sections
+    &:nth-child(1) {
+      a:hover {
+        color: $neon-blue;
+        text-shadow: 0 0 10px rgba($neon-blue, 0.2);
+      }
+    }
+
+    &:nth-child(2) {
+      a:hover {
+        color: $neon-green;
+        text-shadow: 0 0 10px rgba($neon-green, 0.2);
+      }
+    }
+
+    &:nth-child(3) {
+      a:hover {
+        color: $neon-magenta;
+        text-shadow: 0 0 10px rgba($neon-magenta, 0.2);
+      }
+    }
+  }
+
+  &__bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+
+    // Add subtle gradient to the top border
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        rgba($neon-blue, 0.2) 0%,
+        rgba($neon-green, 0.2) 50%,
+        rgba($neon-magenta, 0.2) 100%
+      );
+    }
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .footer__copyright {
+      color: $text-muted;
+      font-size: 0.9rem;
+    }
+
+    .footer__legal {
+      display: flex;
+      gap: 1.5rem;
+
+      a {
+        color: $text-muted;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: color 0.3s ease;
+
+        &:hover {
+          color: $text-secondary;
+        }
+      }
+    }
+  }
+}
+
+// Style for non-clickable links
+.footer__link-disabled {
+  color: $text-secondary;
+  opacity: 0.6;
+  text-decoration: none;
+  margin-bottom: 0.75rem;
+  display: block;
+  cursor: default;
+  position: relative;
+
+  // Add a subtle "coming soon" indicator on hover
+  &:hover::after {
+    content: "Coming Soon";
+    position: absolute;
+    right: 0;
+    font-size: 0.7rem;
+    background: rgba($neon-blue, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 2px 8px;
+    border-radius: 4px;
+    animation: fadeIn 0.3s ease;
+    box-shadow: 0 0 10px rgba($neon-blue, 0.2);
+  }
+}
+
+// Animation for the "Coming Soon" tooltip
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+// Pulsate animation for glow effects
+@keyframes pulsate {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+// Also make legal links in the footer bottom disabled
+.footer__legal {
+  .footer__link-disabled {
+    margin-bottom: 0;
+    display: inline;
+    margin-left: 1.5rem;
+
+    &:first-child {
+      margin-left: 0;
+    }
+
+    &:hover::after {
+      bottom: -24px; // Position the tooltip below the links
+      right: auto;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+  }
+}

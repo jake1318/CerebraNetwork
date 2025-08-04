@@ -1,0 +1,752 @@
+/* src/pages/Portfolio/MarketDashboard.scss */
+/* Last Updated: 2025-07-30 03:39:30 UTC by jake1318 */
+
+/* Neon theme palette */
+$bg-deep: #020314;
+$bg-surface: #050a1e;
+$grid-line: rgba(77, 162, 255, 0.05);
+
+$neon-blue: #4da2ff;
+$neon-green: #1ed760;
+$neon-pink: #ff00ff;
+$neon-purple: #6c5ce7; /* keep for spinners */
+
+$txt-primary: #ffffff;
+$txt-muted: #7c8aa4;
+
+$border-glass: rgba(255, 255, 255, 0.07);
+
+/* Shared drop‑shadows */
+$glow-blue: 0 0 12px rgba($neon-blue, 0.35);
+$glow-green: 0 0 12px rgba($neon-green, 0.35);
+$glow-red: 0 0 12px rgba(#ff5252, 0.35);
+
+$radius: 12px;
+
+/* -------- Page backdrop --------------------------------------------------- */
+.market-dashboard {
+  width: 100%;
+  position: relative;
+  padding: 0; /* Remove padding to reduce spacing */
+  margin: 0;
+  box-sizing: border-box;
+  max-width: 100%; /* Ensure dashboard doesn't exceed parent width */
+  overflow-x: hidden; /* Hide horizontal overflow */
+
+  /* deep‑space gradient + cyber grid */
+  background: transparent; /* Use transparent background to blend with parent */
+
+  /* Remove the glow elements as they cause extra spacing */
+  .glow-1,
+  .glow-2,
+  .glow-3 {
+    display: none;
+  }
+
+  h1 {
+    display: none; /* Hide the title as it's redundant with the sidebar */
+  }
+
+  /* Market summary section */
+  .market-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    z-index: 1;
+    background: rgba($bg-surface, 0.45);
+    border: 1px solid $border-glass;
+    border-radius: $radius;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    box-sizing: border-box;
+
+    .summary-stat {
+      flex: 1 1 180px;
+
+      .stat-label {
+        font-size: 0.8rem;
+        color: $txt-muted;
+        margin-bottom: 0.15rem;
+      }
+
+      .stat-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: $txt-primary;
+        text-shadow: $glow-blue;
+        letter-spacing: 0.03em;
+
+        &.positive {
+          color: $neon-green;
+          text-shadow: $glow-green;
+        }
+
+        &.negative {
+          color: #ff5252;
+          text-shadow: $glow-red;
+        }
+      }
+    }
+
+    /* animated divider pills between stats */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent 0 calc(25% - 1px),
+        rgba($neon-blue, 0.12) calc(25% - 1px) 25%,
+        transparent 25% 50%,
+        rgba($neon-green, 0.1) calc(50% - 1px) 50%,
+        transparent 50% 75%,
+        rgba($neon-pink, 0.08) calc(75% - 1px) 75%,
+        transparent 75% 100%
+      );
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      border-radius: inherit;
+    }
+  }
+
+  /* Controls section */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+
+    .search-container {
+      position: relative;
+      flex: 1 1 240px;
+      max-width: 420px;
+
+      .search-input {
+        width: 100%;
+        padding: 0.55rem 1rem 0.55rem 2.25rem;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid $border-glass;
+        border-radius: $radius;
+        color: $txt-primary;
+        transition: border 0.2s, box-shadow 0.2s;
+
+        &:focus {
+          border-color: $neon-blue;
+          box-shadow: $glow-blue;
+          outline: none;
+        }
+      }
+
+      .search-icon {
+        position: absolute;
+        top: 50%;
+        left: 0.75rem;
+        transform: translateY(-50%);
+        color: $txt-muted;
+        font-size: 0.85rem;
+      }
+    }
+
+    .controls-right {
+      display: flex;
+      align-items: center;
+    }
+
+    .refresh-button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1.2rem;
+      background: rgba($neon-green, 0.15);
+      color: $neon-green;
+      border: 1px solid rgba($neon-green, 0.4);
+      border-radius: $radius;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: background 0.25s, transform 0.15s;
+
+      &:hover {
+        background: rgba($neon-green, 0.25);
+        transform: translateY(-2px);
+      }
+
+      &.refreshing {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+
+      .refresh-icon {
+        transition: transform 0.5s ease;
+
+        &.spin {
+          animation: spin 1s linear infinite;
+        }
+      }
+    }
+
+    .last-updated {
+      font-size: 0.75rem;
+      color: $txt-muted;
+      margin-left: 1.2rem;
+
+      &::before {
+        content: "●";
+        color: $neon-blue;
+        margin-right: 0.4rem;
+        animation: blink 2s ease-in-out infinite;
+      }
+    }
+  }
+
+  /* Table container */
+  .table-container {
+    overflow-x: auto;
+    overflow-y: visible; /* Changed from auto to visible */
+    padding: 0.25rem; /* space for glow */
+    position: relative;
+    margin-bottom: 1rem;
+    height: auto; /* Changed from fixed height to auto */
+    background: rgba($bg-surface, 0.45);
+    border: 1px solid $border-glass;
+    border-radius: $radius;
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%; /* Ensure it doesn't exceed parent width */
+
+    /* Custom scrollbar for horizontal scrolling only - hidden vertical */
+    &::-webkit-scrollbar {
+      height: 6px; /* Only show horizontal scrollbar */
+      width: 0; /* Hide vertical scrollbar */
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba($bg-deep, 0.3);
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba($neon-blue, 0.3);
+      border-radius: 3px;
+      &:hover {
+        background: rgba($neon-blue, 0.5);
+      }
+    }
+
+    /* glow ring */
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border: 1px solid transparent;
+      background: linear-gradient(45deg, $neon-blue, $neon-pink) border-box;
+      -webkit-mask: linear-gradient(#000 0 0) padding-box,
+        linear-gradient(#000 0 0); /* chrome fix */
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0.15;
+      animation: pulse 8s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+  }
+
+  /* Token table styling */
+  .token-table {
+    width: 100%;
+    table-layout: fixed; /* This is important to prevent column expansion */
+    border-collapse: separate;
+    border-spacing: 0;
+    color: $txt-primary;
+    min-width: 1000px; /* Minimum width to ensure all columns are visible */
+
+    th {
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(8px);
+      border-bottom: 2px solid rgba($neon-blue, 0.25);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      cursor: pointer;
+      transition: color 0.2s;
+
+      &:hover {
+        color: $neon-blue;
+      }
+
+      .sort-icon {
+        margin-left: 0.35rem;
+        opacity: 0.5;
+
+        &.active {
+          opacity: 1;
+          color: $neon-blue;
+        }
+      }
+
+      .info-tooltip {
+        position: relative;
+        margin-left: 0.35rem;
+        cursor: help;
+
+        .tooltip-text {
+          visibility: hidden;
+          width: 180px;
+          background: rgba($bg-surface, 0.95);
+          color: $txt-primary;
+          text-align: center;
+          border-radius: 6px;
+          padding: 0.5rem;
+          position: absolute;
+          z-index: 20;
+          bottom: 125%;
+          left: 50%;
+          transform: translateX(-50%);
+          opacity: 0;
+          transition: opacity 0.3s;
+          font-weight: normal;
+          font-size: 0.75rem;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+          border: 1px solid $border-glass;
+        }
+
+        &:hover .tooltip-text {
+          visibility: visible;
+          opacity: 1;
+        }
+      }
+    }
+
+    tbody tr {
+      transition: transform 0.15s ease, box-shadow 0.15s, background-color 0.15s;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba($neon-blue, 0.12);
+        background: rgba($neon-blue, 0.075);
+      }
+
+      &:last-child td {
+        border-bottom: none;
+      }
+    }
+
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid $border-glass;
+      vertical-align: middle;
+      white-space: nowrap; /* Prevent line breaks in table cells */
+      overflow: hidden;
+      text-overflow: ellipsis; /* Show ellipsis for overflowing text */
+
+      &.rank-col {
+        width: 50px;
+        text-align: center;
+      }
+
+      &.name-col {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 180px;
+        max-width: 300px;
+
+        .token-logo {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: rgba($bg-surface, 0.8);
+          object-fit: contain;
+          border: 1px solid $border-glass;
+        }
+
+        .token-info {
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+
+          .token-name {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .token-symbol {
+            color: $txt-muted;
+            font-size: 0.8rem;
+          }
+        }
+      }
+
+      &.change-col {
+        position: relative;
+        padding-left: 1rem; /* room for bar */
+        width: 120px;
+
+        &.positive {
+          color: $neon-green;
+
+          &::before {
+            content: "";
+            position: absolute;
+            left: 0.25rem;
+            top: 25%;
+            height: 50%;
+            width: 4px;
+            border-radius: 2px;
+            background: $neon-green;
+            transform-origin: top;
+          }
+        }
+
+        &.negative {
+          color: #ff5252;
+
+          &::before {
+            content: "";
+            position: absolute;
+            left: 0.25rem;
+            top: 25%;
+            height: 50%;
+            width: 4px;
+            border-radius: 2px;
+            background: #ff5252;
+            transform-origin: top;
+          }
+        }
+      }
+
+      &.price-col {
+        width: 120px;
+      }
+      &.volume-col {
+        width: 120px;
+      }
+      &.market-cap-col {
+        width: 120px;
+      }
+      &.liquidity-col {
+        width: 120px;
+      }
+      &.fdv-col {
+        width: 120px;
+      }
+      &.supply-col {
+        width: 120px;
+      }
+
+      &.no-results {
+        text-align: center;
+        padding: 3rem;
+        color: $txt-muted;
+      }
+    }
+  }
+
+  /* Error message display */
+  .error-message {
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+    color: #ff5252;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba($bg-surface, 0.45);
+    border: 1px solid $border-glass;
+    border-radius: $radius;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    box-sizing: border-box;
+
+    svg {
+      font-size: 1.25rem;
+    }
+
+    button {
+      margin-left: auto;
+      background: rgba(#ff5252, 0.15);
+      border: 1px solid rgba(#ff5252, 0.3);
+      color: #ff5252;
+      padding: 0.5rem 1rem;
+      border-radius: $radius;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(#ff5252, 0.2);
+        transform: translateY(-2px);
+      }
+    }
+  }
+
+  /* Dashboard footer */
+  .dashboard-footer {
+    margin-top: 1rem;
+    margin-bottom: 0; /* Remove bottom margin */
+    color: $txt-muted;
+    font-size: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
+
+    .data-attribution {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+
+      .attribution-item,
+      .update-frequency {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        svg {
+          color: $neon-blue;
+        }
+      }
+    }
+  }
+}
+
+/* Skeleton loading styles */
+.sk-box {
+  border-radius: 4px;
+  display: inline-block;
+  height: 16px;
+  position: relative;
+  overflow: hidden;
+  background: rgba($neon-blue, 0.08);
+  width: 70px;
+
+  &::after {
+    animation: shimmer 1.5s linear infinite;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba($neon-blue, 0.25),
+      transparent
+    );
+    content: "";
+    position: absolute;
+    transform: translateX(-100%);
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+  }
+
+  &.short {
+    width: 30px;
+  }
+
+  &.medium {
+    width: 100px;
+  }
+
+  &.long {
+    width: 150px;
+  }
+}
+
+.sk-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba($neon-blue, 0.08);
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    animation: shimmer 1.5s linear infinite;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba($neon-blue, 0.25),
+      transparent
+    );
+    content: "";
+    position: absolute;
+    transform: translateX(-100%);
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+  }
+}
+
+/* Animation keyframes */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    filter: blur(4px);
+  }
+  100% {
+    filter: blur(12px);
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes pulsate {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+/* Loading indicator for lazy loading */
+.loading-more {
+  text-align: center;
+  padding: 1rem;
+  color: $txt-muted;
+  font-size: 0.9rem;
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: calc(50% - 10px);
+    top: -5px;
+    width: 20px;
+    height: 2px;
+    background: linear-gradient(90deg, $neon-blue, $neon-pink);
+    animation: loading-pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes loading-pulse {
+  0% {
+    opacity: 0.3;
+    transform: scaleX(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1.2);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scaleX(0.7);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .market-dashboard .token-table {
+    min-width: 1000px; /* Keep minimum width for scrollable content */
+  }
+
+  .market-dashboard .market-summary {
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .market-dashboard .controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+
+    .search-container {
+      width: 100%;
+      max-width: none;
+    }
+
+    .controls-right {
+      width: 100%;
+      justify-content: space-between;
+    }
+  }
+
+  .market-dashboard .market-summary {
+    gap: 1rem;
+
+    .summary-stat {
+      flex-basis: 45%;
+    }
+  }
+
+  .market-dashboard .dashboard-footer {
+    .data-attribution {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+  }
+}
+
+/* Remove the "hidden" overflow from body in MarketDashboard.scss */
+body {
+  overflow-y: auto !important;
+}
+
+/* Fix the table container to allow proper scrolling */
+.market-dashboard .table-container {
+  overflow-y: visible !important;
+  height: auto;
+  max-height: none; /* Remove max-height constraint */
+}
+
+/* Remove custom scrollbars that might be causing issues */
+.market-dashboard .table-container::-webkit-scrollbar {
+  width: auto !important;
+  height: auto !important;
+  display: none !important;
+}
+
+/* Fix possible overflow issues in the market dashboard */
+.market-dashboard {
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+}
+
+/* Make sure all scrollbars are visible only at the root level */
+html {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Make sure the market dashboard table doesn't create scrollbars */
+.market-dashboard .table-container {
+  overflow-y: visible !important;
+}

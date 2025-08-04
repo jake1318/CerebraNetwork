@@ -1,0 +1,273 @@
+/* src/pages/Dex/components/PairSelector.scss */
+/* Last Updated: 2025-07-13 21:33:31 UTC by jake1318 */
+
+.pair-selector-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: rgba(2, 2, 2, 0.7); // Darker background to match swap page
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
+    0 8px 32px rgba(0, 255, 128, 0.04), 0 8px 32px rgba(196, 92, 242, 0.04);
+  animation: fadeIn 0.5s ease-out;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.12),
+      0 8px 32px rgba(0, 255, 128, 0.06), 0 8px 32px rgba(196, 92, 242, 0.06);
+  }
+
+  .pair-search {
+    padding: 12px;
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    background: rgba(2, 2, 2, 0.9); // Darker background
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(2, 2, 2, 0.3); // Darker background
+      border: 1px solid rgba(0, 255, 255, 0.1); // Cyan border
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+
+      &:focus {
+        outline: none;
+        border-image: linear-gradient(
+            45deg,
+            rgba(0, 255, 255, 0.5),
+            rgba(196, 92, 242, 0.5)
+          )
+          1;
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.2),
+          0 0 10px rgba(196, 92, 242, 0.2);
+      }
+
+      &::placeholder {
+        color: rgba(177, 165, 200, 0.4); // text-secondary with opacity
+      }
+    }
+  }
+
+  .pair-list-header {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1fr 1.5fr;
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    color: #b1a5c8; // Text-secondary from swap page
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    background-color: rgba(2, 2, 2, 0.3); // Darker background
+
+    .column {
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: #ffffff;
+      }
+
+      &.sorted {
+        background: linear-gradient(
+          90deg,
+          #00ffff,
+          #c45cf2
+        ); // Cyan to purple gradient
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+
+        &::after {
+          content: "";
+          position: absolute;
+          right: 0.25rem;
+          top: 50%;
+          transform: translateY(-50%);
+          border-left: 4px solid transparent;
+          border-right: 4px solid transparent;
+        }
+
+        &.asc::after {
+          border-bottom: 4px solid #00ffff; // Cyan from swap page
+          box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+        }
+
+        &.desc::after {
+          border-top: 4px solid #c45cf2; // Purple from swap page
+          box-shadow: 0 0 5px rgba(196, 92, 242, 0.5);
+        }
+      }
+    }
+  }
+
+  .pair-list {
+    flex: 1;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.5),
+        rgba(0, 255, 128, 0.3),
+        rgba(196, 92, 242, 0.5)
+      );
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.7),
+        rgba(0, 255, 128, 0.5),
+        rgba(196, 92, 242, 0.7)
+      );
+    }
+
+    .pair-item {
+      display: grid;
+      grid-template-columns: 2fr 1.5fr 1fr 1.5fr;
+      padding: 10px 12px;
+      border-bottom: 1px solid;
+      border-image: linear-gradient(
+          90deg,
+          rgba(0, 255, 255, 0.1),
+          rgba(196, 92, 242, 0.1)
+        )
+        1;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: rgba(2, 2, 2, 0.5); // Darker background hover
+        transform: translateY(-1px);
+      }
+
+      &.selected {
+        background: rgba(0, 255, 255, 0.05);
+        border-left: 2px solid;
+        border-image: linear-gradient(
+            180deg,
+            rgba(0, 255, 255, 0.5),
+            rgba(196, 92, 242, 0.5)
+          )
+          1 0 1 1;
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.1);
+      }
+
+      .pair-name {
+        display: flex;
+        align-items: center;
+
+        .pair-logo {
+          width: 24px;
+          height: 24px;
+          margin-right: 0.5rem;
+          border-radius: 50%;
+          background-color: rgba(2, 2, 2, 0.5);
+          box-shadow: 0 0 10px rgba(0, 255, 255, 0.1),
+            0 0 10px rgba(196, 92, 242, 0.1);
+        }
+      }
+
+      .pair-price {
+        font-family: "Orbitron", monospace;
+      }
+
+      .pair-change {
+        font-weight: 500;
+
+        &.positive {
+          color: #1ed760; // Green for buy
+          text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
+        }
+
+        &.negative {
+          color: #ff4444; // Red for sell
+          text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+        }
+      }
+
+      .pair-volume {
+        color: #b1a5c8; // Text-secondary from swap page
+        text-align: right;
+      }
+    }
+
+    .no-pairs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100px;
+      color: #b1a5c8; // Text-secondary from swap page
+      font-style: italic;
+    }
+  }
+}
+
+// Animation keyframes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Responsive adaptations
+@media (max-width: 768px) {
+  .pair-selector-container {
+    .pair-list-header {
+      padding: 8px 10px;
+      font-size: 0.7rem;
+    }
+
+    .pair-list .pair-item {
+      padding: 8px 10px;
+      font-size: 0.8rem;
+
+      .pair-name .pair-logo {
+        width: 20px;
+        height: 20px;
+      }
+    }
+  }
+}

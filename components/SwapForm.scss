@@ -1,0 +1,691 @@
+/* =========================
+   SwapForm.scss
+   Enhanced SwapForm styling with dual-color theme
+   ========================= */
+
+/* --- New Token Selector Styles (Updates) --- */
+.token-selector-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 120px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.token-selector-button:hover {
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2), 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+.token-selector-button:active {
+  transform: scale(0.98);
+}
+
+.token-select-wrapper {
+  position: relative;
+  min-width: 120px;
+  padding-right: 8px;
+}
+
+/* Enhance the selected token display in the token selector button */
+.selected-token {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selected-token .token-logo {
+  /* Use 32px to have a consistent icon size in the 'From'/'To' fields */
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 8px;
+  object-fit: cover;
+  background: rgba(40, 40, 60, 0.6);
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.2), 0 0 5px rgba(255, 0, 255, 0.2);
+}
+
+.selected-token span {
+  font-weight: 500;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* When no token is selected, style the "Select Token" text */
+.token-selector-button:not(:has(.selected-token)) {
+  background: linear-gradient(
+    45deg,
+    rgba(0, 255, 255, 0.1),
+    rgba(255, 0, 255, 0.1)
+  );
+  color: #fff;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
+}
+
+.token-selector-button:not(:has(.selected-token)):hover {
+  background: linear-gradient(
+    45deg,
+    rgba(0, 255, 255, 0.2),
+    rgba(255, 0, 255, 0.2)
+  );
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.5), 0 0 5px rgba(255, 0, 255, 0.5);
+}
+
+/* Ensure proper sizing of token selectors within the form */
+.input-with-token {
+  .token-select-wrapper {
+    margin-left: 4px;
+  }
+}
+
+/* --- Original SwapForm Styles --- */
+
+.swap-form {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+    0 8px 32px rgba(255, 0, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
+      0 8px 32px rgba(255, 0, 255, 0.15);
+  }
+}
+
+.swap-form.loading {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 3px solid #00ffff;
+  border-right: 3px solid #ff00ff;
+  border-bottom: 3px solid #00ffff;
+  border-left: 3px solid #ff00ff;
+  animation: spin 1s ease-in-out infinite;
+  margin: 20px auto;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), 0 0 20px rgba(255, 0, 255, 0.2);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.swap-form h2 {
+  margin-top: 0;
+  margin-bottom: 24px;
+  text-align: center;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: 0.5px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.3px;
+}
+
+.input-with-token {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), 0 0 20px rgba(255, 0, 255, 0.2);
+  }
+
+  &:focus-within {
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.3), 0 0 25px rgba(255, 0, 255, 0.3);
+  }
+}
+
+.input-with-token input {
+  flex: 1;
+  border: none;
+  padding: 16px;
+  font-size: 16px;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  letter-spacing: 0.3px;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.token-select-wrapper {
+  min-width: 140px;
+  padding-right: 8px;
+}
+
+.switch-button {
+  display: block;
+  margin: -10px auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(5, 15, 30, 0.9);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2), 0 0 10px rgba(255, 0, 255, 0.2);
+  z-index: 2;
+  position: relative;
+  color: #00ffff;
+  padding: 0;
+  font-weight: bold;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.4),
+      rgba(255, 0, 255, 0.4)
+    )
+    1;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.6);
+    transform: scale(1.05);
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.8),
+        rgba(255, 0, 255, 0.8)
+      )
+      1;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4), 0 0 15px rgba(255, 0, 255, 0.4);
+    color: #fff;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
+  }
+}
+
+.slippage-control {
+  margin-top: 24px;
+}
+
+.slippage-options {
+  display: flex;
+  gap: 8px;
+
+  button {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.3),
+        rgba(255, 0, 255, 0.3)
+      )
+      1;
+    background: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.5);
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.2),
+        0 0 15px rgba(255, 0, 255, 0.2);
+    }
+
+    &.active {
+      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      color: #000;
+      border: none;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
+        0 0 20px rgba(255, 0, 255, 0.3);
+    }
+  }
+}
+
+.custom-slippage {
+  flex: 1.5;
+  position: relative;
+
+  &.active .custom-slippage-input {
+    display: flex;
+    animation: fadeIn 0.3s ease-out;
+  }
+}
+
+.custom-slippage-input {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 10;
+  align-items: center;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+
+  input {
+    flex: 1;
+    border: none;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 6px;
+    border-radius: 4px;
+    color: #fff;
+    outline: none;
+  }
+
+  .percentage-symbol {
+    margin-left: 4px;
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.slippage-warning {
+  color: #ff4444;
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 6px;
+  background: rgba(255, 68, 68, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 68, 68, 0.2);
+}
+
+.rate-info {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: right;
+  margin: 8px 0 16px;
+  height: 20px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.fee-estimate {
+  margin-bottom: 16px;
+  text-align: right;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.error-message {
+  color: #ff4444;
+  margin-bottom: 16px;
+  padding: 8px;
+  background: rgba(255, 68, 68, 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
+}
+
+.swap-button {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  color: #000;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2), 0 0 15px rgba(255, 0, 255, 0.2);
+  letter-spacing: 0.5px;
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.4), 0 0 25px rgba(255, 0, 255, 0.4);
+    transform: translateY(-2px);
+  }
+
+  &:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+}
+
+.connect-wallet-prompt {
+  margin-top: 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.1),
+      rgba(255, 0, 255, 0.1)
+    )
+    1;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.amount-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.percent-button,
+.max-button {
+  background: none;
+  border: none;
+  color: #00ffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2), 0 0 15px rgba(255, 0, 255, 0.2);
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Original Additional .selected-token style for consistency */
+.selected-token {
+  display: flex;
+  align-items: center;
+
+  .token-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 8px;
+  }
+}
+/* =========================
+   SwapForm.scss
+   Enhanced SwapForm styling with dual-color theme
+   ========================= */
+
+/* --- Token Selector (existing) --- */
+.token-selector-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 120px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.token-selector-button:hover {
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2), 0 0 15px rgba(255, 0, 255, 0.2);
+}
+.token-select-wrapper {
+  position: relative;
+  min-width: 120px;
+  padding-right: 8px;
+}
+.selected-token {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.selected-token .token-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 8px;
+  object-fit: cover;
+  background: rgba(40, 40, 60, 0.6);
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.2), 0 0 5px rgba(255, 0, 255, 0.2);
+}
+.selected-token span {
+  font-weight: 500;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+}
+/* ... rest of your original SwapForm styles omitted for brevity ... */
+
+/* ================================
+   Swap Completed Modal
+   ================================ */
+.tx-success-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(5, 15, 30, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.tx-success-content {
+  background: rgba(5, 15, 30, 0.7);
+  border-radius: 16px;
+  padding: 24px 32px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1),
+    0 8px 32px rgba(255, 0, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  animation: fadeIn 0.3s ease-out both;
+}
+
+.tx-success-content h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  -webkit-background-clip: text;
+  color: transparent;
+  font-weight: 600;
+}
+
+.tx-success-content p {
+  margin: 0 0 20px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.tx-success-content a {
+  color: #ff00ff;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+.tx-success-content a:hover {
+  color: #00ffff;
+}
+
+.tx-close-button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  border: none;
+  color: #000;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.2), 0 0 12px rgba(255, 0, 255, 0.2);
+}
+.tx-close-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 20px rgba(255, 0, 255, 0.3);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* SwapForm.scss */
+.dca-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 1px solid #277;
+  background: #06182e;
+  color: #38dfff;
+  font-weight: 500;
+  transition: background 0.2s;
+  &:hover {
+    background: #0b294d;
+  }
+}
+/* Add to your SwapForm.scss file */
+
+.tx-success-content {
+  /* existing styles remain the same */
+
+  .powered-by {
+    margin-top: 15px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    a {
+      color: #00ffff;
+      text-decoration: none;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: #00ccff;
+        text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+      }
+    }
+  }
+}

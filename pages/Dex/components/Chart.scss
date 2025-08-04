@@ -1,0 +1,180 @@
+/* src/pages/Dex/components/Chart.scss */
+/* Last Updated: 2025-07-13 21:26:22 UTC by jake1318 */
+
+.chart-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(2, 2, 2, 0.7); // Darker background to match swap page
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+
+  .chart-controls {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 34px;
+    background-color: rgba(2, 2, 2, 0.9); // Darker header background
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+
+    .timeframe-buttons {
+      display: flex;
+      align-items: center;
+
+      .timeframe-btn {
+        background: transparent;
+        border: none;
+        color: #b1a5c8; // Text-secondary from swap page
+        font-size: 12px;
+        padding: 0 8px;
+        height: 24px;
+        margin-right: 2px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &.active {
+          color: #00ffff; // Cyan from swap page
+          position: relative;
+
+          &::after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #00ffff; // Cyan from swap page
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+          }
+        }
+
+        &:hover:not(.active) {
+          color: #ffffff;
+        }
+      }
+    }
+
+    .chart-type-buttons {
+      display: flex;
+      align-items: center;
+
+      .chart-type-btn {
+        background: transparent;
+        border: none;
+        color: #b1a5c8; // Text-secondary from swap page
+        font-size: 12px;
+        padding: 0 8px;
+        height: 24px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &.active {
+          color: #00ffff; // Cyan from swap page
+        }
+
+        &:hover:not(.active) {
+          color: #ffffff;
+        }
+      }
+    }
+  }
+
+  .chart-area {
+    flex: 1;
+    position: relative;
+    background-color: rgba(2, 2, 2, 0.6); // Darker background
+
+    .chart-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(2, 2, 2, 0.8); // Darker overlay
+      z-index: 5;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+
+      .loading-indicator {
+        color: #ffffff;
+        background: linear-gradient(
+          90deg,
+          #00ffff,
+          #c45cf2
+        ); // Cyan to purple gradient
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: pulse 1.5s infinite;
+      }
+
+      .error-message {
+        color: #ff4444; // Error color
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        .retry-btn {
+          margin-top: 10px;
+          background-color: rgba(0, 255, 255, 0.1); // Cyan with opacity
+          border: 1px solid rgba(0, 255, 255, 0.3);
+          color: #00ffff; // Cyan
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background-color: rgba(0, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 255, 255, 0.3);
+          }
+        }
+      }
+    }
+
+    // ApexCharts overrides to match our styling
+    :global(.apexcharts-tooltip) {
+      background-color: rgba(2, 2, 2, 0.8) !important; // Darker background
+      border: 1px solid rgba(0, 255, 255, 0.2) !important; // Cyan border
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
+      backdrop-filter: blur(5px) !important;
+      -webkit-backdrop-filter: blur(5px) !important;
+    }
+
+    :global(.apexcharts-tooltip-title) {
+      background-color: rgba(2, 2, 2, 0.9) !important; // Darker background
+      border-bottom: 1px solid rgba(0, 255, 255, 0.2) !important; // Cyan border
+    }
+
+    :global(.apexcharts-xaxistooltip) {
+      background-color: rgba(2, 2, 2, 0.8) !important; // Darker background
+      border: 1px solid rgba(0, 255, 255, 0.2) !important; // Cyan border
+    }
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}

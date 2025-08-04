@@ -1,0 +1,198 @@
+.order-form {
+  background: rgba(5, 15, 30, 0.7);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.3),
+      rgba(255, 0, 255, 0.3)
+    )
+    1;
+  border-radius: 16px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+
+  .order-type {
+    display: flex;
+    margin-bottom: 1.5rem;
+
+    &.buy {
+      .order-type-btn.buy {
+        border-color: #4caf50;
+      }
+    }
+
+    &.sell {
+      .order-type-btn.sell {
+        border-color: #ff5b5b;
+      }
+    }
+
+    &-btn {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.3);
+      color: rgba(255, 255, 255, 0.8);
+      border: 2px solid transparent;
+      padding: 0.8rem 0;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+
+      &:last-child {
+        border-radius: 0 8px 8px 0;
+      }
+
+      &.buy.active {
+        background: rgba(76, 175, 80, 0.2);
+        color: #4caf50;
+      }
+
+      &.sell.active {
+        background: rgba(255, 91, 91, 0.2);
+        color: #ff5b5b;
+      }
+
+      &:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+
+    label {
+      display: block;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+
+    input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.3),
+          rgba(255, 0, 255, 0.3)
+        )
+        1;
+      border-radius: 8px;
+      padding: 1rem;
+      color: #fff;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+
+      &:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.3),
+          0 0 0 2px rgba(255, 0, 255, 0.3);
+      }
+
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+      }
+    }
+
+    .input-info {
+      display: block;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.6);
+      margin-top: 0.5rem;
+    }
+  }
+
+  .order-summary {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      span:first-child {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      span:last-child {
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+      }
+    }
+  }
+
+  .success-message {
+    background: rgba(76, 175, 80, 0.2);
+    border: 1px solid rgba(76, 175, 80, 0.4);
+    border-radius: 8px;
+    padding: 0.8rem;
+    margin-bottom: 1rem;
+    color: #4caf50;
+    text-align: center;
+  }
+
+  .error-message {
+    background: rgba(255, 91, 91, 0.2);
+    border: 1px solid rgba(255, 91, 91, 0.4);
+    border-radius: 8px;
+    padding: 0.8rem;
+    margin-bottom: 1rem;
+    color: #ff5b5b;
+    text-align: center;
+  }
+
+  .submit-button {
+    width: 100%;
+    padding: 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &.buy {
+      background: #4caf50;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+
+      &:hover:not(:disabled) {
+        background: #3d9340;
+        box-shadow: 0 6px 14px rgba(76, 175, 80, 0.5);
+        transform: translateY(-2px);
+      }
+    }
+
+    &.sell {
+      background: #ff5b5b;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(255, 91, 91, 0.4);
+
+      &:hover:not(:disabled) {
+        background: #e54c4c;
+        box-shadow: 0 6px 14px rgba(255, 91, 91, 0.5);
+        transform: translateY(-2px);
+      }
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+  }
+}

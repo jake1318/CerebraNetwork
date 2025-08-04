@@ -1,0 +1,2099 @@
+// src/pages/Home/Home.scss
+// Last Updated: 2025-07-14 19:50:14 UTC by jake1318
+
+// Variables for consistent colors - Updated to match Swap page with neon blue
+$background-dark: #020202;
+$background-surface: #030924;
+$neon-blue: #1e90ff; // Updated to neon blue from navbar instead of cyan
+$neon-green: #00ff80; // Green from Swap page
+$neon-magenta: #c45cf2; // Purple from Swap page
+$text-primary: #ffffff;
+$text-secondary: #b1a5c8;
+$text-muted: #3f4c60;
+$border-dark: rgba(255, 255, 255, 0.05);
+
+.home {
+  width: 100%;
+  overflow-x: hidden;
+  // Updated background with neon blue in top left instead of cyan
+  background: radial-gradient(
+      circle at top left,
+      rgba(30, 144, 255, 0.15) 0%,
+      // Changed to neon blue
+      rgba(2, 2, 2, 0.8) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(196, 92, 242, 0.15) 0%,
+      rgba(2, 2, 2, 0.8) 40%
+    ),
+    linear-gradient(135deg, rgba(2, 2, 2, 0.95) 0%, rgba(5, 5, 15, 0.95) 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: center, center, center;
+  color: $text-primary;
+  font-family: "Inter", sans-serif;
+  position: relative;
+
+  // Grid overlay completely removed
+
+  // Common section padding
+  section {
+    padding: 6rem 0;
+    position: relative;
+    z-index: 1;
+
+    @media (max-width: 768px) {
+      padding: 4rem 0;
+    }
+  }
+
+  .container {
+    width: 95%;
+    max-width: 1600px; // Increased to 1600px to allow more horizontal space
+    margin: 0 auto;
+    position: relative;
+  }
+
+  // Reusable section title style
+  .section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 3rem;
+    background: linear-gradient(
+      90deg,
+      $neon-blue 30%,
+      $neon-green 60%,
+      $neon-magenta 90%
+    ); // Updated color distribution with neon blue
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: 0 0 15px rgba($neon-blue, 0.3);
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 3px;
+      background: linear-gradient(
+        90deg,
+        $neon-blue 30%,
+        $neon-green 60%,
+        $neon-magenta 90%
+      ); // Updated color distribution with neon blue
+      border-radius: 2px;
+      box-shadow: 0 0 10px rgba($neon-blue, 0.5),
+        0 0 10px rgba($neon-green, 0.2);
+    }
+
+    @media (max-width: 768px) {
+      font-size: 2rem;
+    }
+  }
+
+  // Accent colors
+  .accent-blue {
+    color: $neon-blue;
+    text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+  }
+
+  .accent-green {
+    color: $neon-green;
+    text-shadow: 0 0 10px rgba($neon-green, 0.5);
+  }
+
+  .accent-magenta {
+    color: $neon-magenta;
+    text-shadow: 0 0 10px rgba($neon-magenta, 0.5);
+  }
+
+  // Navbar Styles
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 1rem 0;
+    transition: all 0.3s ease;
+    background: rgba($background-dark, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    &.scrolled {
+      background: rgba($background-dark, 0.8);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    &__container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 95%;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    &__logo {
+      a {
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        font-weight: 700;
+        font-size: 1.5rem;
+
+        .logo-text {
+          color: $neon-blue; // Updated to neon blue
+          text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+        }
+
+        .logo-network {
+          color: $text-primary;
+          opacity: 0.7;
+          margin-left: 0.25rem;
+        }
+      }
+    }
+
+    &__links {
+      display: flex;
+      gap: 1.5rem;
+
+      a {
+        color: $text-primary;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        font-weight: 500;
+        position: relative;
+        padding: 0.25rem 0;
+
+        &:hover {
+          color: $neon-blue; // Updated to neon blue
+        }
+
+        &::after {
+          content: "";
+          position: absolute;
+          width: 0;
+          height: 2px;
+          bottom: -3px;
+          left: 0;
+          background: $neon-blue; // Updated to neon blue
+          transition: width 0.3s ease;
+          border-radius: 2px;
+        }
+
+        &:hover::after {
+          width: 100%;
+        }
+
+        &.search-link {
+          color: $neon-magenta; // Updated to purple
+
+          &:hover {
+            text-shadow: 0 0 10px rgba($neon-magenta, 0.5);
+          }
+
+          &::after {
+            background: $neon-magenta; // Updated to purple
+          }
+        }
+      }
+    }
+
+    &__actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+
+      .btn--connect {
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        background: rgba(
+          $neon-green,
+          0.1
+        ); // Green background for connect button
+        border: 1px solid rgba($neon-green, 0.5);
+        color: $text-primary;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+        font-weight: 500;
+
+        &:hover {
+          background: rgba($neon-green, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba($neon-green, 0.2);
+        }
+      }
+
+      .mobile-menu-toggle {
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+        width: 30px;
+        height: 21px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+
+        span {
+          width: 100%;
+          height: 2px;
+          background: $neon-blue; // Updated to neon blue
+          border-radius: 2px;
+        }
+      }
+    }
+
+    @media (max-width: 991px) {
+      .desktop-only {
+        display: none;
+      }
+
+      .mobile-only {
+        display: flex;
+      }
+    }
+
+    @media (min-width: 992px) {
+      .desktop-only {
+        display: flex;
+      }
+
+      .mobile-only {
+        display: none;
+      }
+    }
+  }
+
+  // Hero Section
+  .hero {
+    position: relative;
+    height: 100vh;
+    min-height: 700px;
+    display: flex;
+    align-items: center;
+    padding: 6rem 0 4rem;
+    overflow: hidden;
+
+    // Grid background removed from hero section
+
+    .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4rem; // Increased from 3rem as suggested
+      position: relative;
+      z-index: 10;
+      // Width and max-width are inherited from the global .container
+
+      @media (max-width: 991px) {
+        flex-direction: column;
+        text-align: center;
+        gap: 2rem;
+      }
+    }
+
+    &__content {
+      flex: 0.75;
+      max-width: 500px;
+      position: relative;
+      z-index: 5;
+
+      h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 1.5rem;
+        line-height: 1.2;
+        background: linear-gradient(90deg, $neon-blue, #c45cf2);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        text-shadow: 0 0 20px rgba($neon-blue, 0.2);
+
+        @media (max-width: 768px) {
+          font-size: 2.5rem;
+        }
+      }
+
+      p {
+        font-size: 1.25rem;
+        color: $text-secondary;
+        margin-bottom: 2.5rem;
+        line-height: 1.5;
+
+        @media (max-width: 768px) {
+          font-size: 1.1rem;
+        }
+      }
+    }
+
+    &__buttons {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      // Centered when only one button
+      justify-content: flex-start;
+
+      @media (max-width: 991px) {
+        justify-content: center;
+      }
+
+      @media (max-width: 480px) {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+
+    &__integrations {
+      margin-top: 3rem;
+      position: relative;
+
+      // Added light effect to improve logo visibility
+      .integration-light {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(30, 144, 255, 0.15) 0%,
+          transparent 70%
+        );
+        z-index: -1;
+        filter: blur(10px);
+      }
+
+      span {
+        display: block;
+        font-size: 0.9rem;
+        color: $text-secondary;
+        margin-bottom: 1rem;
+      }
+
+      .integration-logos {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+
+        img {
+          /* Updated to make them square and circular */
+          width: 40px;
+          height: 40px;
+          object-fit: cover;
+          border-radius: 50%;
+          opacity: 0.8; // Increased from 0.7 for better visibility
+          transition: opacity 0.3s ease, transform 0.3s ease;
+
+          /* Add subtle border and glow effect */
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          box-shadow: 0 0 10px rgba($neon-blue, 0.2);
+
+          &:hover {
+            opacity: 1;
+            transform: translateY(-3px);
+            box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+          }
+        }
+
+        @media (max-width: 991px) {
+          justify-content: center;
+        }
+      }
+    }
+
+    &__image {
+      flex: 1.25;
+      max-width: 800px;
+      position: relative;
+      align-self: center;
+      transform: translateX(120px); // Increased from 40px as suggested
+      z-index: 2;
+
+      .dashboard-preview {
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        object-fit: contain;
+        background-color: rgba(0, 0, 0, 0.2);
+        transform-origin: center center;
+        transform: scale(1.15);
+      }
+
+      &:hover .dashboard-preview {
+        transform: scale(1.2);
+        transition: transform 0.3s ease;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4),
+          0 0 30px rgba($neon-blue, 0.2);
+      }
+
+      .glow-effect {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          circle at center,
+          rgba($neon-blue, 0.15),
+          transparent 60%
+        );
+        filter: blur(40px);
+        z-index: -1;
+      }
+    }
+
+    &__glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.2;
+      z-index: 1;
+
+      &--blue {
+        background: $neon-blue; // Updated to neon blue
+        width: 300px;
+        height: 300px;
+        top: -100px;
+        left: 10%;
+        animation: pulsate 8s ease-in-out infinite alternate;
+      }
+
+      &--green {
+        background: $neon-green; // Updated to green from swap
+        width: 200px;
+        height: 200px;
+        bottom: -100px;
+        right: 10%;
+        animation: pulsate 10s ease-in-out infinite alternate-reverse;
+        opacity: 0.15; // More transparent
+      }
+
+      &--magenta {
+        background: $neon-magenta; // Updated to purple
+        width: 150px;
+        height: 150px;
+        bottom: 100px;
+        right: 30%;
+        animation: pulsate 9s ease-in-out infinite;
+        opacity: 0.12; // More transparent
+      }
+    }
+
+    // Scanning horizontal and vertical lines removed as requested
+  }
+
+  // Added media query for widescreen displays to further push the image right
+  @media (min-width: 1400px) {
+    .hero .container .hero__image {
+      transform: translateX(150px);
+    }
+  }
+
+  // Stats Section
+  .stats {
+    padding: 4rem 0;
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+    border-top: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba($neon-blue, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    border-bottom: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba($neon-blue, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+
+    &__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
+    }
+  }
+
+  .stat-card {
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba($neon-blue, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    box-shadow: 0 8px 32px rgba($neon-blue, 0.08),
+      0 8px 32px rgba(196, 92, 242, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 32px rgba($neon-blue, 0.12),
+        0 8px 32px rgba(196, 92, 242, 0.12);
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      color: $text-secondary;
+      margin-bottom: 1rem;
+      font-weight: 500;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: $neon-blue; // Updated to neon blue
+      text-shadow: 0 0 10px rgba($neon-blue, 0.3);
+
+      &.accent-green {
+        color: $neon-green; // Updated to green from swap
+        text-shadow: 0 0 10px rgba($neon-green, 0.5);
+      }
+
+      &.accent-magenta {
+        color: $neon-magenta; // Updated to purple
+        text-shadow: 0 0 10px rgba($neon-magenta, 0.5);
+      }
+    }
+  }
+
+  // Features Section
+  .features {
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+    padding: 6rem 0;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(
+          circle at 20% 30%,
+          rgba($neon-blue, 0.1),
+          transparent 40%
+        ),
+        radial-gradient(
+          circle at 80% 70%,
+          rgba($neon-magenta, 0.08),
+          transparent 40%
+        );
+      pointer-events: none;
+    }
+
+    &__grid {
+      display: grid;
+      grid-template-columns: repeat(
+        3,
+        1fr
+      ); // Changed to exact 3 columns for 3x3 grid
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+
+      @media (max-width: 1200px) {
+        grid-template-columns: repeat(2, 1fr); // 2 columns on medium screens
+      }
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr; // 1 column on mobile
+      }
+    }
+  }
+
+  .feature-card {
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba($neon-blue, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    z-index: 2;
+    height: 100%; // Ensure all cards have the same height
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 32px rgba($neon-blue, 0.12),
+        0 8px 32px rgba(196, 92, 242, 0.12);
+    }
+
+    .feature-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: linear-gradient(
+        135deg,
+        rgba($neon-blue, 0.1),
+        rgba($neon-blue, 0.02)
+      );
+      border: 1px solid rgba($neon-blue, 0.2);
+      position: relative;
+
+      svg {
+        width: 35px;
+        height: 35px;
+        color: $neon-blue; // Updated to neon blue
+        filter: drop-shadow(0 0 8px rgba($neon-blue, 0.5));
+        transition: transform 0.3s ease;
+      }
+
+      &:hover svg {
+        transform: scale(1.1);
+      }
+
+      &::after {
+        content: "";
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, rgba($neon-blue, 0.5), transparent);
+        z-index: -1;
+        opacity: 0.4;
+        filter: blur(4px);
+      }
+
+      &--green {
+        background: linear-gradient(
+          135deg,
+          rgba($neon-green, 0.1),
+          rgba($neon-green, 0.02)
+        );
+        border: 1px solid rgba($neon-green, 0.2);
+
+        svg {
+          color: $neon-green; // Updated to green from swap
+          filter: drop-shadow(0 0 8px rgba($neon-green, 0.5));
+        }
+
+        &::after {
+          background: linear-gradient(
+            45deg,
+            rgba($neon-green, 0.5),
+            transparent
+          );
+        }
+      }
+
+      &--magenta {
+        background: linear-gradient(
+          135deg,
+          rgba($neon-magenta, 0.1),
+          rgba($neon-magenta, 0.02)
+        );
+        border: 1px solid rgba($neon-magenta, 0.2);
+
+        svg {
+          color: $neon-magenta; // Updated to purple
+          filter: drop-shadow(0 0 8px rgba($neon-magenta, 0.5));
+        }
+
+        &::after {
+          background: linear-gradient(
+            45deg,
+            rgba($neon-magenta, 0.5),
+            transparent
+          );
+        }
+      }
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: $neon-blue; // Updated to neon blue
+      font-weight: 600;
+
+      &.green {
+        color: $neon-green; // Updated to green from swap
+      }
+
+      &.magenta {
+        color: $neon-magenta; // Updated to purple
+      }
+    }
+
+    p {
+      color: $text-secondary;
+      font-size: 1rem;
+      line-height: 1.6;
+      flex-grow: 1; // Allow paragraph to take up remaining space
+    }
+  }
+
+  // Dashboard Preview Section
+  .dashboard-preview {
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+    padding: 6rem 0;
+
+    &__content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+
+      @media (max-width: 991px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    &__text {
+      h2 {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        color: $neon-blue; // Updated to neon blue
+        font-weight: 700;
+        background: linear-gradient(
+          90deg,
+          $neon-blue,
+          #c45cf2
+        ); // Updated gradient with neon blue
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        text-shadow: 0 0 20px rgba($neon-blue, 0.2);
+
+        @media (max-width: 768px) {
+          font-size: 2rem;
+        }
+      }
+
+      p {
+        color: $text-secondary;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+      }
+
+      .dashboard-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2.5rem;
+
+        @media (max-width: 480px) {
+          grid-template-columns: 1fr;
+        }
+
+        .dashboard-stat {
+          .label {
+            display: block;
+            color: $text-muted;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+          }
+
+          .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: $neon-blue; // Updated to neon blue
+
+            &.accent-green {
+              color: $neon-green; // Updated to green from swap
+              text-shadow: 0 0 10px rgba($neon-green, 0.5);
+            }
+
+            &.accent-magenta {
+              color: $neon-magenta; // Updated to purple
+              text-shadow: 0 0 10px rgba($neon-magenta, 0.5);
+            }
+          }
+        }
+      }
+    }
+
+    &__image {
+      position: relative;
+
+      img {
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid;
+        border-image: linear-gradient(
+            45deg,
+            rgba($neon-blue, 0.2),
+            rgba(196, 92, 242, 0.2)
+          )
+          1;
+        object-fit: contain;
+        background-color: rgba(0, 0, 0, 0.2);
+        transform: scale(
+          1.15
+        ); // Added a permanent scale to make the image larger
+      }
+
+      // Added hover effect on dashboard
+      &:hover img {
+        transform: scale(1.2); // Additional scale on hover
+        transition: transform 0.3s ease;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4),
+          0 0 30px rgba($neon-blue, 0.2);
+      }
+
+      .glow-effect {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          circle at center,
+          rgba($neon-blue, 0.15),
+          transparent 60%
+        );
+        filter: blur(40px);
+        z-index: -1;
+      }
+    }
+  }
+
+  // Add a modal for viewing dashboard full-screen
+  .dashboard-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(15px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+
+    &.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      width: 90%;
+      max-width: 1600px;
+      position: relative;
+
+      img {
+        width: 100%;
+        border-radius: 16px;
+        box-shadow: 0 0 50px rgba($neon-blue, 0.2);
+      }
+
+      .close-button {
+        position: absolute;
+        top: -40px;
+        right: -40px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba($background-dark, 0.7);
+        border: 1px solid rgba($neon-blue, 0.5);
+        color: $neon-blue;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.5rem;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba($neon-blue, 0.2);
+          transform: rotate(90deg);
+        }
+      }
+    }
+  }
+
+  // AI Search Section
+  .ai-search {
+    position: relative;
+    padding: 6rem 0;
+    overflow: hidden;
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+
+    &__background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(2, 2, 2, 0.4); // Darker background
+      z-index: -1;
+    }
+
+    &__glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.2;
+      z-index: -1;
+
+      &--1 {
+        background: $neon-blue; // Updated to neon blue
+        width: 300px;
+        height: 300px;
+        top: -100px;
+        right: 10%;
+        animation: pulsate 8s ease-in-out infinite alternate-reverse;
+      }
+
+      &--2 {
+        background: $neon-magenta; // Updated to purple
+        width: 200px;
+        height: 200px;
+        bottom: -100px;
+        left: 10%;
+        animation: pulsate 10s ease-in-out infinite alternate;
+        opacity: 0.15; // More transparent
+      }
+    }
+
+    &__content {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    &__text {
+      text-align: center;
+      margin-bottom: 3rem;
+
+      h2 {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        color: $neon-magenta; // Updated to purple
+        font-weight: 700;
+        background: linear-gradient(
+          90deg,
+          #c45cf2,
+          $neon-blue
+        ); // Updated gradient with neon blue
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+
+        @media (max-width: 768px) {
+          font-size: 2rem;
+        }
+      }
+
+      p {
+        color: $text-secondary;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        max-width: 700px;
+        margin: 0 auto;
+      }
+    }
+
+    &__demo {
+      .search-bar-container {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+
+        @media (max-width: 768px) {
+          flex-direction: column;
+        }
+
+        .search-bar {
+          flex: 1;
+          position: relative;
+
+          input {
+            width: 100%;
+            padding: 1.25rem 3.5rem 1.25rem 1.5rem;
+            border-radius: 12px;
+            background: rgba(2, 2, 2, 0.7); // Darker background
+            border: 1px solid rgba($neon-magenta, 0.3); // Purple border for search
+            color: $text-primary;
+            font-size: 1.1rem;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+
+            &:focus {
+              border-color: $neon-magenta; // Purple focus
+              outline: none;
+              box-shadow: 0 0 0 2px rgba($neon-magenta, 0.2);
+            }
+
+            &.focused {
+              border-color: $neon-magenta; // Purple focus
+              box-shadow: 0 0 15px rgba($neon-magenta, 0.3);
+            }
+
+            &::placeholder {
+              color: rgba($text-secondary, 0.6);
+            }
+          }
+
+          .search-icon {
+            position: absolute;
+            right: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: $neon-magenta; // Updated to purple
+            font-size: 1.5rem;
+          }
+        }
+
+        .btn--search {
+          padding: 0 2rem;
+          background: linear-gradient(
+            45deg,
+            $neon-blue,
+            #c45cf2
+          ); // Updated gradient with neon blue
+          color: #000;
+          border-radius: 12px;
+          border: none;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 0 20px rgba($neon-blue, 0.3),
+            0 0 20px rgba(196, 92, 242, 0.3);
+          min-width: 120px;
+
+          &:hover {
+            box-shadow: 0 0 30px rgba($neon-blue, 0.4),
+              0 0 30px rgba(196, 92, 242, 0.4);
+            transform: translateY(-2px);
+          }
+
+          @media (max-width: 768px) {
+            height: 50px;
+          }
+        }
+      }
+
+      .search-example {
+        background: rgba(2, 2, 2, 0.7); // Darker background
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid rgba($neon-magenta, 0.2); // Purple border
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        margin-bottom: 2rem;
+
+        .search-question {
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+          span {
+            font-weight: 600;
+            color: $text-primary;
+            font-size: 1.1rem;
+          }
+        }
+
+        .search-answer {
+          display: flex;
+          gap: 1rem;
+
+          .ai-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: $neon-magenta; // Updated to purple
+            color: #000;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            height: fit-content;
+          }
+
+          p {
+            flex: 1;
+            color: $text-secondary;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin: 0;
+          }
+        }
+      }
+    }
+
+    .sources-list {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.5rem;
+      margin-top: 2rem;
+      justify-content: center;
+
+      .sources-title {
+        color: $text-muted;
+        font-size: 0.9rem;
+      }
+
+      .source-items {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .source-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        .source-icon {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+
+          &.web {
+            background: linear-gradient(45deg, #5b86e5, #36d1dc);
+          }
+
+          &.youtube {
+            background: linear-gradient(45deg, #ff0000, #ff5e62);
+          }
+
+          &.blockchain {
+            background: linear-gradient(45deg, #a770ef, #cf8bf3);
+          }
+
+          &.ai {
+            background: $neon-magenta; // Updated to purple
+          }
+        }
+
+        span {
+          color: $text-secondary;
+          font-size: 0.9rem;
+        }
+      }
+    }
+  }
+
+  // Top Pools Section
+  .top-pools {
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+    padding: 6rem 0;
+
+    .pools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .pool-card {
+      background: rgba(2, 2, 2, 0.7); // Darker background
+      border-radius: 16px;
+      padding: 2rem;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba($neon-blue, 0.2),
+          rgba(196, 92, 242, 0.2)
+        )
+        1;
+      box-shadow: 0 8px 32px rgba($neon-blue, 0.08),
+        0 8px 32px rgba(196, 92, 242, 0.08);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+      &:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 32px rgba($neon-blue, 0.12),
+          0 8px 32px rgba(196, 92, 242, 0.12);
+      }
+
+      h3 {
+        font-size: 1.5rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(
+          90deg,
+          $neon-blue,
+          #c45cf2
+        ); // Updated gradient with neon blue
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+      }
+
+      .pool-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+
+        .pool-stat {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+
+          .label {
+            color: $text-muted;
+          }
+
+          .value {
+            font-weight: 600;
+
+            &.accent-blue {
+              color: $neon-blue; // Updated to neon blue
+              text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+            }
+
+            &.accent-green {
+              color: $neon-green; // Updated to green from swap
+              text-shadow: 0 0 10px rgba($neon-green, 0.5);
+            }
+          }
+        }
+      }
+    }
+
+    .view-all {
+      text-align: center;
+      margin-top: 3rem;
+    }
+  }
+
+  // CTA Section
+  .cta {
+    position: relative;
+    padding: 6rem 0;
+    overflow: hidden;
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+
+    &__glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.2;
+      z-index: 0;
+
+      &--1 {
+        background: $neon-blue; // Updated to neon blue
+        width: 300px;
+        height: 300px;
+        top: -150px;
+        left: 10%;
+        animation: pulsate 8s ease-in-out infinite alternate;
+      }
+
+      &--2 {
+        background: $neon-green; // Updated to green from swap
+        width: 200px;
+        height: 200px;
+        bottom: -150px;
+        right: 10%;
+        animation: pulsate 10s ease-in-out infinite alternate-reverse;
+        opacity: 0.15;
+      }
+
+      &--3 {
+        background: $neon-magenta; // Updated to purple
+        width: 150px;
+        height: 150px;
+        bottom: 50px;
+        left: 30%;
+        animation: pulsate 9s ease-in-out infinite alternate-reverse;
+        opacity: 0.12;
+      }
+    }
+
+    &__content {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+
+      h2 {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(
+          90deg,
+          $neon-blue 30%,
+          $neon-green 60%,
+          $neon-magenta 90%
+        ); // Updated color distribution with neon blue
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        font-weight: 700;
+
+        @media (max-width: 768px) {
+          font-size: 2rem;
+        }
+      }
+
+      p {
+        color: $text-secondary;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+      }
+
+      &__buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+
+        @media (max-width: 480px) {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    }
+  }
+
+  // Footer
+  .footer {
+    background: rgba(2, 2, 2, 0.7); // Darker background to match Swap page
+    padding: 4rem 0 2rem;
+    border-top: 1px solid;
+    border-image: linear-gradient(
+        90deg,
+        rgba($neon-blue, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+
+    &__grid {
+      display: grid;
+      grid-template-columns: 2fr 3fr;
+      gap: 4rem;
+      margin-bottom: 4rem;
+
+      @media (max-width: 991px) {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+      }
+    }
+
+    &__brand {
+      .footer-logo {
+        display: inline-block;
+        text-decoration: none;
+        margin-bottom: 1.5rem;
+
+        .logo-text {
+          color: $neon-blue; // Updated to neon blue
+          text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+          font-size: 1.5rem;
+          font-weight: 700;
+        }
+
+        .logo-network {
+          color: $text-primary;
+          opacity: 0.7;
+          font-size: 1.5rem;
+          margin-left: 0.25rem;
+        }
+      }
+
+      p {
+        color: $text-secondary;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+      }
+
+      .social-links {
+        display: flex;
+        gap: 1rem;
+
+        a {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: rgba(2, 2, 2, 0.4); // Darker background
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: $text-secondary;
+          transition: all 0.3s ease;
+
+          &:hover {
+            color: $neon-blue; // Updated to neon blue
+            border-color: $neon-blue;
+            box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+            transform: translateY(-3px);
+          }
+
+          // Assign different colors to different social icons
+          &:nth-child(1):hover {
+            color: $neon-blue; // Updated to neon blue
+            border-color: $neon-blue;
+            box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+          }
+
+          &:nth-child(2):hover {
+            color: $neon-magenta; // Updated to purple
+            border-color: $neon-magenta;
+            box-shadow: 0 0 15px rgba($neon-magenta, 0.3);
+          }
+
+          &:nth-child(3):hover {
+            color: $neon-green; // Updated to green from swap
+            border-color: $neon-green;
+            box-shadow: 0 0 15px rgba($neon-green, 0.3);
+          }
+
+          &:nth-child(4):hover {
+            color: $neon-blue; // Updated to neon blue
+            border-color: $neon-blue;
+            box-shadow: 0 0 15px rgba($neon-blue, 0.3);
+          }
+        }
+      }
+    }
+
+    &__links {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      @media (max-width: 480px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    &__link-group {
+      h4 {
+        color: $text-primary;
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      a {
+        display: block;
+        color: $text-secondary;
+        text-decoration: none;
+        margin-bottom: 0.75rem;
+        transition: all 0.3s ease;
+
+        &:hover {
+          color: $neon-blue; // Updated to neon blue
+          transform: translateX(5px);
+        }
+      }
+
+      // Color variations for different sections
+      &:nth-child(1) {
+        a:hover {
+          color: $neon-blue; // Updated to neon blue
+        }
+      }
+
+      &:nth-child(2) {
+        a:hover {
+          color: $neon-green; // Updated to green from swap
+        }
+      }
+
+      &:nth-child(3) {
+        a:hover {
+          color: $neon-magenta; // Updated to purple
+        }
+      }
+    }
+
+    &__bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+      @media (max-width: 768px) {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+
+      .footer__copyright {
+        color: $text-muted;
+        font-size: 0.9rem;
+      }
+
+      .footer__legal {
+        display: flex;
+        gap: 1.5rem;
+
+        a {
+          color: $text-muted;
+          text-decoration: none;
+          font-size: 0.9rem;
+          transition: color 0.3s ease;
+
+          &:hover {
+            color: $text-secondary;
+          }
+        }
+      }
+    }
+  }
+
+  // Button Styles
+  .btn {
+    display: inline-block;
+    padding: 0.9rem 2.2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    border: none;
+
+    &--primary {
+      background: linear-gradient(
+        45deg,
+        $neon-blue,
+        #c45cf2
+      ); // Updated gradient with neon blue
+      color: #000; // Dark text for contrast
+      box-shadow: 0 0 20px rgba($neon-blue, 0.3),
+        0 0 20px rgba(196, 92, 242, 0.3);
+
+      &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 25px rgba($neon-blue, 0.4),
+          0 5px 25px rgba(196, 92, 242, 0.4);
+      }
+
+      &:active {
+        transform: translateY(-1px);
+      }
+    }
+
+    &--secondary {
+      background: rgba(2, 2, 2, 0.3); // Darker background
+      border: 1px solid $neon-green; // Green secondary button
+      color: $text-primary;
+
+      &:hover {
+        background: rgba(2, 2, 2, 0.5);
+        transform: translateY(-3px);
+        box-shadow: 0 5px 25px rgba($neon-green, 0.2);
+      }
+
+      &:active {
+        transform: translateY(-1px);
+      }
+    }
+
+    &--magenta {
+      background: rgba(2, 2, 2, 0.3); // Darker background
+      border: 1px solid $neon-magenta; // Purple button option
+      color: $text-primary;
+
+      &:hover {
+        background: rgba(2, 2, 2, 0.5);
+        transform: translateY(-3px);
+        box-shadow: 0 5px 25px rgba($neon-magenta, 0.2);
+      }
+    }
+  }
+
+  // Animations
+  @keyframes pulsate {
+    0% {
+      opacity: 0.5;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.8;
+      transform: scale(1.2);
+    }
+  }
+
+  // Media Queries for Responsive Design
+  @media (max-width: 1200px) {
+    .hero {
+      min-height: 600px;
+
+      &__content {
+        h1 {
+          font-size: 3rem;
+        }
+      }
+
+      // Adjust image position on smaller screens
+      .container .hero__image {
+        transform: translateX(60px); // Less shifting on smaller screens
+      }
+    }
+
+    // Make features section 2x3 on tablets
+    .features__grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 991px) {
+    .hero {
+      padding: 8rem 0 4rem;
+      height: auto;
+
+      .container {
+        width: 90%;
+      }
+
+      &__content {
+        text-align: center;
+        max-width: 100%;
+
+        h1 {
+          font-size: 2.5rem;
+        }
+
+        p {
+          font-size: 1.1rem;
+        }
+      }
+
+      &__buttons {
+        justify-content: center;
+      }
+
+      // Reset position on mobile
+      .container .hero__image {
+        transform: translateX(0);
+        margin: 0 auto;
+        max-width: 90%;
+
+        .dashboard-preview {
+          transform: scale(1.15);
+        }
+      }
+    }
+
+    .dashboard-preview {
+      &__text {
+        order: 2;
+      }
+
+      &__image {
+        order: 1;
+        margin-bottom: 2rem;
+
+        // Maintain scaling on mobile
+        img {
+          transform: scale(1.15);
+        }
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    section {
+      padding: 4rem 0;
+    }
+
+    .hero {
+      padding: 6rem 0 3rem;
+
+      &__content {
+        h1 {
+          font-size: 2.2rem;
+        }
+
+        p {
+          font-size: 1rem;
+        }
+      }
+    }
+
+    .section-title {
+      font-size: 2rem;
+    }
+
+    .stat-card {
+      .stat-value {
+        font-size: 2rem;
+      }
+    }
+
+    .feature-card {
+      .feature-icon {
+        width: 70px;
+        height: 70px;
+
+        svg {
+          width: 30px;
+          height: 30px;
+        }
+      }
+
+      h3 {
+        font-size: 1.3rem;
+      }
+    }
+
+    // Make features section 1 column on mobile
+    .features__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-preview {
+      &__text {
+        h2 {
+          font-size: 2rem;
+        }
+      }
+    }
+
+    .ai-search {
+      &__text {
+        h2 {
+          font-size: 2rem;
+        }
+      }
+    }
+
+    .cta {
+      &__content {
+        h2 {
+          font-size: 2rem;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    .hero {
+      &__content {
+        h1 {
+          font-size: 2rem;
+        }
+      }
+
+      &__buttons {
+        flex-direction: column;
+
+        .btn {
+          width: 100%;
+        }
+      }
+    }
+
+    .btn {
+      width: 100%;
+    }
+
+    .feature-card {
+      .feature-icon {
+        width: 60px;
+        height: 60px;
+
+        svg {
+          width: 25px;
+          height: 25px;
+        }
+      }
+    }
+  }
+}
+// Add to src/pages/Home/Home.scss
+
+.pools-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(30, 144, 255, 0.1);
+    border-top-color: $neon-blue;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    color: $text-secondary;
+    font-size: 1rem;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+// Add to src/pages/Home/Home.scss
+
+// Protocol badges styling
+.protocol-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(
+    135deg,
+    rgba(30, 30, 30, 0.7),
+    rgba(0, 0, 0, 0.9)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  // Protocol-specific styles
+  &.cetus {
+    background: linear-gradient(135deg, #4650a8, #1a2264);
+    border-color: rgba(70, 80, 168, 0.5);
+  }
+
+  &.bluefin {
+    background: linear-gradient(135deg, #2c78b2, #1a4a6f);
+    border-color: rgba(44, 120, 178, 0.5);
+  }
+
+  &.turbos {
+    background: linear-gradient(135deg, #20c4bc, #128e88);
+    border-color: rgba(32, 196, 188, 0.5);
+  }
+
+  &.kriya {
+    background: linear-gradient(135deg, #8155ff, #4d33a3);
+    border-color: rgba(129, 85, 255, 0.5);
+  }
+
+  &.flowx {
+    background: linear-gradient(135deg, #3e7db0, #274e6e);
+    border-color: rgba(62, 125, 176, 0.5);
+  }
+
+  &.aftermath {
+    background: linear-gradient(135deg, #0c8ce9, #0660a0);
+    border-color: rgba(12, 140, 233, 0.5);
+  }
+
+  &.deepbook {
+    background: linear-gradient(135deg, #1d818a, #10484d);
+    border-color: rgba(29, 129, 138, 0.5);
+  }
+
+  &.suiswap {
+    background: linear-gradient(135deg, #6186ff, #3c60d4);
+    border-color: rgba(97, 134, 255, 0.5);
+  }
+}
+
+.pool-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+  .token-icons {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+
+    .token-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+
+      &.token-a {
+        z-index: 2;
+        margin-right: -8px;
+        border: 1px solid rgba(30, 144, 255, 0.5);
+      }
+
+      &.token-b {
+        z-index: 1;
+        border: 1px solid rgba(196, 92, 242, 0.5);
+      }
+    }
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    background: linear-gradient(90deg, $neon-blue, #c45cf2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    margin-bottom: 0.25rem;
+  }
+}
+
+.pools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.pool-card {
+  background: rgba(2, 2, 2, 0.7);
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba($neon-blue, 0.2),
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  box-shadow: 0 8px 32px rgba($neon-blue, 0.08),
+    0 8px 32px rgba(196, 92, 242, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba($neon-blue, 0.12),
+      0 8px 32px rgba(196, 92, 242, 0.12);
+  }
+
+  .pool-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+
+    .pool-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .label {
+        color: $text-muted;
+      }
+
+      .value {
+        font-weight: 600;
+
+        &.accent-blue {
+          color: $neon-blue;
+          text-shadow: 0 0 10px rgba($neon-blue, 0.5);
+        }
+
+        &.accent-green {
+          color: $neon-green;
+          text-shadow: 0 0 10px rgba($neon-green, 0.5);
+        }
+      }
+    }
+  }
+}
+
+.pools-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(30, 144, 255, 0.1);
+    border-top-color: $neon-blue;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    color: $text-secondary;
+    font-size: 1rem;
+  }
+}
+
+.pools-empty {
+  text-align: center;
+  padding: 3rem;
+  color: $text-secondary;
+  font-style: italic;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.view-all {
+  text-align: center;
+  margin-top: 2rem;
+}

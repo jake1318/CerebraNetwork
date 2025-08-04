@@ -1,0 +1,478 @@
+/* src/pages/Dex/components/OrderForm.scss */
+/* Last Updated: 2025-07-13 21:26:22 UTC by jake1318 */
+
+.dex-order-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  color: #ffffff;
+  padding: 12px;
+  background: rgba(2, 2, 2, 0.7); // Darker background to match swap page
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  animation: fadeIn 0.5s ease-out;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
+    0 8px 32px rgba(196, 92, 242, 0.08);
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.15),
+      0 8px 32px rgba(196, 92, 242, 0.15);
+  }
+
+  // Variables
+  $buy-color: #1ed760; // Keep this color for buy buttons
+  $buy-hover: #17b04f;
+  $buy-bg: rgba(30, 215, 96, 0.1);
+  $buy-border: rgba(30, 215, 96, 0.3);
+
+  $sell-color: #ff4444; // Error red
+  $sell-hover: #e53935;
+  $sell-bg: rgba(255, 68, 68, 0.1);
+  $sell-border: rgba(255, 68, 68, 0.3);
+
+  $accent-color: #00ffff; // Cyan from swap page
+  $accent-bg: rgba(0, 255, 255, 0.1);
+  $accent-border: rgba(0, 255, 255, 0.3);
+
+  $border-color: rgba(255, 255, 255, 0.1);
+  $input-bg: rgba(2, 2, 2, 0.3); // Darker background for inputs
+  $text-muted: #b1a5c8; // Text-secondary from swap page
+
+  // Buy/Sell tabs at the top
+  .order-form-tabs {
+    display: flex;
+    margin-bottom: 12px;
+
+    .tab {
+      flex: 1;
+      padding: 8px 0;
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(196, 92, 242, 0.2)
+        )
+        1;
+      background: rgba(2, 2, 2, 0.3); /* Darker background to match Swap */
+      color: $text-muted;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+
+      &:last-child {
+        border-radius: 0 8px 8px 0;
+      }
+
+      &.buy.active {
+        background-color: $buy-bg;
+        color: $buy-color;
+        border-color: $buy-border;
+        text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
+      }
+
+      &.sell.active {
+        background-color: $sell-bg;
+        color: $sell-color;
+        border-color: $sell-border;
+        text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      }
+
+      &:hover:not(.active) {
+        color: #ffffff;
+        background-color: rgba(255, 255, 255, 0.05);
+        transform: translateY(-1px);
+      }
+    }
+  }
+
+  // Limit/Market mode selector
+  .order-form-mode-selector {
+    display: flex;
+    margin-bottom: 16px;
+
+    .mode-btn {
+      flex: 1;
+      padding: 6px 0;
+      background: rgba(2, 2, 2, 0.3); /* Darker background to match Swap */
+      border: 1px solid;
+      border-image: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(196, 92, 242, 0.2)
+        )
+        1;
+      color: $text-muted;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+
+      &:last-child {
+        border-radius: 0 8px 8px 0;
+      }
+
+      &.active {
+        background: linear-gradient(
+          45deg,
+          rgba(0, 255, 255, 0.2),
+          rgba(196, 92, 242, 0.2)
+        );
+        color: #ffffff;
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.1);
+      }
+
+      &:hover:not(.active) {
+        color: #ffffff;
+        background-color: rgba(255, 255, 255, 0.05);
+        transform: translateY(-1px);
+      }
+    }
+  }
+
+  // Form content
+  .order-form-content {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+
+      label {
+        font-size: 13px;
+        color: $text-muted;
+        margin-bottom: 6px;
+      }
+
+      .input-container {
+        position: relative;
+
+        input {
+          width: 100%;
+          padding: 10px 12px;
+          background-color: $input-bg;
+          border: 1px solid;
+          border-image: linear-gradient(
+              45deg,
+              rgba(0, 255, 255, 0.2),
+              rgba(196, 92, 242, 0.2)
+            )
+            1;
+          border-radius: 8px;
+          color: #ffffff;
+          font-size: 14px;
+          font-family: "Orbitron", monospace;
+          transition: all 0.3s ease;
+
+          &:focus {
+            outline: none;
+            border-color: $accent-border;
+            box-shadow: 0 0 10px $accent-bg;
+          }
+
+          &:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+
+          // Remove spinner buttons in number inputs
+          &::-webkit-outer-spin-button,
+          &::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+
+          // Firefox
+          &[type="number"] {
+            -moz-appearance: textfield;
+          }
+        }
+      }
+
+      .balance-info {
+        font-size: 12px;
+        color: $text-muted;
+        margin-top: 6px;
+        text-align: right;
+      }
+
+      .percentage-buttons {
+        display: flex;
+        margin-top: 8px;
+        gap: 4px;
+
+        .pct-btn {
+          flex: 1;
+          padding: 4px 0;
+          background-color: rgba(2, 2, 2, 0.3);
+          border: 1px solid $border-color;
+          color: $text-muted;
+          font-size: 12px;
+          cursor: pointer;
+          border-radius: 4px;
+          transition: all 0.3s ease;
+
+          &:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            transform: translateY(-1px);
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+
+      .total-value {
+        background-color: $input-bg;
+        padding: 10px 12px;
+        border: 1px solid;
+        border-image: linear-gradient(
+            45deg,
+            rgba(0, 255, 255, 0.2),
+            rgba(196, 92, 242, 0.2)
+          )
+          1;
+        border-radius: 8px;
+        font-family: "Orbitron", monospace;
+        font-size: 14px;
+      }
+    }
+
+    .market-notice {
+      background: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.1),
+        rgba(196, 92, 242, 0.05),
+        rgba(0, 255, 128, 0.05)
+      );
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      text-align: center;
+      font-size: 14px;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.1);
+    }
+
+    .order-status {
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 13px;
+      margin: 8px 0;
+
+      &.success {
+        background-color: rgba(30, 215, 96, 0.1);
+        border: 1px solid rgba(30, 215, 96, 0.3);
+        color: $buy-color;
+        text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
+        box-shadow: 0 0 15px rgba(30, 215, 96, 0.2);
+      }
+
+      &.error {
+        background-color: rgba(255, 68, 68, 0.1);
+        border: 1px solid rgba(255, 68, 68, 0.3);
+        color: $sell-color;
+        text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+        box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
+      }
+    }
+
+    .submit-order-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 8px;
+
+      &.buy {
+        background: linear-gradient(
+          45deg,
+          rgba(30, 215, 96, 0.8),
+          rgba(30, 215, 96, 0.6)
+        );
+        color: white;
+        border: none;
+        box-shadow: 0 0 20px rgba(30, 215, 96, 0.3);
+        text-shadow: 0 0 10px rgba(30, 215, 96, 0.4);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(
+            45deg,
+            rgba(30, 215, 96, 0.9),
+            rgba(30, 215, 96, 0.7)
+          );
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(30, 215, 96, 0.4);
+        }
+      }
+
+      &.sell {
+        background: linear-gradient(
+          45deg,
+          rgba(255, 68, 68, 0.8),
+          rgba(255, 68, 68, 0.6)
+        );
+        color: white;
+        border: none;
+        box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
+        text-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(
+            45deg,
+            rgba(255, 68, 68, 0.9),
+            rgba(255, 68, 68, 0.7)
+          );
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(255, 68, 68, 0.4);
+        }
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
+
+// Animation keyframes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 576px) {
+  .dex-order-form {
+    padding: 8px;
+
+    .order-form-tabs .tab,
+    .order-form-mode-selector .mode-btn {
+      font-size: 12px;
+    }
+
+    .order-form-content .form-group {
+      label {
+        font-size: 12px;
+      }
+
+      .input-container input {
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      .percentage-buttons .pct-btn {
+        font-size: 11px;
+      }
+    }
+
+    .submit-order-btn {
+      font-size: 14px;
+      padding: 10px;
+    }
+  }
+}
+// Add these styles to OrderForm.scss if they don't already exist
+
+.tx-success-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.tx-success-content {
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  text-align: center;
+
+  h3 {
+    margin-top: 0;
+    color: #4ce6b7;
+  }
+
+  p {
+    margin: 16px 0;
+  }
+
+  a {
+    color: #4ce6b7;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.tx-close-button {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background-color: #4ce6b7;
+  color: #0f0f1b;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: #3bd8a7;
+  }
+}
+
+.powered-by {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #999;
+}
+
+.fee-info {
+  margin: 10px 0;
+  font-size: 14px;
+  color: #999;
+  text-align: right;
+}

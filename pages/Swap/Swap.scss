@@ -1,0 +1,928 @@
+// src/pages/Swap/Swap.scss
+// Last Updated: 2025-07-14 05:13:42 UTC by jake1318
+
+.swap-page {
+  width: 100%;
+  min-height: calc(100vh - 80px);
+  padding: 2rem;
+  // Updated background with neon blue (50%), green (25%), and magenta (25%) distribution
+  background: radial-gradient(
+      circle at top left,
+      rgba(30, 144, 255, 0.15) 0%,
+      // Changed to neon blue from navbar
+      rgba(2, 2, 2, 0.8) 40%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(196, 92, 242, 0.15) 0%,
+      rgba(2, 2, 2, 0.8) 40%
+    ),
+    linear-gradient(135deg, rgba(2, 2, 2, 0.95) 0%, rgba(5, 5, 15, 0.95) 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: center, center, center;
+  position: relative;
+  overflow: hidden;
+
+  // Removed grid overlay
+
+  // Scanning horizontal line (neon blue)
+  &::after {
+    content: "";
+    position: absolute;
+    width: 100vw;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      #1e90ff,
+      transparent
+    ); // Changed to neon blue
+    top: 50%;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: horizonScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(30, 144, 255, 0.5); // Changed to neon blue
+  }
+
+  // Vertical scan line (neon purple) - matching home page
+  .vertical-scan {
+    content: "";
+    position: absolute;
+    width: 2px;
+    height: 100vh;
+    background: linear-gradient(180deg, transparent, #c45cf2, transparent);
+    left: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+    animation: verticalScan 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 0 20px rgba(196, 92, 242, 0.5);
+  }
+
+  // Glow effects (neon blue and purple) - matching home page
+  .glow-1 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(30, 144, 255, 0.12); // Changed to neon blue
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -100px;
+    left: 10%;
+    z-index: 1;
+    animation: pulsate 8s ease-in-out infinite alternate;
+  }
+
+  .glow-2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(196, 92, 242, 0.12);
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: 10%;
+    z-index: 1;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+  }
+
+  // Add a green glow element to match the requested color distribution
+  .glow-3 {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba(0, 255, 128, 0.12);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: 60%;
+    left: 70%;
+    z-index: 1;
+    animation: pulsate 9s ease-in-out infinite;
+  }
+
+  &__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  &__header {
+    text-align: center;
+    margin-bottom: 3rem;
+
+    h1 {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      // Updated gradient with neon blue (#1E90FF) and purple (#C45CF2)
+      background: linear-gradient(90deg, #1e90ff, #c45cf2);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: 0 0 20px rgba(30, 144, 255, 0.2);
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    p {
+      font-size: 1.5rem;
+      // Using softer gray as mentioned (#B1A5C8)
+      color: #b1a5c8;
+      max-width: 600px;
+      margin: 0 auto;
+      letter-spacing: 0.5px;
+    }
+  }
+
+  &__content {
+    position: relative;
+    max-width: 480px;
+    margin: 0 auto;
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  .connect-prompt {
+    // Darker card background (#020202)
+    background: rgba(2, 2, 2, 0.7);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    box-shadow: 0 8px 32px rgba(30, 144, 255, 0.08),
+      // Changed to neon blue
+      0 8px 32px rgba(196, 92, 242, 0.08);
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 32px rgba(30, 144, 255, 0.15),
+        // Changed to neon blue
+        0 8px 32px rgba(196, 92, 242, 0.15);
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      // Updated gradient with neon blue and purple
+      background: linear-gradient(90deg, #1e90ff, #c45cf2);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      position: relative;
+      text-shadow: 0 0 20px rgba(30, 144, 255, 0.2); // Changed to neon blue
+      font-weight: bold;
+      letter-spacing: 1px;
+
+      &::after {
+        content: "";
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 3px;
+        // Updated gradient with neon blue and purple
+        background: linear-gradient(90deg, #1e90ff, #c45cf2);
+        border-radius: 3px;
+        box-shadow: 0 0 10px rgba(30, 144, 255, 0.5),
+          // Changed to neon blue
+          0 0 10px rgba(196, 92, 242, 0.5);
+      }
+    }
+
+    p {
+      // Using softer gray as mentioned (#B1A5C8)
+      color: #b1a5c8;
+      font-size: 1.1rem;
+      line-height: 1.6;
+      margin-top: 1.5rem;
+    }
+  }
+
+  // Animations - matching home page
+  @keyframes horizonScan {
+    0% {
+      transform: translateX(-150vw);
+    }
+    100% {
+      transform: translateX(150vw);
+    }
+  }
+
+  @keyframes verticalScan {
+    0% {
+      transform: translateY(-150vh);
+    }
+    100% {
+      transform: translateY(150vh);
+    }
+  }
+
+  @keyframes pulsate {
+    0% {
+      opacity: 0.5;
+      transform: scale(0.8);
+    }
+    100% {
+      opacity: 0.8;
+      transform: scale(1.2);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+// Add responsive styles - matching home page
+@media (max-width: 768px) {
+  .swap-page {
+    padding: 1rem;
+
+    &__header {
+      h1 {
+        font-size: 2.5rem;
+      }
+
+      p {
+        font-size: 1.2rem;
+      }
+    }
+
+    &__content {
+      padding: 0 1rem;
+    }
+  }
+}
+
+/* ==========================================
+   Enhanced SwapForm styling 
+   ========================================== */
+.swap-form {
+  // Darker card background (#020202)
+  background: rgba(2, 2, 2, 0.7);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 32px rgba(30, 144, 255, 0.08),
+    // Changed to neon blue
+    0 8px 32px rgba(196, 92, 242, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.2),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(30, 144, 255, 0.15),
+      // Changed to neon blue
+      0 8px 32px rgba(196, 92, 242, 0.15);
+  }
+
+  h2 {
+    margin-top: 0;
+    margin-bottom: 24px;
+    text-align: center;
+    // Updated gradient with neon blue (#1E90FF) and purple (#C45CF2)
+    background: linear-gradient(90deg, #1e90ff, #c45cf2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: 0 0 20px rgba(30, 144, 255, 0.2); // Changed to neon blue
+    font-weight: bold;
+    letter-spacing: 1px;
+    font-size: 2rem;
+  }
+}
+
+.swap-form.loading {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 3px solid #1e90ff; // Changed to neon blue
+  border-right: 3px solid #c45cf2;
+  border-bottom: 3px solid #1e90ff; // Changed to neon blue
+  border-left: 3px solid #c45cf2;
+  animation: spin 1s ease-in-out infinite;
+  margin: 20px auto;
+  box-shadow: 0 0 20px rgba(30, 144, 255, 0.2), 0 0 20px rgba(196, 92, 242, 0.2); // Changed to neon blue
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  // Using softer gray as mentioned (#3F4C60)
+  color: #3f4c60;
+  letter-spacing: 0.3px;
+}
+
+.input-with-token {
+  display: flex;
+  align-items: center;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.3);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.2),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 0 20px rgba(30, 144, 255, 0.08),
+      0 0 20px rgba(196, 92, 242, 0.08); // Changed to neon blue
+  }
+
+  &:focus-within {
+    box-shadow: 0 0 25px rgba(30, 144, 255, 0.1),
+      0 0 25px rgba(196, 92, 242, 0.1); // Changed to neon blue
+  }
+
+  input {
+    flex: 1;
+    border: none;
+    padding: 16px;
+    font-size: 16px;
+    outline: none;
+    background: transparent;
+    color: #fff;
+    letter-spacing: 0.3px;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
+}
+
+.token-select-wrapper {
+  min-width: 140px;
+  padding-right: 8px;
+}
+
+// Token selector button styling
+.token-selector-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px 12px;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.4);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.2),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 120px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  &:hover {
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.6);
+    box-shadow: 0 0 15px rgba(30, 144, 255, 0.15),
+      0 0 15px rgba(196, 92, 242, 0.15); // Changed to neon blue
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// Selected token styling
+.selected-token {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .token-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 8px;
+    object-fit: cover;
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.6);
+    box-shadow: 0 0 5px rgba(30, 144, 255, 0.1), 0 0 5px rgba(196, 92, 242, 0.1); // Changed to neon blue
+  }
+
+  span {
+    font-weight: 500;
+    // Updated gradient with neon blue (#1E90FF) and purple (#C45CF2)
+    background: linear-gradient(45deg, #1e90ff, #c45cf2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+}
+
+.token-selector-button:not(:has(.selected-token)) {
+  background: linear-gradient(
+    45deg,
+    rgba(30, 144, 255, 0.1),
+    // Changed to neon blue
+    rgba(196, 92, 242, 0.1)
+  );
+  color: #fff;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.15),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.15)
+    );
+    text-shadow: 0 0 5px rgba(30, 144, 255, 0.3),
+      0 0 5px rgba(196, 92, 242, 0.3); // Changed to neon blue
+  }
+}
+
+.switch-button {
+  display: block;
+  margin: -10px auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.9);
+  box-shadow: 0 0 10px rgba(30, 144, 255, 0.15),
+    0 0 10px rgba(196, 92, 242, 0.15); // Changed to neon blue
+  z-index: 2;
+  position: relative;
+  color: #1e90ff; // Changed to neon blue
+  padding: 0;
+  font-weight: bold;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.2),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.6);
+    transform: scale(1.05);
+    border-image: linear-gradient(
+        45deg,
+        rgba(30, 144, 255, 0.4),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.4)
+      )
+      1;
+    box-shadow: 0 0 15px rgba(30, 144, 255, 0.2),
+      0 0 15px rgba(196, 92, 242, 0.2); // Changed to neon blue
+    color: #fff;
+    text-shadow: 0 0 8px rgba(30, 144, 255, 0.4); // Changed to neon blue
+  }
+}
+
+.slippage-control {
+  margin-top: 24px;
+}
+
+.slippage-options {
+  display: flex;
+  gap: 8px;
+
+  button {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.3);
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &:hover {
+      // Darker background (#020202)
+      background: rgba(2, 2, 2, 0.5);
+      box-shadow: 0 0 15px rgba(30, 144, 255, 0.1),
+        // Changed to neon blue
+        0 0 15px rgba(196, 92, 242, 0.1);
+    }
+
+    &.active {
+      // Updated gradient with neon blue (#1E90FF) and purple (#C45CF2)
+      background: linear-gradient(45deg, #1e90ff, #c45cf2);
+      color: #000;
+      border: none;
+      box-shadow: 0 0 20px rgba(30, 144, 255, 0.2),
+        // Changed to neon blue
+        0 0 20px rgba(196, 92, 242, 0.2);
+    }
+  }
+}
+
+.custom-slippage {
+  flex: 1.5;
+  position: relative;
+
+  &.active .custom-slippage-input {
+    display: flex;
+    animation: fadeIn 0.3s ease-out;
+  }
+}
+
+.custom-slippage-input {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.6);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.2),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 10;
+  align-items: center;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+
+  input {
+    flex: 1;
+    border: none;
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.3);
+    padding: 6px;
+    border-radius: 4px;
+    color: #fff;
+    outline: none;
+  }
+
+  .percentage-symbol {
+    margin-left: 4px;
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.slippage-warning {
+  color: #ff4444;
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 6px;
+  background: rgba(255, 68, 68, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 68, 68, 0.2);
+}
+
+.rate-info {
+  font-size: 14px;
+  // Using softer gray as mentioned (#B1A5C8)
+  color: #b1a5c8;
+  text-align: right;
+  margin: 8px 0 16px;
+  height: 20px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.fee-estimate {
+  margin-bottom: 16px;
+  text-align: right;
+  font-size: 14px;
+  // Using softer gray as mentioned (#B1A5C8)
+  color: #b1a5c8;
+}
+
+.error-message {
+  color: #ff4444;
+  margin-bottom: 16px;
+  padding: 8px;
+  background: rgba(255, 68, 68, 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  box-shadow: 0 0 15px rgba(255, 68, 68, 0.2);
+}
+
+.swap-button {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  // Updated gradient with neon blue (#1E90FF) and purple (#C45CF2)
+  background: linear-gradient(45deg, #1e90ff, #c45cf2);
+  color: #000;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(30, 144, 255, 0.1), 0 0 15px rgba(196, 92, 242, 0.1); // Changed to neon blue
+  letter-spacing: 0.5px;
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 0 25px rgba(30, 144, 255, 0.2),
+      0 0 25px rgba(196, 92, 242, 0.2); // Changed to neon blue
+    transform: translateY(-2px);
+  }
+
+  &:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+}
+
+.connect-wallet-prompt {
+  margin-top: 16px;
+  text-align: center;
+  // Using softer gray as mentioned (#B1A5C8)
+  color: #b1a5c8;
+  font-size: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.1),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.1)
+    )
+    1;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.2);
+}
+
+.amount-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.percent-button {
+  background: none;
+  border: none;
+  color: #1e90ff; // Changed to neon blue
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 5px rgba(30, 144, 255, 0.3); // Changed to neon blue
+
+  &:hover {
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.3);
+    box-shadow: 0 0 15px rgba(30, 144, 255, 0.1),
+      0 0 15px rgba(196, 92, 242, 0.1); // Changed to neon blue
+    text-shadow: 0 0 8px rgba(30, 144, 255, 0.4); // Changed to neon blue
+  }
+}
+
+// Green element for the 25% green color distribution
+.max-button {
+  background: none;
+  border: none;
+  color: #00ff80; // Green color to match our 25% green distribution
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 5px rgba(0, 255, 128, 0.3);
+
+  &:hover {
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.3);
+    box-shadow: 0 0 15px rgba(0, 255, 128, 0.1),
+      0 0 15px rgba(196, 92, 242, 0.1);
+    text-shadow: 0 0 8px rgba(0, 255, 128, 0.4);
+  }
+}
+
+/* ================================
+   Swap Completed Modal
+   ================================ */
+.tx-success-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.tx-success-content {
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.7);
+  border-radius: 16px;
+  padding: 24px 32px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(30, 144, 255, 0.08),
+    // Changed to neon blue
+    0 8px 32px rgba(196, 92, 242, 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.2),
+      // Changed to neon blue
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  animation: fadeIn 0.3s ease-out both;
+
+  h3 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    // Updated gradient with neon blue (#1E90FF) and purple (#C45CF2)
+    background: linear-gradient(45deg, #1e90ff, #c45cf2);
+    -webkit-background-clip: text;
+    color: transparent;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0 0 20px;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  a {
+    color: #c45cf2;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #1e90ff; // Changed to neon blue
+    }
+  }
+
+  .tx-close-button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    // Updated gradient with neon blue (#1E90FF) and purple (#C45CF2)
+    background: linear-gradient(45deg, #1e90ff, #c45cf2);
+    border: none;
+    color: #000;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 12px rgba(30, 144, 255, 0.1),
+      0 0 12px rgba(196, 92, 242, 0.1); // Changed to neon blue
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 20px rgba(30, 144, 255, 0.2),
+        0 0 20px rgba(196, 92, 242, 0.2); // Changed to neon blue
+    }
+  }
+
+  .powered-by {
+    margin-top: 15px;
+    font-size: 13px;
+    // Using softer gray as mentioned (#3F4C60)
+    color: #3f4c60;
+    text-align: center;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    a {
+      // Add green element for color distribution
+      color: #00ff80; // Green color to match the 25% green requirement
+      text-decoration: none;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: #1e90ff; // Changed to neon blue
+        text-shadow: 0 0 8px rgba(30, 144, 255, 0.3); // Changed to neon blue
+      }
+    }
+  }
+}
+
+.dca-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(30, 144, 255, 0.2),
+      // Changed to neon blue
+      rgba(0, 255, 128, 0.2)
+    )
+    1;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.6);
+  // Add green for color distribution
+  color: #00ff80;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  &:hover {
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.8);
+    box-shadow: 0 0 15px rgba(0, 255, 128, 0.15);
+    text-shadow: 0 0 8px rgba(0, 255, 128, 0.4);
+  }
+}

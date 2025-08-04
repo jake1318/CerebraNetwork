@@ -1,0 +1,454 @@
+// src/components/TokenSelector/TokenSelector.scss
+// Last Updated: 2025-07-13 18:43:58 UTC by jake1318
+
+.token-selector-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  // Darker background (#020202)
+  background-color: rgba(2, 2, 2, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+}
+
+.token-selector-content {
+  width: 90%;
+  max-width: 450px;
+  max-height: 85vh;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.7);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 255, 255, 0.08),
+    0 8px 32px rgba(196, 92, 242, 0.08);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  animation: modal-appear 0.2s ease-out forwards;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  border-image: linear-gradient(
+      45deg,
+      rgba(0, 255, 255, 0.2),
+      rgba(196, 92, 242, 0.2)
+    )
+    1;
+  position: relative;
+  overflow: hidden;
+
+  // Add blue glow effect for 50% blue distribution
+  &::before {
+    content: "";
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(0, 255, 255, 0.08);
+    border-radius: 50%;
+    filter: blur(70px);
+    top: -150px;
+    left: -50px;
+    z-index: 0;
+    animation: pulsate 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  // Add purple glow effect for 25% magenta distribution
+  &::after {
+    content: "";
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    background: rgba(196, 92, 242, 0.08);
+    border-radius: 50%;
+    filter: blur(80px);
+    bottom: -100px;
+    right: -50px;
+    z-index: 0;
+    animation: pulsate 10s ease-in-out infinite alternate-reverse;
+    pointer-events: none;
+  }
+}
+
+// Add green glow effect for 25% green distribution
+.token-selector-content .green-glow {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background: rgba(0, 255, 128, 0.08);
+  border-radius: 50%;
+  filter: blur(70px);
+  bottom: 10%;
+  right: 40%;
+  z-index: 0;
+  animation: pulsate 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulsate {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+.token-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 0 0.5rem;
+  position: relative;
+  z-index: 2;
+
+  h2 {
+    font-size: 1.75rem;
+    margin: 0;
+    font-weight: 600;
+    // Updated gradient with cyan (#00ffff) and purple (#C45CF2)
+    background: linear-gradient(90deg, #00ffff, #c45cf2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+  }
+
+  .close-button {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.75rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+
+    &:hover {
+      color: #00ffff; // Cyan hover color for blue distribution
+      transform: scale(1.1);
+    }
+  }
+}
+
+.token-search {
+  margin-bottom: 1.25rem;
+  padding: 0 0.25rem;
+  position: relative;
+  z-index: 2;
+
+  input {
+    width: 100%;
+    padding: 0.85rem 1.25rem;
+    // Darker background (#020202)
+    background: rgba(2, 2, 2, 0.6);
+    border: 1px solid;
+    border-image: linear-gradient(
+        45deg,
+        rgba(0, 255, 255, 0.2),
+        rgba(196, 92, 242, 0.2)
+      )
+      1;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.2s;
+
+    &:focus {
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.15),
+        0 0 15px rgba(196, 92, 242, 0.15);
+    }
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+  }
+}
+
+.token-list {
+  flex: 1;
+  overflow: hidden;
+  min-height: 300px;
+  position: relative;
+  margin: 0 -0.5rem;
+  padding: 0 0.5rem;
+  z-index: 2;
+}
+
+.virtual-token-list {
+  &::-webkit-scrollbar {
+    width: 4px;
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 255, 0.3); // Cyan scrollbar for blue distribution
+  }
+}
+
+/* Fix: Simplified hover effect to prevent flickering */
+.token-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease; /* Only transition background to avoid flickering */
+  position: relative;
+  margin-bottom: 4px; /* Small space between items */
+  background: transparent; /* Transparent background */
+  border-radius: 8px; /* Rounded corners for hover effect */
+  height: 72px; /* Fixed height to prevent size changes */
+  box-sizing: border-box; /* Include padding in height calculation */
+
+  /* Simpler hover effect to prevent flickering */
+  &:hover {
+    background: rgba(
+      10,
+      20,
+      40,
+      0.5
+    ); /* Semi-transparent background on hover */
+
+    /* Simpler text color changes without transforms or layout shifts */
+    .token-symbol {
+      color: #00ffff;
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+    }
+
+    .token-price {
+      color: #00ff80;
+      text-shadow: 0 0 8px rgba(0, 255, 128, 0.4);
+    }
+  }
+
+  /* Special styling for trending items - no borders, just an indicator */
+  &.trending {
+    position: relative;
+
+    /* Fire emoji in the corner */
+    &::after {
+      content: "🔥";
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 14px;
+    }
+
+    /* Simpler hover effect for trending items */
+    &:hover {
+      background: rgba(10, 20, 40, 0.6); /* Slightly darker for trending */
+    }
+  }
+}
+
+.token-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.token-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow: hidden;
+}
+
+/* Fix: Removed transform and transition from token logo to avoid reloading */
+.token-logo {
+  width: 36px;
+  height: 36px;
+  min-width: 36px; /* Prevent logo from shrinking */
+  border-radius: 50%; // Circle to match Swap page
+  object-fit: cover;
+  // Darker background (#020202)
+  background: rgba(2, 2, 2, 0.6);
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.1), 0 0 5px rgba(196, 92, 242, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Removed transition property to avoid reloading */
+}
+
+/* Fix: Only apply color transition for hover effect */
+.token-symbol {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #00ffff; // Cyan for 50% blue distribution
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s ease, text-shadow 0.2s ease; /* Only transition color properties */
+}
+
+.token-name {
+  font-size: 0.85rem;
+  // Using softer gray as mentioned (#B1A5C8)
+  color: #b1a5c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.token-address {
+  font-size: 0.75rem;
+  // Using softer gray as mentioned (#3F4C60)
+  color: #3f4c60;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.token-data {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 0.15rem;
+  min-width: 100px; /* Prevent width changes */
+}
+
+/* Fix: Only apply color transition for hover effect */
+.token-balance {
+  font-weight: 500;
+  font-size: 1rem;
+  color: #fff;
+  white-space: nowrap; /* Prevent text wrapping */
+}
+
+/* Fix: Only apply color transition for hover effect */
+.token-price {
+  font-size: 0.85rem;
+  color: #00ff80; // Green for 25% green distribution
+  transition: color 0.2s ease, text-shadow 0.2s ease; /* Only transition color properties */
+  white-space: nowrap; /* Prevent text wrapping */
+}
+
+.loading,
+.no-tokens {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  position: relative;
+  z-index: 2;
+}
+
+.loading {
+  // Updated gradient with cyan (#00ffff) and purple (#C45CF2)
+  background: linear-gradient(90deg, #00ffff, #c45cf2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: pulse 1.5s infinite;
+}
+
+.loading-more-tokens {
+  text-align: center;
+  padding: 0.75rem 0;
+  color: #00ff80; // Green for 25% green distribution
+  font-size: 0.85rem;
+  position: relative;
+  z-index: 2;
+
+  .loading-dots {
+    display: inline-block;
+
+    .dot {
+      animation: loading-dots 1.4s infinite;
+      display: inline-block;
+      opacity: 0;
+
+      &:nth-child(1) {
+        animation-delay: 0s;
+      }
+
+      &:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      &:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+    }
+  }
+}
+
+@keyframes loading-dots {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 576px) {
+  .token-selector-content {
+    width: 95%;
+    padding: 1rem;
+    max-height: 90vh;
+  }
+
+  .token-symbol {
+    font-size: 1rem;
+  }
+
+  .token-logo {
+    width: 32px;
+    height: 32px;
+    min-width: 32px; /* Prevent logo from shrinking */
+  }
+
+  .token-name,
+  .token-address {
+    max-width: 120px;
+  }
+}
