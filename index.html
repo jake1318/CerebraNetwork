@@ -1,12 +1,144 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- =======================================================
+         Cerebra Network – All‑in‑One DeFi on Sui
+         Swaps • Order‑book DEX • Lending & Borrowing • Yield
+         Farming • Perpetual Futures • AI Search • News Feed
+         • Portfolio Tracking
+    ==========================================================-->
+
+    <!-- 1. Character set / compatibility -->
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- 2. Viewport -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+
+    <!-- 3. Favicon & PWA manifest -->
+    <link rel="icon" type="image/png" href="/Cerebra.jpg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- 4. Primary title & description -->
+    <title>Cerebra Network – All‑in‑One DeFi on Sui</title>
+    <meta
+      name="description"
+      content="Cerebra Network is the all‑in‑one DeFi super‑app on Sui — instant token swaps, order‑book DEX, lending & borrowing, yield generation, perpetual futures, AI‑powered search and real‑time financial news with full portfolio tracking."
+    />
+
+    <!-- 5. Keywords -->
+    <meta
+      name="keywords"
+      content="Cerebra Network, Sui blockchain, DeFi, DEX, swaps, lending, borrowing, yield farming, perpetual futures, crypto portfolio tracker, AI search, crypto news"
+    />
+
+    <!-- 6. Robots & canonical -->
+    <meta
+      name="robots"
+      content="index,follow,max-snippet:-1,max-video-preview:-1,max-image-preview:large"
+    />
+    <link rel="canonical" href="https://cerebranetwork.com/" />
+
+    <!-- 7. Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Cerebra Network" />
+    <meta property="og:url" content="https://cerebranetwork.com/" />
+    <meta
+      property="og:title"
+      content="Cerebra Network – All‑in‑One DeFi on Sui"
+    />
+    <meta
+      property="og:description"
+      content="Trade, lend, earn yield and manage your entire Sui portfolio in one AI‑driven dashboard."
+    />
+    <meta
+      property="og:image"
+      content="https://cerebranetwork.com/og-cover.jpg"
+    />
+
+    <!-- 8. Twitter card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Cerebra_Net" />
+    <meta name="twitter:creator" content="@Cerebra_Net" />
+    <meta
+      name="twitter:title"
+      content="Cerebra Network – All‑in‑One DeFi on Sui"
+    />
+    <meta
+      name="twitter:description"
+      content="Instant swaps, order‑book DEX, lending, perpetuals, AI search, news and portfolio tracking — all on Sui."
+    />
+    <meta
+      name="twitter:image"
+      content="https://cerebranetwork.com/og-cover.jpg"
+    />
+
+    <!-- 9. Performance: preconnect font domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- 10. Theme colour -->
+    <meta name="theme-color" content="#0F172A" />
+
+    <!-- 11. Structured data (JSON‑LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FinancialService",
+        "name": "Cerebra Network",
+        "url": "https://cerebranetwork.com",
+        "logo": "https://cerebranetwork.com/Cerebra.png",
+        "description": "Cerebra Network is the all‑in‑one DeFi platform on Sui for token swaps, order‑book trading, lending, borrowing, yield strategies, perpetual futures, AI‑driven search and real‑time financial news with portfolio analytics.",
+        "sameAs": ["https://twitter.com/Cerebra_Net"],
+        "hasOfferCatalog": {
+          "@type": "OfferCatalog",
+          "name": "Cerebra DeFi Services",
+          "itemListElement": [
+            {
+              "@type": "Offer",
+              "itemOffered": { "@type": "Service", "name": "Token Swap" }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": { "@type": "Service", "name": "Order‑Book DEX" }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Lending & Borrowing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": { "@type": "Service", "name": "Yield Farming" }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": { "@type": "Service", "name": "Perpetual Futures" }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": { "@type": "Service", "name": "AI Search Engine" }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": { "@type": "Service", "name": "Portfolio Tracker" }
+            }
+          ]
+        },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://cerebranetwork.com/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
   </head>
+
   <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
