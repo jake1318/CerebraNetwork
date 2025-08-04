@@ -1,5 +1,5 @@
 // src/services/blockvisionService.ts
-// Last Updated: 2025-07-31 23:10:03 UTC by jake1318
+// Last Updated: 2025-08-03 23:22:10 UTC by jake1318
 
 import axios from "axios";
 import {
@@ -81,6 +81,57 @@ export interface AccountCoin {
   objects: number;
   price: string;
   priceChangePercentage24H: string;
+}
+
+// ► NEW – strongly‑typed response fragment for Account Activity
+export interface AccountActivity {
+  digest: string;
+  timestampMs: string; // millisec‑epoch
+  type: string;
+  gasFee: string;
+  status: "success" | "failure";
+  sender: string;
+  interactAddresses?: { address: string; name?: string }[];
+  coinChanges?: {
+    amount: string;
+    coinAddress: string;
+    symbol: string;
+    decimal: number;
+  }[];
+}
+
+interface AccountActivityResponse {
+  result: {
+    data: AccountActivity[];
+    nextPageCursor: string;
+  };
+}
+
+// ► NEW API call
+export async function getAccountActivities(
+  address: string,
+  limit = 20,
+  cursor?: string
+) {
+  const params = new URLSearchParams({
+    address,
+    limit: String(limit),
+  });
+  if (cursor) params.append("cursor", cursor);
+
+  const res = await fetch(
+    `https://api.blockvision.org/v2/sui/account/activities?${params.toString()}`,
+    {
+      headers: {
+        Accept: "application/json",
+        "x-api-key": import.meta.env.VITE_BLOCKVISION_API_KEY || "",
+      },
+    }
+  );
+
+  if (!res.ok) throw new Error(`Blockvision error ${res.status}`);
+  const json = (await res.json()) as AccountActivityResponse;
+  return json.result;
 }
 
 // ─── Common Types for DeFi Portfolio ───────────────────────────────────────────
