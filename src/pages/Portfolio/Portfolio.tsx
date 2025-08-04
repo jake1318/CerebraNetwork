@@ -1,5 +1,5 @@
 // src/pages/Portfolio/Portfolio.tsx
-// Last Updated: 2025-08-01 01:17:09 UTC by jake1318
+// Last Updated: 2025-08-03 23:48:23 UTC by jake1318
 
 import React, {
   useState,
@@ -49,6 +49,7 @@ import {
   FaNewspaper,
   FaGhost, // Added for Phantom icon
   FaWater, // Added for Slush icon
+  FaHistory, // Added for Trade History icon
 } from "react-icons/fa";
 import { getSwapHistory } from "@7kprotocol/sdk-ts";
 
@@ -60,6 +61,7 @@ import blockvisionService, {
 import * as birdeyeService from "../../services/birdeyeService";
 import MarketDashboard from "./MarketDashboard";
 import MarketNews from "../../components/portfolio/MarketNews";
+import TradeHistory from "./components/TradeHistory"; // Import the new TradeHistory component
 
 // Import components
 import ProtocolBadge from "../PoolsPage/ProtocolBadge";
@@ -176,6 +178,18 @@ function Sidebar({
                     <FaNewspaper />
                   </span>
                   <span className="nav-label">Market News</span>
+                </button>
+                {/* Add Trade History navigation link */}
+                <button
+                  className={`nav-link ${
+                    activeView === "trade_history" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveView("trade_history")}
+                >
+                  <span className="nav-icon">
+                    <FaHistory />
+                  </span>
+                  <span className="nav-label">Trade History</span>
                 </button>
               </div>
             </div>
@@ -1712,6 +1726,25 @@ function EmptyPositions({ activeTab }: { activeTab: string }) {
   );
 }
 
+// Trade History View Component
+function TradeHistoryView() {
+  return (
+    <div className="dashboard-grid dashboard-grid--single">
+      <div className="dashboard-card dashboard-card--glass">
+        <div className="dashboard-card__header">
+          <h2 className="card-title">
+            <FaHistory className="card-icon" />
+            Trade History
+          </h2>
+        </div>
+        <div className="dashboard-card__content">
+          <TradeHistory />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Portfolio() {
   console.log("Portfolio component initializing");
   const wallet = useWallet();
@@ -2819,8 +2852,10 @@ function Portfolio() {
     switch (activeView) {
       case "dashboard":
         return <MarketDashboard />;
-      case "market_news": // Changed from "activity" to "market_news"
+      case "market_news":
         return <MarketNews defaultQuery="CRYPTO" />;
+      case "trade_history": // Add case for trade history view
+        return <TradeHistoryView />;
       case "portfolio":
       default:
         return renderPortfolioView();
