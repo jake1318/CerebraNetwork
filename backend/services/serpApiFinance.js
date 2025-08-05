@@ -1,5 +1,5 @@
 // services/serpApiFinance.js
-// Last Updated: 2025-07-30 00:53:37 UTC by jake1318
+// Last Updated: 2025-08-04 01:22:18 UTC by jake1318
 
 import fetch from "node-fetch";
 import dotenv from "dotenv";
@@ -9,20 +9,24 @@ dotenv.config();
 
 const API_ENDPOINT = "https://serpapi.com/search.json";
 
-// Add logging to debug the environment variable issue
-console.log(
-  "SERPAPI_API_KEY exists:",
-  process.env.SERPAPI_API_KEY ? "Yes" : "No"
-);
+// Check for both environment variable formats
+const apiKey = process.env.VITE_SERPAPI_API_KEY || process.env.SERPAPI_API_KEY;
 
-// Use SERPAPI_API_KEY with a fallback to the hardcoded value
-const apiKey =
-  process.env.SERPAPI_API_KEY ||
-  "c96d838c75ecea54f766e3c2d4bea3fea2a3088e41fab5466eebe7ddcfd543a6";
+// Add logging to debug the environment variable status
+console.log("Environment check:", {
+  "VITE_SERPAPI_API_KEY exists": process.env.VITE_SERPAPI_API_KEY
+    ? "Yes"
+    : "No",
+  "SERPAPI_API_KEY exists": process.env.SERPAPI_API_KEY ? "Yes" : "No",
+});
 
-if (!process.env.SERPAPI_API_KEY) {
-  console.warn(
-    "WARNING: Using hardcoded API key as environment variable is missing"
+// Verify API key exists
+if (!apiKey) {
+  console.error(
+    "ERROR: No SerpAPI key found in environment variables. Please set VITE_SERPAPI_API_KEY in your .env file."
+  );
+  throw new Error(
+    "Missing required API key for SerpAPI. Check environment variables."
   );
 }
 
@@ -45,7 +49,12 @@ export async function queryFinance(opts) {
     ...opts,
   };
   const qs = new URLSearchParams(params).toString();
+  // Hide API key from logs
+  const sanitizedQs = qs.replace(/api_key=[^&]+/, "api_key=REDACTED");
   const url = `${API_ENDPOINT}?${qs}`;
+  const sanitizedUrl = `${API_ENDPOINT}?${sanitizedQs}`;
+
+  console.log(`Making SerpAPI request: ${sanitizedUrl}`);
 
   const res = await fetch(url, { method: "GET" });
   if (!res.ok) {
@@ -97,10 +106,13 @@ export async function getFinanceNews(opts = {}) {
   });
 
   const qs = new URLSearchParams(params).toString();
+  // Hide API key from logs
+  const sanitizedQs = qs.replace(/api_key=[^&]+/, "api_key=REDACTED");
   const url = `${API_ENDPOINT}?${qs}`;
+  const sanitizedUrl = `${API_ENDPOINT}?${sanitizedQs}`;
 
   try {
-    console.log(`Sending request to SerpAPI: ${url}`);
+    console.log(`Sending request to SerpAPI: ${sanitizedUrl}`);
     const res = await fetch(url, { method: "GET" });
 
     if (!res.ok) {

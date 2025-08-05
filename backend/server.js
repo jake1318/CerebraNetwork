@@ -1,5 +1,5 @@
 // server.js
-// Last Updated: 2025-08-01 21:58:46 UTC by jake1318
+// Last Updated: 2025-08-05 01:11:07 UTC by jake1318
 
 import express from "express";
 import axios from "axios";
@@ -14,36 +14,35 @@ import financeRouter from "./routes/finance.js";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// API keys
+// API keys - Use standard environment variable names for production
 const BIRDEYE_BASE = "https://public-api.birdeye.so";
-const BIRDEYE_KEY = process.env.VITE_BIRDEYE_API_KEY;
-const DEEPSEEK_API_KEY = process.env.VITE_DEEPSEEK_API_KEY;
-const OPENAI_API_KEY = process.env.VITE_OPENAI_API_KEY;
-const YOUTUBE_API_KEY = process.env.VITE_YOUTUBE_API_KEY;
-const SERPAPI_API_KEY = process.env.VITE_SERPAPI_API_KEY;
-const BLOCKVISION_API_KEY = process.env.VITE_BLOCKVISION_API_KEY;
+const BIRDEYE_KEY = process.env.BIRDEYE_API_KEY;
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+const SERPAPI_API_KEY = process.env.SERPAPI_API_KEY;
+const BLOCKVISION_API_KEY = process.env.BLOCKVISION_API_KEY;
 
 // Check critical API keys
 console.log("\n🔑 API Key Validation:");
 
 if (!BIRDEYE_KEY) {
-  console.error("❌ Missing VITE_BIRDEYE_API_KEY in .env");
+  console.error("❌ Missing BIRDEYE_API_KEY in environment variables");
   process.exit(1);
 }
 console.log("✅ BIRDEYE_API_KEY: Valid");
 
 if (!OPENAI_API_KEY) {
   console.error(
-    "❌ Missing VITE_OPENAI_API_KEY in .env - AI functionality won't work"
+    "❌ Missing OPENAI_API_KEY in environment variables - AI functionality won't work"
   );
   process.exit(1);
 }
 console.log("✅ OPENAI_API_KEY: Valid");
 
 if (!BLOCKVISION_API_KEY) {
-  console.error("❌ Missing VITE_BLOCKVISION_API_KEY in .env");
+  console.error("❌ Missing BLOCKVISION_API_KEY in environment variables");
   process.exit(1);
 }
 console.log("✅ BLOCKVISION_API_KEY: Valid");
@@ -51,7 +50,7 @@ console.log("✅ BLOCKVISION_API_KEY: Valid");
 // Check optional API keys
 if (!DEEPSEEK_API_KEY) {
   console.warn(
-    "⚠️ Missing VITE_DEEPSEEK_API_KEY in .env - Deep research will use OpenAI as fallback"
+    "⚠️ Missing DEEPSEEK_API_KEY in environment variables - Deep research will use OpenAI as fallback"
   );
 } else {
   console.log("✅ DEEPSEEK_API_KEY: Valid");
@@ -59,7 +58,7 @@ if (!DEEPSEEK_API_KEY) {
 
 if (!YOUTUBE_API_KEY) {
   console.warn(
-    "⚠️ Missing VITE_YOUTUBE_API_KEY in .env - Video results won't be available"
+    "⚠️ Missing YOUTUBE_API_KEY in environment variables - Video results won't be available"
   );
 } else {
   console.log("✅ YOUTUBE_API_KEY: Valid");
@@ -67,7 +66,7 @@ if (!YOUTUBE_API_KEY) {
 
 if (!SERPAPI_API_KEY || SERPAPI_API_KEY.trim() === "") {
   console.warn(
-    "⚠️ Missing or empty VITE_SERPAPI_API_KEY in .env - Web search results will be simulated using AI"
+    "⚠️ Missing or empty SERPAPI_API_KEY in environment variables - Web search results will be simulated using AI"
   );
 } else {
   console.log("✅ SERPAPI_API_KEY: Valid");
@@ -164,7 +163,16 @@ const birdeye = axios.create({
 const bvCache = new Map();
 const CACHE_TTL = 60_000; // 1 minute cache
 
-app.use(cors());
+// Configure CORS for production only
+app.use(
+  cors({
+    origin: ["https://www.cerebra.network", "https://cerebra.network"],
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "X-API-KEY", "X-Chain"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 // mount the Birdeye proxy under /api
@@ -247,7 +255,7 @@ app.get("/api/coin/market/pro", blockVisionLimiter, async (req, res) => {
         params: { coinType },
         headers: {
           accept: "application/json",
-          "x-api-key": process.env.VITE_BLOCKVISION_API_KEY,
+          "x-api-key": BLOCKVISION_API_KEY,
         },
       }
     );
@@ -313,7 +321,7 @@ app.get("/api/coin/price/batch", blockVisionBatchLimiter, async (req, res) => {
         },
         headers: {
           accept: "application/json",
-          "x-api-key": process.env.VITE_BLOCKVISION_API_KEY,
+          "x-api-key": BLOCKVISION_API_KEY,
         },
       }
     );
@@ -366,6 +374,5 @@ app.use("/api/*", (_req, res) =>
   res.status(404).json({ success: false, message: "Not found" })
 );
 
-app.listen(PORT, () => {
-  console.log(`🚀 Backend proxy listening on http://localhost:${PORT}`);
-});
+// Export for Vercel serverless deployment
+export default app;
