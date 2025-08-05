@@ -1,7 +1,8 @@
 // src/App.tsx
-// Last Updated: 2025-05-16 23:07:49 by jake1318
+// Last Updated: 2025-07-31 06:36:35 by jake1318
 
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SuiProvider } from "./providers/SuiProvider";
 import { WalletProvider } from "./contexts/WalletContext";
 import { BirdeyeProvider } from "./contexts/BirdeyeContext";
@@ -16,7 +17,19 @@ import Positions from "./pages/PoolsPage/Positions";
 import Portfolio from "./pages/Portfolio/Portfolio";
 import LendingPage from "./pages/Lending/LendingPage";
 import PerpetualPage from "./pages/Perpetual/PerpetualPage";
+import PhantomProvider from "./components/PhantomProvider";
 import "./App.scss";
+
+// Create a React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Don't refetch when window regains focus
+      retry: 1, // Only retry failed queries once
+      staleTime: 5 * 60 * 1000, // Data is considered fresh for 5 minutes
+    },
+  },
+});
 
 function AppContent() {
   return (
@@ -52,7 +65,11 @@ function App() {
     <SuiProvider>
       <WalletProvider>
         <BirdeyeProvider>
-          <AppContent />
+          {/* Add PhantomProvider at the highest level, before QueryClientProvider */}
+          <PhantomProvider />
+          <QueryClientProvider client={queryClient}>
+            <AppContent />
+          </QueryClientProvider>
         </BirdeyeProvider>
       </WalletProvider>
     </SuiProvider>
