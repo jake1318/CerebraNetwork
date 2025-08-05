@@ -1,8 +1,9 @@
 // src/hooks/useFinanceNews.ts
-// Last Updated: 2025-07-30 00:53:37 UTC by jake1318
+// Last Updated: 2025-08-05 01:11:07 UTC by jake1318
 
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO } from "date-fns";
+import { apiUrl } from "../services/apiClient";
 
 // Define proper TypeScript interfaces for our data
 interface NewsItem {
@@ -72,11 +73,12 @@ export function useFinanceNews(
       const includeRss =
         query === "CRYPTO" || query === "COINTELEGRAPH" || !query;
 
-      const url = `/api/finance/news${
-        query ? `?q=${encodeURIComponent(query)}` : ""
-      }${
-        includeRss ? (query ? "&include_rss=true" : "?include_rss=true") : ""
-      }`;
+      // Use apiUrl helper to get the full production URL
+      const url = apiUrl(
+        `/api/finance/news${query ? `?q=${encodeURIComponent(query)}` : ""}${
+          includeRss ? (query ? "&include_rss=true" : "?include_rss=true") : ""
+        }`
+      );
 
       const res = await fetch(url);
 
