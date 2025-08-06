@@ -2,8 +2,9 @@
 // Last Updated: 2025-07-31 22:56:58 UTC by jake1318
 
 import axios from "axios";
+import { apiUrl } from "./apiClient"; // Import apiUrl helper
 
-const API_BASE = "/api";
+const API_BASE = apiUrl("/api"); // Updated to use apiUrl helper
 const DEFAULT_CHAIN = "sui";
 
 /**

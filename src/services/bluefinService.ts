@@ -4,12 +4,13 @@
 import { WalletContextState } from "@suiet/wallet-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import type { PoolInfo } from "./coinGeckoService";
+import { apiUrl } from "./apiClient"; // Import apiUrl helper
 
 /* ------------------------------------------------------------------ */
 /* existing code (deposit / withdraw helpers etc.) is UNCHANGED below */
 /* ------------------------------------------------------------------ */
 
-const API_URL = "/api/bluefin";
+const API_URL = apiUrl("/api/bluefin"); // Updated to use apiUrl helper
 
 /* ---------- tiny helpers ------------------------------------------------ */
 
