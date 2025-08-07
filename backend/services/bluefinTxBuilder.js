@@ -1,5 +1,5 @@
 // services/bluefinTxBuilder.js
-// Updated: 2025-07-18 07:22:03 UTC by jake1318
+// Updated: 2025-08-07 02:50:15 UTC by jake1318
 
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import {
@@ -26,7 +26,7 @@ const BLUEFIN_ABORTS = {
   1003: "Selected price range is no longer valid",
   1004: "Required token amount exceeds your maximum",
   1005: "Slippage tolerance exceeded",
-  1010: "Invalid tick range for position",
+  1010: "Invalid tick range for position - doesn't match pool's tick spacing",
   1018: "Position cannot be closed yet (cooldown period)",
   1029: "Position has no liquidity to remove",
 };
@@ -81,8 +81,9 @@ function extractBluefinError(error) {
  */
 export async function getRewardTokensForPosition(walletAddress, positionId) {
   try {
-    // Get the API key from environment variables
-    const API_KEY = process.env.BLOCKVISION_API_KEY;
+    // Get the API key from environment variables - check for Vite prefix
+    const API_KEY =
+      process.env.VITE_BLOCKVISION_API_KEY || process.env.BLOCKVISION_API_KEY;
 
     if (!API_KEY) {
       console.warn("Blockvision API key not found in environment variables");
@@ -312,9 +313,10 @@ function getCorrectTickSpacing(poolFields) {
     }
   }
 
-  // If we got a suspicious value (like 1), default to 60
-  if (tickSpacing === 1 && poolFields.fee_rate?.fields?.value !== "100") {
-    console.warn("Got suspicious tick spacing of 1, defaulting to 60");
+  // FIXED: Never override the on-chain value - Bluefin changed several pools to spacing 1
+  // Only fall back if the field is genuinely missing
+  if (tickSpacing === undefined || tickSpacing === null) {
+    console.warn("Tick spacing value missing, defaulting to 60");
     tickSpacing = 60;
   }
 
@@ -1599,6 +1601,9 @@ export async function buildRemoveLiquidityTx({
       initialSharedVersion: initialConfigVersion,
       mutable: true,
     });
+
+    // REQUIRED: Include the recipient address as the eighth parameter for remove_liquidity
+    // Continuing from where the file was cut off...
 
     // REQUIRED: Include the recipient address as the eighth parameter for remove_liquidity
     const result = txb.moveCall({
