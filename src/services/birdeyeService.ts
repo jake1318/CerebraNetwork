@@ -1,11 +1,18 @@
 // src/services/birdeyeService.ts
-// Last Updated: 2025-07-31 22:56:58 UTC by jake1318
+// Last Updated: 2025-08-07 01:59:21 UTC by jake1318
 
 import axios from "axios";
-import { apiUrl } from "./apiClient"; // Import apiUrl helper
 
-const API_BASE = apiUrl("/api"); // Updated to use apiUrl helper
 const DEFAULT_CHAIN = "sui";
+// Updated to use port 5000 for the backend server
+const LOCAL_API_BASE = "http://localhost:5000/api";
+const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY || "";
+const BIRDEYE_BASE_URL = "https://public-api.birdeye.so/defi";
+const MAX_REQUESTS_PER_SECOND = 45; // Using 45 out of 50 to leave some safety margin
+
+// Track if local server is available (start with false, will try once)
+let isLocalServerAvailable = false;
+let hasCheckedLocalServer = false;
 
 /**
  * Birdeye requires the 64‑byte canonical object address (0x + 64 hex chars).
@@ -91,12 +98,6 @@ export interface TokenMetadata {
   logo?: string;
 }
 
-// Get API key from environment variables
-const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY || "";
-const BIRDEYE_BASE_URL = "https://public-api.birdeye.so/defi/v3";
-// Updated to use the new higher rate limit (with safety margin)
-const MAX_REQUESTS_PER_SECOND = 45; // Using 45 out of 50 to leave some safety margin
-
 /**
  * Token metadata cache to avoid redundant API calls
  */
@@ -172,6 +173,36 @@ class RateLimiter {
 // Create a rate limiter instance with the new limit
 const rateLimiter = new RateLimiter(MAX_REQUESTS_PER_SECOND);
 
+// Function to check if local server is available
+async function checkLocalServer() {
+  if (hasCheckedLocalServer) {
+    return isLocalServerAvailable;
+  }
+
+  try {
+    console.log("Checking local server availability at", LOCAL_API_BASE);
+    const response = await fetch(`${LOCAL_API_BASE}/test`, {
+      signal: AbortSignal.timeout(2000), // 2 second timeout
+    });
+    isLocalServerAvailable = response.ok;
+    console.log(
+      `Local server ${isLocalServerAvailable ? "is" : "is NOT"} available`
+    );
+  } catch (e) {
+    console.warn("Local server check failed:", e);
+    isLocalServerAvailable = false;
+    console.warn(
+      "Local server not available, will use direct Birdeye API calls"
+    );
+  }
+
+  hasCheckedLocalServer = true;
+  return isLocalServerAvailable;
+}
+
+// Call this once when the module loads
+checkLocalServer();
+
 /**
  * Get token metadata from Birdeye API with rate limiting
  * Export this function so it can be imported by other services
@@ -191,17 +222,54 @@ export async function getTokenMetadata(
         canonicaliseSuiAddress(tokenAddress)
       );
 
-      const response = await fetch(
-        `${BIRDEYE_BASE_URL}/token/meta-data/single?address=${encodedAddress}`,
-        {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "x-chain": "sui",
-            "X-API-KEY": BIRDEYE_API_KEY,
-          },
+      let response;
+
+      // Try using local server if available, otherwise use direct Birdeye API
+      if (await checkLocalServer()) {
+        try {
+          response = await fetch(
+            `${LOCAL_API_BASE}/token_metadata?address=${encodedAddress}`,
+            {
+              method: "GET",
+              headers: {
+                accept: "application/json",
+                "x-chain": "sui",
+              },
+              // Short timeout to quickly detect if local server is unavailable
+              signal: AbortSignal.timeout(3000),
+            }
+          );
+        } catch (localError) {
+          console.warn(
+            "Local server request failed, falling back to direct API call"
+          );
+          // Fall back to direct API call
+          response = await fetch(
+            `${BIRDEYE_BASE_URL}/v3/token/meta-data/single?address=${encodedAddress}`,
+            {
+              method: "GET",
+              headers: {
+                accept: "application/json",
+                "x-chain": "sui",
+                "X-API-KEY": BIRDEYE_API_KEY,
+              },
+            }
+          );
         }
-      );
+      } else {
+        // We already know local server is unavailable, go direct
+        response = await fetch(
+          `${BIRDEYE_BASE_URL}/v3/token/meta-data/single?address=${encodedAddress}`,
+          {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "x-chain": "sui",
+              "X-API-KEY": BIRDEYE_API_KEY,
+            },
+          }
+        );
+      }
 
       if (!response.ok) {
         console.warn(
@@ -334,7 +402,31 @@ export const birdeyeService = {
     offset = 0
   ): Promise<BirdeyeTrendingToken[]> {
     try {
-      const resp = await axios.get(`${API_BASE}/token_trending`, {
+      // Check if we need to use direct API
+      if (!(await checkLocalServer())) {
+        // Use direct Birdeye API
+        const resp = await axios.get(`${BIRDEYE_BASE_URL}/token_trending`, {
+          headers: {
+            "x-chain": chain,
+            "X-API-KEY": BIRDEYE_API_KEY,
+          },
+          params: { sort_by: "rank", sort_type: "asc", limit, offset },
+        });
+        if (!resp.data.success || !resp.data.data?.tokens) return [];
+
+        return resp.data.data.tokens.map((t: any) => ({
+          address: t.address, // ← no .toLowerCase()
+          symbol: t.symbol,
+          name: t.name,
+          logoURI: t.logoURI || t.logo_uri || "",
+          decimals: t.decimals,
+          price: Number(t.price),
+          price24hChangePercent: t.price24hChangePercent,
+        }));
+      }
+
+      // Use local server
+      const resp = await axios.get(`${LOCAL_API_BASE}/token_trending`, {
         headers: { "x-chain": chain },
         params: { sort_by: "rank", sort_type: "asc", limit, offset },
       });
@@ -367,7 +459,37 @@ export const birdeyeService = {
     min_liquidity = 100
   ): Promise<BirdeyeListToken[]> {
     try {
-      const resp = await axios.get(`${API_BASE}/tokenlist`, {
+      // Check if we need to use direct API
+      if (!(await checkLocalServer())) {
+        // Use direct Birdeye API
+        const resp = await axios.get(`${BIRDEYE_BASE_URL}/tokenlist`, {
+          headers: {
+            "x-chain": chain,
+            "X-API-KEY": BIRDEYE_API_KEY,
+          },
+          params: {
+            sort_by: "v24hUSD",
+            sort_type: "desc",
+            offset,
+            limit,
+            min_liquidity,
+          },
+        });
+        if (!resp.data.success || !resp.data.data?.tokens) return [];
+
+        return resp.data.data.tokens.map((t: any) => ({
+          address: t.address, // ← no .toLowerCase()
+          symbol: t.symbol,
+          name: t.name,
+          logoURI: t.logoURI || t.logo_uri || "",
+          decimals: t.decimals,
+          v24hUSD: Number(t.v24hUSD),
+          v24hChangePercent: Number(t.v24hChangePercent),
+        }));
+      }
+
+      // Use local server
+      const resp = await axios.get(`${LOCAL_API_BASE}/tokenlist`, {
         headers: { "x-chain": chain },
         params: {
           sort_by: "v24hUSD",
@@ -404,8 +526,16 @@ export const birdeyeService = {
     chain: string = DEFAULT_CHAIN
   ): Promise<PriceVolumeSingle | null> {
     try {
-      const resp = await axios.get(`${API_BASE}/price_volume/single`, {
-        headers: { "x-chain": chain },
+      const apiUrl = (await checkLocalServer())
+        ? `${LOCAL_API_BASE}/price_volume/single`
+        : `${BIRDEYE_BASE_URL}/price_volume/single`;
+
+      const headers = (await checkLocalServer())
+        ? { "x-chain": chain }
+        : { "x-chain": chain, "X-API-KEY": BIRDEYE_API_KEY };
+
+      const resp = await axios.get(apiUrl, {
+        headers: headers,
         params: { address: stripTypeTag(address), type },
       });
 
@@ -446,8 +576,16 @@ export const birdeyeService = {
     const time_from = now - (spanMap[type] || spanMap["1d"]);
 
     try {
-      const resp = await axios.get(`${API_BASE}/history_price`, {
-        headers: { "x-chain": chain },
+      const apiUrl = (await checkLocalServer())
+        ? `${LOCAL_API_BASE}/history_price`
+        : `${BIRDEYE_BASE_URL}/history_price`;
+
+      const headers = (await checkLocalServer())
+        ? { "x-chain": chain }
+        : { "x-chain": chain, "X-API-KEY": BIRDEYE_API_KEY };
+
+      const resp = await axios.get(apiUrl, {
+        headers: headers,
         params: {
           address: stripTypeTag(address),
           address_type: "token",

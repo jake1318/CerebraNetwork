@@ -1,16 +1,16 @@
 // src/services/bluefinService.ts
-// Updated: 2025-07-16 02:12:45 UTC by jake1318
+// Updated: 2025-08-07 01:45:43 UTC by jake1318
 
 import { WalletContextState } from "@suiet/wallet-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import type { PoolInfo } from "./coinGeckoService";
-import { apiUrl } from "./apiClient"; // Import apiUrl helper
 
 /* ------------------------------------------------------------------ */
 /* existing code (deposit / withdraw helpers etc.) is UNCHANGED below */
 /* ------------------------------------------------------------------ */
 
-const API_URL = apiUrl("/api/bluefin"); // Updated to use apiUrl helper
+// Updated to use localhost
+const API_URL = "http://localhost:5000/api/bluefin";
 
 /* ---------- tiny helpers ------------------------------------------------ */
 
