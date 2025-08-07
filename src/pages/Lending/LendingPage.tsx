@@ -2837,9 +2837,7 @@ const LendingPage: React.FC = () => {
       )}
 
       {/* Last updated timestamp */}
-      <div className="last-updated">
-        Last updated: 2025-07-24 06:44:28 UTC by jake1318
-      </div>
+      <div className="last-updated"></div>
     </div>
   );
 };

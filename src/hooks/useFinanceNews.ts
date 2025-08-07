@@ -1,9 +1,8 @@
 // src/hooks/useFinanceNews.ts
-// Last Updated: 2025-08-05 01:11:07 UTC by jake1318
+// Last Updated: 2025-08-07 02:11:40 UTC by jake1318
 
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO } from "date-fns";
-import { apiUrl } from "../services/apiClient";
 
 // Define proper TypeScript interfaces for our data
 interface NewsItem {
@@ -31,6 +30,9 @@ interface ApiResponse {
   data: NewsData;
   error?: string;
 }
+
+// Constants for API endpoints - using port 5000 as confirmed working
+const FINANCE_API_BASE = "http://localhost:5000/api/finance";
 
 /**
  * Helper to format relative time strings
@@ -73,14 +75,20 @@ export function useFinanceNews(
       const includeRss =
         query === "CRYPTO" || query === "COINTELEGRAPH" || !query;
 
-      // Use apiUrl helper to get the full production URL
-      const url = apiUrl(
-        `/api/finance/news${query ? `?q=${encodeURIComponent(query)}` : ""}${
-          includeRss ? (query ? "&include_rss=true" : "?include_rss=true") : ""
-        }`
-      );
+      // Build the URL with proper parameters
+      const url = `${FINANCE_API_BASE}/news${
+        query ? `?q=${encodeURIComponent(query)}` : ""
+      }${
+        includeRss ? (query ? "&include_rss=true" : "?include_rss=true") : ""
+      }`;
 
-      const res = await fetch(url);
+      // Log the URL being requested (helpful for debugging)
+      console.log(`Fetching finance news from: ${url}`);
+
+      const res = await fetch(url, {
+        // Add a longer timeout to avoid network issues
+        signal: AbortSignal.timeout(10000),
+      });
 
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
@@ -107,6 +115,8 @@ export function useFinanceNews(
     },
     staleTime: 30 * 60 * 1000, // 30 minutes
     refetchOnWindowFocus: false,
+    retry: 2, // Retry up to 2 times if the request fails
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
     ...options,
   });
 }
