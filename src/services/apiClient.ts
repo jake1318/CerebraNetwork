@@ -3,7 +3,7 @@
  * In production, this should be the deployed backend URL
  */
 export const API_BASE_URL =
-  "https://nodejs-serverless-function-express-puce-nu.vercel.app";
+  "https://nodejs-serverless-function-express-puce-nu.vercel.app/";
 
 /**
  * Helper to construct API URLs consistently
