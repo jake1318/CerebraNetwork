@@ -1,5 +1,5 @@
 // src/components/Navbar/Navbar.tsx
-// Last Updated: 2025-07-25  (with logo update)
+
 
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -280,3 +280,4 @@ const Navbar: React.FC = () => {
 };
 
 export default Navbar;
+
